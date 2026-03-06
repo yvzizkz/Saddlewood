@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/* ============================================
+   SADDLEWOOD V2 — EDITORIAL LUXURY TOKENS
+   ============================================ */
+
+:root {
+  --background: #FAFAF7;
+  --foreground: #2A2A2A;
+  --teal: #1B3A4B;
+  --teal-90: rgba(27,58,75,0.9);
+  --teal-dark: #0F2530;
+  --gold: #C49A3C;
+  --gold-muted: #B8924A;
+  --stone: #F5F0E8;
+  --stone-mid: #EDE6DA;
+  --charcoal: #2A2A2A;
+  --charcoal-light: #5A5A5A;
+  --off-white: #FAFAF7;
+  --cream: #F9F6F0;
+  --white: #FFFFFF;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-teal: var(--teal);
+  --color-teal-dark: var(--teal-dark);
+  --color-teal-90: var(--teal-90);
+  --color-gold: var(--gold);
+  --color-gold-muted: var(--gold-muted);
+  --color-stone: var(--stone);
+  --color-stone-mid: var(--stone-mid);
+  --color-charcoal: var(--charcoal);
+  --color-charcoal-light: var(--charcoal-light);
+  --color-off-white: var(--off-white);
+  --color-cream: var(--cream);
+  --color-white: var(--white);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-heading: "Georgia", "Playfair Display", "Times New Roman", serif;
+}
+
+/* ===== BASE STYLES ===== */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--off-white);
+  color: var(--charcoal);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+
+/* ===== EDITORIAL TYPOGRAPHY ===== */
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===== SECTION LABEL PATTERN ===== */
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-label::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: var(--gold);
+}
+
+/* ===== CUSTOM SCROLLBAR ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--off-white);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--teal);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--charcoal-light);
+}
+
+/* ===== EDITORIAL TRANSITIONS ===== */
+.editorial-hover img {
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.editorial-hover:hover img {
+  transform: scale(1.05);
+}
