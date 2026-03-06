@@ -60,7 +60,7 @@ export function Navbar() {
         className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-10 transition-all duration-400 ${
           scrolled
             ? "h-[80px] bg-[rgba(15,37,48,0.97)] backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.06)]"
-            : "h-[88px] bg-transparent"
+            : "h-[88px] bg-gradient-to-b from-[rgba(15,37,48,0.85)] via-[rgba(15,37,48,0.5)] to-transparent"
         }`}
       >
         {/* Brand with Logo — larger, no clipping */}
@@ -75,10 +75,10 @@ export function Navbar() {
             />
           </div>
           <div className="flex flex-col">
-            <span className="font-heading text-lg sm:text-xl font-semibold text-white leading-none tracking-wide">
+            <span className="font-heading text-lg sm:text-xl font-semibold text-white leading-none tracking-wide" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7), 0 0px 8px rgba(0,0,0,0.4)' }}>
               Saddlewood
             </span>
-            <span className="font-sans text-[9px] sm:text-[10px] tracking-[0.35em] uppercase text-gold font-medium mt-[2px]">
+            <span className="font-sans text-[10px] sm:text-[11px] tracking-[0.35em] uppercase text-gold font-semibold mt-[2px]" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0px 6px rgba(0,0,0,0.5)' }}>
               Contracting
             </span>
           </div>
