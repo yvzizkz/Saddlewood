@@ -7,7 +7,7 @@ const credentials = [
 
 export function CredentialsBar() {
   return (
-    <div className="bg-teal py-14 px-6 lg:px-12 grid grid-cols-2 lg:grid-cols-4 gap-px">
+    <div className="bg-teal py-10 sm:py-14 px-4 sm:px-6 lg:px-12 grid grid-cols-2 lg:grid-cols-4 gap-px" role="region" aria-label="Contractor credentials">
       {credentials.map((cred, i) => (
         <div
           key={cred.type}

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Phone } from "lucide-react";
 import Image from "next/image";
+import { PageHero } from "@/components/PageHero";
 
 const credentials = [
   {
@@ -46,22 +47,13 @@ const values = [
 export default function AboutPage() {
   return (
     <>
-      {/* Hero */}
-      <section className="relative min-h-[500px] flex items-end bg-teal-dark">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-          <div className="max-w-2xl">
-            <span className="text-gold text-sm tracking-[0.2em] uppercase font-light">
-              About Us
-            </span>
-            <h1 className="font-heading text-6xl lg:text-7xl font-light text-stone mt-6 mb-6 leading-tight">
-              Our Story
-            </h1>
-            <p className="text-stone/70 max-w-2xl text-lg font-light leading-relaxed">
-              Built on a foundation of integrity, quality, and a deep love for transforming Scottsdale homes.
-            </p>
-          </div>
-        </div>
-      </section>
+      <PageHero
+        label="About Us"
+        title="Our Story"
+        description="Built on a foundation of integrity, quality, and a deep love for transforming Scottsdale homes."
+        image="/images/kitchen1.jpg"
+        imageAlt="Saddlewood Contracting craftsmanship in a Scottsdale kitchen remodel"
+      />
 
       {/* Story Section */}
       <section className="py-24 bg-off-white">
@@ -96,7 +88,7 @@ export default function AboutPage() {
                 <div className="h-px w-8 bg-gold" />
                 <span className="section-label">Heritage</span>
               </div>
-              <h2 className="font-heading text-5xl font-light text-charcoal mb-8 leading-tight">
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-8 leading-tight">
                 Where Craftsmanship Meets Character
               </h2>
               <div className="space-y-6 text-charcoal-light font-light leading-relaxed">
@@ -128,7 +120,7 @@ export default function AboutPage() {
               <div className="h-px w-8 bg-gold" />
               <span className="section-label">Values</span>
             </div>
-            <h2 className="font-heading text-5xl font-light text-charcoal">
+            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal">
               What Drives Us
             </h2>
           </motion.div>
@@ -168,7 +160,7 @@ export default function AboutPage() {
               <div className="h-px w-8 bg-gold" />
               <span className="section-label">Credentials</span>
             </div>
-            <h2 className="font-heading text-5xl font-light text-charcoal">
+            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal">
               Licensed, Bonded & Insured
             </h2>
           </motion.div>
@@ -207,7 +199,7 @@ export default function AboutPage() {
                 Service Area
               </span>
             </div>
-            <h2 className="font-heading text-5xl font-light text-stone mb-6 leading-tight">
+            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-stone mb-6 leading-tight">
               Proudly Serving Scottsdale
             </h2>
             <p className="text-stone/70 max-w-2xl font-light leading-relaxed mb-12">

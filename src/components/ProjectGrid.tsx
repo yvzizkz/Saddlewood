@@ -203,6 +203,9 @@ export function ProjectGrid() {
             onClick={() => setSelectedProject(null)}
           >
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label={selectedProject.title}
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -219,9 +222,10 @@ export function ProjectGrid() {
                 />
                 <button
                   onClick={() => setSelectedProject(null)}
+                  aria-label="Close project details"
                   className="absolute top-4 right-4 w-10 h-10 bg-white/90 flex items-center justify-center hover:bg-white transition-colors"
                 >
-                  <X className="w-5 h-5 text-teal" />
+                  <X className="w-5 h-5 text-teal" aria-hidden="true" />
                 </button>
               </div>
 

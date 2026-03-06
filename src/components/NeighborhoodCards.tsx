@@ -31,8 +31,8 @@ const hoods = [
 
 export function NeighborhoodCards() {
   return (
-    <section className="bg-teal-dark">
-      <div className="py-16 lg:py-20 px-6 lg:px-12">
+    <section className="bg-teal-dark" aria-label="Neighborhoods we serve">
+      <div className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-12">
         <div className="max-w-[1200px] mx-auto">
           <div className="section-label">Neighborhoods</div>
           <h2 className="font-heading text-3xl lg:text-[42px] font-medium text-stone leading-[1.15] tracking-[-0.02em]">
@@ -71,7 +71,7 @@ export function NeighborhoodCards() {
                 </h3>
                 <p className="text-[13px] text-white/50 font-light mb-5">{hood.tagline}</p>
                 <div className="w-10 h-10 border border-white/20 flex items-center justify-center group-hover:border-gold group-hover:bg-gold transition-all duration-300">
-                  <ArrowRight className="w-4 h-4 text-white/60 group-hover:text-teal-dark transition-colors duration-300" />
+                  <ArrowRight className="w-4 h-4 text-white/60 group-hover:text-teal-dark transition-colors duration-300" aria-hidden="true" />
                 </div>
               </div>
             </Link>

@@ -5,7 +5,7 @@ import Image from "next/image";
 
 export function Testimonials() {
   return (
-    <section className="py-24 lg:py-32 px-6 lg:px-12 bg-off-white">
+    <section className="py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-12 bg-off-white" aria-label="Client testimonials">
       <div className="max-w-[1200px] mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-16 lg:gap-20 items-center">
           {/* Quote */}

@@ -29,7 +29,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             <span className="text-gold text-sm tracking-[0.2em] uppercase font-light">
               {data.zip}
             </span>
-            <h1 className="font-heading text-6xl lg:text-7xl font-light text-stone mt-4 mb-6 leading-tight">
+            <h1 className="font-heading text-3xl sm:text-5xl lg:text-6xl xl:text-7xl font-light text-stone mt-4 mb-6 leading-tight">
               Remodeling in
               <br />
               <span className="text-gold">{data.fullName}</span>
@@ -54,7 +54,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                 <div className="h-px w-8 bg-gold" />
                 <span className="section-label">About</span>
               </div>
-              <h2 className="font-heading text-5xl font-light text-charcoal mb-8 leading-tight">
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-6 sm:mb-8 leading-tight">
                 Why Saddlewood for
                 <br />
                 {data.name}?
@@ -131,7 +131,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
               <div className="h-px w-8 bg-gold" />
               <span className="section-label">Projects</span>
             </div>
-            <h2 className="font-heading text-5xl font-light text-charcoal">
+            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal">
               {data.name} Projects
             </h2>
           </motion.div>
@@ -244,7 +244,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                 <div className="h-px w-8 bg-gold" />
                 <span className="section-label">Stories</span>
               </div>
-              <h2 className="font-heading text-5xl font-light text-stone">
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-stone">
                 From {data.name} Homeowners
               </h2>
             </motion.div>
@@ -290,7 +290,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="font-heading text-5xl sm:text-6xl font-light text-stone mb-8 leading-tight">
+            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-light text-stone mb-6 sm:mb-8 leading-tight">
               Let&apos;s Talk About Your
               <br />
               <span className="text-gold">{data.name} Home</span>

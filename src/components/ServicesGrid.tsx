@@ -16,7 +16,7 @@ const services = [
 
 export function ServicesGrid() {
   return (
-    <section className="py-24 lg:py-32 px-6 lg:px-12 bg-cream">
+    <section className="py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-12 bg-cream" aria-label="Services">
       <div className="max-w-[1200px] mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-16 lg:gap-20 items-start">
           {/* Left: Text + Service List */}
@@ -39,7 +39,7 @@ export function ServicesGrid() {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <span className="font-heading text-[22px] font-medium text-teal group-hover:text-gold transition-colors">
+                  <span className="font-heading text-lg sm:text-[22px] font-medium text-teal group-hover:text-gold transition-colors">
                     {svc.name}
                   </span>
                   <span className="text-[11px] tracking-[0.1em] uppercase text-charcoal-light font-normal">

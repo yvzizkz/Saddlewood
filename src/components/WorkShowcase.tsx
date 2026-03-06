@@ -37,7 +37,7 @@ const projects = [
 
 export function WorkShowcase() {
   return (
-    <section className="py-24 lg:py-32 px-6 lg:px-12 bg-off-white">
+    <section className="py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-12 bg-off-white" aria-label="Recent projects">
       <div className="max-w-[1200px] mx-auto">
         {/* Header */}
         <div className="flex items-end justify-between mb-12">

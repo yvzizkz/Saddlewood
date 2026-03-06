@@ -93,7 +93,7 @@ export function ContactForm() {
                 <div className="h-px w-8 bg-gold" />
                 <span className="section-label">Contact</span>
               </div>
-              <h2 className="font-heading text-5xl font-light text-charcoal mb-4 leading-tight">
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-4 leading-tight">
                 Start Your Project
               </h2>
               <p className="text-charcoal-light font-light mb-12 max-w-lg">
@@ -114,15 +114,17 @@ export function ContactForm() {
                   </p>
                 </motion.div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6" aria-label="Contact form">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm text-charcoal-light font-light mb-3">
+                      <label htmlFor="contact-name" className="block text-sm text-charcoal-light font-light mb-3">
                         Full Name
                       </label>
                       <input
+                        id="contact-name"
                         type="text"
                         required
+                        autoComplete="name"
                         value={formData.name}
                         onChange={(e) =>
                           setFormData({ ...formData, name: e.target.value })
@@ -132,12 +134,14 @@ export function ContactForm() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-charcoal-light font-light mb-3">
+                      <label htmlFor="contact-email" className="block text-sm text-charcoal-light font-light mb-3">
                         Email
                       </label>
                       <input
+                        id="contact-email"
                         type="email"
                         required
+                        autoComplete="email"
                         value={formData.email}
                         onChange={(e) =>
                           setFormData({ ...formData, email: e.target.value })
@@ -150,11 +154,13 @@ export function ContactForm() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm text-charcoal-light font-light mb-3">
+                      <label htmlFor="contact-phone" className="block text-sm text-charcoal-light font-light mb-3">
                         Phone
                       </label>
                       <input
+                        id="contact-phone"
                         type="tel"
+                        autoComplete="tel"
                         value={formData.phone}
                         onChange={(e) =>
                           setFormData({ ...formData, phone: e.target.value })
@@ -164,10 +170,11 @@ export function ContactForm() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-charcoal-light font-light mb-3">
+                      <label htmlFor="contact-neighborhood" className="block text-sm text-charcoal-light font-light mb-3">
                         Neighborhood
                       </label>
                       <select
+                        id="contact-neighborhood"
                         value={formData.neighborhood}
                         onChange={(e) =>
                           setFormData({
@@ -189,10 +196,11 @@ export function ContactForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm text-charcoal-light font-light mb-3">
+                    <label htmlFor="contact-project-type" className="block text-sm text-charcoal-light font-light mb-3">
                       Project Type
                     </label>
                     <select
+                      id="contact-project-type"
                       value={formData.projectType}
                       onChange={(e) =>
                         setFormData({
@@ -215,10 +223,11 @@ export function ContactForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm text-charcoal-light font-light mb-3">
+                    <label htmlFor="contact-message" className="block text-sm text-charcoal-light font-light mb-3">
                       Tell Us About Your Project
                     </label>
                     <textarea
+                      id="contact-message"
                       rows={5}
                       value={formData.message}
                       onChange={(e) =>
@@ -287,7 +296,7 @@ export function ContactForm() {
                     <Mail className="w-5 h-5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm text-stone/70">Email</p>
-                      <p className="text-lg">info@saddlewoodcontracting.com</p>
+                      <p className="text-lg break-all sm:break-normal">info@saddlewoodcontracting.com</p>
                     </div>
                   </a>
                   <div className="flex items-start gap-4 font-light">

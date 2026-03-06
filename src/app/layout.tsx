@@ -92,7 +92,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <JsonLd />
         <Navbar />
-        <main>{children}</main>
+        <main id="main-content">{children}</main>
         <Footer />
       </body>
     </html>

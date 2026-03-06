@@ -10,7 +10,7 @@ const stats = [
 
 export function IntroStrip() {
   return (
-    <div className="bg-teal py-16 px-6 lg:px-12">
+    <div className="bg-teal py-12 sm:py-16 px-4 sm:px-6 lg:px-12" role="region" aria-label="Key statistics">
       <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-12 items-center">
         {stats.map((stat, i) => (
           <div key={stat.label} className="contents">

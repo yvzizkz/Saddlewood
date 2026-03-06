@@ -74,7 +74,7 @@ export function ProcessTimeline() {
             <span className="section-label">Our Process</span>
             <div className="h-px w-8 bg-gold" />
           </div>
-          <h2 className="font-heading text-4xl lg:text-5xl font-light text-charcoal leading-tight mb-4">
+          <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal leading-tight mb-4">
             Five Steps to Your
             <br />
             <em className="italic text-teal font-normal">Dream Space</em>
@@ -187,18 +187,20 @@ export function ProcessTimeline() {
                   <button
                     onClick={() => setActiveStep(Math.max(0, activeStep - 1))}
                     disabled={activeStep === 0}
+                    aria-label="Previous step"
                     className="w-10 h-10 border border-charcoal/15 flex items-center justify-center text-charcoal-light hover:border-gold hover:text-gold transition-all disabled:opacity-30 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal-light"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
                   <button
                     onClick={() => setActiveStep(Math.min(steps.length - 1, activeStep + 1))}
                     disabled={activeStep === steps.length - 1}
+                    aria-label="Next step"
                     className="w-10 h-10 border border-charcoal/15 flex items-center justify-center text-charcoal-light hover:border-gold hover:text-gold transition-all disabled:opacity-30 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal-light"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
                     </svg>
                   </button>

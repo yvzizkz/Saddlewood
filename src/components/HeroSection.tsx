@@ -7,7 +7,7 @@ import { Phone } from "lucide-react";
 
 export function HeroSection() {
   return (
-    <section className="relative h-screen min-h-[700px] flex items-end overflow-hidden">
+    <section className="relative h-screen min-h-[600px] sm:min-h-[700px] flex items-end overflow-hidden" aria-label="Hero">
       {/* Background Image */}
       <div className="absolute inset-0">
         <Image
@@ -50,7 +50,7 @@ export function HeroSection() {
           Luxury kitchen, bathroom, and whole-home remodeling in Scottsdale&apos;s most prestigious neighborhoods.
         </p>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Link
             href="/portfolio"
             className="inline-block px-8 py-3.5 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase no-underline hover:bg-[#d4a94c] transition-all hover:-translate-y-px"
