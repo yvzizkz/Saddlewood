@@ -17,8 +17,8 @@ export default function ServicesPage() {
         label="What We Do"
         title="Our Services"
         description="From full kitchen renovations to licensed specialty trades, we handle every aspect of your remodel under one roof."
-        image="/images/wetbar.jpg"
-        imageAlt="Custom wet bar remodel by Saddlewood Contracting in Scottsdale"
+        image="/images/mcr-kitchen-island-06.jpg"
+        imageAlt="Luxury kitchen remodel with custom island by Saddlewood Contracting in Scottsdale"
       />
       <ServicesGrid />
       <ProcessTimeline />
