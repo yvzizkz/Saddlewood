@@ -4,36 +4,36 @@
     <path id="bottomText" d="M 28,100 A 72,72 0 0,0 172,100" fill="none"/>
   </defs>
 
-  <!-- Background circle — warm stone/taupe (Logo 3) -->
-  <circle cx="100" cy="100" r="98" fill="#BFB5A3"/>
+  <!-- Background circle — white -->
+  <circle cx="100" cy="100" r="98" fill="#FFFFFF"/>
 
-  <!-- Outer ring — white -->
-  <circle cx="100" cy="100" r="93" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+  <!-- Outer ring — dark -->
+  <circle cx="100" cy="100" r="93" fill="none" stroke="#2A2A2A" stroke-width="2"/>
 
-  <!-- Inner ring — white -->
-  <circle cx="100" cy="100" r="82" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+  <!-- Inner ring — dark -->
+  <circle cx="100" cy="100" r="82" fill="none" stroke="#2A2A2A" stroke-width="1.5"/>
 
-  <!-- Cross lines (subtle, white) -->
-  <line x1="100" y1="8" x2="100" y2="30" stroke="#FFFFFF" stroke-width="0.8" opacity="0.5"/>
-  <line x1="100" y1="170" x2="100" y2="192" stroke="#FFFFFF" stroke-width="0.8" opacity="0.5"/>
-  <line x1="8" y1="100" x2="30" y2="100" stroke="#FFFFFF" stroke-width="0.8" opacity="0.5"/>
-  <line x1="170" y1="100" x2="192" y2="100" stroke="#FFFFFF" stroke-width="0.8" opacity="0.5"/>
+  <!-- Cross lines (subtle, dark) -->
+  <line x1="100" y1="8" x2="100" y2="30" stroke="#2A2A2A" stroke-width="0.8" opacity="0.5"/>
+  <line x1="100" y1="170" x2="100" y2="192" stroke="#2A2A2A" stroke-width="0.8" opacity="0.5"/>
+  <line x1="8" y1="100" x2="30" y2="100" stroke="#2A2A2A" stroke-width="0.8" opacity="0.5"/>
+  <line x1="170" y1="100" x2="192" y2="100" stroke="#2A2A2A" stroke-width="0.8" opacity="0.5"/>
 
-  <!-- House icon — white -->
+  <!-- House icon — dark -->
   <path d="M100 48 L72 72 L72 105 L88 105 L88 88 L112 88 L112 105 L128 105 L128 72 Z"
-        fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round" opacity="0.85"/>
+        fill="none" stroke="#2A2A2A" stroke-width="2.5" stroke-linejoin="round"/>
 
-  <!-- SC letters — white -->
-  <text x="87" y="105" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="400" fill="#FFFFFF" opacity="0.9">S</text>
-  <text x="106" y="105" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="400" fill="#FFFFFF" opacity="0.9">C</text>
+  <!-- SC letters — dark -->
+  <text x="87" y="105" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="400" fill="#2A2A2A">S</text>
+  <text x="106" y="105" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="400" fill="#2A2A2A">C</text>
 
-  <!-- Curved top text: SADDLEWOOD — white -->
-  <text font-family="Georgia, 'Times New Roman', serif" font-size="14" letter-spacing="5" fill="#FFFFFF" font-weight="400">
+  <!-- Curved top text: SADDLEWOOD — dark -->
+  <text font-family="Georgia, 'Times New Roman', serif" font-size="14" letter-spacing="5" fill="#2A2A2A" font-weight="400">
     <textPath href="#topText" startOffset="50%" text-anchor="middle">SADDLEWOOD</textPath>
   </text>
 
-  <!-- Curved bottom text: CONTRACTING LLC. — white -->
-  <text font-family="Georgia, 'Times New Roman', serif" font-size="12" letter-spacing="3.5" fill="#FFFFFF" font-weight="400">
+  <!-- Curved bottom text: CONTRACTING LLC. — dark -->
+  <text font-family="Georgia, 'Times New Roman', serif" font-size="12" letter-spacing="3.5" fill="#2A2A2A" font-weight="400">
     <textPath href="#bottomText" startOffset="50%" text-anchor="middle">CONTRACTING LLC.</textPath>
   </text>
 </svg>
