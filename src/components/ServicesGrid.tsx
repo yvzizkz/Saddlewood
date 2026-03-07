@@ -33,7 +33,7 @@ export function ServicesGrid() {
               {services.map((svc, i) => (
                 <motion.li
                   key={svc.name}
-                  className="py-7 border-b border-teal/[0.08] flex justify-between items-center cursor-pointer group first:border-t first:border-teal/[0.08] hover:pl-3 transition-[padding] duration-300"
+                  className="py-7 border-b border-teal/[0.08] flex justify-between items-center group first:border-t first:border-teal/[0.08] hover:pl-3 transition-[padding] duration-300"
                   initial={{ opacity: 0, x: -10 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
@@ -58,14 +58,14 @@ export function ServicesGrid() {
             viewport={{ once: true }}
           >
             <Image
-              src="/images/wetbar.jpg"
-              alt="Custom wet bar with wine wall"
+              src="/images/mcr-kitchen-island-04.jpg"
+              alt="Modern kitchen remodel with custom island in McCormick Ranch"
               fill
               className="object-cover"
             />
             <div className="absolute bottom-0 left-0 right-0 p-6 lg:p-7 bg-teal-90">
               <p className="text-[13px] text-stone/70 font-light leading-relaxed">
-                <strong className="text-gold font-medium">McCormick Ranch</strong> &mdash; Custom wet bar with floating shelves, integrated wine wall, and beverage center. Designed, built, and wired by our in-house team.
+                <strong className="text-gold font-medium">McCormick Ranch</strong> &mdash; Modern kitchen featuring custom island, premium cabinetry, and designer finishes. Every detail handled by our in-house team.
               </p>
             </div>
           </motion.div>

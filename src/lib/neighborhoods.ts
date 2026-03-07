@@ -30,7 +30,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "McCormick Ranch",
     zip: "85258",
     tagline: "Timeless Elegance in the Heart of Scottsdale",
-    heroImage: "/images/mcr-kitchen-island-01.jpg",
+    heroImage: "/images/mcr-kitchen-island-05.jpg",
     description: [
       "McCormick Ranch is one of Scottsdale\u2019s most established and beloved communities. With its tree-lined streets, lakeside homes, and mid-century to contemporary architecture, it offers a unique blend of character and comfort that\u2019s hard to find anywhere else in the Valley.",
       "At Saddlewood, we\u2019ve completed dozens of remodels throughout McCormick Ranch. We understand the architectural diversity \u2014 from original ranch-style homes to modern updates \u2014 and know how to honor the existing character while bringing spaces into the present.",
@@ -85,6 +85,13 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
         description: "Spa-style primary bath with soaking tub, walk-in shower, and dual vanity.",
         caption: "This primary bath balances luxury and function \u2014 heated floors, a deep soaking tub, and a zero-threshold shower entry.",
       },
+      {
+        title: "Luxury Master Bathroom",
+        category: "Bathroom",
+        image: "/images/mcr-bathroom-luxury.jpg",
+        description: "Elegant master bathroom featuring premium finishes, custom tilework, and designer fixtures.",
+        caption: "Every surface in this master bath was carefully selected \u2014 from the floor tile to the countertop \u2014 to create a cohesive luxury experience.",
+      },
     ],
     testimonials: [
       {
@@ -105,7 +112,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "Gainey Ranch",
     zip: "85258",
     tagline: "Refined Living with Desert Sophistication",
-    heroImage: "/images/gr-kitchen-island.jpg",
+    heroImage: "/images/gr-living-room-02.jpg",
     description: [
       "Gainey Ranch represents the pinnacle of Scottsdale luxury living. This guard-gated community features world-class golf, stunning desert views, and some of the most architecturally significant homes in the Valley.",
       "Saddlewood Contracting has built a strong reputation within Gainey Ranch for delivering remodels that honor the community\u2019s sophisticated aesthetic. We understand the elevated expectations of Gainey Ranch homeowners and consistently rise to meet them.",
@@ -159,7 +166,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "Pinnacle Peak Country Club",
     zip: "85255",
     tagline: "Modern Luxury at the Base of the Mountain",
-    heroImage: "/images/pp-great-room-view.jpg",
+    heroImage: "/images/pp-living-room-01.jpg",
     description: [
       "Nestled at the base of iconic Pinnacle Peak, this exclusive country club community offers some of the most breathtaking views and impressive homes in all of Scottsdale. The architecture here tends toward desert contemporary and modern luxury.",
       "Saddlewood Contracting has completed numerous projects in Pinnacle Peak Country Club, from chef\u2019s kitchens with mountain views to spa-style master suites that rival luxury resorts. We understand the larger scale and elevated expectations of these homes.",
@@ -220,6 +227,27 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
         image: "/images/pp-spa-shower.jpg",
         description: "Zero-threshold shower with bench seating, rain head, and body sprays.",
         caption: "This walk-in spa shower features a heated bench, rain showerhead, and multiple body sprays \u2014 all plumbed and wired by our licensed team.",
+      },
+      {
+        title: "Great Room & Dining Area",
+        category: "Living",
+        image: "/images/pp-great-room-dining.jpg",
+        description: "Open-concept great room flowing into a formal dining area with mountain views.",
+        caption: "The great room transitions seamlessly into the dining area \u2014 perfect for hosting with Pinnacle Peak as the backdrop.",
+      },
+      {
+        title: "Cozy Sitting Room with Fireplace",
+        category: "Living",
+        image: "/images/pp-sitting-room-fireplace.jpg",
+        description: "Intimate sitting room featuring a custom stone fireplace and built-in shelving.",
+        caption: "A quiet retreat within the home \u2014 this sitting room pairs a custom fireplace with curated built-ins for a timeless feel.",
+      },
+      {
+        title: "Contemporary Living Space",
+        category: "Living",
+        image: "/images/pp-living-room-02.jpg",
+        description: "Modern living room with clean lines, designer furniture, and desert views.",
+        caption: "Clean lines and neutral tones let the desert landscape take center stage in this Pinnacle Peak living room.",
       },
     ],
     testimonials: [

@@ -15,7 +15,7 @@ export default function PortfolioPage() {
         label="Portfolio"
         title="Our Work"
         description="Luxury remodels across Scottsdale's most prestigious neighborhoods. Click any project for full details."
-        image="/images/mcr-kitchen-island-01.jpg"
+        image="/images/mcr-kitchen-island-02.jpg"
         imageAlt="Luxury kitchen island remodel in McCormick Ranch by Saddlewood Contracting"
       />
 

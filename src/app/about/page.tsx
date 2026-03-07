@@ -67,7 +67,7 @@ export default function AboutPage() {
               className="relative h-[500px] border border-charcoal-light"
             >
               <Image
-                src="/images/kitchen1.jpg"
+                src="/images/mcr-bathroom-luxury.jpg"
                 alt="Saddlewood craftsmanship"
                 fill
                 className="object-cover"

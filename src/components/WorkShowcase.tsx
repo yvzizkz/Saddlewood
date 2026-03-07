@@ -25,12 +25,12 @@ const projects = [
     tall: false,
   },
   {
-    image: "/images/pp-great-room-view.jpg",
-    alt: "Pinnacle Peak great room with floor-to-ceiling desert views",
-    category: "Living",
+    image: "/images/pp-kitchen-01.jpg",
+    alt: "Pinnacle Peak contemporary kitchen with designer finishes",
+    category: "Kitchen",
     location: "Pinnacle Peak",
-    title: "Desert View Great Room",
-    caption: "Floor-to-ceiling glass dissolves the boundary between indoors and out — the Sonoran desert becomes part of the living room.",
+    title: "Contemporary Kitchen",
+    caption: "Designer finishes and professional-grade appliances come together in this Pinnacle Peak kitchen renovation.",
     tall: false,
   },
 ];
