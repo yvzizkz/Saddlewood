@@ -6,7 +6,6 @@ import { Phone } from "lucide-react";
 
 export function CTABanner() {
   return (
-<<<<<<< HEAD
     <section className="bg-teal-dark py-14 sm:py-18 lg:py-24 px-4 sm:px-6 lg:px-12 text-center" aria-label="Call to action">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
