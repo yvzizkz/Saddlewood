@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +26,12 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hoodOpen, setHoodOpen] = useState(false);
+  const [activeMenuIndex, setActiveMenuIndex] = useState(-1);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuItemsRef = useRef<(HTMLAnchorElement | null)[]>([]);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -45,6 +51,133 @@ export function Navbar() {
     };
   }, [mobileOpen]);
 
+  // Focus trap for mobile menu
+  useEffect(() => {
+    if (!mobileOpen || !mobileMenuRef.current) return;
+
+    const menu = mobileMenuRef.current;
+    const focusableSelector = 'a[href], button, [tabindex]:not([tabindex="-1"])';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        mobileToggleRef.current?.focus();
+        return;
+      }
+
+      if (e.key !== "Tab") return;
+
+      const focusableElements = menu.querySelectorAll<HTMLElement>(focusableSelector);
+      // Include the mobile toggle button in the focus trap
+      const allFocusable = [mobileToggleRef.current!, ...Array.from(focusableElements)].filter(Boolean);
+      if (allFocusable.length === 0) return;
+
+      const firstEl = allFocusable[0];
+      const lastEl = allFocusable[allFocusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    // Move focus into the mobile menu on open
+    const firstLink = menu.querySelector<HTMLElement>(focusableSelector);
+    firstLink?.focus();
+
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [mobileOpen]);
+
+  // Keyboard navigation for dropdown menu
+  const handleDropdownKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const neighborhoodLink = navLinks.find((l) => l.children);
+      if (!neighborhoodLink?.children) return;
+      const itemCount = neighborhoodLink.children.length;
+
+      switch (e.key) {
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          if (!hoodOpen) {
+            setHoodOpen(true);
+            setActiveMenuIndex(0);
+          }
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          if (!hoodOpen) {
+            setHoodOpen(true);
+            setActiveMenuIndex(0);
+          } else {
+            setActiveMenuIndex((prev) => (prev + 1) % itemCount);
+          }
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          if (hoodOpen) {
+            setActiveMenuIndex((prev) => (prev - 1 + itemCount) % itemCount);
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          setHoodOpen(false);
+          setActiveMenuIndex(-1);
+          break;
+        case "Tab":
+          if (hoodOpen) {
+            setHoodOpen(false);
+            setActiveMenuIndex(-1);
+          }
+          break;
+      }
+    },
+    [hoodOpen]
+  );
+
+  // Focus menu items when activeMenuIndex changes
+  useEffect(() => {
+    if (activeMenuIndex >= 0 && menuItemsRef.current[activeMenuIndex]) {
+      menuItemsRef.current[activeMenuIndex]?.focus();
+    }
+  }, [activeMenuIndex]);
+
+  // Handle keydown within dropdown menu items
+  const handleMenuItemKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      const neighborhoodLink = navLinks.find((l) => l.children);
+      if (!neighborhoodLink?.children) return;
+      const itemCount = neighborhoodLink.children.length;
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setActiveMenuIndex((index + 1) % itemCount);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setActiveMenuIndex((index - 1 + itemCount) % itemCount);
+          break;
+        case "Escape":
+          e.preventDefault();
+          setHoodOpen(false);
+          setActiveMenuIndex(-1);
+          // Return focus to the dropdown trigger
+          dropdownRef.current?.querySelector("button")?.focus();
+          break;
+        case "Tab":
+          setHoodOpen(false);
+          setActiveMenuIndex(-1);
+          break;
+      }
+    },
+    []
+  );
+
   return (
     <>
       <a
@@ -63,8 +196,8 @@ export function Navbar() {
             : "h-[88px] bg-gradient-to-b from-[rgba(15,37,48,0.85)] via-[rgba(15,37,48,0.5)] to-transparent"
         }`}
       >
-        {/* Brand with Logo — larger, no clipping */}
-        <Link href="/" className="flex items-center gap-3 no-underline shrink-0" aria-label="Saddlewood Contracting home">
+        {/* Brand with Logo */}
+        <Link href="/" className="flex items-center gap-3 no-underline shrink-0" aria-label="Saddlewood Contracting — home">
           <div className="relative w-[64px] h-[64px] sm:w-[72px] sm:h-[72px] shrink-0">
             <Image
               src="/images/logo.svg"
@@ -84,20 +217,33 @@ export function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop Nav Links — larger, more readable font */}
+        {/* Desktop Nav Links */}
         <div className="hidden lg:flex items-center gap-8 xl:gap-10">
           {navLinks.map((link) =>
             link.children ? (
               <div
                 key={link.label}
                 className="relative"
+                ref={dropdownRef}
                 onMouseEnter={() => setHoodOpen(true)}
-                onMouseLeave={() => setHoodOpen(false)}
+                onMouseLeave={() => {
+                  setHoodOpen(false);
+                  setActiveMenuIndex(-1);
+                }}
               >
                 <button
                   className="flex items-center gap-1.5 text-[15px] xl:text-base font-normal text-white/80 hover:text-white transition-colors tracking-wide bg-transparent border-none cursor-pointer"
                   aria-expanded={hoodOpen}
                   aria-haspopup="true"
+                  onKeyDown={handleDropdownKeyDown}
+                  onFocus={() => setHoodOpen(true)}
+                  onBlur={(e) => {
+                    // Close if focus moves outside the dropdown container
+                    if (!dropdownRef.current?.contains(e.relatedTarget as Node)) {
+                      setHoodOpen(false);
+                      setActiveMenuIndex(-1);
+                    }
+                  }}
                 >
                   {link.label}
                   <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
@@ -111,13 +257,25 @@ export function Navbar() {
                       transition={{ duration: 0.15 }}
                       className="absolute top-full left-0 mt-2 min-w-[220px] bg-[rgba(15,37,48,0.95)] backdrop-blur-xl border border-white/[0.06] py-2 rounded-sm"
                       role="menu"
+                      aria-label="Neighborhoods submenu"
                     >
-                      {link.children.map((child) => (
+                      {link.children.map((child, idx) => (
                         <Link
                           key={child.href}
                           href={child.href}
-                          className="block px-5 py-3 text-[15px] text-white/70 hover:text-gold hover:bg-white/[0.03] transition-colors no-underline"
+                          ref={(el) => { menuItemsRef.current[idx] = el; }}
+                          className={`block px-5 py-3 text-[15px] text-white/70 hover:text-gold hover:bg-white/[0.03] transition-colors no-underline ${
+                            idx === activeMenuIndex ? "text-gold bg-white/[0.03]" : ""
+                          }`}
                           role="menuitem"
+                          tabIndex={-1}
+                          onKeyDown={(e) => handleMenuItemKeyDown(e, idx)}
+                          onBlur={(e) => {
+                            if (!dropdownRef.current?.contains(e.relatedTarget as Node)) {
+                              setHoodOpen(false);
+                              setActiveMenuIndex(-1);
+                            }
+                          }}
                         >
                           {child.label}
                         </Link>
@@ -147,6 +305,7 @@ export function Navbar() {
             Book Consultation
           </Link>
           <button
+            ref={mobileToggleRef}
             onClick={() => setMobileOpen(!mobileOpen)}
             className="lg:hidden text-white bg-transparent border-none p-2 cursor-pointer"
             aria-expanded={mobileOpen}
@@ -161,6 +320,7 @@ export function Navbar() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
+            ref={mobileMenuRef}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
