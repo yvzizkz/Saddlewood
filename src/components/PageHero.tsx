@@ -7,31 +7,43 @@ interface PageHeroProps {
   label: string;
   title: string;
   description: string;
-  image: string;
-  imageAlt: string;
+  image?: string;
+  imageAlt?: string;
 }
 
 export function PageHero({ label, title, description, image, imageAlt }: PageHeroProps) {
+  const hasImage = !!image;
+
   return (
-    <section className="relative min-h-[420px] sm:min-h-[480px] lg:min-h-[540px] flex items-end overflow-hidden" role="banner">
+    <section
+      className={`relative flex items-end overflow-hidden ${
+        hasImage
+          ? "min-h-[420px] sm:min-h-[480px] lg:min-h-[540px]"
+          : "min-h-[280px] sm:min-h-[320px] lg:min-h-[360px] bg-teal-dark"
+      }`}
+      role="banner"
+    >
       {/* Background Image */}
-      <div className="absolute inset-0">
-        <Image
-          src={image}
-          alt={imageAlt}
-          fill
-          className="object-cover"
-          priority
-          sizes="100vw"
-        />
-      </div>
+      {hasImage && (
+        <div className="absolute inset-0">
+          <Image
+            src={image}
+            alt={imageAlt || ""}
+            fill
+            className="object-cover"
+            priority
+            sizes="100vw"
+          />
+        </div>
+      )}
 
       {/* Gradient Overlay */}
       <div
         className="absolute inset-0"
         style={{
-          background:
-            "linear-gradient(to top, rgba(15,37,48,0.92) 0%, rgba(15,37,48,0.65) 40%, rgba(15,37,48,0.3) 70%, rgba(15,37,48,0.4) 100%)",
+          background: hasImage
+            ? "linear-gradient(to top, rgba(15,37,48,0.92) 0%, rgba(15,37,48,0.65) 40%, rgba(15,37,48,0.3) 70%, rgba(15,37,48,0.4) 100%)"
+            : "linear-gradient(to top, rgba(15,37,48,0.95) 0%, rgba(15,37,48,0.85) 100%)",
         }}
         aria-hidden="true"
       />

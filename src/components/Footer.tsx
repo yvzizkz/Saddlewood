@@ -7,7 +7,7 @@ export function Footer() {
       <div className="max-w-[1200px] mx-auto grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
         {/* Brand */}
         <div className="col-span-2 md:col-span-1">
-          <div className="flex items-center gap-3 mb-3">
+          <Link href="/" className="flex items-center gap-3 mb-3 no-underline" aria-label="Saddlewood Contracting — home">
             <div className="relative w-[48px] h-[48px] shrink-0">
               <Image
                 src="/images/logo.svg"
@@ -20,7 +20,7 @@ export function Footer() {
               <div className="font-heading text-lg text-stone font-semibold">Saddlewood</div>
               <span className="text-[9px] tracking-[0.35em] uppercase text-gold font-medium block">Contracting</span>
             </div>
-          </div>
+          </Link>
           <p className="text-sm text-stone/35 italic font-light mt-3">
             &ldquo;Where Craftsmanship Meets Character&rdquo;
           </p>
@@ -32,7 +32,7 @@ export function Footer() {
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
             {["Kitchen Remodeling", "Bathroom Renovation", "Whole-Home Remodels", "Outdoor Living", "Electrical", "HVAC", "Plumbing"].map((svc) => (
               <li key={svc}>
-                <Link href="/services" className="text-sm text-stone/55 font-light hover:text-gold transition-colors no-underline">{svc}</Link>
+                <Link href="/services" className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline">{svc}</Link>
               </li>
             ))}
           </ul>
@@ -48,7 +48,7 @@ export function Footer() {
               { label: "Pinnacle Peak CC", href: "/neighborhoods/pinnacle-peak" },
             ].map((n) => (
               <li key={n.href}>
-                <Link href={n.href} className="text-sm text-stone/55 font-light hover:text-gold transition-colors no-underline">{n.label}</Link>
+                <Link href={n.href} className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline">{n.label}</Link>
               </li>
             ))}
           </ul>
@@ -60,7 +60,7 @@ export function Footer() {
               { label: "Contact", href: "/contact" },
             ].map((c) => (
               <li key={c.href}>
-                <Link href={c.href} className="text-sm text-stone/55 font-light hover:text-gold transition-colors no-underline">{c.label}</Link>
+                <Link href={c.href} className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline">{c.label}</Link>
               </li>
             ))}
           </ul>
@@ -70,9 +70,9 @@ export function Footer() {
         <div className="col-span-2 sm:col-span-1">
           <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-stone/40 mb-4 sm:mb-5 not-italic">Contact</h4>
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
-            <li><a href="tel:4809996100" className="text-sm text-stone/55 font-light hover:text-gold transition-colors no-underline">(480) 999-6100</a></li>
-            <li><a href="mailto:info@saddlewoodcontracting.com" className="text-sm text-stone/55 font-light hover:text-gold transition-colors no-underline break-all sm:break-normal">info@saddlewoodcontracting.com</a></li>
-            <li><span className="text-sm text-stone/55 font-light">Scottsdale, AZ 85258</span></li>
+            <li><a href="tel:4809996100" className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline">(480) 999-6100</a></li>
+            <li><a href="mailto:info@saddlewoodcontracting.com" className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline break-all sm:break-normal">info@saddlewoodcontracting.com</a></li>
+            <li><span className="text-sm text-stone/65 font-light">Scottsdale, AZ 85258</span></li>
           </ul>
           <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-stone/40 mt-6 sm:mt-8 mb-4 sm:mb-5 not-italic">Hours</h4>
           <ul className="space-y-2 list-none p-0 m-0">
@@ -85,7 +85,13 @@ export function Footer() {
       {/* Bottom bar */}
       <div className="max-w-[1200px] mx-auto mt-8 sm:mt-10 pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row justify-between items-center gap-2">
         <p className="text-[11px] text-stone/25">&copy; 2026 Saddlewood Contracting LLC. All rights reserved.</p>
-        <p className="text-[11px] text-stone/25">Licensed &middot; Bonded &middot; Insured &middot; Arizona ROC</p>
+        <div className="flex items-center gap-3 text-[11px] text-stone/25">
+          <Link href="/privacy" className="hover:text-gold transition-colors no-underline text-stone/25">Privacy</Link>
+          <span>&middot;</span>
+          <Link href="/terms" className="hover:text-gold transition-colors no-underline text-stone/25">Terms</Link>
+          <span>&middot;</span>
+          <span>Licensed &middot; Bonded &middot; Insured &middot; Arizona ROC</span>
+        </div>
       </div>
     </footer>
   );

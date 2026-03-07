@@ -42,7 +42,7 @@ export function WhySaddlewood() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span className="text-gold text-sm tracking-[0.2em] uppercase font-medium">
+          <span className="text-gold-accessible text-sm tracking-[0.2em] uppercase font-medium">
             Why Choose Us
           </span>
           <h2 className="font-heading text-4xl sm:text-5xl font-bold text-teal mt-3 mb-4">

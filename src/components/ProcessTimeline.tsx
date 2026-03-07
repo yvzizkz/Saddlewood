@@ -70,9 +70,9 @@ export function ProcessTimeline() {
           className="text-center mb-16 lg:mb-20"
         >
           <div className="flex items-center gap-4 mb-6 justify-center">
-            <div className="h-px w-8 bg-gold" />
+            <div className="h-px w-8 bg-gold" aria-hidden="true" />
             <span className="section-label">Our Process</span>
-            <div className="h-px w-8 bg-gold" />
+            <div className="h-px w-8 bg-gold" aria-hidden="true" />
           </div>
           <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal leading-tight mb-4">
             Five Steps to Your
@@ -104,6 +104,8 @@ export function ProcessTimeline() {
                   <motion.button
                     key={step.number}
                     onClick={() => setActiveStep(i)}
+                    aria-controls="step-panel-desktop"
+                    aria-current={isActive ? "step" : undefined}
                     className="flex flex-col items-center group relative"
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -126,7 +128,7 @@ export function ProcessTimeline() {
                     {/* Step number */}
                     <span
                       className={`text-[11px] tracking-[0.15em] font-medium mt-4 transition-colors duration-300 ${
-                        isActive ? "text-gold" : "text-charcoal-light"
+                        isActive ? "text-gold-accessible" : "text-charcoal-light"
                       }`}
                     >
                       STEP {step.number}
@@ -151,6 +153,7 @@ export function ProcessTimeline() {
         <div className="hidden lg:block">
           <AnimatePresence mode="wait">
             <motion.div
+              id="step-panel-desktop"
               key={activeStep}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -226,6 +229,8 @@ export function ProcessTimeline() {
               >
                 <button
                   onClick={() => setActiveStep(i)}
+                  aria-expanded={isActive}
+                  aria-controls={`step-panel-mobile-${step.number}`}
                   className={`w-full text-left transition-all duration-400 ${
                     isActive ? "bg-teal-dark" : "bg-white border border-stone-mid"
                   }`}
@@ -270,6 +275,7 @@ export function ProcessTimeline() {
                 <AnimatePresence>
                   {isActive && (
                     <motion.div
+                      id={`step-panel-mobile-${step.number}`}
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}

@@ -20,6 +20,8 @@ export function LogoMark({ className = "" }: { className?: string }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
+      role="img"
+      aria-label="Saddlewood Contracting LLC logo"
     >
       {/* Outer circle */}
       <circle cx="100" cy="100" r="95" stroke="currentColor" strokeWidth="2" opacity="0.3" />

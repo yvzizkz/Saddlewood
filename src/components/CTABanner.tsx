@@ -6,7 +6,8 @@ import { Phone } from "lucide-react";
 
 export function CTABanner() {
   return (
-    <section className="bg-teal-dark py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-12 text-center" aria-label="Call to action">
+<<<<<<< HEAD
+    <section className="bg-teal-dark py-14 sm:py-18 lg:py-24 px-4 sm:px-6 lg:px-12 text-center" aria-label="Call to action">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -16,7 +17,7 @@ export function CTABanner() {
           Ready to transform<br />
           your <em className="italic text-gold font-normal">home?</em>
         </h2>
-        <p className="text-[15px] text-white/50 max-w-[480px] mx-auto font-light leading-relaxed mb-10">
+        <p className="text-[15px] text-white/60 max-w-[480px] mx-auto font-light leading-relaxed mb-10">
           Start with a free, no-obligation design consultation. We&apos;ll walk your space, discuss your vision, and provide a detailed estimate.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center">

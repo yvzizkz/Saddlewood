@@ -8,6 +8,8 @@ interface CompareSliderProps {
   afterImage: string;
   beforeLabel?: string;
   afterLabel?: string;
+  beforeAlt?: string;
+  afterAlt?: string;
 }
 
 function CompareSlider({
@@ -15,6 +17,8 @@ function CompareSlider({
   afterImage,
   beforeLabel = "Before",
   afterLabel = "After",
+  beforeAlt = "Before renovation",
+  afterAlt = "After renovation",
 }: CompareSliderProps) {
   const [sliderPos, setSliderPos] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +48,31 @@ function CompareSlider({
     handleMove(e.touches[0].clientX);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    let newPos = sliderPos;
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        newPos = Math.max(0, sliderPos - 2);
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        newPos = Math.min(100, sliderPos + 2);
+        break;
+      case "Home":
+        e.preventDefault();
+        newPos = 0;
+        break;
+      case "End":
+        e.preventDefault();
+        newPos = 100;
+        break;
+      default:
+        return;
+    }
+    setSliderPos(newPos);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -57,6 +86,8 @@ function CompareSlider({
       <div
         className="absolute inset-0 bg-cover bg-center bg-teal-dark"
         style={{ backgroundImage: `url('${afterImage}')` }}
+        role="img"
+        aria-label={afterAlt}
       />
 
       {/* Before Image (clipped) */}
@@ -66,14 +97,24 @@ function CompareSlider({
           backgroundImage: `url('${beforeImage}')`,
           clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
         }}
+        role="img"
+        aria-label={beforeAlt}
       />
 
-      {/* Slider Line */}
+      {/* Slider Line — keyboard accessible */}
       <div
         className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg z-10"
         style={{ left: `${sliderPos}%` }}
         onMouseDown={handleMouseDown}
         onTouchStart={handleMouseDown}
+        role="slider"
+        aria-label="Compare before and after images"
+        aria-valuenow={Math.round(sliderPos)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuetext={`Showing ${Math.round(sliderPos)}% before, ${Math.round(100 - sliderPos)}% after`}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
       >
         {/* Handle */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing">
@@ -82,6 +123,7 @@ function CompareSlider({
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -94,10 +136,10 @@ function CompareSlider({
       </div>
 
       {/* Labels */}
-      <div className="absolute top-4 left-4 bg-teal-dark/80 text-stone text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm">
+      <div className="absolute top-4 left-4 bg-teal-dark/80 text-stone text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm" aria-hidden="true">
         {beforeLabel}
       </div>
-      <div className="absolute top-4 right-4 bg-gold/90 text-teal-dark text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm">
+      <div className="absolute top-4 right-4 bg-gold/90 text-teal-dark text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm" aria-hidden="true">
         {afterLabel}
       </div>
     </div>
@@ -110,12 +152,16 @@ const transformations = [
     after: "/images/after-kitchen-1.jpg",
     title: "McCormick Ranch Kitchen",
     description: "Complete kitchen transformation with custom island and quartz countertops",
+    beforeAlt: "McCormick Ranch kitchen before renovation — dated cabinets and countertops",
+    afterAlt: "McCormick Ranch kitchen after renovation — custom island with quartz countertops",
   },
   {
     before: "/images/before-bathroom-1.jpg",
     after: "/images/after-bathroom-1.jpg",
     title: "Gainey Ranch Master Bath",
     description: "Luxurious spa-inspired bathroom with walk-in shower and freestanding tub",
+    beforeAlt: "Gainey Ranch master bathroom before renovation",
+    afterAlt: "Gainey Ranch master bathroom after renovation — spa-inspired with freestanding tub",
   },
 ];
 
@@ -131,15 +177,15 @@ export function BeforeAfter() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span className="text-gold text-sm tracking-[0.2em] uppercase font-medium">
+          <span className="text-gold-accessible text-sm tracking-[0.2em] uppercase font-medium">
             Transformations
           </span>
           <h2 className="font-heading text-4xl sm:text-5xl font-bold text-teal mt-3 mb-4">
             See the Difference
           </h2>
           <p className="text-charcoal/60 max-w-2xl mx-auto">
-            Drag the slider to reveal stunning before and after transformations
-            from our recent projects.
+            Drag the slider or use arrow keys to reveal stunning before and after
+            transformations from our recent projects.
           </p>
         </motion.div>
 
@@ -156,6 +202,8 @@ export function BeforeAfter() {
               <CompareSlider
                 beforeImage={t.before}
                 afterImage={t.after}
+                beforeAlt={t.beforeAlt}
+                afterAlt={t.afterAlt}
               />
               <div className="mt-4">
                 <h3 className="font-heading text-xl font-bold text-teal">

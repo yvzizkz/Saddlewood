@@ -35,7 +35,7 @@ export function HeroSection() {
         transition={{ duration: 0.8, delay: 0.2 }}
       >
         <div className="flex items-center gap-3 mb-5">
-          <span className="w-8 h-px bg-gold" />
+          <span className="w-8 h-px bg-gold" aria-hidden="true" />
           <span className="text-[11px] font-medium tracking-[0.25em] uppercase text-gold">
             Scottsdale&apos;s Premier Contractor
           </span>

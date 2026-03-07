@@ -11,6 +11,7 @@ const hoods = [
     zip: "85258",
     tagline: "Timeless elegance in the heart of Scottsdale",
     image: "/images/kitchen2.jpg",
+    imageAlt: "Modern kitchen interior from a McCormick Ranch home remodel",
     href: "/neighborhoods/mccormick-ranch",
   },
   {
@@ -18,6 +19,7 @@ const hoods = [
     zip: "85258",
     tagline: "Refined living with desert sophistication",
     image: "/images/fireplace.jpg",
+    imageAlt: "Statement fireplace surround in a Gainey Ranch living room",
     href: "/neighborhoods/gainey-ranch",
   },
   {
@@ -25,6 +27,7 @@ const hoods = [
     zip: "85255",
     tagline: "Modern luxury at the base of the mountain",
     image: "/images/dining.jpg",
+    imageAlt: "Indoor-outdoor dining space at a Pinnacle Peak residence",
     href: "/neighborhoods/pinnacle-peak",
   },
 ];
@@ -57,7 +60,7 @@ export function NeighborhoodCards() {
             >
               <Image
                 src={hood.image}
-                alt={hood.name}
+                alt={hood.imageAlt}
                 fill
                 className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
               />
@@ -69,7 +72,7 @@ export function NeighborhoodCards() {
                 <h3 className="font-heading text-2xl lg:text-[28px] text-white font-medium mb-2">
                   {hood.name}
                 </h3>
-                <p className="text-[13px] text-white/50 font-light mb-5">{hood.tagline}</p>
+                <p className="text-[13px] text-white/65 font-light mb-5">{hood.tagline}</p>
                 <div className="w-10 h-10 border border-white/20 flex items-center justify-center group-hover:border-gold group-hover:bg-gold transition-all duration-300">
                   <ArrowRight className="w-4 h-4 text-white/60 group-hover:text-teal-dark transition-colors duration-300" aria-hidden="true" />
                 </div>

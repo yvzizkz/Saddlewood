@@ -14,6 +14,7 @@ export function ContactForm() {
     neighborhood: "",
     projectType: "",
     message: "",
+    consent: false,
   });
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
@@ -71,6 +72,7 @@ export function ContactForm() {
         neighborhood: "",
         projectType: "",
         message: "",
+        consent: false,
       });
     } catch {
       console.error("Form submission error");
@@ -90,7 +92,7 @@ export function ContactForm() {
               viewport={{ once: true }}
             >
               <div className="flex items-center gap-4 mb-6">
-                <div className="h-px w-8 bg-gold" />
+                <div className="h-px w-8 bg-gold" aria-hidden="true" />
                 <span className="section-label">Contact</span>
               </div>
               <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-4 leading-tight">
@@ -105,6 +107,8 @@ export function ContactForm() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="bg-teal-dark p-12 text-center border border-gold"
+                  role="status"
+                  aria-live="polite"
                 >
                   <h3 className="font-heading text-3xl font-light text-gold mb-2">
                     Message Sent
@@ -238,8 +242,27 @@ export function ContactForm() {
                     />
                   </div>
 
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="contact-consent"
+                      type="checkbox"
+                      required
+                      checked={formData.consent}
+                      onChange={(e) =>
+                        setFormData({ ...formData, consent: e.target.checked })
+                      }
+                      className="mt-1 w-4 h-4 accent-gold shrink-0 cursor-pointer"
+                    />
+                    <label htmlFor="contact-consent" className="text-[13px] text-charcoal-light font-light leading-relaxed cursor-pointer">
+                      I consent to being contacted by Saddlewood Contracting via phone, email, or text regarding my project inquiry. I have read and agree to the{" "}
+                      <a href="/privacy" className="text-teal underline hover:text-gold transition-colors">Privacy Policy</a>{" "}
+                      and{" "}
+                      <a href="/terms" className="text-teal underline hover:text-gold transition-colors">Terms of Service</a>.
+                    </label>
+                  </div>
+
                   {status === "error" && (
-                    <div className="bg-red-50 border border-red-200 p-4">
+                    <div className="bg-red-50 border border-red-200 p-4" role="alert" aria-live="assertive">
                       <p className="text-red-700 text-sm font-light">
                         Something went wrong. Please try again or call us directly at (480) 999-6100.
                       </p>
@@ -329,7 +352,7 @@ export function ContactForm() {
                     "No-obligation, no pressure",
                   ].map((item) => (
                     <div key={item} className="flex items-center gap-3">
-                      <div className="w-px h-4 bg-gold" />
+                      <div className="w-px h-4 bg-gold" aria-hidden="true" />
                       <span className="text-sm text-charcoal-light font-light">{item}</span>
                     </div>
                   ))}

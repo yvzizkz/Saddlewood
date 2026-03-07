@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -106,12 +106,68 @@ export function ProjectGrid() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeNeighborhood, setActiveNeighborhood] = useState("All");
   const [selectedProject, setSelectedProject] = useState<(typeof projects)[0] | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const filtered = projects.filter((p) => {
     const catMatch = activeCategory === "All" || p.category === activeCategory;
     const hoodMatch = activeNeighborhood === "All" || p.neighborhood === activeNeighborhood;
     return catMatch && hoodMatch;
   });
+
+  const closeModal = useCallback(() => {
+    setSelectedProject(null);
+    // Return focus to the element that triggered the modal
+    previousFocusRef.current?.focus();
+  }, []);
+
+  // Focus trap + Escape for modal
+  useEffect(() => {
+    if (!selectedProject || !modalRef.current) return;
+
+    // Focus the close button when modal opens
+    closeButtonRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeModal();
+        return;
+      }
+
+      if (e.key !== "Tab") return;
+
+      const focusableSelector = 'a[href], button, [tabindex]:not([tabindex="-1"])';
+      const focusableElements = modalRef.current!.querySelectorAll<HTMLElement>(focusableSelector);
+      const allFocusable = Array.from(focusableElements);
+      if (allFocusable.length === 0) return;
+
+      const firstEl = allFocusable[0];
+      const lastEl = allFocusable[allFocusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+
+    // Lock body scroll
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedProject, closeModal]);
+
+  const handleCardActivate = (project: typeof projects[0], e: React.MouseEvent | React.KeyboardEvent) => {
+    previousFocusRef.current = e.currentTarget as HTMLElement;
+    setSelectedProject(project);
+  };
 
   return (
     <>
@@ -166,7 +222,16 @@ export function ProjectGrid() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              onClick={() => setSelectedProject(project)}
+              role="button"
+              tabIndex={0}
+              aria-label={`View ${project.title} — ${project.category} in ${project.neighborhood}`}
+              onClick={(e) => handleCardActivate(project, e)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleCardActivate(project, e);
+                }
+              }}
               className="group cursor-pointer"
             >
               <div className="relative h-72 overflow-hidden">
@@ -176,8 +241,8 @@ export function ProjectGrid() {
                   fill
                   className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[rgba(15,37,48,0.85)] via-[rgba(15,37,48,0.3)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
-                <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-2 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-400">
+                <div className="absolute inset-0 bg-gradient-to-t from-[rgba(15,37,48,0.85)] via-[rgba(15,37,48,0.3)] to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-400" />
+                <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-2 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 transition-all duration-400">
                   <div className="text-[10px] tracking-[0.2em] uppercase text-gold font-medium mb-1">
                     {project.category} &middot; {project.neighborhood}
                   </div>
@@ -200,9 +265,10 @@ export function ProjectGrid() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-teal-dark/90 backdrop-blur-sm"
-            onClick={() => setSelectedProject(null)}
+            onClick={closeModal}
           >
             <motion.div
+              ref={modalRef}
               role="dialog"
               aria-modal="true"
               aria-label={selectedProject.title}
@@ -221,7 +287,8 @@ export function ProjectGrid() {
                   className="object-cover"
                 />
                 <button
-                  onClick={() => setSelectedProject(null)}
+                  ref={closeButtonRef}
+                  onClick={closeModal}
                   aria-label="Close project details"
                   className="absolute top-4 right-4 w-10 h-10 bg-white/90 flex items-center justify-center hover:bg-white transition-colors"
                 >
@@ -231,7 +298,7 @@ export function ProjectGrid() {
 
               {/* Content */}
               <div className="p-8 lg:p-10">
-                <div className="text-[10px] tracking-[0.2em] uppercase text-gold font-medium mb-2">
+                <div className="text-[10px] tracking-[0.2em] uppercase text-gold-accessible font-medium mb-2">
                   {selectedProject.category} &middot; {selectedProject.neighborhood}
                 </div>
                 <h2 className="font-heading text-2xl lg:text-3xl font-medium text-teal mb-4">
