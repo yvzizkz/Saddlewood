@@ -203,7 +203,7 @@ export function Navbar() {
               src="/images/logo.png"
               alt="Saddlewood Contracting LLC"
               fill
-              className="object-contain brightness-0 invert"
+              className="object-contain"
               priority
             />
           </div>
