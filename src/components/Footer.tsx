@@ -13,7 +13,8 @@ export function Footer() {
                 src="/images/logo.png"
                 alt=""
                 fill
-                className="object-contain invert"
+                className="object-contain"
+                style={{ filter: "invert(1)" }}
               />
             </div>
             <div>
