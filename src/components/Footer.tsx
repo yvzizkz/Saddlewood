@@ -10,7 +10,7 @@ export function Footer() {
           <Link href="/" className="flex items-center gap-3 mb-3 no-underline" aria-label="Saddlewood Contracting — home">
             <div className="relative w-[48px] h-[48px] shrink-0">
               <Image
-                src="/images/logo.svg"
+                src="/images/logo.png"
                 alt=""
                 fill
                 className="object-contain"

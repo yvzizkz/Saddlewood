@@ -12,7 +12,7 @@ export function JsonLd() {
     url: siteUrl,
     telephone: "+14809996100",
     email: "info@saddlewoodcontracting.com",
-    logo: `${siteUrl}/images/logo.svg`,
+    logo: `${siteUrl}/images/logo.png`,
     image: `${siteUrl}/images/mcr-kitchen-island-01.jpg`,
     priceRange: "$$$",
     currenciesAccepted: "USD",

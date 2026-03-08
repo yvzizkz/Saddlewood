@@ -200,7 +200,7 @@ export function Navbar() {
         <Link href="/" className="flex items-center gap-3 no-underline shrink-0" aria-label="Saddlewood Contracting — home">
           <div className="relative w-[64px] h-[64px] sm:w-[72px] sm:h-[72px] shrink-0">
             <Image
-              src="/images/logo.svg"
+              src="/images/logo.png"
               alt=""
               fill
               className="object-contain"
