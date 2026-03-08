@@ -197,8 +197,8 @@ export function Navbar() {
         }`}
       >
         {/* Brand with Logo */}
-        <Link href="/" className="flex items-center gap-3 no-underline shrink-0" aria-label="Saddlewood Contracting — home">
-          <div className="relative w-[64px] h-[64px] sm:w-[72px] sm:h-[72px] shrink-0">
+        <Link href="/" className="flex items-center gap-4 no-underline shrink-0" aria-label="Saddlewood Contracting — home">
+          <div className="relative w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] shrink-0">
             <Image
               src="/images/logo.svg"
               alt=""
@@ -207,11 +207,11 @@ export function Navbar() {
               priority
             />
           </div>
-          <div className="flex flex-col">
-            <span className="font-heading text-lg sm:text-xl font-semibold text-white leading-none tracking-wide" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7), 0 0px 8px rgba(0,0,0,0.4)' }}>
+          <div className="flex flex-col justify-center">
+            <span className="font-heading text-xl sm:text-2xl font-semibold text-white leading-none tracking-wide" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7), 0 0px 8px rgba(0,0,0,0.4)' }}>
               Saddlewood
             </span>
-            <span className="font-sans text-[10px] sm:text-[11px] tracking-[0.35em] uppercase text-gold font-semibold mt-[2px]" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0px 6px rgba(0,0,0,0.5)' }}>
+            <span className="font-sans text-[10px] sm:text-[11px] tracking-[0.35em] uppercase text-gold font-semibold mt-1" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0px 6px rgba(0,0,0,0.5)' }}>
               Contracting
             </span>
           </div>
