@@ -7,7 +7,7 @@ export function Logo({ size = 48, className = "" }: { size?: number; className?:
       alt="Saddlewood Contracting LLC"
       width={size}
       height={size}
-      className={className}
+      className={`invert mix-blend-screen ${className}`}
       priority
     />
   );

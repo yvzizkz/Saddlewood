@@ -203,7 +203,7 @@ export function Navbar() {
               src="/images/logo.png"
               alt=""
               fill
-              className="object-contain"
+              className="object-contain invert mix-blend-screen"
               priority
             />
           </div>
