@@ -23,44 +23,51 @@ export function LogoMark({ className = "" }: { className?: string }) {
       role="img"
       aria-label="Saddlewood Contracting LLC logo"
     >
-      {/* Outer circle */}
-      <circle cx="100" cy="100" r="95" stroke="currentColor" strokeWidth="2" opacity="0.3" />
-      <circle cx="100" cy="100" r="82" stroke="currentColor" strokeWidth="1.5" opacity="0.2" />
+      {/* Outer double ring */}
+      <circle cx="100" cy="100" r="96" stroke="currentColor" strokeWidth="3" opacity="0.8" />
+      <circle cx="100" cy="100" r="80" stroke="currentColor" strokeWidth="3" opacity="0.8" />
 
-      {/* House icon */}
+      {/* Cross lines spanning the ring gap */}
+      <line x1="100" y1="1" x2="100" y2="20" stroke="currentColor" strokeWidth="2.5" opacity="0.8" />
+      <line x1="100" y1="180" x2="100" y2="199" stroke="currentColor" strokeWidth="2.5" opacity="0.8" />
+      <line x1="1" y1="100" x2="20" y2="100" stroke="currentColor" strokeWidth="2.5" opacity="0.8" />
+      <line x1="180" y1="100" x2="199" y2="100" stroke="currentColor" strokeWidth="2.5" opacity="0.8" />
+
+      {/* House icon — bold geometric */}
       <path
-        d="M100 45L65 75V120H85V95H115V120H135V75L100 45Z"
+        d="M100 44L68 70V110H88V90H112V110H132V70Z"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="4"
+        strokeLinejoin="miter"
         fill="none"
-        opacity="0.6"
+        opacity="0.9"
       />
 
-      {/* SC letters */}
+      {/* SC letters — bold */}
       <text
         x="100"
         y="108"
         textAnchor="middle"
         fontFamily="Georgia, serif"
-        fontSize="28"
-        fontWeight="500"
+        fontSize="34"
+        fontWeight="600"
         fill="currentColor"
-        opacity="0.8"
+        opacity="0.9"
       >
         SC
       </text>
 
       {/* Curved text - top */}
-      <path id="topArc" d="M 30,100 A 70,70 0 0,1 170,100" fill="none" />
-      <text fontSize="10" letterSpacing="6" fill="currentColor" opacity="0.5" fontFamily="Georgia, serif">
+      <path id="topArc" d="M 25,100 A 75,75 0 0,1 175,100" fill="none" />
+      <text fontSize="15" letterSpacing="5.5" fill="currentColor" opacity="0.8" fontFamily="Georgia, serif">
         <textPath href="#topArc" startOffset="50%" textAnchor="middle">
           SADDLEWOOD
         </textPath>
       </text>
 
       {/* Curved text - bottom */}
-      <path id="bottomArc" d="M 30,100 A 70,70 0 0,0 170,100" fill="none" />
-      <text fontSize="9" letterSpacing="4" fill="currentColor" opacity="0.5" fontFamily="Georgia, serif">
+      <path id="bottomArc" d="M 25,100 A 75,75 0 0,0 175,100" fill="none" />
+      <text fontSize="13" letterSpacing="3.5" fill="currentColor" opacity="0.8" fontFamily="Georgia, serif">
         <textPath href="#bottomArc" startOffset="50%" textAnchor="middle">
           CONTRACTING LLC.
         </textPath>
