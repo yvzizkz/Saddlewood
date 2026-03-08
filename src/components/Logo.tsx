@@ -8,7 +8,6 @@ export function Logo({ size = 48, className = "" }: { size?: number; className?:
       width={size}
       height={size}
       className={className}
-      style={{ filter: "invert(1)" }}
       priority
     />
   );

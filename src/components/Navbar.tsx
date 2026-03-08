@@ -204,7 +204,6 @@ export function Navbar() {
               alt=""
               fill
               className="object-contain"
-              style={{ filter: "invert(1)" }}
               priority
             />
           </div>

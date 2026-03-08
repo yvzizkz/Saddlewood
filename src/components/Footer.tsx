@@ -14,7 +14,6 @@ export function Footer() {
                 alt=""
                 fill
                 className="object-contain"
-                style={{ filter: "invert(1)" }}
               />
             </div>
             <div>
