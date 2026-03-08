@@ -36,7 +36,7 @@ export function HeroSection() {
       >
         <div className="flex items-center gap-3 mb-5">
           <span className="w-8 h-px bg-gold" aria-hidden="true" />
-          <span className="text-[11px] font-medium tracking-[0.25em] uppercase text-gold">
+          <span className="text-[13px] font-semibold tracking-[0.25em] uppercase text-gold drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
             Scottsdale&apos;s Premier Contractor
           </span>
         </div>
