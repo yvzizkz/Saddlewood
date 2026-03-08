@@ -3,11 +3,11 @@ import Image from "next/image";
 export function Logo({ size = 48, className = "" }: { size?: number; className?: string }) {
   return (
     <Image
-      src="/images/logo.png"
+      src="/images/logo.svg"
       alt="Saddlewood Contracting LLC"
       width={size}
       height={size}
-      className={`mix-blend-screen brightness-150 ${className}`}
+      className={className}
       priority
     />
   );

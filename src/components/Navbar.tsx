@@ -200,10 +200,10 @@ export function Navbar() {
         <Link href="/" className="flex items-center gap-3 no-underline shrink-0" aria-label="Saddlewood Contracting — home">
           <div className="relative w-[64px] h-[64px] sm:w-[72px] sm:h-[72px] shrink-0">
             <Image
-              src="/images/logo.png"
+              src="/images/logo.svg"
               alt=""
               fill
-              className="object-contain mix-blend-screen brightness-150"
+              className="object-contain"
               priority
             />
           </div>

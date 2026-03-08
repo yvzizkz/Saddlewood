@@ -10,10 +10,10 @@ export function Footer() {
           <Link href="/" className="flex items-center gap-3 mb-3 no-underline" aria-label="Saddlewood Contracting — home">
             <div className="relative w-[48px] h-[48px] shrink-0">
               <Image
-                src="/images/logo.png"
+                src="/images/logo.svg"
                 alt=""
                 fill
-                className="object-contain mix-blend-screen brightness-150"
+                className="object-contain"
               />
             </div>
             <div>

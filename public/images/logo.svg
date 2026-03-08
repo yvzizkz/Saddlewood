@@ -4,34 +4,33 @@
     <path id="bottomText" d="M 25,100 A 75,75 0 0,0 175,100" fill="none"/>
   </defs>
 
-  <!-- Background circle — white -->
-  <circle cx="100" cy="100" r="99" fill="#FFFFFF"/>
+  <!-- No background — transparent -->
 
   <!-- Outer double ring -->
-  <circle cx="100" cy="100" r="96" fill="none" stroke="#1A1A1A" stroke-width="3"/>
-  <circle cx="100" cy="100" r="80" fill="none" stroke="#1A1A1A" stroke-width="3"/>
+  <circle cx="100" cy="100" r="96" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.85"/>
+  <circle cx="100" cy="100" r="80" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.85"/>
 
   <!-- Cross lines spanning the ring gap -->
-  <line x1="100" y1="1" x2="100" y2="20" stroke="#1A1A1A" stroke-width="2.5"/>
-  <line x1="100" y1="180" x2="100" y2="199" stroke="#1A1A1A" stroke-width="2.5"/>
-  <line x1="1" y1="100" x2="20" y2="100" stroke="#1A1A1A" stroke-width="2.5"/>
-  <line x1="180" y1="100" x2="199" y2="100" stroke="#1A1A1A" stroke-width="2.5"/>
+  <line x1="100" y1="1" x2="100" y2="20" stroke="#FFFFFF" stroke-width="2.5" opacity="0.85"/>
+  <line x1="100" y1="180" x2="100" y2="199" stroke="#FFFFFF" stroke-width="2.5" opacity="0.85"/>
+  <line x1="1" y1="100" x2="20" y2="100" stroke="#FFFFFF" stroke-width="2.5" opacity="0.85"/>
+  <line x1="180" y1="100" x2="199" y2="100" stroke="#FFFFFF" stroke-width="2.5" opacity="0.85"/>
 
   <!-- House icon — bold geometric -->
   <path d="M100 44 L68 70 L68 110 L88 110 L88 90 L112 90 L112 110 L132 110 L132 70 Z"
-        fill="none" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="miter"/>
+        fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="miter" opacity="0.9"/>
 
   <!-- SC letters — bold -->
-  <text x="84" y="108" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="600" fill="#1A1A1A">S</text>
-  <text x="106" y="108" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="600" fill="#1A1A1A">C</text>
+  <text x="84" y="108" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="600" fill="#FFFFFF" opacity="0.9">S</text>
+  <text x="106" y="108" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="600" fill="#FFFFFF" opacity="0.9">C</text>
 
   <!-- Curved top text: SADDLEWOOD -->
-  <text font-family="Georgia, 'Times New Roman', serif" font-size="15" letter-spacing="5.5" fill="#1A1A1A" font-weight="400">
+  <text font-family="Georgia, 'Times New Roman', serif" font-size="15" letter-spacing="5.5" fill="#FFFFFF" font-weight="400" opacity="0.85">
     <textPath href="#topText" startOffset="50%" text-anchor="middle">SADDLEWOOD</textPath>
   </text>
 
   <!-- Curved bottom text: CONTRACTING LLC. -->
-  <text font-family="Georgia, 'Times New Roman', serif" font-size="13" letter-spacing="3.5" fill="#1A1A1A" font-weight="400">
+  <text font-family="Georgia, 'Times New Roman', serif" font-size="13" letter-spacing="3.5" fill="#FFFFFF" font-weight="400" opacity="0.85">
     <textPath href="#bottomText" startOffset="50%" text-anchor="middle">CONTRACTING LLC.</textPath>
   </text>
 </svg>
