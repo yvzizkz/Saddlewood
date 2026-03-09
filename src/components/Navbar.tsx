@@ -197,16 +197,19 @@ export function Navbar() {
         }`}
       >
         {/* Brand with Logo */}
-        <Link href="/" className="flex items-center no-underline shrink-0" aria-label="Saddlewood Contracting — home">
+        <Link href="/" className="flex items-center gap-3 no-underline shrink-0" aria-label="Saddlewood Contracting — home">
           <div className="relative w-[60px] h-[60px] sm:w-[68px] sm:h-[68px] shrink-0">
             <Image
               src="/images/logo.png"
               alt="Saddlewood Contracting LLC"
               fill
-              className="object-contain brightness-0 invert"
+              className="object-contain"
               priority
             />
           </div>
+          <span className="hidden sm:block text-white text-[15px] font-heading tracking-[0.04em] leading-tight uppercase">
+            Saddlewood<br />Contracting
+          </span>
         </Link>
 
         {/* Desktop Nav Links */}
