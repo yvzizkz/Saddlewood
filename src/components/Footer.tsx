@@ -7,7 +7,7 @@ export function Footer() {
       <div className="max-w-[1200px] mx-auto grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
         {/* Brand */}
         <div className="col-span-2 md:col-span-1">
-          <Link href="/" className="flex items-center mb-3 no-underline" aria-label="Saddlewood Contracting — home">
+          <Link href="/" className="flex items-center gap-3 mb-3 no-underline" aria-label="Saddlewood Contracting — home">
             <div className="relative w-[56px] h-[56px] shrink-0">
               <Image
                 src="/images/logo.png"
@@ -16,6 +16,9 @@ export function Footer() {
                 className="object-contain"
               />
             </div>
+            <span className="text-white text-[15px] font-heading tracking-[0.04em] leading-tight uppercase">
+              Saddlewood<br />Contracting
+            </span>
           </Link>
           <p className="text-sm text-stone/35 italic font-light mt-3">
             &ldquo;Where Craftsmanship Meets Character&rdquo;

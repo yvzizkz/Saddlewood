@@ -207,7 +207,7 @@ export function Navbar() {
               priority
             />
           </div>
-          <span className="hidden sm:block text-white text-[15px] font-heading tracking-[0.04em] leading-tight uppercase">
+          <span className="text-white text-[15px] font-heading tracking-[0.04em] leading-tight uppercase">
             Saddlewood<br />Contracting
           </span>
         </Link>
