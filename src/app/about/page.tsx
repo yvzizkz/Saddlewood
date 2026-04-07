@@ -67,14 +67,14 @@ export default function AboutPage() {
               className="relative h-[500px] border border-charcoal-light"
             >
               <Image
-                src="/images/mcr-bathroom-luxury.jpg"
-                alt="Saddlewood craftsmanship"
+                src="/images/pv-shower-dual-brass.jpg"
+                alt="Luxury dual rain shower with brass fixtures in a Paradise Valley remodel"
                 fill
                 className="object-cover"
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-charcoal to-charcoal/0 p-8">
-                <p className="text-gold text-sm font-light">Saddlewood Team</p>
-                <p className="text-stone/60 text-xs font-light">Scottsdale, Arizona</p>
+                <p className="text-gold text-sm font-light">Paradise Valley</p>
+                <p className="text-stone/60 text-xs font-light">Full Home Remodel</p>
               </div>
             </motion.div>
 
@@ -88,7 +88,7 @@ export default function AboutPage() {
                 <div className="h-px w-8 bg-gold" />
                 <span className="section-label">Heritage</span>
               </div>
-              <h2 className="font-heading text-3xl sm:text-4xl lg:text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-8 leading-tight">
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-8 leading-tight">
                 Where Craftsmanship Meets Character
               </h2>
               <div className="space-y-6 text-charcoal-light font-light leading-relaxed">
@@ -99,7 +99,7 @@ export default function AboutPage() {
                   What sets us apart is our ability to handle every aspect of your remodel in-house. With four active ROC licenses — General, HVAC, Electrical, and Plumbing — we eliminate the coordination headaches that come with managing multiple subcontractors.
                 </p>
                 <p>
-                  We specialize in the communities we know best: McCormick Ranch, Gainey Ranch, and Pinnacle Peak Country Club. This hyper-local focus means we understand the architectural styles, HOA requirements, and design preferences that make each neighborhood unique.
+                  We specialize in the communities we know best: McCormick Ranch, Gainey Ranch, Paradise Valley, and Pinnacle Peak Country Club. This hyper-local focus means we understand the architectural styles, HOA requirements, and design preferences that make each neighborhood unique.
                 </p>
               </div>
             </motion.div>
@@ -205,8 +205,8 @@ export default function AboutPage() {
             <p className="text-stone/70 max-w-2xl font-light leading-relaxed mb-12">
               Our hyper-local focus means deeper expertise and stronger relationships in the communities where we work.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mb-12">
-              {["McCormick Ranch · 85258", "Gainey Ranch · 85258", "Pinnacle Peak CC · 85255"].map(
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mb-12">
+              {["McCormick Ranch · 85258", "Gainey Ranch · 85258", "Paradise Valley · 85253", "Pinnacle Peak CC · 85255"].map(
                 (area) => (
                   <div
                     key={area}

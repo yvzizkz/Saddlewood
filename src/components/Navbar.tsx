@@ -15,6 +15,7 @@ const navLinks = [
     children: [
       { label: "McCormick Ranch", href: "/neighborhoods/mccormick-ranch" },
       { label: "Gainey Ranch", href: "/neighborhoods/gainey-ranch" },
+      { label: "Paradise Valley", href: "/neighborhoods/paradise-valley" },
       { label: "Pinnacle Peak", href: "/neighborhoods/pinnacle-peak" },
     ],
   },

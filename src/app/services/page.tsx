@@ -1,4 +1,5 @@
 import { ServicesGrid } from "@/components/ServicesGrid";
+import { ProjectPhotoGrid } from "@/components/ProjectPhotoGrid";
 import { ProcessTimeline } from "@/components/ProcessTimeline";
 import { CTABanner } from "@/components/CTABanner";
 import { PageHero } from "@/components/PageHero";
@@ -21,6 +22,7 @@ export default function ServicesPage() {
         imageAlt="Luxury kitchen remodel with custom island by Saddlewood Contracting in Scottsdale"
       />
       <ServicesGrid />
+      <ProjectPhotoGrid />
       <ProcessTimeline />
       <CTABanner />
     </>
