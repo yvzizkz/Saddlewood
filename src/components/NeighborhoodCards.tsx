@@ -30,6 +30,14 @@ const hoods = [
     imageAlt: "Indoor-outdoor dining space at a Pinnacle Peak residence",
     href: "/neighborhoods/pinnacle-peak",
   },
+  {
+    name: "Paradise Valley",
+    zip: "85253",
+    tagline: "Luxury reimagined in the heart of the desert",
+    image: "/images/pv-aerial-sunset.jpg",
+    imageAlt: "Aerial sunset view of a luxury Paradise Valley home remodel",
+    href: "/neighborhoods/paradise-valley",
+  },
 ];
 
 export function NeighborhoodCards() {
@@ -45,7 +53,7 @@ export function NeighborhoodCards() {
       </div>
 
       {/* Edge-to-edge image cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-[2px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[2px]">
         {hoods.map((hood, i) => (
           <motion.div
             key={hood.name}
