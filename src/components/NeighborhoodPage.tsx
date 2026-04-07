@@ -230,6 +230,64 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
         </div>
       </section>
 
+      {/* Construction Process Timeline */}
+      {data.processSteps && data.processSteps.length > 0 && (
+        <section className="py-24 bg-off-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="mb-16"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="h-px w-8 bg-gold" />
+                <span className="section-label">Our Process</span>
+              </div>
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-4">
+                From Ground Up
+              </h2>
+              <p className="text-charcoal-light font-light max-w-2xl leading-relaxed">
+                This {data.name} project showcases our full-scope capabilities — from demolition through luxury finishes, every phase handled by our in-house licensed team.
+              </p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {data.processSteps.map((step, i) => (
+                <motion.div
+                  key={step.title}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="group"
+                >
+                  <div className="relative h-64 overflow-hidden mb-5">
+                    <Image
+                      src={step.image}
+                      alt={step.title}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute top-4 left-4">
+                      <span className="w-8 h-8 bg-gold text-teal-dark text-xs font-medium flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="font-heading text-lg font-light text-charcoal mb-2">
+                    {step.title}
+                  </h3>
+                  <p className="text-charcoal-light text-sm font-light leading-relaxed">
+                    {step.caption}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Testimonials */}
       {data.testimonials.length > 0 && (
         <section className="py-24 bg-teal-dark">
