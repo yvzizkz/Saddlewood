@@ -6,6 +6,12 @@ export interface NeighborhoodProject {
   caption: string;
 }
 
+export interface ProcessStep {
+  title: string;
+  image: string;
+  caption: string;
+}
+
 export interface NeighborhoodData {
   slug: string;
   name: string;
@@ -21,6 +27,7 @@ export interface NeighborhoodData {
     name: string;
     project: string;
   }[];
+  processSteps?: ProcessStep[];
 }
 
 export const neighborhoods: Record<string, NeighborhoodData> = {
@@ -255,6 +262,157 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
         quote: "From the first consultation to the final walkthrough, the Saddlewood team was exceptional. They respected our home, stayed on schedule, and delivered beyond our expectations.",
         name: "Jennifer & David L.",
         project: "Whole-Home Remodel",
+      },
+    ],
+  },
+  "paradise-valley": {
+    slug: "paradise-valley",
+    name: "Paradise Valley",
+    fullName: "Paradise Valley",
+    zip: "85253",
+    tagline: "Luxury Reimagined in the Heart of the Desert",
+    heroImage: "/images/pv-aerial-sunset.jpg",
+    description: [
+      "Paradise Valley is Arizona\u2019s most exclusive enclave \u2014 a town of fewer than 15,000 residents tucked between Camelback Mountain and Mummy Mountain. Known for its estate-sized lots, world-class resorts, and strict architectural standards, it\u2019s where discerning homeowners expect nothing less than exceptional craftsmanship.",
+      "Saddlewood Contracting earned its reputation in Paradise Valley through whole-home transformations that honor the community\u2019s architectural character while introducing modern luxury. Our 40th Street project showcases the full scope of our capabilities \u2014 from demolition and structural work through fine interior finishes.",
+      "With four ROC licenses covering general contracting, electrical, plumbing, and HVAC, we handle every phase in-house. In Paradise Valley, where project scale and complexity demand seamless coordination, this integrated approach eliminates delays and ensures quality from foundation to finish.",
+    ],
+    features: [
+      "Whole-home renovation expertise for estate-scale properties",
+      "Experience navigating Paradise Valley\u2019s architectural review process",
+      "Full in-house capabilities: structural, electrical, plumbing, HVAC",
+      "Proven track record with high-end finishes and custom millwork",
+    ],
+    projects: [
+      {
+        title: "Great Room with Ring Chandelier",
+        category: "Living",
+        image: "/images/pv-living-room-chandelier.jpg",
+        description: "Coffered ceilings, custom built-in shelving, and floor-to-ceiling windows framing mountain views.",
+        caption: "A statement ring chandelier anchors this great room \u2014 coffered ceilings and white oak built-ins frame the desert views beyond.",
+      },
+      {
+        title: "Formal Dining with Exposed Beams",
+        category: "Living",
+        image: "/images/pv-dining-room-beams.jpg",
+        description: "Exposed beam ceiling with bubble chandelier and seamless indoor-outdoor flow to the pool area.",
+        caption: "Natural wood beams and a sculptural chandelier set the tone for this dining room, with sliding doors opening directly to the pool terrace.",
+      },
+      {
+        title: "Chef\u2019s Kitchen with Stone Island",
+        category: "Kitchen",
+        image: "/images/pv-kitchen-island-wide.jpg",
+        description: "Massive natural stone island with waterfall edges, pendant lighting, and coffered ceiling detail.",
+        caption: "This kitchen island seats five and anchors the open floor plan \u2014 natural stone, pendant lighting, and coffered ceilings unify the space.",
+      },
+      {
+        title: "Kitchen to Living Sightline",
+        category: "Kitchen",
+        image: "/images/pv-kitchen-to-living-01.jpg",
+        description: "Open-concept kitchen flowing into the living room with fireplace and mountain views.",
+        caption: "From the kitchen island, the eye travels past the fireplace to the desert landscape beyond \u2014 a carefully composed sightline.",
+      },
+      {
+        title: "Open Kitchen & Great Room",
+        category: "Kitchen",
+        image: "/images/pv-kitchen-to-living-02.jpg",
+        description: "Wide-angle view of the kitchen opening into the great room with statement lighting throughout.",
+        caption: "The open floor plan connects kitchen, dining, and living spaces under a continuous coffered ceiling with coordinated lighting.",
+      },
+      {
+        title: "Grand Entry Foyer",
+        category: "Living",
+        image: "/images/pv-entry-foyer.jpg",
+        description: "Dramatic entry hall with exposed beams, arched mirrors, curated art, and wide-plank oak flooring.",
+        caption: "This entry sets the tone for the entire home \u2014 exposed beams, oversized art, and warm oak floors create an immediate sense of arrival.",
+      },
+      {
+        title: "Designer Living Room",
+        category: "Living",
+        image: "/images/pv-great-room-interior.jpg",
+        description: "Curated living space with designer sectional, open sightlines to kitchen and outdoor living.",
+        caption: "Neutral tones and natural materials let the architecture speak \u2014 the living room connects seamlessly to kitchen and patio.",
+      },
+      {
+        title: "Glass Wine Wall",
+        category: "Living",
+        image: "/images/pv-wine-wall.jpg",
+        description: "Temperature-controlled glass wine display with natural stone backing and steel framework.",
+        caption: "This climate-controlled wine wall doubles as a design statement \u2014 stone backing and blackened steel framing showcase the collection.",
+      },
+      {
+        title: "Wine Cellar & Kitchen View",
+        category: "Kitchen",
+        image: "/images/pv-wine-cellar-kitchen.jpg",
+        description: "Wine storage wall adjacent to the kitchen island, blending entertaining and culinary spaces.",
+        caption: "The wine wall meets the kitchen island at the heart of the home \u2014 designed for hosts who love to cook and entertain simultaneously.",
+      },
+      {
+        title: "Kitchen Detail & Built-In Ovens",
+        category: "Kitchen",
+        image: "/images/pv-kitchen-detail-ovens.jpg",
+        description: "Custom oak cabinetry with integrated double ovens, display niche, and stone countertops.",
+        caption: "Every detail was considered \u2014 integrated double ovens, a curated display niche, and flush oak cabinetry with brass hardware.",
+      },
+      {
+        title: "Custom Bar & Office",
+        category: "Living",
+        image: "/images/pv-custom-bar-office.jpg",
+        description: "Dark cabinetry with marble backsplash, live-edge desk, and crystal chandelier in a combined bar and office.",
+        caption: "This dual-purpose room pairs a marble wet bar with a live-edge desk \u2014 sophisticated enough for clients, comfortable enough for late nights.",
+      },
+      {
+        title: "Primary Suite with Skylight",
+        category: "Living",
+        image: "/images/pv-master-bedroom-skylight.jpg",
+        description: "Expansive primary bedroom with oversized skylight flooding the space with natural light.",
+        caption: "An oversized skylight transforms the primary suite \u2014 waking up to blue sky and falling asleep under the stars.",
+      },
+      {
+        title: "Sunset Aerial View",
+        category: "Outdoor",
+        image: "/images/pv-aerial-sunset.jpg",
+        description: "Drone view of the completed property at sunset, showcasing the full scope of the transformation.",
+        caption: "The completed 40th Street estate at golden hour \u2014 a full transformation from the ground up, captured from above.",
+      },
+    ],
+    processSteps: [
+      {
+        title: "Demolition & Site Prep",
+        image: "/images/pv-process-00-demo.jpg",
+        caption: "The existing structure was carefully demolished and the site prepared for new construction, including pool removal and grading.",
+      },
+      {
+        title: "Foundation & Concrete",
+        image: "/images/pv-process-01-slab.jpg",
+        caption: "Fresh concrete slab poured to exacting specifications, establishing the footprint for the reimagined floor plan.",
+      },
+      {
+        title: "Exterior Framing",
+        image: "/images/pv-process-02-framing-ext.jpg",
+        caption: "Exterior walls rise from the slab \u2014 the home\u2019s new bones taking shape against the desert sky.",
+      },
+      {
+        title: "Interior Framing",
+        image: "/images/pv-process-03-framing-int.jpg",
+        caption: "Interior walls and ceiling joists define the open floor plan that will become the home\u2019s signature feature.",
+      },
+      {
+        title: "Roof Trusses",
+        image: "/images/pv-process-04-trusses.jpg",
+        caption: "Engineered roof trusses installed, creating the dramatic ceiling heights visible in the finished great room.",
+      },
+      {
+        title: "Crew at Work",
+        image: "/images/pv-process-05-crew.jpg",
+        caption: "Our in-house framing crew at work \u2014 every phase handled by Saddlewood\u2019s own licensed tradespeople.",
+      },
+    ],
+    testimonials: [
+      {
+        quote: "Saddlewood took our 40th Street property from a dated ranch home to a modern desert estate. The scope was massive \u2014 full demo to finished luxury \u2014 and they handled every phase with professionalism and precision. We couldn\u2019t be happier with the result.",
+        name: "The Morrison Family",
+        project: "Whole-Home Transformation",
       },
     ],
   },
