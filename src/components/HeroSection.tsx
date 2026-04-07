@@ -1,29 +1,85 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { Phone } from "lucide-react";
 
+const heroImages = [
+  {
+    src: "/images/pv-entry-foyer.jpg",
+    alt: "Paradise Valley grand entry foyer with exposed beams and curated art",
+  },
+  {
+    src: "/images/pv-living-room-chandelier.jpg",
+    alt: "Paradise Valley great room with ring chandelier and mountain views",
+  },
+  {
+    src: "/images/pv-kitchen-island-wide.jpg",
+    alt: "Paradise Valley chef's kitchen with natural stone island",
+  },
+  {
+    src: "/images/pv-aerial-sunset.jpg",
+    alt: "Aerial sunset view of luxury Paradise Valley home remodel",
+  },
+];
+
+const INTERVAL_MS = 6000;
+
 export function HeroSection() {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const advance = useCallback(() => {
+    setActiveIndex((prev) => (prev + 1) % heroImages.length);
+  }, []);
+
+  useEffect(() => {
+    let timer = setInterval(advance, INTERVAL_MS);
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(timer);
+      } else {
+        timer = setInterval(advance, INTERVAL_MS);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [advance]);
+
   return (
     <section className="relative h-screen min-h-[600px] sm:min-h-[700px] flex items-end overflow-hidden" aria-label="Hero">
-      {/* Background Image */}
-      <div className="absolute inset-0">
-        <Image
-          src="/images/hero.jpg"
-          alt="Saddlewood Contracting luxury kitchen remodel in Scottsdale"
-          fill
-          className="object-cover"
-          priority
-        />
-      </div>
+      {/* Background Images — stacked, crossfade via opacity */}
+      {heroImages.map((img, i) => (
+        <div
+          key={img.src}
+          className={`absolute inset-0 transition-opacity duration-1000 ${
+            i === activeIndex ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          <Image
+            src={img.src}
+            alt={img.alt}
+            fill
+            className="object-cover"
+            priority={i === 0}
+            loading={i === 0 ? undefined : "eager"}
+            sizes="100vw"
+          />
+        </div>
+      ))}
 
       {/* Gradient Overlay */}
       <div
         className="absolute inset-0"
         style={{
-          background: "linear-gradient(to top, rgba(15,37,48,0.92) 0%, rgba(15,37,48,0.5) 35%, rgba(15,37,48,0.15) 60%, rgba(15,37,48,0.25) 100%)",
+          background: "linear-gradient(to top, rgba(26,47,47,0.92) 0%, rgba(26,47,47,0.5) 35%, rgba(26,47,47,0.15) 60%, rgba(26,47,47,0.25) 100%)",
         }}
       />
 
@@ -41,7 +97,7 @@ export function HeroSection() {
           </span>
         </div>
 
-        <h1 className="font-heading text-4xl md:text-5xl lg:text-[56px] font-medium text-white mb-5 leading-[1.15] tracking-[-0.02em]">
+        <h1 className="font-heading text-4xl md:text-5xl lg:text-[64px] font-medium text-white mb-5 leading-[1.15] tracking-[-0.02em]">
           Where Craftsmanship<br />
           Meets <em className="italic text-gold font-normal">Character</em>
         </h1>
@@ -53,7 +109,7 @@ export function HeroSection() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Link
             href="/portfolio"
-            className="inline-block px-8 py-3.5 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase no-underline hover:bg-[#d4a94c] transition-all hover:-translate-y-px"
+            className="inline-block px-10 py-4 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase rounded-sm no-underline hover:bg-[#d4a94c] transition-all hover:-translate-y-px"
           >
             View Our Work
           </Link>
