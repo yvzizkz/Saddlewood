@@ -25,12 +25,12 @@ const projects = [
     tall: false,
   },
   {
-    image: "/images/pp-kitchen-01.jpg",
-    alt: "Pinnacle Peak contemporary kitchen with designer finishes",
-    category: "Kitchen",
-    location: "Pinnacle Peak",
-    title: "Contemporary Kitchen",
-    caption: "Designer finishes and professional-grade appliances come together in this Pinnacle Peak kitchen renovation.",
+    image: "/images/pv-entry-foyer.jpg",
+    alt: "Paradise Valley grand entry foyer with exposed beams and curated art",
+    category: "Living",
+    location: "Paradise Valley",
+    title: "Grand Entry Transformation",
+    caption: "Exposed beams, oversized art, and warm oak floors create a dramatic sense of arrival in this Paradise Valley estate.",
     tall: false,
   },
 ];
