@@ -5,19 +5,19 @@
    ============================================ */
 
 :root {
-  --background: #FAFAF7;
-  --foreground: #2A2A2A;
-  --teal: #1B3A4B;
-  --teal-90: rgba(27,58,75,0.9);
-  --teal-dark: #0F2530;
-  --gold: #C49A3C;
+  --background: #f5f0e8;
+  --foreground: #2c2926;
+  --teal: #2d4a4a;
+  --teal-90: rgba(45,74,74,0.9);
+  --teal-dark: #1a2f2f;
+  --gold: #c8a55a;
   --gold-muted: #B8924A;
-  --stone: #F5F0E8;
-  --stone-mid: #EDE6DA;
-  --charcoal: #2A2A2A;
+  --stone: #e2dbd0;
+  --stone-mid: #d9d0c3;
+  --charcoal: #2c2926;
   --charcoal-light: #5A5A5A;
-  --off-white: #FAFAF7;
-  --cream: #F9F6F0;
+  --off-white: #f5f0e8;
+  --cream: #ede6d8;
   --white: #FFFFFF;
   --gold-accessible: #8B6914;
 }
