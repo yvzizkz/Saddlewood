@@ -97,10 +97,60 @@ const projects = [
     caption: "Floor-to-ceiling stone tile and frameless glass create a seamless, spa-like shower experience.",
     scope: ["Frameless glass enclosure", "Rain showerhead", "Bench seating", "Natural stone tile"],
   },
+  {
+    id: 10,
+    title: "Great Room with Ring Chandelier",
+    neighborhood: "Paradise Valley",
+    category: "Living",
+    image: "/images/pv-living-room-chandelier.jpg",
+    description: "Coffered ceilings, custom built-in shelving, and floor-to-ceiling windows framing mountain views.",
+    caption: "A statement ring chandelier anchors this great room — coffered ceilings and white oak built-ins frame the desert views beyond.",
+    scope: ["Coffered ceiling", "Custom built-in shelving", "Ring chandelier", "Wide-plank oak flooring", "Floor-to-ceiling windows"],
+  },
+  {
+    id: 11,
+    title: "Chef's Kitchen with Stone Island",
+    neighborhood: "Paradise Valley",
+    category: "Kitchen",
+    image: "/images/pv-kitchen-island-wide.jpg",
+    description: "Massive natural stone island with waterfall edges, pendant lighting, and coffered ceiling detail.",
+    caption: "This kitchen island seats five and anchors the open floor plan — natural stone, pendant lighting, and coffered ceilings unify the space.",
+    scope: ["Natural stone island", "Waterfall edges", "Pendant lighting", "Coffered ceiling", "Custom oak cabinetry"],
+  },
+  {
+    id: 12,
+    title: "Grand Entry Foyer",
+    neighborhood: "Paradise Valley",
+    category: "Living",
+    image: "/images/pv-entry-foyer.jpg",
+    description: "Dramatic entry hall with exposed beams, arched mirrors, curated art, and wide-plank oak flooring.",
+    caption: "This entry sets the tone for the entire home — exposed beams, oversized art, and warm oak floors create an immediate sense of arrival.",
+    scope: ["Exposed ceiling beams", "Wide-plank oak flooring", "Custom art lighting", "Arched mirrors", "Designer furniture"],
+  },
+  {
+    id: 13,
+    title: "Glass Wine Wall",
+    neighborhood: "Paradise Valley",
+    category: "Living",
+    image: "/images/pv-wine-wall.jpg",
+    description: "Temperature-controlled glass wine display with natural stone backing and steel framework.",
+    caption: "This climate-controlled wine wall doubles as a design statement — stone backing and blackened steel framing showcase the collection.",
+    scope: ["Climate-controlled storage", "Glass panel doors", "Stone backing", "Steel framework", "LED accent lighting"],
+  },
+  {
+    id: 14,
+    title: "Primary Suite with Skylight",
+    neighborhood: "Paradise Valley",
+    category: "Living",
+    image: "/images/pv-master-bedroom-skylight.jpg",
+    description: "Expansive primary bedroom with oversized skylight flooding the space with natural light.",
+    caption: "An oversized skylight transforms the primary suite — waking up to blue sky and falling asleep under the stars.",
+    scope: ["Oversized skylight", "Wide-plank oak flooring", "Custom closet doors", "Designer fixtures", "En-suite access"],
+  },
 ];
 
 const categories = ["All", "Kitchen", "Bathroom", "Living", "Outdoor"];
-const neighborhoodFilters = ["All", "McCormick Ranch", "Gainey Ranch", "Pinnacle Peak"];
+const neighborhoodFilters = ["All", "McCormick Ranch", "Gainey Ranch", "Pinnacle Peak", "Paradise Valley"];
 
 export function ProjectGrid() {
   const [activeCategory, setActiveCategory] = useState("All");
