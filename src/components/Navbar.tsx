@@ -192,8 +192,8 @@ export function Navbar() {
         aria-label="Main navigation"
         className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-10 transition-all duration-400 ${
           scrolled
-            ? "h-[80px] bg-[rgba(15,37,48,0.97)] backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.06)]"
-            : "h-[88px] bg-gradient-to-b from-[rgba(15,37,48,0.85)] via-[rgba(15,37,48,0.5)] to-transparent"
+            ? "h-[80px] bg-[rgba(26,47,47,0.97)] backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.06)]"
+            : "h-[88px] bg-gradient-to-b from-[rgba(26,47,47,0.85)] via-[rgba(26,47,47,0.5)] to-transparent"
         }`}
       >
         {/* Brand with Logo */}
@@ -250,7 +250,7 @@ export function Navbar() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 4 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute top-full left-0 mt-2 min-w-[220px] bg-[rgba(15,37,48,0.95)] backdrop-blur-xl border border-white/[0.06] py-2 rounded-sm"
+                      className="absolute top-full left-0 mt-2 min-w-[220px] bg-[rgba(26,47,47,0.95)] backdrop-blur-xl border border-white/[0.06] py-2 rounded-sm"
                       role="menu"
                       aria-label="Neighborhoods submenu"
                     >
@@ -319,7 +319,7 @@ export function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-[rgba(15,37,48,0.98)] pt-24 px-6 overflow-y-auto"
+            className="fixed inset-0 z-40 bg-[rgba(26,47,47,0.98)] pt-24 px-6 overflow-y-auto"
             role="dialog"
             aria-modal="true"
             aria-label="Mobile navigation menu"

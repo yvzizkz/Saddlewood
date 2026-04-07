@@ -42,7 +42,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
       </section>
 
       {/* About Section */}
-      <section className="py-24 bg-off-white">
+      <section className="py-28 bg-off-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
             <motion.div
@@ -119,7 +119,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
       </section>
 
       {/* Projects Gallery with Captions */}
-      <section className="py-24 bg-cream">
+      <section className="py-28 bg-cream">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

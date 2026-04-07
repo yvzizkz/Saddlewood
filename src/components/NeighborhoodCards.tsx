@@ -72,7 +72,7 @@ export function NeighborhoodCards() {
                 fill
                 className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[rgba(15,37,48,0.85)] via-[rgba(15,37,48,0.2)_60%] to-[rgba(15,37,48,0.35)] group-hover:from-[rgba(15,37,48,0.9)] group-hover:via-[rgba(15,37,48,0.3)_60%] group-hover:to-[rgba(15,37,48,0.15)] transition-all duration-400" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[rgba(26,47,47,0.85)] via-[rgba(26,47,47,0.2)_60%] to-[rgba(26,47,47,0.35)] group-hover:from-[rgba(26,47,47,0.9)] group-hover:via-[rgba(26,47,47,0.3)_60%] group-hover:to-[rgba(26,47,47,0.15)] transition-all duration-400" />
               <div className="absolute bottom-0 left-0 right-0 p-8 lg:p-10">
                 <div className="text-[10px] tracking-[0.3em] uppercase text-gold font-medium mb-3">
                   {hood.zip}

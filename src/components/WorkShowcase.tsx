@@ -37,7 +37,7 @@ const projects = [
 
 export function WorkShowcase() {
   return (
-    <section className="py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-12 bg-off-white" aria-label="Recent projects">
+    <section className="py-20 sm:py-28 lg:py-36 px-4 sm:px-6 lg:px-12 bg-off-white" aria-label="Recent projects">
       <div className="max-w-[1200px] mx-auto">
         {/* Header */}
         <div className="flex items-end justify-between mb-12">
@@ -75,7 +75,7 @@ export function WorkShowcase() {
                 fill
                 className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[rgba(15,37,48,0.85)] via-[rgba(15,37,48,0.3)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[rgba(26,47,47,0.85)] via-[rgba(26,47,47,0.3)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
               <div className="absolute bottom-0 left-0 right-0 p-8 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-400 delay-50">
                 <div className="text-[10px] tracking-[0.2em] uppercase text-gold font-medium mb-1.5">
                   {project.category} &middot; {project.location}

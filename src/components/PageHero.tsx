@@ -42,8 +42,8 @@ export function PageHero({ label, title, description, image, imageAlt }: PageHer
         className="absolute inset-0"
         style={{
           background: hasImage
-            ? "linear-gradient(to top, rgba(15,37,48,0.92) 0%, rgba(15,37,48,0.65) 40%, rgba(15,37,48,0.3) 70%, rgba(15,37,48,0.4) 100%)"
-            : "linear-gradient(to top, rgba(15,37,48,0.95) 0%, rgba(15,37,48,0.85) 100%)",
+            ? "linear-gradient(to top, rgba(26,47,47,0.92) 0%, rgba(26,47,47,0.65) 40%, rgba(26,47,47,0.3) 70%, rgba(26,47,47,0.4) 100%)"
+            : "linear-gradient(to top, rgba(26,47,47,0.95) 0%, rgba(26,47,47,0.85) 100%)",
         }}
         aria-hidden="true"
       />
