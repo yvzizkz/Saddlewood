@@ -2,19 +2,12 @@
 /**
  * Image processing pipeline. See:
  *   docs/superpowers/specs/2026-05-01-image-processing-pipeline-design.md
- *
- * Modes:
- *   default            - intake from raw-images/ + public/images/other/ via rename-map.json
- *   --reprocess        - rewrite public/images/*.jpg in place (top-level only, skips logos)
- *
- * Flags:
- *   --upscale          - run Real-ESRGAN on inputs with longest-side < 1600px
- *   --dry-run          - probe and log; do not write outputs or manifest
- *   --only <basename>  - process only the named file (output basename)
  */
 
 import { parseArgs } from "node:util";
 import * as path from "node:path";
+import * as fs from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 type Flags = {
   upscale: boolean;
@@ -22,6 +15,32 @@ type Flags = {
   dryRun: boolean;
   only: string | undefined;
 };
+
+type RenameMap = Record<string, string>;
+
+type JobInput = {
+  /** Absolute path to the source file. */
+  sourcePath: string;
+  /** Path relative to repo root, for manifest. */
+  sourceRelative: string;
+  /** Output basename in public/images/. */
+  outputBasename: string;
+  /** Whether this came from raw-images intake or in-place reprocess. */
+  sourceMode: "intake" | "reprocess";
+};
+
+// tsx may load this file as either CJS or ESM depending on package.json "type".
+// Resolve script directory in both cases so REPO_ROOT works regardless.
+const SCRIPT_DIR =
+  typeof __dirname !== "undefined"
+    ? __dirname
+    : path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(SCRIPT_DIR, "..");
+const RAW_IMAGES_DIR = path.join(REPO_ROOT, "raw-images");
+const PUBLIC_IMAGES_DIR = path.join(REPO_ROOT, "public", "images");
+const PUBLIC_IMAGES_OTHER_DIR = path.join(PUBLIC_IMAGES_DIR, "other");
+const RENAME_MAP_PATH = path.join(REPO_ROOT, "scripts", "rename-map.json");
+const MANIFEST_PATH = path.join(PUBLIC_IMAGES_DIR, "manifest.json");
 
 function parseFlags(): Flags {
   const { values } = parseArgs({
@@ -62,10 +81,78 @@ FLAGS:
   --help               Show this help`);
 }
 
+async function loadRenameMap(): Promise<RenameMap> {
+  const raw = await fs.readFile(RENAME_MAP_PATH, "utf8");
+  return JSON.parse(raw) as RenameMap;
+}
+
+async function fileExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Default-mode input resolution. For each rename-map key, search
+ * raw-images/ first, then public/images/other/. First match wins.
+ * Files in the rename map but not present in either dir are warned and skipped.
+ */
+async function enumerateIntakeJobs(map: RenameMap): Promise<JobInput[]> {
+  const jobs: JobInput[] = [];
+  for (const [inputBasename, outputBasename] of Object.entries(map)) {
+    const candidates = [
+      path.join(RAW_IMAGES_DIR, inputBasename),
+      path.join(PUBLIC_IMAGES_OTHER_DIR, inputBasename),
+    ];
+    let resolved: string | null = null;
+    for (const c of candidates) {
+      if (await fileExists(c)) {
+        resolved = c;
+        break;
+      }
+    }
+    if (!resolved) {
+      console.warn(
+        `[intake] WARN: ${inputBasename} not found in raw-images/ or public/images/other/, skipping`,
+      );
+      continue;
+    }
+    jobs.push({
+      sourcePath: resolved,
+      sourceRelative: path.relative(REPO_ROOT, resolved).replace(/\\/g, "/"),
+      outputBasename,
+      sourceMode: "intake",
+    });
+  }
+  return jobs;
+}
+
 async function main(): Promise<void> {
   const flags = parseFlags();
-  console.log("[process-images] flags:", flags);
-  console.log("[process-images] (skeleton — no work performed yet)");
+  if (flags.reprocess) {
+    console.log("[process-images] --reprocess mode (not yet implemented)");
+    return;
+  }
+  const map = await loadRenameMap();
+  let jobs = await enumerateIntakeJobs(map);
+  if (flags.only) {
+    jobs = jobs.filter((j) => j.outputBasename === flags.only);
+    if (jobs.length === 0) {
+      console.error(`[only] no rename-map entry produces output ${flags.only}`);
+      process.exit(2);
+    }
+  }
+  console.log(`[intake] resolved ${jobs.length} job(s)`);
+  if (flags.dryRun) {
+    for (const j of jobs) {
+      console.log(`  ${j.sourceRelative}  ->  public/images/${j.outputBasename}`);
+    }
+    return;
+  }
+  console.log("[process-images] (processing not yet implemented)");
 }
 
 main().catch((err) => {
