@@ -43,6 +43,11 @@ const PUBLIC_IMAGES_OTHER_DIR = path.join(PUBLIC_IMAGES_DIR, "other");
 const RENAME_MAP_PATH = path.join(REPO_ROOT, "scripts", "rename-map.json");
 const MANIFEST_PATH = path.join(PUBLIC_IMAGES_DIR, "manifest.json");
 
+// Exit codes:
+//   0  success / --help
+//   1  fatal (uncaught error)
+//   2  --only matched no jobs
+//   3  output basename collision
 function parseFlags(): Flags {
   const { values } = parseArgs({
     options: {
@@ -131,6 +136,31 @@ async function enumerateIntakeJobs(map: RenameMap): Promise<JobInput[]> {
   return jobs;
 }
 
+const REPROCESS_EXCLUSIONS = new Set(["logo.png", "logo.svg"]);
+
+/**
+ * Reprocess-mode input enumeration.
+ * Top-level public/images/*.jpg only. Subfolders skipped, logos skipped.
+ * Input and output basenames are identical — files are rewritten in place.
+ */
+async function enumerateReprocessJobs(): Promise<JobInput[]> {
+  const entries = await fs.readdir(PUBLIC_IMAGES_DIR, { withFileTypes: true });
+  const jobs: JobInput[] = [];
+  for (const e of entries) {
+    if (!e.isFile()) continue;
+    if (REPROCESS_EXCLUSIONS.has(e.name)) continue;
+    if (!/\.jpe?g$/i.test(e.name)) continue;
+    const sourcePath = path.join(PUBLIC_IMAGES_DIR, e.name);
+    jobs.push({
+      sourcePath,
+      sourceRelative: `public/images/${e.name}`,
+      outputBasename: e.name,
+      sourceMode: "reprocess",
+    });
+  }
+  return jobs;
+}
+
 type ProcessOutcome = {
   originalDimensions: { width: number; height: number };
   outputDimensions: { width: number; height: number };
@@ -164,6 +194,9 @@ const JPEG_OPTIONS = { quality: 85, mozjpeg: true, progressive: true } as const;
  * Returns dimensions and provenance for the manifest.
  *
  * Sharp pipeline rationale:
+ *  - Input is read into a Buffer first because reprocess mode writes back to
+ *    the same path, and sharp refuses to read+write the same file path
+ *    (libvips lazy-loads pixels and would truncate the input mid-read).
  *  - .rotate() FIRST bakes EXIF Orientation into pixels. Required because we
  *    strip EXIF; without this, sideways-shot iPhone photos render rotated.
  *  - .resize(N, N, fit:'inside', withoutEnlargement:false) caps the LONGEST
@@ -176,14 +209,15 @@ async function processOne(
   outputPath: string,
   upscaledFromBin: boolean,
 ): Promise<ProcessOutcome> {
-  const inputMeta = await sharp(inputPath).metadata();
+  const inputBuffer = await fs.readFile(inputPath);
+  const inputMeta = await sharp(inputBuffer).metadata();
   if (!inputMeta.width || !inputMeta.height) {
     throw new Error(`could not read dimensions of ${inputPath}`);
   }
   const originalDimensions = { width: inputMeta.width, height: inputMeta.height };
 
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  const info = await sharp(inputPath)
+  const info = await sharp(inputBuffer)
     .rotate()
     .resize(TARGET_LONGEST_SIDE, TARGET_LONGEST_SIDE, {
       fit: "inside",
@@ -240,33 +274,20 @@ async function writeManifest(m: Manifest): Promise<void> {
   await fs.writeFile(MANIFEST_PATH, JSON.stringify(m, null, 2) + "\n", "utf8");
 }
 
-async function main(): Promise<void> {
-  const flags = parseFlags();
-  if (flags.reprocess) {
-    console.log("[process-images] --reprocess mode (not yet implemented)");
-    return;
-  }
-  const map = await loadRenameMap();
-  let jobs = await enumerateIntakeJobs(map);
-  if (flags.only) {
-    jobs = jobs.filter((j) => j.outputBasename === flags.only);
-    if (jobs.length === 0) {
-      console.error(`[only] no rename-map entry produces output ${flags.only}`);
-      process.exit(2);
-    }
-  }
-
-  // Pre-flight: detect output basename collisions across the job set.
-  const seen = new Set<string>();
+async function runJobs(jobs: JobInput[], flags: Flags): Promise<void> {
+  const seenByOutput = new Map<string, string>();
   for (const j of jobs) {
-    if (seen.has(j.outputBasename)) {
-      console.error(`[collision] two jobs produce ${j.outputBasename}; aborting`);
+    const first = seenByOutput.get(j.outputBasename);
+    if (first !== undefined) {
+      console.error(
+        `[collision] ${first} and ${j.sourceRelative} both produce ${j.outputBasename}; aborting`,
+      );
       process.exit(3);
     }
-    seen.add(j.outputBasename);
+    seenByOutput.set(j.outputBasename, j.sourceRelative);
   }
 
-  console.log(`[intake] resolved ${jobs.length} job(s)`);
+  console.log(`[run] ${jobs.length} job(s)`);
 
   if (flags.dryRun) {
     for (const j of jobs) {
@@ -295,7 +316,26 @@ async function main(): Promise<void> {
     }
   }
   await writeManifest(manifest);
-  console.log(`[intake] done: ${ok} ok, ${failed} failed; manifest at public/images/manifest.json`);
+  console.log(`[run] done: ${ok} ok, ${failed} failed; manifest at public/images/manifest.json`);
+}
+
+async function main(): Promise<void> {
+  const flags = parseFlags();
+  let jobs: JobInput[];
+  if (flags.reprocess) {
+    jobs = await enumerateReprocessJobs();
+  } else {
+    const map = await loadRenameMap();
+    jobs = await enumerateIntakeJobs(map);
+  }
+  if (flags.only) {
+    jobs = jobs.filter((j) => j.outputBasename === flags.only);
+    if (jobs.length === 0) {
+      console.error(`[only] no job produces output ${flags.only}`);
+      process.exit(2);
+    }
+  }
+  await runJobs(jobs, flags);
 }
 
 main().catch((err) => {
