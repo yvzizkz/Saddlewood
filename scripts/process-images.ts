@@ -297,6 +297,9 @@ async function maybeUpscale(
     ]);
     return { path: tempfile, upscaled: true, tempfile };
   } catch (err) {
+    // ESRGAN may have written a partial PNG before erroring; clean it up here
+    // since we return tempfile:null and the caller's finally won't see it.
+    await fs.unlink(tempfile).catch(() => {});
     console.warn(
       `[upscale] realesrgan failed for ${path.basename(inputPath)}: ${(err as Error).message}`,
     );
