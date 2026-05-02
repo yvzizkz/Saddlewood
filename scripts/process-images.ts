@@ -208,8 +208,12 @@ const JPEG_OPTIONS = { quality: 85, mozjpeg: true, progressive: true } as const;
  *    inputPath is an ESRGAN tempfile the buffer-read is harmless.
  *  - .rotate() FIRST bakes EXIF Orientation into pixels. Required because we
  *    strip EXIF; without this, sideways-shot iPhone photos render rotated.
- *  - .resize(N, N, fit:'inside', withoutEnlargement:false) caps the LONGEST
- *    side at N while preserving aspect ratio. Upscales small inputs.
+ *  - .resize(N, N, fit:'inside') caps the LONGEST side at N. Enlargement is
+ *    permitted ONLY when the input is an ESRGAN intermediate (upscaledFromBin),
+ *    since that case is always a downsize from the 4x intermediate to 2400.
+ *    For all other paths (sharp-only intake, reprocess), withoutEnlargement is
+ *    true so we never lanczos-upscale a small original — that's exactly the
+ *    soft output ESRGAN exists to avoid on this luxury-portfolio site.
  *  - .jpeg({quality:85, mozjpeg:true, progressive:true}) is the encode setting.
  *  - No .keepMetadata() call — sharp's default re-encode strips EXIF/GPS/ICC.
  */
@@ -226,7 +230,7 @@ async function processOne(
     .rotate()
     .resize(TARGET_LONGEST_SIDE, TARGET_LONGEST_SIDE, {
       fit: "inside",
-      withoutEnlargement: false,
+      withoutEnlargement: !upscaledFromBin,
     })
     .jpeg(JPEG_OPTIONS)
     .toFile(outputPath);
