@@ -35,8 +35,8 @@ export function Testimonials() {
             transition={{ delay: 0.15 }}
           >
             <Image
-              src="/images/bathroom1.jpg"
-              alt="Luxury bathroom remodel"
+              src="/images/pp-spa-shower.jpg"
+              alt="Master bath shower with travertine walls, built-in niche, and natural light"
               fill
               className="object-cover"
             />

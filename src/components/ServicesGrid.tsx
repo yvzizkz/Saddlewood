@@ -59,13 +59,13 @@ export function ServicesGrid() {
           >
             <Image
               src="/images/mcr-kitchen-island-04.jpg"
-              alt="Modern kitchen remodel with custom island in McCormick Ranch"
+              alt="McCormick Ranch family room with vaulted ceiling, fireplace, and abstract art"
               fill
               className="object-cover"
             />
             <div className="absolute bottom-0 left-0 right-0 p-6 lg:p-7 bg-teal-90">
               <p className="text-[13px] text-stone/70 font-light leading-relaxed">
-                <strong className="text-gold font-medium">McCormick Ranch</strong> &mdash; Modern kitchen featuring custom island, premium cabinetry, and designer finishes. Every detail handled by our in-house team.
+                <strong className="text-gold font-medium">McCormick Ranch</strong> &mdash; Family room with soaring vaulted ceiling, custom fireplace surround, and designer finishes. Every detail handled by our in-house team.
               </p>
             </div>
           </motion.div>
