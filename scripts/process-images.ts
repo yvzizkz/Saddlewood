@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 
 type Flags = {
   upscale: boolean;
@@ -128,6 +129,64 @@ async function enumerateIntakeJobs(map: RenameMap): Promise<JobInput[]> {
     });
   }
   return jobs;
+}
+
+type ProcessOutcome = {
+  originalDimensions: { width: number; height: number };
+  outputDimensions: { width: number; height: number };
+  resized: boolean;
+  upscaled: boolean;
+  exifStripped: true;
+};
+
+const TARGET_LONGEST_SIDE = 2400;
+const JPEG_OPTIONS = { quality: 85, mozjpeg: true, progressive: true } as const;
+
+/**
+ * Process a single image: optional upscale (handled by caller), then sharp pipeline.
+ * Returns dimensions and provenance for the manifest.
+ *
+ * Sharp pipeline rationale:
+ *  - .rotate() FIRST bakes EXIF Orientation into pixels. Required because we
+ *    strip EXIF; without this, sideways-shot iPhone photos render rotated.
+ *  - .resize(N, N, fit:'inside', withoutEnlargement:false) caps the LONGEST
+ *    side at N while preserving aspect ratio. Upscales small inputs.
+ *  - .jpeg({quality:85, mozjpeg:true, progressive:true}) is the encode setting.
+ *  - No .keepMetadata() call — sharp's default re-encode strips EXIF/GPS/ICC.
+ */
+async function processOne(
+  inputPath: string,
+  outputPath: string,
+  upscaledFromBin: boolean,
+): Promise<ProcessOutcome> {
+  const inputMeta = await sharp(inputPath).metadata();
+  if (!inputMeta.width || !inputMeta.height) {
+    throw new Error(`could not read dimensions of ${inputPath}`);
+  }
+  const originalDimensions = { width: inputMeta.width, height: inputMeta.height };
+
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  const info = await sharp(inputPath)
+    .rotate()
+    .resize(TARGET_LONGEST_SIDE, TARGET_LONGEST_SIDE, {
+      fit: "inside",
+      withoutEnlargement: false,
+    })
+    .jpeg(JPEG_OPTIONS)
+    .toFile(outputPath);
+
+  const outputDimensions = { width: info.width, height: info.height };
+  const resized =
+    outputDimensions.width !== originalDimensions.width ||
+    outputDimensions.height !== originalDimensions.height;
+
+  return {
+    originalDimensions,
+    outputDimensions,
+    resized,
+    upscaled: upscaledFromBin,
+    exifStripped: true,
+  };
 }
 
 async function main(): Promise<void> {
