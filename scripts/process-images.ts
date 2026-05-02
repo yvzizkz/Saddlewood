@@ -204,14 +204,44 @@ async function main(): Promise<void> {
       process.exit(2);
     }
   }
+
+  // Pre-flight: detect output basename collisions across the job set.
+  const seen = new Set<string>();
+  for (const j of jobs) {
+    if (seen.has(j.outputBasename)) {
+      console.error(`[collision] two jobs produce ${j.outputBasename}; aborting`);
+      process.exit(3);
+    }
+    seen.add(j.outputBasename);
+  }
+
   console.log(`[intake] resolved ${jobs.length} job(s)`);
+
   if (flags.dryRun) {
     for (const j of jobs) {
       console.log(`  ${j.sourceRelative}  ->  public/images/${j.outputBasename}`);
     }
     return;
   }
-  console.log("[process-images] (processing not yet implemented)");
+
+  let ok = 0;
+  let failed = 0;
+  for (const j of jobs) {
+    const outputPath = path.join(PUBLIC_IMAGES_DIR, j.outputBasename);
+    try {
+      const outcome = await processOne(j.sourcePath, outputPath, false);
+      console.log(
+        `  [ok] ${j.outputBasename}  ${outcome.originalDimensions.width}x${outcome.originalDimensions.height}` +
+          ` -> ${outcome.outputDimensions.width}x${outcome.outputDimensions.height}` +
+          (outcome.resized ? " (resized)" : ""),
+      );
+      ok++;
+    } catch (err) {
+      console.error(`  [err] ${j.outputBasename}: ${(err as Error).message}`);
+      failed++;
+    }
+  }
+  console.log(`[intake] done: ${ok} ok, ${failed} failed`);
 }
 
 main().catch((err) => {
