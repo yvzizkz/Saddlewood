@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-02T15:46:02.896Z",
+  "generated_at": "2026-05-02T19:01:30.324Z",
   "images": {
     "bathroom1.jpg": {
       "source": "public/images/bathroom1.jpg",
@@ -945,6 +945,630 @@
       "upscaled": false,
       "exif_stripped": true,
       "processed_at": "2026-05-02T15:46:02.896Z"
+    },
+    "pv-master-bath-silver-tub-wide.jpg": {
+      "source": "raw-images/IMG_5031.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 580
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1450
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T17:44:24.079Z"
+    },
+    "pv-master-bath-fluted-shower-detail.jpg": {
+      "source": "raw-images/IMG_5032.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1361
+      },
+      "output_dimensions": {
+        "width": 1693,
+        "height": 2400
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T17:48:41.318Z"
+    },
+    "pv-bedroom-wood-wall-velvet.jpg": {
+      "source": "raw-images/IMG_5033.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1339
+      },
+      "output_dimensions": {
+        "width": 1721,
+        "height": 2400
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T17:52:58.690Z"
+    },
+    "pv-master-bedroom-wide.jpg": {
+      "source": "raw-images/IMG_5034.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 580
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1450
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T17:54:55.614Z"
+    },
+    "pv-bathroom-oval-mirror-vanity.jpg": {
+      "source": "raw-images/IMG_5035.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1352
+      },
+      "output_dimensions": {
+        "width": 1704,
+        "height": 2400
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T17:59:15.824Z"
+    },
+    "pv-closet-vanity-mirror.jpg": {
+      "source": "raw-images/IMG_5036.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 593
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1483
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:01:13.878Z"
+    },
+    "pv-master-bedroom-pillows-detail.jpg": {
+      "source": "raw-images/IMG_5037.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1345
+      },
+      "output_dimensions": {
+        "width": 1713,
+        "height": 2400
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:05:03.716Z"
+    },
+    "pv-secondary-bath-dual-vanity.jpg": {
+      "source": "raw-images/IMG_5038.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 582
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1455
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:06:47.293Z"
+    },
+    "pv-exterior-fireplace-twilight.jpg": {
+      "source": "raw-images/IMG_5039.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 548
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1370
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:08:23.837Z"
+    },
+    "pv-family-room-pool-open.jpg": {
+      "source": "raw-images/IMG_5040.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 590
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1475
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:10:14.990Z"
+    },
+    "pv-master-bath-veined-marble-tub.jpg": {
+      "source": "raw-images/IMG_5041.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 639
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1598
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:12:22.219Z"
+    },
+    "pv-master-bath-veined-marble-wide.jpg": {
+      "source": "raw-images/IMG_5042.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 571
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1428
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:14:17.887Z"
+    },
+    "pv-exterior-pool-mountain-day.jpg": {
+      "source": "raw-images/IMG_5043.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 581
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1453
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:16:16.517Z"
+    },
+    "pv-closet-galley-shoe-storage.jpg": {
+      "source": "raw-images/IMG_5044.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 625
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1563
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:18:11.711Z"
+    },
+    "pv-kitchen-from-wine-wall.jpg": {
+      "source": "raw-images/IMG_5045.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 558
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1395
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:19:46.451Z"
+    },
+    "pv-kitchen-range-brass-canisters.jpg": {
+      "source": "raw-images/IMG_5046.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 601
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1503
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:21:22.460Z"
+    },
+    "pv-great-room-chandelier-pool.jpg": {
+      "source": "raw-images/IMG_5047.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 601
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1503
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:22:59.019Z"
+    },
+    "pv-office-bar-crystal-chandelier.jpg": {
+      "source": "raw-images/IMG_5048.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 582
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1455
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:24:30.920Z"
+    },
+    "pv-foyer-wine-cellar-view.jpg": {
+      "source": "raw-images/IMG_5049.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 591
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1478
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:26:05.945Z"
+    },
+    "pv-exterior-covered-patio-wicker.jpg": {
+      "source": "raw-images/IMG_5050.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 583
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1458
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:27:37.697Z"
+    },
+    "pv-laundry-room.jpg": {
+      "source": "raw-images/IMG_5051.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 617
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1543
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:29:13.508Z"
+    },
+    "pv-family-room-from-behind-sofa.jpg": {
+      "source": "raw-images/IMG_5052.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1403
+      },
+      "output_dimensions": {
+        "width": 1642,
+        "height": 2400
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:32:49.615Z"
+    },
+    "pv-exterior-grill-dining.jpg": {
+      "source": "raw-images/IMG_5053.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 579
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1448
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:34:23.472Z"
+    },
+    "pv-exterior-bath-wing-dusk.jpg": {
+      "source": "raw-images/IMG_5054.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 570
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1425
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:35:53.817Z"
+    },
+    "pv-exterior-outdoor-dining-dusk.jpg": {
+      "source": "raw-images/IMG_5055.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 585
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1463
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:37:26.150Z"
+    },
+    "new-sitting-area-abstract-art.jpg": {
+      "source": "raw-images/IMG_5056.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1346
+      },
+      "output_dimensions": {
+        "width": 1712,
+        "height": 2400
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:40:59.052Z"
+    },
+    "pv-exterior-pool-golden-hour.jpg": {
+      "source": "raw-images/IMG_5057.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 576
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1440
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:42:41.988Z"
+    },
+    "pv-family-room-toward-tv.jpg": {
+      "source": "raw-images/IMG_5058.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1417
+      },
+      "output_dimensions": {
+        "width": 1626,
+        "height": 2400
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:46:51.842Z"
+    },
+    "pv-exterior-covered-patio-desert.jpg": {
+      "source": "raw-images/IMG_5060.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 580
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1450
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:48:33.561Z"
+    },
+    "pv-exterior-back-twilight.jpg": {
+      "source": "raw-images/IMG_5061.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 582
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1455
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:50:16.670Z"
+    },
+    "pv-exterior-front-sunset.jpg": {
+      "source": "raw-images/IMG_5062.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 578
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1445
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:51:49.583Z"
+    },
+    "pv-exterior-aerial-sunset-streetside.jpg": {
+      "source": "raw-images/IMG_5063.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 626
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1565
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:53:29.498Z"
+    },
+    "pv-exterior-pool-yard-twilight.jpg": {
+      "source": "raw-images/IMG_5064.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 575
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1438
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:55:00.971Z"
+    },
+    "pv-exterior-aerial-mountain.jpg": {
+      "source": "raw-images/IMG_5065.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 626
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1565
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:56:41.011Z"
+    },
+    "pv-exterior-pool-lounge-twilight.jpg": {
+      "source": "raw-images/IMG_5066.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 612
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1530
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:58:17.984Z"
+    },
+    "pv-exterior-aerial-sunset-mountain.jpg": {
+      "source": "raw-images/IMG_5067.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 572
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1430
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T18:59:48.557Z"
+    },
+    "pv-exterior-front-entrance-dusk.jpg": {
+      "source": "raw-images/IMG_5068.JPEG",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 960,
+        "height": 578
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1445
+      },
+      "resized": true,
+      "upscaled": true,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T19:01:26.360Z"
+    },
+    "new-bathroom-glass-shower.jpg": {
+      "source": "public/images/other/new-bathroom-glass-shower.png",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 7680,
+        "height": 5008
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1565
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T19:01:28.358Z"
+    },
+    "new-kitchen-shaker-range.jpg": {
+      "source": "public/images/other/new-kitchen-shaker-range.png",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 7680,
+        "height": 5024
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1570
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T19:01:30.323Z"
     }
   }
 }
