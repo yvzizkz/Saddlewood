@@ -4,11 +4,17 @@
  *   docs/superpowers/specs/2026-05-01-image-processing-pipeline-design.md
  */
 
-import { parseArgs } from "node:util";
+import { parseArgs, promisify } from "node:util";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import which from "which";
+
+const execFileAsync = promisify(execFile);
 
 type Flags = {
   upscale: boolean;
@@ -190,13 +196,16 @@ const TARGET_LONGEST_SIDE = 2400;
 const JPEG_OPTIONS = { quality: 85, mozjpeg: true, progressive: true } as const;
 
 /**
- * Process a single image: optional upscale (handled by caller), then sharp pipeline.
- * Returns dimensions and provenance for the manifest.
+ * Process a single image through the sharp pipeline. The caller probes the
+ * TRUE original dimensions and passes them in so the manifest records the
+ * untouched source size even when inputPath points at an upscaled tempfile
+ * produced by maybeUpscale().
  *
  * Sharp pipeline rationale:
  *  - Input is read into a Buffer first because reprocess mode writes back to
  *    the same path, and sharp refuses to read+write the same file path
- *    (libvips lazy-loads pixels and would truncate the input mid-read).
+ *    (libvips lazy-loads pixels and would truncate the input mid-read). When
+ *    inputPath is an ESRGAN tempfile the buffer-read is harmless.
  *  - .rotate() FIRST bakes EXIF Orientation into pixels. Required because we
  *    strip EXIF; without this, sideways-shot iPhone photos render rotated.
  *  - .resize(N, N, fit:'inside', withoutEnlargement:false) caps the LONGEST
@@ -207,14 +216,10 @@ const JPEG_OPTIONS = { quality: 85, mozjpeg: true, progressive: true } as const;
 async function processOne(
   inputPath: string,
   outputPath: string,
+  originalDimensions: { width: number; height: number },
   upscaledFromBin: boolean,
 ): Promise<ProcessOutcome> {
   const inputBuffer = await fs.readFile(inputPath);
-  const inputMeta = await sharp(inputBuffer).metadata();
-  if (!inputMeta.width || !inputMeta.height) {
-    throw new Error(`could not read dimensions of ${inputPath}`);
-  }
-  const originalDimensions = { width: inputMeta.width, height: inputMeta.height };
 
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   const info = await sharp(inputBuffer)
@@ -238,6 +243,66 @@ async function processOne(
     upscaled: upscaledFromBin,
     exifStripped: true,
   };
+}
+
+const UPSCALE_THRESHOLD = 1600;
+let installHintShown = false;
+
+/**
+ * Real-ESRGAN pre-pass. Returns the path that should be passed to sharp.
+ * Either the original input (no upscale needed/possible), or a tempfile that
+ * the caller MUST delete after sharp processes it.
+ *
+ * Graceful behavior:
+ *  - --upscale not set, or longest side >= 1600px: returns original, upscaled=false.
+ *  - realesrgan-ncnn-vulkan binary missing from PATH: warn once, return original.
+ *  - Binary present but errors on a file: warn for that file, return original.
+ */
+async function maybeUpscale(
+  inputPath: string,
+  dims: { width: number; height: number },
+  upscaleEnabled: boolean,
+): Promise<{ path: string; upscaled: boolean; tempfile: string | null }> {
+  if (!upscaleEnabled) return { path: inputPath, upscaled: false, tempfile: null };
+  const longest = Math.max(dims.width, dims.height);
+  if (longest >= UPSCALE_THRESHOLD) {
+    return { path: inputPath, upscaled: false, tempfile: null };
+  }
+
+  const bin = await which("realesrgan-ncnn-vulkan", { nothrow: true });
+  if (!bin) {
+    if (!installHintShown) {
+      console.warn("[upscale] realesrgan-ncnn-vulkan not found on PATH.");
+      console.warn("[upscale] Install: https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan/releases");
+      console.warn("[upscale] Extract the zip, add the directory to PATH. Skipping upscaling for this run.");
+      installHintShown = true;
+    }
+    return { path: inputPath, upscaled: false, tempfile: null };
+  }
+
+  const tempfile = path.join(os.tmpdir(), `upscale-${randomUUID()}.png`);
+  try {
+    // The binary's -m flag defaults to "models" relative to the CURRENT WORKING
+    // DIRECTORY (not the binary's directory). Invoked from a Node script whose
+    // CWD is the repo root, the binary would look for <repo-root>/models/ and
+    // fail. Derive an absolute models path from the resolved binary location so
+    // this works regardless of CWD.
+    const modelsDir = path.join(path.dirname(bin), "models");
+    await execFileAsync(bin, [
+      "-i", inputPath,
+      "-o", tempfile,
+      "-n", "realesrgan-x4plus",
+      "-s", "4",
+      "-m", modelsDir,
+    ]);
+    return { path: tempfile, upscaled: true, tempfile };
+  } catch (err) {
+    console.warn(
+      `[upscale] realesrgan failed for ${path.basename(inputPath)}: ${(err as Error).message}`,
+    );
+    console.warn("[upscale] falling back to sharp-only resize for this file");
+    return { path: inputPath, upscaled: false, tempfile: null };
+  }
 }
 
 async function loadOrInitManifest(): Promise<Manifest> {
@@ -301,18 +366,39 @@ async function runJobs(jobs: JobInput[], flags: Flags): Promise<void> {
   let failed = 0;
   for (const j of jobs) {
     const outputPath = path.join(PUBLIC_IMAGES_DIR, j.outputBasename);
+    let upscaleResult: Awaited<ReturnType<typeof maybeUpscale>> | null = null;
     try {
-      const outcome = await processOne(j.sourcePath, outputPath, false);
+      // Probe TRUE original dims before any upscale step so the manifest
+      // records the untouched source size, not the ESRGAN intermediate.
+      const probe = await sharp(j.sourcePath).metadata();
+      if (!probe.width || !probe.height) {
+        throw new Error(`could not read dimensions of ${j.sourcePath}`);
+      }
+      const originalDimensions = { width: probe.width, height: probe.height };
+      upscaleResult = await maybeUpscale(j.sourcePath, originalDimensions, flags.upscale);
+      const outcome = await processOne(
+        upscaleResult.path,
+        outputPath,
+        originalDimensions,
+        upscaleResult.upscaled,
+      );
       manifest.images[j.outputBasename] = makeEntry(j, outcome, new Date().toISOString());
       console.log(
         `  [ok] ${j.outputBasename}  ${outcome.originalDimensions.width}x${outcome.originalDimensions.height}` +
           ` -> ${outcome.outputDimensions.width}x${outcome.outputDimensions.height}` +
-          (outcome.resized ? " (resized)" : ""),
+          (outcome.resized ? " (resized)" : "") +
+          (outcome.upscaled ? " (upscaled)" : ""),
       );
       ok++;
     } catch (err) {
       console.error(`  [err] ${j.outputBasename}: ${(err as Error).message}`);
       failed++;
+    } finally {
+      // Use .catch(noop) so a stale-tempfile cleanup error doesn't mask a real
+      // pipeline error from the try block.
+      if (upscaleResult?.tempfile) {
+        await fs.unlink(upscaleResult.tempfile).catch(() => {});
+      }
     }
   }
   await writeManifest(manifest);
