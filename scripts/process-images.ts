@@ -258,7 +258,7 @@ let installHintShown = false;
  * the caller MUST delete after sharp processes it.
  *
  * Graceful behavior:
- *  - --upscale not set, or longest side >= 1600px: returns original, upscaled=false.
+ *  - --upscale not set, or longest side > 1600px: returns original, upscaled=false.
  *  - realesrgan-ncnn-vulkan binary missing from PATH: warn once, return original.
  *  - Binary present but errors on a file: warn for that file, return original.
  */
@@ -269,7 +269,7 @@ async function maybeUpscale(
 ): Promise<{ path: string; upscaled: boolean; tempfile: string | null }> {
   if (!upscaleEnabled) return { path: inputPath, upscaled: false, tempfile: null };
   const longest = Math.max(dims.width, dims.height);
-  if (longest >= UPSCALE_THRESHOLD) {
+  if (longest > UPSCALE_THRESHOLD) {
     return { path: inputPath, upscaled: false, tempfile: null };
   }
 
