@@ -1,0 +1,950 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-02T08:50:02.838Z",
+  "images": {
+    "bathroom1.jpg": {
+      "source": "public/images/bathroom1.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 795
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 795
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:39.324Z"
+    },
+    "dining.jpg": {
+      "source": "public/images/dining.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 799
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 799
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:39.432Z"
+    },
+    "fireplace.jpg": {
+      "source": "public/images/fireplace.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 795
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 795
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:39.536Z"
+    },
+    "gr-kitchen-island.jpg": {
+      "source": "public/images/gr-kitchen-island.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2714,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1592
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:39.852Z"
+    },
+    "gr-living-room-01.jpg": {
+      "source": "public/images/gr-living-room-01.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1400,
+        "height": 867
+      },
+      "output_dimensions": {
+        "width": 1400,
+        "height": 867
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:40.048Z"
+    },
+    "gr-living-room-02.jpg": {
+      "source": "public/images/gr-living-room-02.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2714,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1592
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:40.397Z"
+    },
+    "hero.jpg": {
+      "source": "public/images/hero.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2400,
+        "height": 1598
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1598
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:40.883Z"
+    },
+    "kitchen1.jpg": {
+      "source": "public/images/kitchen1.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2400,
+        "height": 1598
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1598
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:41.363Z"
+    },
+    "kitchen2.jpg": {
+      "source": "public/images/kitchen2.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1098,
+        "height": 800
+      },
+      "output_dimensions": {
+        "width": 1098,
+        "height": 800
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:41.493Z"
+    },
+    "living1.jpg": {
+      "source": "public/images/living1.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 3600,
+        "height": 2385
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1590
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:41.805Z"
+    },
+    "mcr-bathroom-luxury.jpg": {
+      "source": "public/images/mcr-bathroom-luxury.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2700,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1600
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:42.113Z"
+    },
+    "mcr-bathroom-shower.jpg": {
+      "source": "public/images/mcr-bathroom-shower.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1400,
+        "height": 874
+      },
+      "output_dimensions": {
+        "width": 1400,
+        "height": 874
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:42.265Z"
+    },
+    "mcr-bathroom-spa.jpg": {
+      "source": "public/images/mcr-bathroom-spa.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1400,
+        "height": 888
+      },
+      "output_dimensions": {
+        "width": 1400,
+        "height": 888
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:42.407Z"
+    },
+    "mcr-bathroom-tub.jpg": {
+      "source": "public/images/mcr-bathroom-tub.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1357,
+        "height": 900
+      },
+      "output_dimensions": {
+        "width": 1357,
+        "height": 900
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:42.542Z"
+    },
+    "mcr-kitchen-island-01.jpg": {
+      "source": "public/images/mcr-kitchen-island-01.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2714,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1592
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:42.881Z"
+    },
+    "mcr-kitchen-island-02.jpg": {
+      "source": "public/images/mcr-kitchen-island-02.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2700,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1600
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:43.222Z"
+    },
+    "mcr-kitchen-island-03.jpg": {
+      "source": "public/images/mcr-kitchen-island-03.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2702,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1599
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:43.574Z"
+    },
+    "mcr-kitchen-island-04.jpg": {
+      "source": "public/images/mcr-kitchen-island-04.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2702,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1599
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:43.941Z"
+    },
+    "mcr-kitchen-island-05.jpg": {
+      "source": "public/images/mcr-kitchen-island-05.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2714,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1592
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:44.296Z"
+    },
+    "mcr-kitchen-island-06.jpg": {
+      "source": "public/images/mcr-kitchen-island-06.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 4053,
+        "height": 2700
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1599
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:44.706Z"
+    },
+    "mcr-kitchen-modern.jpg": {
+      "source": "public/images/mcr-kitchen-modern.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "output_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:44.828Z"
+    },
+    "mcr-wetbar.jpg": {
+      "source": "public/images/mcr-wetbar.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1357,
+        "height": 900
+      },
+      "output_dimensions": {
+        "width": 1357,
+        "height": 900
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:44.940Z"
+    },
+    "pp-bathroom-vanity.jpg": {
+      "source": "public/images/pp-bathroom-vanity.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "output_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:45.088Z"
+    },
+    "pp-dining-patio.jpg": {
+      "source": "public/images/pp-dining-patio.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "output_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:45.281Z"
+    },
+    "pp-fireplace.jpg": {
+      "source": "public/images/pp-fireplace.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1357,
+        "height": 900
+      },
+      "output_dimensions": {
+        "width": 1357,
+        "height": 900
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:45.412Z"
+    },
+    "pp-great-room-dining.jpg": {
+      "source": "public/images/pp-great-room-dining.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2702,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1599
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:45.806Z"
+    },
+    "pp-great-room-view.jpg": {
+      "source": "public/images/pp-great-room-view.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2714,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1592
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:46.130Z"
+    },
+    "pp-kitchen-01.jpg": {
+      "source": "public/images/pp-kitchen-01.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2472,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1748
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:46.640Z"
+    },
+    "pp-kitchen-dining.jpg": {
+      "source": "public/images/pp-kitchen-dining.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "output_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:46.872Z"
+    },
+    "pp-kitchen-island.jpg": {
+      "source": "public/images/pp-kitchen-island.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "output_dimensions": {
+        "width": 1351,
+        "height": 900
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:47.161Z"
+    },
+    "pp-living-room-01.jpg": {
+      "source": "public/images/pp-living-room-01.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2400,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1800
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:47.754Z"
+    },
+    "pp-living-room-02.jpg": {
+      "source": "public/images/pp-living-room-02.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2700,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1600
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:48.179Z"
+    },
+    "pp-living-room-03.jpg": {
+      "source": "public/images/pp-living-room-03.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2700,
+        "height": 1800
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1600
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:48.667Z"
+    },
+    "pp-sitting-room-fireplace.jpg": {
+      "source": "public/images/pp-sitting-room-fireplace.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 2800,
+        "height": 1736
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1488
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:48.996Z"
+    },
+    "pp-spa-shower.jpg": {
+      "source": "public/images/pp-spa-shower.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1400,
+        "height": 853
+      },
+      "output_dimensions": {
+        "width": 1400,
+        "height": 853
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:49.114Z"
+    },
+    "pv-aerial-sunset.jpg": {
+      "source": "public/images/pv-aerial-sunset.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1268
+      },
+      "output_dimensions": {
+        "width": 960,
+        "height": 1268
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:49.365Z"
+    },
+    "pv-custom-bar-office.jpg": {
+      "source": "public/images/pv-custom-bar-office.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1266
+      },
+      "output_dimensions": {
+        "width": 960,
+        "height": 1266
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:49.511Z"
+    },
+    "pv-custom-closet.jpg": {
+      "source": "public/images/pv-custom-closet.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 7680,
+        "height": 5160
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1613
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:51.278Z"
+    },
+    "pv-dining-room-beams.jpg": {
+      "source": "public/images/pv-dining-room-beams.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:51.517Z"
+    },
+    "pv-entry-foyer.jpg": {
+      "source": "public/images/pv-entry-foyer.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1440,
+        "height": 1920
+      },
+      "output_dimensions": {
+        "width": 1440,
+        "height": 1920
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:51.837Z"
+    },
+    "pv-great-room-interior.jpg": {
+      "source": "public/images/pv-great-room-interior.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1268
+      },
+      "output_dimensions": {
+        "width": 960,
+        "height": 1268
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:52.028Z"
+    },
+    "pv-kitchen-detail-ovens.jpg": {
+      "source": "public/images/pv-kitchen-detail-ovens.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1281
+      },
+      "output_dimensions": {
+        "width": 960,
+        "height": 1281
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:52.169Z"
+    },
+    "pv-kitchen-farmhouse-sink.jpg": {
+      "source": "public/images/pv-kitchen-farmhouse-sink.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 7680,
+        "height": 5064
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1583
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:54.580Z"
+    },
+    "pv-kitchen-island-wide.jpg": {
+      "source": "public/images/pv-kitchen-island-wide.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:54.851Z"
+    },
+    "pv-kitchen-sage-cabinets.jpg": {
+      "source": "public/images/pv-kitchen-sage-cabinets.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 3840,
+        "height": 2560
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1600
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:55.592Z"
+    },
+    "pv-kitchen-to-living-01.jpg": {
+      "source": "public/images/pv-kitchen-to-living-01.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:55.831Z"
+    },
+    "pv-kitchen-to-living-02.jpg": {
+      "source": "public/images/pv-kitchen-to-living-02.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:56.109Z"
+    },
+    "pv-living-room-chandelier.jpg": {
+      "source": "public/images/pv-living-room-chandelier.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:56.343Z"
+    },
+    "pv-master-bedroom-skylight.jpg": {
+      "source": "public/images/pv-master-bedroom-skylight.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1262
+      },
+      "output_dimensions": {
+        "width": 960,
+        "height": 1262
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:56.510Z"
+    },
+    "pv-process-00-demo.jpg": {
+      "source": "public/images/pv-process-00-demo.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:57.065Z"
+    },
+    "pv-process-01-slab.jpg": {
+      "source": "public/images/pv-process-01-slab.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:57.345Z"
+    },
+    "pv-process-02-framing-ext.jpg": {
+      "source": "public/images/pv-process-02-framing-ext.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:57.604Z"
+    },
+    "pv-process-03-framing-int.jpg": {
+      "source": "public/images/pv-process-03-framing-int.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:57.871Z"
+    },
+    "pv-process-04-trusses.jpg": {
+      "source": "public/images/pv-process-04-trusses.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:58.178Z"
+    },
+    "pv-process-05-crew.jpg": {
+      "source": "public/images/pv-process-05-crew.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:49:58.622Z"
+    },
+    "pv-shower-dual-brass.jpg": {
+      "source": "public/images/pv-shower-dual-brass.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 9648,
+        "height": 6376
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1586
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:50:02.147Z"
+    },
+    "pv-wine-cellar-kitchen.jpg": {
+      "source": "public/images/pv-wine-cellar-kitchen.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 960,
+        "height": 1257
+      },
+      "output_dimensions": {
+        "width": 960,
+        "height": 1257
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:50:02.275Z"
+    },
+    "pv-wine-wall.jpg": {
+      "source": "public/images/pv-wine-wall.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "output_dimensions": {
+        "width": 1200,
+        "height": 1600
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:50:02.525Z"
+    },
+    "wetbar.jpg": {
+      "source": "public/images/wetbar.jpg",
+      "source_mode": "reprocess",
+      "original_dimensions": {
+        "width": 3600,
+        "height": 2385
+      },
+      "output_dimensions": {
+        "width": 2400,
+        "height": 1590
+      },
+      "resized": true,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-05-02T08:50:02.837Z"
+    }
+  }
+}
