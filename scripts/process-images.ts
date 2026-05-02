@@ -139,6 +139,23 @@ type ProcessOutcome = {
   exifStripped: true;
 };
 
+type ManifestEntry = {
+  source: string;
+  source_mode: "intake" | "reprocess";
+  original_dimensions: { width: number; height: number };
+  output_dimensions: { width: number; height: number };
+  resized: boolean;
+  upscaled: boolean;
+  exif_stripped: boolean;
+  processed_at: string;
+};
+
+type Manifest = {
+  version: 1;
+  generated_at: string;
+  images: Record<string, ManifestEntry>;
+};
+
 const TARGET_LONGEST_SIDE = 2400;
 const JPEG_OPTIONS = { quality: 85, mozjpeg: true, progressive: true } as const;
 
@@ -189,6 +206,40 @@ async function processOne(
   };
 }
 
+async function loadOrInitManifest(): Promise<Manifest> {
+  if (await fileExists(MANIFEST_PATH)) {
+    const raw = await fs.readFile(MANIFEST_PATH, "utf8");
+    const parsed = JSON.parse(raw) as Manifest;
+    if (parsed.version !== 1) {
+      throw new Error(`unknown manifest version: ${parsed.version}`);
+    }
+    return parsed;
+  }
+  return { version: 1, generated_at: new Date().toISOString(), images: {} };
+}
+
+function makeEntry(
+  job: JobInput,
+  outcome: ProcessOutcome,
+  now: string,
+): ManifestEntry {
+  return {
+    source: job.sourceRelative,
+    source_mode: job.sourceMode,
+    original_dimensions: outcome.originalDimensions,
+    output_dimensions: outcome.outputDimensions,
+    resized: outcome.resized,
+    upscaled: outcome.upscaled,
+    exif_stripped: outcome.exifStripped,
+    processed_at: now,
+  };
+}
+
+async function writeManifest(m: Manifest): Promise<void> {
+  m.generated_at = new Date().toISOString();
+  await fs.writeFile(MANIFEST_PATH, JSON.stringify(m, null, 2) + "\n", "utf8");
+}
+
 async function main(): Promise<void> {
   const flags = parseFlags();
   if (flags.reprocess) {
@@ -224,12 +275,14 @@ async function main(): Promise<void> {
     return;
   }
 
+  const manifest = await loadOrInitManifest();
   let ok = 0;
   let failed = 0;
   for (const j of jobs) {
     const outputPath = path.join(PUBLIC_IMAGES_DIR, j.outputBasename);
     try {
       const outcome = await processOne(j.sourcePath, outputPath, false);
+      manifest.images[j.outputBasename] = makeEntry(j, outcome, new Date().toISOString());
       console.log(
         `  [ok] ${j.outputBasename}  ${outcome.originalDimensions.width}x${outcome.originalDimensions.height}` +
           ` -> ${outcome.outputDimensions.width}x${outcome.outputDimensions.height}` +
@@ -241,7 +294,8 @@ async function main(): Promise<void> {
       failed++;
     }
   }
-  console.log(`[intake] done: ${ok} ok, ${failed} failed`);
+  await writeManifest(manifest);
+  console.log(`[intake] done: ${ok} ok, ${failed} failed; manifest at public/images/manifest.json`);
 }
 
 main().catch((err) => {
