@@ -124,7 +124,7 @@ export function HeroSection() {
         initial={initial}
         animate="visible"
       >
-        <h1 className="font-heading text-4xl md:text-5xl lg:text-[64px] font-medium text-white mb-9 leading-[1.15] tracking-[-0.02em]">
+        <h1 className="font-heading text-4xl md:text-5xl lg:text-[64px] font-normal text-white mb-9 leading-[1.1] tracking-[-0.025em]">
           <span className="block overflow-hidden pb-1">
             <motion.span variants={maskLineVariants} className="block">
               Built for Homes
