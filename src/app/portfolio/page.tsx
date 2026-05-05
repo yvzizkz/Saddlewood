@@ -14,13 +14,13 @@ export default function PortfolioPage() {
       <PageHero
         label="Portfolio"
         title="Our Work"
-        description="Luxury remodels across Scottsdale's most prestigious neighborhoods. Click any project for full details."
-        image="/images/mcr-kitchen-island-02.jpg"
-        imageAlt="Luxury kitchen island remodel in McCormick Ranch by Saddlewood Contracting"
+        description="Luxury remodels across Scottsdale's most prestigious neighborhoods."
+        image="/images/pv-exterior-pool-golden-hour.jpg"
+        imageAlt="Paradise Valley pool and patio at golden hour by Saddlewood Contracting"
       />
 
       {/* Project Grid */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-cream">
+      <section className="py-10 sm:py-12 lg:py-16 bg-cream">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <ProjectGrid />
         </div>
