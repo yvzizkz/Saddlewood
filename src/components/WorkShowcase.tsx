@@ -4,63 +4,9 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { projects } from "@/data/projects";
 
-const projects = [
-  {
-    image: "/images/pv-kitchen-island-wide.jpg",
-    alt: "Paradise Valley chef's kitchen with natural stone island and coffered ceiling",
-    category: "Kitchen",
-    location: "Paradise Valley",
-    title: "Chef's Kitchen with Stone Island",
-    caption: "This kitchen island seats five and anchors the open floor plan — natural stone, pendant lighting, and coffered ceilings unify the space.",
-    tall: true,
-  },
-  {
-    image: "/images/mcr-bathroom-tub.jpg",
-    alt: "Spa-inspired master bath with freestanding soaking tub and chandelier",
-    category: "Bathroom",
-    location: "McCormick Ranch",
-    title: "Spa-Inspired Master Bath",
-    caption: "A freestanding soaking tub and chandelier transform this master bath into a private retreat.",
-    tall: false,
-  },
-  {
-    image: "/images/pv-master-bath-veined-marble-wide.jpg",
-    alt: "Paradise Valley master bath with bookmatched veined marble and freestanding tub",
-    category: "Bathroom",
-    location: "Paradise Valley",
-    title: "Veined Marble Master Bath",
-    caption: "Bookmatched veined marble runs floor-to-ceiling — the freestanding tub and vanity become a single sculpted composition.",
-    tall: false,
-  },
-  {
-    image: "/images/pv-exterior-pool-yard-twilight.jpg",
-    alt: "Paradise Valley pool deck and outdoor lounge at twilight",
-    category: "Outdoor",
-    location: "Paradise Valley",
-    title: "Pool & Patio at Twilight",
-    caption: "As the sky turns over Paradise Valley, the pool and lounge come alive — landscape lighting and clean lines designed for evening entertaining.",
-    tall: true,
-  },
-  {
-    image: "/images/gr-kitchen-island.jpg",
-    alt: "Gainey Ranch contemporary kitchen with quartzite island and integrated appliances",
-    category: "Kitchen",
-    location: "Gainey Ranch",
-    title: "Contemporary Kitchen Redesign",
-    caption: "This Gainey Ranch kitchen pairs a massive quartzite island with integrated appliances for a clean, uncluttered look befitting the community's design standards.",
-    tall: false,
-  },
-  {
-    image: "/images/pv-wine-wall.jpg",
-    alt: "Paradise Valley climate-controlled glass wine wall with stone backing",
-    category: "Living",
-    location: "Paradise Valley",
-    title: "Glass Wine Wall",
-    caption: "This climate-controlled wine wall doubles as a design statement — stone backing and blackened steel framing showcase the collection.",
-    tall: false,
-  },
-];
+const showcaseProjects = projects.slice(0, 6);
 
 export function WorkShowcase() {
   return (
@@ -85,9 +31,9 @@ export function WorkShowcase() {
 
         {/* Editorial Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-          {projects.map((project, i) => (
+          {showcaseProjects.map((project, i) => (
             <motion.div
-              key={project.title}
+              key={project.slug}
               className={`relative overflow-hidden cursor-pointer group ${
                 project.tall ? "md:row-span-2 h-[400px] md:h-auto" : "h-[320px]"
               }`}
@@ -97,8 +43,8 @@ export function WorkShowcase() {
               transition={{ delay: i * 0.1 }}
             >
               <Image
-                src={project.image}
-                alt={project.alt}
+                src={project.heroImage}
+                alt={project.caption || project.title}
                 fill
                 className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
               />

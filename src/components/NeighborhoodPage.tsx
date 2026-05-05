@@ -5,8 +5,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { Phone } from "lucide-react";
 import type { NeighborhoodData } from "@/lib/neighborhoods";
+import { getProjectBySlug, getProjectsByNeighborhood } from "@/data/projects";
 
 export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
+  const projects = getProjectsByNeighborhood(data.name);
+  // PV's whole-home build is the master case study for the construction
+  // process timeline; only Paradise Valley currently surfaces processSteps.
+  const wholeHomeMaster = getProjectBySlug(
+    "paradise-valley-40th-street-whole-home-build",
+  );
+  const processSteps =
+    data.slug === "paradise-valley" ? wholeHomeMaster?.processSteps : undefined;
+
   return (
     <>
       {/* Hero */}
@@ -137,7 +147,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
           </motion.div>
 
           {/* Featured project — large */}
-          {data.projects.length > 0 && (
+          {projects.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -147,27 +157,27 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                 <div className="relative h-[360px] lg:h-[480px] overflow-hidden">
                   <Image
-                    src={data.projects[0].image}
-                    alt={data.projects[0].title}
+                    src={projects[0].heroImage}
+                    alt={projects[0].title}
                     fill
                     className="object-cover"
                   />
                   <div className="absolute top-4 left-4">
                     <span className="bg-gold text-charcoal text-xs font-light px-3 py-1">
-                      {data.projects[0].category}
+                      {projects[0].category}
                     </span>
                   </div>
                 </div>
                 <div className="bg-teal-dark p-10 lg:p-14 flex flex-col justify-center">
                   <h3 className="font-heading text-3xl font-light text-stone mb-4">
-                    {data.projects[0].title}
+                    {projects[0].title}
                   </h3>
                   <p className="text-stone/70 font-light leading-relaxed mb-6">
-                    {data.projects[0].description}
+                    {projects[0].description}
                   </p>
-                  {data.projects[0].caption && (
+                  {projects[0].caption && (
                     <p className="text-gold/80 text-sm font-light leading-relaxed italic border-l-2 border-gold/40 pl-5">
-                      {data.projects[0].caption}
+                      {projects[0].caption}
                     </p>
                   )}
                 </div>
@@ -177,9 +187,9 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
 
           {/* Remaining projects — grid with hover captions */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {data.projects.slice(1).map((project, i) => (
+            {projects.slice(1).map((project, i) => (
               <motion.div
-                key={project.title}
+                key={project.slug}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -188,7 +198,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
               >
                 <div className="relative h-64 overflow-hidden mb-4">
                   <Image
-                    src={project.image}
+                    src={project.heroImage}
                     alt={project.title}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -231,7 +241,13 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
       </section>
 
       {/* Construction Process Timeline */}
-      {data.processSteps && data.processSteps.length > 0 && (
+      {/*
+        TODO: per-step descriptive caption was lost in the migration to
+        the unified projects.ts data layer. The new ProjectProcessStep
+        shape is { image, label } only. If we want long-form copy back
+        per step, extend the interface in src/data/projects.ts.
+      */}
+      {processSteps && processSteps.length > 0 && (
         <section className="py-24 bg-off-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <motion.div
@@ -253,9 +269,9 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {data.processSteps.map((step, i) => (
+              {processSteps.map((step, i) => (
                 <motion.div
-                  key={step.title}
+                  key={step.label}
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -265,7 +281,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                   <div className="relative h-64 overflow-hidden mb-5">
                     <Image
                       src={step.image}
-                      alt={step.title}
+                      alt={step.label}
                       fill
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
@@ -275,12 +291,9 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                       </span>
                     </div>
                   </div>
-                  <h3 className="font-heading text-lg font-light text-charcoal mb-2">
-                    {step.title}
+                  <h3 className="font-heading text-lg font-light text-charcoal">
+                    {step.label}
                   </h3>
-                  <p className="text-charcoal-light text-sm font-light leading-relaxed">
-                    {step.caption}
-                  </p>
                 </motion.div>
               ))}
             </div>
