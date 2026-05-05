@@ -8,6 +8,7 @@ const services = [
 ];
 
 const trades = [
+  { name: "General", roc: "ROC #305762" },
   { name: "Electrical", roc: "ROC #350715" },
   { name: "HVAC", roc: "ROC #350714" },
   { name: "Plumbing", roc: "ROC #350716" },
