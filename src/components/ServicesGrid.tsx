@@ -21,10 +21,15 @@ export function ServicesGrid() {
       aria-label="Services"
     >
       <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 lg:gap-20 items-start">
-        {/* Left — single editorial line */}
-        <p className="font-heading font-medium text-teal text-[20px] sm:text-[22px] leading-[1.5] tracking-[-0.01em] max-w-[480px]">
-          Four licenses. One crew. Every trade handled in-house from demo to final detail.
-        </p>
+        {/* Left — single editorial line + maker's mark */}
+        <div className="max-w-[480px]">
+          <p className="font-heading font-medium text-teal text-[20px] sm:text-[22px] leading-[1.5] tracking-[-0.01em]">
+            Four licenses. One crew. Every trade handled in-house from demo to final detail.
+          </p>
+          <p className="mt-8 sm:mt-10 text-[11px] tracking-[0.25em] uppercase text-gold-accessible font-medium">
+            Est. 2007
+          </p>
+        </div>
 
         {/* Right — service stack + in-house trades + ROC credentials */}
         <div>
