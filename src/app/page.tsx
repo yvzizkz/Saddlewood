@@ -4,7 +4,6 @@ import { WorkShowcase } from "@/components/WorkShowcase";
 import { ServicesGrid } from "@/components/ServicesGrid";
 import { NeighborhoodCards } from "@/components/NeighborhoodCards";
 import { Testimonials } from "@/components/Testimonials";
-import { CredentialsBar } from "@/components/CredentialsBar";
 import { CTABanner } from "@/components/CTABanner";
 
 export default function Home() {
@@ -16,7 +15,6 @@ export default function Home() {
       <ServicesGrid />
       <NeighborhoodCards />
       <Testimonials />
-      <CredentialsBar />
       <CTABanner />
     </>
   );

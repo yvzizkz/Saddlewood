@@ -1,74 +1,62 @@
-"use client";
-
-import { motion } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 
 const services = [
-  { name: "Kitchen Remodeling", tag: "\u2192" },
-  { name: "Bathroom Renovation", tag: "\u2192" },
-  { name: "Whole-Home Remodels", tag: "\u2192" },
-  { name: "Outdoor Living", tag: "\u2192" },
-  { name: "Electrical", tag: "ROC #350715" },
-  { name: "HVAC", tag: "ROC #350714" },
-  { name: "Plumbing", tag: "ROC #350716" },
+  "Kitchen",
+  "Bathroom",
+  "Whole-Home",
+  "Outdoor Living",
+];
+
+const trades = [
+  { name: "Electrical", roc: "ROC #350715" },
+  { name: "HVAC", roc: "ROC #350714" },
+  { name: "Plumbing", roc: "ROC #350716" },
 ];
 
 export function ServicesGrid() {
   return (
-    <section className="py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-12 bg-cream" aria-label="Services">
-      <div className="max-w-[1200px] mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-16 lg:gap-20 items-start">
-          {/* Left: Text + Service List */}
-          <div>
-            <div className="section-label">Services</div>
-            <h2 className="font-heading text-3xl lg:text-[42px] font-medium text-teal max-w-[560px] leading-[1.15] tracking-[-0.02em] mb-5">
-              Everything under one roof
-            </h2>
-            <p className="text-[15px] text-charcoal-light max-w-[480px] leading-relaxed font-light mb-12">
-              Four ROC licenses mean we handle every trade in-house. No subcontractor coordination. No finger-pointing. One team, one standard.
-            </p>
+    <section
+      className="bg-cream py-20 sm:py-28 lg:py-36 px-4 sm:px-6 lg:px-12"
+      aria-label="Services"
+    >
+      <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 lg:gap-20 items-start">
+        {/* Left — single editorial line */}
+        <p className="font-heading font-medium text-teal text-[20px] sm:text-[22px] leading-[1.5] tracking-[-0.01em] max-w-[480px]">
+          Four licenses. One crew. Every trade handled in-house from demo to final detail.
+        </p>
 
-            <ul className="list-none p-0 m-0">
-              {services.map((svc, i) => (
-                <motion.li
-                  key={svc.name}
-                  className="py-7 border-b border-teal/[0.08] flex justify-between items-center group first:border-t first:border-teal/[0.08] hover:pl-3 transition-[padding] duration-300"
-                  initial={{ opacity: 0, x: -10 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.05 }}
+        {/* Right — service stack + in-house trades + ROC credentials */}
+        <div>
+          <ul className="list-none p-0 m-0 mb-10 sm:mb-12">
+            {services.map((service) => (
+              <li key={service}>
+                <Link
+                  href="/services"
+                  className="block font-heading text-[36px] sm:text-[40px] font-light leading-[1.2] text-teal hover:text-gold-accessible transition-colors no-underline"
                 >
-                  <span className="font-heading text-lg sm:text-[22px] font-medium text-teal group-hover:text-gold transition-colors">
-                    {svc.name}
-                  </span>
-                  <span className="text-[11px] tracking-[0.1em] uppercase text-charcoal-light font-normal">
-                    {svc.tag}
-                  </span>
-                </motion.li>
-              ))}
-            </ul>
+                  {service}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="text-[11px] tracking-[0.25em] uppercase text-charcoal-light mb-3">
+            {trades.map((t, i) => (
+              <span key={t.name}>
+                {i > 0 && <span className="mx-2" aria-hidden="true">·</span>}
+                {t.name}
+              </span>
+            ))}
           </div>
 
-          {/* Right: Feature Image */}
-          <motion.div
-            className="relative h-[420px] lg:h-[580px] overflow-hidden"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-          >
-            <Image
-              src="/images/mcr-kitchen-island-04.jpg"
-              alt="McCormick Ranch family room with vaulted ceiling, fireplace, and abstract art"
-              fill
-              className="object-cover"
-            />
-            <div className="absolute bottom-0 left-0 right-0 p-6 lg:p-7 bg-teal-90">
-              <p className="text-[13px] text-stone/70 font-light leading-relaxed">
-                <strong className="text-gold font-medium">McCormick Ranch</strong> &mdash; Family room with soaring vaulted ceiling, custom fireplace surround, and designer finishes. Every detail handled by our in-house team.
-              </p>
-            </div>
-          </motion.div>
+          <div className="text-[10px] tracking-[0.1em] uppercase text-charcoal-light opacity-50">
+            {trades.map((t, i) => (
+              <span key={t.roc}>
+                {i > 0 && <span className="mx-2" aria-hidden="true">·</span>}
+                {t.roc}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </section>
