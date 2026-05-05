@@ -41,34 +41,42 @@ const heroImages = [
   },
 ];
 
-// ease-out cubic — cinematic settle
+// ease-out cubic — cinematic settle, fast start, soft landing
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const containerVariants: Variants = {
   hidden: {},
   visible: {
     transition: {
-      delayChildren: 0.6,
-      staggerChildren: 0.18,
+      delayChildren: 0.5,
+      staggerChildren: 0.22,
     },
   },
 };
 
-const lineVariants: Variants = {
-  hidden: { opacity: 0, y: 24 },
+// Mask reveal: text rises from below an overflow-hidden frame
+const maskLineVariants: Variants = {
+  hidden: { y: "115%" },
   visible: {
-    opacity: 1,
     y: 0,
-    transition: { duration: 0.9, ease: EASE },
+    transition: { duration: 1.05, ease: EASE },
   },
 };
 
 const ctaVariants: Variants = {
-  hidden: { opacity: 0, y: 12 },
+  hidden: { opacity: 0, y: 14 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.7, ease: EASE },
+    transition: { duration: 0.8, ease: EASE },
+  },
+};
+
+const accentVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { duration: 1.4, ease: EASE, delay: 0.15 },
   },
 };
 
@@ -99,7 +107,7 @@ export function HeroSection() {
         />
       </div>
 
-      {/* Gradient — bottom darkens enough for white text to read cleanly */}
+      {/* Gradient — bottom darkens enough for white display type to read */}
       <div
         className="absolute inset-0 pointer-events-none"
         aria-hidden="true"
@@ -109,21 +117,39 @@ export function HeroSection() {
         }}
       />
 
-      {/* Content — bottom-left, staggered reveal */}
+      {/* Content — bottom-left, mask-reveal stagger */}
       <motion.div
-        className="relative z-10 px-6 lg:px-12 pb-16 lg:pb-20 max-w-[720px]"
+        className="relative z-10 px-6 lg:px-12 pb-16 lg:pb-20 max-w-[860px]"
         variants={containerVariants}
         initial={initial}
         animate="visible"
       >
-        <h1 className="font-heading text-4xl md:text-5xl lg:text-[64px] font-medium text-white mb-9 leading-[1.15] tracking-[-0.02em]">
-          <motion.span variants={lineVariants} className="block">
-            Built for Homes
-          </motion.span>
-          <motion.span variants={lineVariants} className="block">
-            That Demand{" "}
-            <em className="italic text-gold font-normal">More.</em>
-          </motion.span>
+        <h1
+          className="font-heading text-white mb-10 sm:mb-12
+            text-5xl sm:text-6xl md:text-7xl lg:text-[88px] xl:text-[100px]
+            font-normal leading-[1.02] tracking-[-0.028em]
+            [text-shadow:0_2px_32px_rgba(0,0,0,0.35)]"
+        >
+          <span className="block overflow-hidden pb-1">
+            <motion.span variants={maskLineVariants} className="block">
+              Built for Homes
+            </motion.span>
+          </span>
+          <span className="block overflow-hidden pb-1">
+            <motion.span variants={maskLineVariants} className="block">
+              That Demand{" "}
+              <motion.em
+                variants={accentVariants}
+                className="italic font-light text-gold"
+                style={{
+                  fontFeatureSettings: '"ss01", "swsh"',
+                  textShadow: "0 1px 28px rgba(200,165,90,0.25)",
+                }}
+              >
+                More.
+              </motion.em>
+            </motion.span>
+          </span>
         </h1>
 
         <motion.div
