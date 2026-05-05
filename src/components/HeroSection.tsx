@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { Phone } from "lucide-react";
@@ -41,70 +41,27 @@ const heroImages = [
   },
 ];
 
-const HOLD_MS = 6000;
-const FADE_MS = 1500;
-
 export function HeroSection() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const prefersReducedMotion = useReducedMotion();
-
-  const advance = useCallback(() => {
-    setActiveIndex((prev) => (prev + 1) % heroImages.length);
-  }, []);
+  const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    if (prefersReducedMotion) return;
+    setIndex(Math.floor(Math.random() * heroImages.length));
+  }, []);
 
-    let timer = setInterval(advance, HOLD_MS);
-
-    const handleVisibility = () => {
-      if (document.hidden) {
-        clearInterval(timer);
-      } else {
-        timer = setInterval(advance, HOLD_MS);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibility);
-
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [advance, prefersReducedMotion]);
+  const hero = heroImages[index];
 
   return (
     <section className="relative h-screen min-h-[600px] sm:min-h-[700px] flex items-end overflow-hidden" aria-label="Hero">
-      {/* Background Images — stacked, crossfade via opacity, Ken Burns on active */}
-      {heroImages.map((img, i) => {
-        const isActive = i === activeIndex;
-        return (
-          <div
-            key={img.src}
-            className={`absolute inset-0 transition-opacity ease-in-out ${
-              isActive ? "opacity-100" : "opacity-0"
-            }`}
-            style={{ transitionDuration: `${FADE_MS}ms` }}
-            aria-hidden={!isActive}
-          >
-            <div
-              className={`absolute inset-0 ${
-                isActive && !prefersReducedMotion ? "ken-burns-active" : ""
-              }`}
-            >
-              <Image
-                src={img.src}
-                alt={img.alt}
-                fill
-                className="object-cover"
-                priority={i === 0}
-                loading={i === 0 ? undefined : "eager"}
-                sizes="100vw"
-              />
-            </div>
-          </div>
-        );
-      })}
+      <div key={hero.src} className="absolute inset-0 ken-burns-active">
+        <Image
+          src={hero.src}
+          alt={hero.alt}
+          fill
+          className="object-cover"
+          priority
+          sizes="100vw"
+        />
+      </div>
 
       {/* Gradient Overlay */}
       <div

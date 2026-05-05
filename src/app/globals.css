@@ -145,12 +145,19 @@ img {
 
 /* ===== HERO KEN BURNS ===== */
 @keyframes ken-burns-zoom {
-  from { transform: scale(1); }
-  to { transform: scale(1.07); }
+  from { transform: scale(1) translate(0, 0); }
+  to   { transform: scale(1.08) translate(-1.5%, -1%); }
 }
 
 .ken-burns-active {
-  animation: ken-burns-zoom 7500ms ease-out forwards;
+  animation: ken-burns-zoom 15s ease-in-out forwards;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ken-burns-active {
+    animation: none;
+  }
 }
 
 /* ===== RESPONSIVE TYPOGRAPHY ===== */
