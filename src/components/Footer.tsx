@@ -1,9 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Instagram, Facebook, Linkedin } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="bg-teal-dark border-t border-white/[0.06] pt-12 sm:pt-16 pb-8 px-4 sm:px-6 lg:px-12" role="contentinfo">
+    <footer className="bg-charcoal border-t border-white/[0.06] pt-12 sm:pt-16 pb-8 px-4 sm:px-6 lg:px-12" role="contentinfo">
       <div className="max-w-[1200px] mx-auto grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
         {/* Brand */}
         <div className="col-span-2 md:col-span-1">
@@ -17,18 +18,45 @@ export function Footer() {
               />
             </div>
           </Link>
-          <p className="text-sm text-stone/35 italic font-light mt-3">
+          <p className="text-sm text-stone/40 italic font-light mt-3">
             &ldquo;Where Craftsmanship Meets Character&rdquo;
           </p>
+          <p className="text-[13px] text-white/60 font-light leading-relaxed mt-5 max-w-[240px]">
+            Serving Scottsdale&apos;s premier neighborhoods since 2007.
+          </p>
+          {/* TODO: Replace href="#" with real social URLs once available */}
+          <div className="flex items-center gap-4 mt-6">
+            <a
+              href="#"
+              aria-label="Instagram"
+              className="text-white/60 hover:text-gold transition-colors"
+            >
+              <Instagram className="w-5 h-5" strokeWidth={1.5} />
+            </a>
+            <a
+              href="#"
+              aria-label="Facebook"
+              className="text-white/60 hover:text-gold transition-colors"
+            >
+              <Facebook className="w-5 h-5" strokeWidth={1.5} />
+            </a>
+            <a
+              href="#"
+              aria-label="LinkedIn"
+              className="text-white/60 hover:text-gold transition-colors"
+            >
+              <Linkedin className="w-5 h-5" strokeWidth={1.5} />
+            </a>
+          </div>
         </div>
 
         {/* Services */}
         <div>
-          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-stone/40 mb-4 sm:mb-5 not-italic">Services</h4>
+          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mb-4 sm:mb-5 not-italic">Services</h4>
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
             {["Kitchen Remodeling", "Bathroom Renovation", "Whole-Home Remodels", "Outdoor Living", "Electrical", "HVAC", "Plumbing"].map((svc) => (
               <li key={svc}>
-                <Link href="/services" className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline">{svc}</Link>
+                <Link href="/services" className="text-sm text-white/75 font-light hover:text-gold transition-colors no-underline">{svc}</Link>
               </li>
             ))}
           </ul>
@@ -36,7 +64,7 @@ export function Footer() {
 
         {/* Neighborhoods + Company */}
         <div>
-          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-stone/40 mb-4 sm:mb-5 not-italic">Neighborhoods</h4>
+          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mb-4 sm:mb-5 not-italic">Neighborhoods</h4>
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
             {[
               { label: "McCormick Ranch", href: "/neighborhoods/mccormick-ranch" },
@@ -45,11 +73,11 @@ export function Footer() {
               { label: "Pinnacle Peak CC", href: "/neighborhoods/pinnacle-peak" },
             ].map((n) => (
               <li key={n.href}>
-                <Link href={n.href} className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline">{n.label}</Link>
+                <Link href={n.href} className="text-sm text-white/75 font-light hover:text-gold transition-colors no-underline">{n.label}</Link>
               </li>
             ))}
           </ul>
-          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-stone/40 mt-6 sm:mt-8 mb-4 sm:mb-5 not-italic">Company</h4>
+          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mt-6 sm:mt-8 mb-4 sm:mb-5 not-italic">Company</h4>
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
             {[
               { label: "Our Work", href: "/portfolio" },
@@ -57,7 +85,7 @@ export function Footer() {
               { label: "Contact", href: "/contact" },
             ].map((c) => (
               <li key={c.href}>
-                <Link href={c.href} className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline">{c.label}</Link>
+                <Link href={c.href} className="text-sm text-white/75 font-light hover:text-gold transition-colors no-underline">{c.label}</Link>
               </li>
             ))}
           </ul>
@@ -65,27 +93,30 @@ export function Footer() {
 
         {/* Contact + Hours */}
         <div className="col-span-2 sm:col-span-1">
-          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-stone/40 mb-4 sm:mb-5 not-italic">Contact</h4>
+          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mb-4 sm:mb-5 not-italic">Contact</h4>
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
-            <li><a href="tel:4809996100" className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline">(480) 999-6100</a></li>
-            <li><a href="mailto:info@saddlewoodcontracting.com" className="text-sm text-stone/65 font-light hover:text-gold transition-colors no-underline break-all sm:break-normal">info@saddlewoodcontracting.com</a></li>
-            <li><span className="text-sm text-stone/65 font-light">Scottsdale, AZ 85258</span></li>
+            <li><a href="tel:4809996100" className="text-sm text-white/75 font-light hover:text-gold transition-colors no-underline">(480) 999-6100</a></li>
+            <li><a href="mailto:info@saddlewoodcontracting.com" className="text-sm text-white/75 font-light hover:text-gold transition-colors no-underline break-all sm:break-normal">info@saddlewoodcontracting.com</a></li>
+            <li><span className="text-sm text-white/75 font-light">Scottsdale, AZ 85258</span></li>
           </ul>
-          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-stone/40 mt-6 sm:mt-8 mb-4 sm:mb-5 not-italic">Hours</h4>
+          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mt-6 sm:mt-8 mb-4 sm:mb-5 not-italic">Hours</h4>
           <ul className="space-y-2 list-none p-0 m-0">
-            <li className="text-sm text-stone/40">Mon&ndash;Fri: 7am &ndash; 5pm</li>
-            <li className="text-sm text-stone/40">Sat: By appointment</li>
+            <li className="text-sm text-white/75 font-light">Mon&ndash;Fri: 7am &ndash; 5pm</li>
+            <li className="text-sm text-white/75 font-light">Sat: By appointment</li>
           </ul>
         </div>
       </div>
 
+      {/* Gold rule between footer body and copyright bar */}
+      <div className="max-w-[1200px] mx-auto mt-8 sm:mt-10 border-t border-[#b5954a]/20" />
+
       {/* Bottom bar */}
-      <div className="max-w-[1200px] mx-auto mt-8 sm:mt-10 pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row justify-between items-center gap-2">
-        <p className="text-[11px] text-stone/25">&copy; 2026 Saddlewood Contracting LLC. All rights reserved.</p>
-        <div className="flex items-center gap-3 text-[11px] text-stone/25">
-          <Link href="/privacy" className="hover:text-gold transition-colors no-underline text-stone/25">Privacy</Link>
+      <div className="max-w-[1200px] mx-auto pt-6 flex flex-col sm:flex-row justify-between items-center gap-2">
+        <p className="text-[11px] text-white/40">&copy; 2026 Saddlewood Contracting LLC. All rights reserved.</p>
+        <div className="flex items-center gap-3 text-[11px] text-white/40">
+          <Link href="/privacy" className="hover:text-gold transition-colors no-underline">Privacy</Link>
           <span>&middot;</span>
-          <Link href="/terms" className="hover:text-gold transition-colors no-underline text-stone/25">Terms</Link>
+          <Link href="/terms" className="hover:text-gold transition-colors no-underline">Terms</Link>
           <span>&middot;</span>
           <span>Licensed &middot; Bonded &middot; Insured &middot; Arizona ROC</span>
         </div>
