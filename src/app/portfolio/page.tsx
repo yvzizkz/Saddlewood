@@ -15,8 +15,8 @@ export default function PortfolioPage() {
         label="Portfolio"
         title="Our Work"
         description="Luxury remodels across Scottsdale's most prestigious neighborhoods."
-        image="/images/pv-exterior-pool-golden-hour.jpg"
-        imageAlt="Paradise Valley pool and patio at golden hour by Saddlewood Contracting"
+        image="/images/pv-exterior-fireplace-twilight.jpg"
+        imageAlt="Paradise Valley outdoor fireplace and covered patio at twilight"
       />
 
       {/* Project Grid */}

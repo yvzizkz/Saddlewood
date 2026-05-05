@@ -198,7 +198,22 @@ export default async function ProjectCaseStudyPage({ params }: PageProps) {
         </section>
       )}
 
-      {/* h. Footer CTAs — quiet */}
+      {/* h1. Conversion CTA — quiet but present, before the back/forward nav */}
+      <section className="bg-cream py-20 sm:py-24 lg:py-28">
+        <div className="max-w-[820px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-heading text-2xl sm:text-3xl lg:text-[34px] font-medium text-teal leading-[1.25] tracking-[-0.01em] mb-8">
+            Ready to build something like this?
+          </p>
+          <Link
+            href="/contact"
+            className="inline-block px-10 py-4 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase rounded-sm no-underline hover:bg-[#d4a94c] transition-all hover:-translate-y-px"
+          >
+            Book Your Consultation
+          </Link>
+        </div>
+      </section>
+
+      {/* h2. Footer nav — quiet */}
       <section className="border-t border-stone-mid/60 py-14 sm:py-16">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <Link

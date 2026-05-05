@@ -40,8 +40,18 @@ export function ProjectGallery({ project, children }: ProjectGalleryProps) {
     return [project.heroImage, ...project.images];
   }, [project.heroImage, project.images]);
 
-  // Body gallery skips the hero (already shown above).
-  const bodyImages = useMemo(() => lightboxImages.slice(1), [lightboxImages]);
+  // Body gallery skips the hero (already shown above) AND any image that
+  // also appears in processSteps[] — those render in the dedicated
+  // construction-timeline section, so showing them inline as well would
+  // dilute the build-narrative pacing.
+  const processStepImages = useMemo(
+    () => new Set(project.processSteps?.map((s) => s.image) ?? []),
+    [project.processSteps]
+  );
+  const bodyImages = useMemo(
+    () => lightboxImages.slice(1).filter((img) => !processStepImages.has(img)),
+    [lightboxImages, processStepImages]
+  );
 
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
