@@ -119,17 +119,12 @@ export function HeroSection() {
 
       {/* Content — bottom-left, mask-reveal stagger */}
       <motion.div
-        className="relative z-10 px-6 lg:px-12 pb-16 lg:pb-20 max-w-[860px]"
+        className="relative z-10 px-6 lg:px-12 pb-16 lg:pb-20 max-w-[720px]"
         variants={containerVariants}
         initial={initial}
         animate="visible"
       >
-        <h1
-          className="font-heading text-white mb-10 sm:mb-12
-            text-5xl sm:text-6xl md:text-7xl lg:text-[88px] xl:text-[100px]
-            font-normal leading-[1.02] tracking-[-0.028em]
-            [text-shadow:0_2px_32px_rgba(0,0,0,0.35)]"
-        >
+        <h1 className="font-heading text-4xl md:text-5xl lg:text-[64px] font-medium text-white mb-9 leading-[1.15] tracking-[-0.02em]">
           <span className="block overflow-hidden pb-1">
             <motion.span variants={maskLineVariants} className="block">
               Built for Homes
@@ -140,11 +135,7 @@ export function HeroSection() {
               That Demand{" "}
               <motion.em
                 variants={accentVariants}
-                className="italic font-light text-gold"
-                style={{
-                  fontFeatureSettings: '"ss01", "swsh"',
-                  textShadow: "0 1px 28px rgba(200,165,90,0.25)",
-                }}
+                className="italic text-gold font-normal"
               >
                 More.
               </motion.em>
