@@ -1521,3 +1521,148 @@ Maintain a 2D ref map of `[rowIndex][fieldIndex]` → input. On Tab in any cell,
 | Labor override reset when `null` | Handle `null` in the PATCH route explicitly; Supabase `.update({ labor_rate_override: null })` sets the column to NULL correctly |
 | `env(safe-area-inset-bottom)` on non-iOS | Returns `0` on non-iOS browsers; no negative effect |
 | Inline edit Tab goes outside the trade table | Constrain Tab navigation to within the current trade section's cells only |
+
+---
+
+## AMENDMENTS — Gap Fixes (2026-05-13)
+
+### Gap 3 Fix — Offline / Poor Signal Autosave Handling
+
+**Problem:** Marco reviews estimates on his iPhone at job sites with spotty cellular signal. If a PATCH fails due to network loss, the current plan marks items with `saveError` state but does not retry. If Marco closes Safari with unsaved dirty items, all edits are lost.
+
+**Two-layer fix: online event retry + localStorage crash recovery**
+
+---
+
+#### Layer 1: Online Event Retry in `useAutosave`
+
+Update the `useAutosave` hook to listen for the browser `online` event and immediately retry all dirty items when connectivity is restored:
+
+```typescript
+// Add to useAutosave.ts — inside the hook body
+
+// Retry on reconnect
+useEffect(() => {
+  const handleOnline = () => {
+    const { dirtyItemIds } = useEstimateStore.getState()
+    if (dirtyItemIds.size > 0) {
+      // Trigger immediate save (bypass debounce)
+      triggerSave()
+    }
+  }
+  
+  window.addEventListener('online', handleOnline)
+  return () => window.removeEventListener('online', handleOnline)
+}, [])
+
+// Exponential backoff on PATCH failure (network errors only, not 4xx)
+async function patchWithRetry(
+  url: string, 
+  body: object, 
+  attempt = 1
+): Promise<Response> {
+  try {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return res
+  } catch (err) {
+    // Only retry on network errors (TypeError), not HTTP errors
+    if (err instanceof TypeError && attempt < 4) {
+      const delay = Math.min(1000 * 2 ** attempt, 30000) // 2s, 4s, 8s, max 30s
+      await new Promise(r => setTimeout(r, delay))
+      return patchWithRetry(url, body, attempt + 1)
+    }
+    throw err
+  }
+}
+```
+
+Update the batch save loop to use `patchWithRetry` instead of plain `fetch`.
+
+---
+
+#### Layer 2: localStorage Crash Recovery
+
+Persist `dirtyItemIds` and the corresponding `lineItems` changes to localStorage so that if Marco closes Safari mid-edit, his unsaved changes survive a page reload.
+
+```typescript
+// Add to the Zustand store (src/store/estimateStore.ts)
+
+// On every updateLineItem call, persist dirty state to localStorage
+updateLineItem: (id, patch) =>
+  set(produce((state) => {
+    // ... existing mutation ...
+    state.dirtyItemIds.add(id)
+    
+    // Persist crash recovery data
+    const recoveryKey = `estimate-dirty-${state.estimate?.id}`
+    const existing = JSON.parse(localStorage.getItem(recoveryKey) ?? '{}')
+    existing[id] = { ...existing[id], ...patch }
+    localStorage.setItem(recoveryKey, JSON.stringify(existing))
+  }))
+
+// Clear localStorage for an item when its save succeeds
+markSaved: (ids: string[]) =>
+  set(produce((state) => {
+    ids.forEach(id => state.dirtyItemIds.delete(id))
+    
+    const recoveryKey = `estimate-dirty-${state.estimate?.id}`
+    const existing = JSON.parse(localStorage.getItem(recoveryKey) ?? '{}')
+    ids.forEach(id => delete existing[id])
+    if (Object.keys(existing).length === 0) {
+      localStorage.removeItem(recoveryKey)
+    } else {
+      localStorage.setItem(recoveryKey, JSON.stringify(existing))
+    }
+  }))
+```
+
+**On page load** — check for crash recovery data in `EstimatePageClient`:
+```typescript
+useEffect(() => {
+  const recoveryKey = `estimate-dirty-${estimateId}`
+  const crashData = localStorage.getItem(recoveryKey)
+  
+  if (crashData) {
+    const unsavedChanges = JSON.parse(crashData)
+    const changeCount = Object.keys(unsavedChanges).length
+    
+    if (changeCount > 0) {
+      // Show a non-blocking toast: "You have N unsaved changes from your last session. [Restore] [Discard]"
+      setRecoveryPrompt({ changes: unsavedChanges, count: changeCount })
+    }
+  }
+}, [estimateId])
+```
+
+If Marco taps **Restore**: apply the cached changes to the Zustand store and mark them dirty (triggers autosave immediately).
+If Marco taps **Discard**: clear localStorage, show current server state.
+
+---
+
+#### Autosave indicator updates
+
+The header autosave indicator should reflect offline state:
+
+| State | Indicator | Color |
+|---|---|---|
+| Saved | "Saved · just now" | Green dot |
+| Saving | "Saving..." | Spinner |
+| Offline — queued | "Offline — changes queued (N)" | Yellow dot |
+| Save failed | "Save failed — tap to retry" | Red dot, tappable |
+| Crash recovery available | "N unsaved changes from last session" | Yellow banner at top |
+
+The "Offline — changes queued" state is triggered when `!navigator.onLine` AND `dirtyItemIds.size > 0`.
+
+---
+
+#### Testing for this fix
+
+1. Make edits, turn on Airplane Mode, verify indicator shows "Offline — changes queued"
+2. Turn off Airplane Mode, verify indicator shows "Saving..." then "Saved" as retry fires
+3. Make edits, kill the browser tab, reopen the page, verify the recovery prompt appears
+4. Tap Restore, verify changes are visible and save immediately fires
+5. Make edits, kill tab, reopen, tap Discard — verify server state is shown (no dirty changes)
