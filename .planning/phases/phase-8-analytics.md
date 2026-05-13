@@ -2400,3 +2400,206 @@ WHERE table_name = 'estimates' AND column_name = 'status';
 
 **`won` and `lost` are final states — the Zustand store must reflect this.**
 After a `won` or `lost` PATCH succeeds, update the store's `estimate.status` and re-render the review page. The `StatusQuickActions` component should read status from the store (or local state synced from the API response) so it swaps to the read-only badge without a page reload.
+
+---
+
+## AMENDMENTS — Gap Fixes (2026-05-13)
+
+### Gap 8 Fix — Sub Bid Tracker
+
+**Problem:** Many estimates include trades priced as allowances (`trade_status = 'DEFERRED'` or `is_allowance = true`) because the real sub quote hasn't come in yet. There was no mechanism to track incoming sub quotes, compare them to allowances, or trigger estimate revisions when quotes arrive. This gap was identified in the vision doc but never assigned to a phase plan.
+
+---
+
+#### New Database Table: `sub_quotes`
+
+```sql
+CREATE TABLE sub_quotes (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  estimate_id       UUID NOT NULL REFERENCES estimates(id) ON DELETE CASCADE,
+  trade_id          UUID NOT NULL REFERENCES estimate_trades(id) ON DELETE CASCADE,
+  job_id            UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+
+  -- Sub information
+  sub_company_name  TEXT NOT NULL,
+  sub_contact_name  TEXT,
+  sub_contact_email TEXT,
+
+  -- Quote details
+  quote_amount      NUMERIC(12,2) NOT NULL,
+  quote_date        DATE NOT NULL DEFAULT CURRENT_DATE,
+  quote_valid_until DATE,
+  scope_notes       TEXT,
+
+  -- Comparison to allowance
+  allowance_amount  NUMERIC(12,2),  -- snapshot of the allowance at time of quote receipt
+  variance_amount   NUMERIC(12,2) GENERATED ALWAYS AS (quote_amount - allowance_amount) STORED,
+  variance_pct      NUMERIC(6,2) GENERATED ALWAYS AS (
+    CASE WHEN allowance_amount > 0 
+    THEN ROUND(((quote_amount - allowance_amount) / allowance_amount) * 100, 2)
+    ELSE NULL END
+  ) STORED,
+
+  -- Status
+  status            TEXT NOT NULL DEFAULT 'received'
+    CHECK (status IN ('received', 'accepted', 'rejected', 'expired')),
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER trg_sub_quotes_updated_at
+  BEFORE UPDATE ON sub_quotes
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+CREATE INDEX idx_sub_quotes_estimate_id ON sub_quotes(estimate_id);
+CREATE INDEX idx_sub_quotes_job_id ON sub_quotes(job_id);
+CREATE INDEX idx_sub_quotes_status ON sub_quotes(status);
+
+-- RLS
+ALTER TABLE sub_quotes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "authenticated_full_access" ON sub_quotes
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+```
+
+---
+
+#### UI: Sub Quotes Panel on the Estimate Review Page
+
+Add a new collapsible section at the bottom of the estimate review page (Phase 3/4), visible only when at least one trade has `trade_status = 'DEFERRED'` OR contains line items with `is_allowance = true`:
+
+**Mobile view:**
+```
+SUB QUOTES PENDING
+──────────────────────────────────────
+ELECTRICAL              ALLOWANCE
+$65,000 placeholder     [+ Log Quote]
+No quotes received yet
+
+HVAC / MECHANICAL       ALLOWANCE
+$48,000 placeholder     [+ Log Quote]
+No quotes received yet
+
+FIRE SPRINKLER          DEFERRED
+$22,000 estimate        [+ Log Quote]
+1 quote received ▼
+  ABC Fire Protection   $19,400
+  −$2,600 below allowance   [Accept] [Reject]
+──────────────────────────────────────
+TOTAL AT RISK: $135,000 in allowances
+3 trades pending confirmed quotes
+```
+
+**"Log Quote" button** → opens a bottom sheet (mobile) or modal (desktop):
+```
+LOG SUB QUOTE — ELECTRICAL
+─────────────────────────────────
+Sub company name: [_______________]
+Contact name:     [_______________] (optional)
+Contact email:    [_______________] (optional)
+Quote amount:     $[_______________]
+Quote date:       [date picker, default today]
+Valid until:      [date picker] (optional)
+Scope notes:      [text area] (optional)
+
+Allowance currently in estimate: $65,000
+This quote: [amount you enter]
+Difference: shown live as you type
+
+[  SAVE QUOTE  ]
+```
+
+**When quote amount < allowance:** Show green indicator: "✅ $17,800 below allowance — apply to estimate?"
+**When quote amount > allowance:** Show red indicator: "⚠️ $8,200 above allowance — estimate may need revision"
+
+**[Accept] button on a quote:** 
+1. Sets `sub_quotes.status = 'accepted'`
+2. Shows confirmation: "Apply this quote to the estimate? This will update the [Trade] total from $65,000 to $47,200 and create a new estimate version."
+3. On confirm: updates the relevant line item(s) in the estimate, sets `is_manual_override = true`, triggers a new estimate version (or marks for manual re-push from pipeline)
+4. Records the change in `estimate_activity`
+5. Prompts: "Send revised estimate to [recipient]?" → if yes, opens compose panel pre-filled with change summary (Gap 9 logic)
+
+---
+
+#### API Routes for Sub Quotes
+
+Add to the API route tree:
+
+```
+/api/estimates/[id]/sub-quotes
+  GET    → list all sub_quotes for this estimate
+  POST   → log a new quote { trade_id, sub_company_name, quote_amount, ... }
+
+/api/estimates/[id]/sub-quotes/[quoteId]
+  PATCH  → update status (accept/reject), update quote details
+  DELETE → remove a quote (soft delete optional)
+```
+
+**GET response shape:**
+```typescript
+interface SubQuotesResponse {
+  tradeId: string
+  tradeName: string
+  tradeStatus: 'SP' | 'SUB' | 'DEFERRED'
+  allowanceAmount: number
+  quotes: SubQuote[]
+  bestQuote: SubQuote | null  // lowest accepted or received quote
+}
+```
+
+---
+
+#### Dashboard: Sub Quotes Summary
+
+Add to the dashboard metrics panel (alongside the existing 4 metrics):
+
+**Mobile: 5th card (or inline with the estimate card)**
+```
+PENDING QUOTES
+4 trades waiting
+$198,000 at risk
+```
+
+Tapping this metric card goes to a dedicated "Sub Quotes" view that shows all pending quotes across ALL active estimates, sorted by allowance amount (largest first):
+
+```
+ALL PENDING SUB QUOTES
+───────────────────────────────
+BELLEVUE CHURCH
+  Electrical    $65K allow.   2 quotes received
+  HVAC          $48K allow.   0 quotes received  ← highlight
+
+ACME OFFICE TI
+  Fire Sprinkler $22K allow.  1 quote received
+───────────────────────────────
+TOTAL EXPOSURE: $135K across 3 trades
+```
+
+---
+
+#### Notifications (add to Phase 5 email system)
+
+Add 2 new email templates for sub quote events:
+
+**`sub-quote-received` → to estimator (ESTIMATOR_EMAIL)**
+- Triggered: when a sub quote is logged via the portal
+- Subject: `Sub quote received: [Trade] for [Job Name] — $[Amount]`
+- Body: Quote details, comparison to allowance, "Apply to estimate?" CTA
+
+**`sub-quote-accepted` → to Marco (via magic link)**
+- Triggered: when estimator accepts a quote and applies it to the estimate
+- Subject: `[Trade] confirmed for [Job Name]: $[Amount] (was $[Allowance])`
+- Body: The change in plain English, net impact on total, "Review revised estimate" CTA
+
+---
+
+#### Testing Checklist for Sub Bid Tracker
+
+- [ ] Log a quote below the allowance — verify green indicator and "Apply to estimate?" prompt
+- [ ] Log a quote above the allowance — verify red indicator
+- [ ] Accept a quote — verify line item updates and activity log records the change
+- [ ] Reject a quote — verify it stays visible but marked rejected
+- [ ] Log 3 quotes for the same trade — verify they all appear and best quote is highlighted
+- [ ] Dashboard metric card shows correct count and dollar exposure
+- [ ] `sub-quote-received` email arrives at ESTIMATOR_EMAIL after logging a quote
+- [ ] `sub-quote-accepted` email arrives at Marco after accepting a quote
