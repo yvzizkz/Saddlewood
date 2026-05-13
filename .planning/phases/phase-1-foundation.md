@@ -892,3 +892,67 @@ Phase 1 is complete when:
 4. No marketing page behavior has regressed
 
 Phase 2 will add the estimates database schema, file upload to Supabase Storage, and the estimate creation form.
+
+---
+
+## AMENDMENTS — Gap Fixes (2026-05-13)
+
+### Gap 1 Fix — Marco Notification Emails Must Be Magic Links
+
+**Problem identified:** The `estimate-ready` and other Marco notification emails currently contain plain deep links to `/internal/estimates/[id]`. If Marco's 30-day Supabase session has expired, clicking the link redirects him to `/login`, requires him to enter his email, wait for a second magic link email, click that, and THEN reach the estimate. On a job site with spotty signal, this 3–4 step flow is a blocker.
+
+**Solution:** When sending any notification email TO MARCO, generate a Supabase magic link (OTP) that simultaneously authenticates him AND redirects him to the specific estimate. One tap = logged in + on the right page.
+
+**Implementation — add this utility function to `src/lib/supabase/admin.ts`:**
+
+```typescript
+/**
+ * Generates a magic link for Marco that auto-authenticates and redirects
+ * to a specific internal route. Use this for ALL notification emails sent to Marco.
+ * Never send Marco a plain /internal/* link — he may not have an active session.
+ */
+export async function generateMarcoMagicLink(redirectPath: string): Promise<string> {
+  const supabase = createAdminClient()
+  
+  const { data, error } = await supabase.auth.admin.generateLink({
+    type: 'magiclink',
+    email: process.env.MARCO_EMAIL!,
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}${redirectPath}`,
+    },
+  })
+  
+  if (error || !data.properties?.action_link) {
+    // Fallback to plain link if generation fails — better than no email
+    console.error('Magic link generation failed:', error)
+    return `${process.env.NEXT_PUBLIC_APP_URL}${redirectPath}`
+  }
+  
+  return data.properties.action_link
+}
+```
+
+**Where to use this:**
+- In `/api/estimates/ingest` (Phase 2): when firing the `estimate-ready` email to Marco, call `generateMarcoMagicLink('/internal/estimates/' + estimateId)` and pass the resulting URL as the CTA button href
+- In `/api/estimates/[id]/route.ts` (Phase 3): when Marco approves and the estimator notification is sent, also generate a magic link for Marco's copy of the confirmation
+- In any Phase 3–8 route that sends an email to Marco: always use `generateMarcoMagicLink()` instead of a plain URL
+
+**Auth callback support:** The `src/app/auth/callback/route.ts` already handles the magic link redirect (from Phase 1 foundation). The `redirectTo` URL passed to `generateLink()` will route through the callback and then forward to the estimate page. No additional changes needed to the callback route itself.
+
+**Session note:** Magic links generated via `admin.generateLink()` are one-time-use and expire in 1 hour by default (configurable in Supabase Auth settings). This is fine — the notification email is typically opened within minutes. The 30-day session means Marco rarely hits the expiry; the magic link is a fallback for those cases.
+
+**ENV var required:** `MARCO_EMAIL=marco@saddlewoodcontracting.com` — already in the plan. Confirm it is set before Phase 2 routes are written.
+
+---
+
+### Gap 2 Fix — ESTIMATOR_EMAIL Environment Variable
+
+**Add to the ENV vars list in this plan:**
+
+```bash
+ESTIMATOR_EMAIL=info@saddlewoodcontracting.com
+```
+
+This variable must be set in both `.env.local` AND the Vercel dashboard (Production + Preview scope) before Phase 5 email templates are built. Without it, the `estimate-approved-internal` notification (and all other estimator-facing notifications) have no destination and will fail silently.
+
+**Use in code:** Reference as `process.env.ESTIMATOR_EMAIL` in all server-side API routes that send internal notifications. Never hard-code the email address.
