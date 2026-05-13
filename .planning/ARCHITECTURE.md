@@ -641,3 +641,59 @@ Add two new env vars to the pipeline environment:
 - **The route group refactor is the very first code change** — do it before touching any portal files
 - **SQL schema must be run before any API routes are written** — the routes reference table names
 - **Test the ingest endpoint with curl before building any UI** — a broken ingest kills the whole pipeline→portal connection
+
+
+---
+
+## AMENDMENTS — Gap Fixes (2026-05-13)
+
+### Gap 2 Fix — ESTIMATOR_EMAIL Environment Variable
+
+This variable was missing from the original plan. It is required for the `estimate-approved-internal` email template (and other internal notifications) to have a destination.
+
+**Add to `.env.local`:**
+```bash
+# Estimator / operations inbox — receives notifications when Marco approves, requests changes, etc.
+ESTIMATOR_EMAIL=info@saddlewoodcontracting.com
+```
+
+**Add to Vercel dashboard** (Project → Settings → Environment Variables, scope: Production + Preview):
+- Key: `ESTIMATOR_EMAIL`
+- Value: `info@saddlewoodcontracting.com`
+
+**Where it is used:**
+- `estimate-approved-internal` template (to: ESTIMATOR_EMAIL) — fires when Marco approves
+- `estimate-changes-requested` template (to: ESTIMATOR_EMAIL) — fires when Marco requests changes
+- `estimate-rejected` template (to: ESTIMATOR_EMAIL) — fires if Marco marks "not bidding"
+- Any other internal operational notification that needs to reach the estimator
+
+**Updated complete ENV vars list** — add this entry between `MARCO_EMAIL` and `NEXT_PUBLIC_APP_URL`:
+```bash
+MARCO_EMAIL=marco@saddlewoodcontracting.com
+ESTIMATOR_EMAIL=info@saddlewoodcontracting.com   # ← ADD THIS
+NEXT_PUBLIC_APP_URL=https://saddlewoodcontracting.com
+```
+
+### Gap 4 Fix — Re-Ingest Versioning
+
+When the pipeline runs a second time for the same job (e.g., revised electrical allowance, re-run framing agent), the ingest endpoint will receive a different payload hash and create a new `estimates` row. The following rules govern versioning:
+
+**Ingest endpoint versioning logic (add to `/api/estimates/ingest`):**
+1. After upserting the `jobs` row, query: `SELECT MAX(version) FROM estimates WHERE job_id = $jobId`
+2. If result is NULL (first estimate for this job): `version = 1`, `parent_estimate_id = null`, `is_ai_baseline = true`
+3. If result >= 1 (revision): `version = MAX + 1`, `parent_estimate_id = id of the version with MAX version`, `is_ai_baseline = true`
+4. Archive the previous estimate: `UPDATE estimates SET review_status = 'archived' WHERE job_id = $jobId AND version = MAX AND id != new_estimate_id`
+
+**Pipeline ingest payload — add optional field:**
+```typescript
+interface IngestPayload {
+  pipeline_version: string
+  ingest_mode?: 'new' | 'revision'  // ← ADD: 'revision' signals this replaces a previous estimate
+  job: { ... }
+  // ... rest unchanged
+}
+```
+
+**Dashboard display:** Group estimates by `job_id`. Show only the highest version by default. "Show previous versions" expander shows archived versions. Each version card shows "v2" badge if `version > 1`.
+
+**Version history page** (`/internal/estimates/[id]/history`): Lists all estimates for the same `job_id`, sorted by version DESC, with a diff summary between versions (count of changed line items, net dollar change).
