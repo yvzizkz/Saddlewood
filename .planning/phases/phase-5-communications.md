@@ -1652,3 +1652,249 @@ npm install svix
 11. Wire up `ComposePanel` to estimate detail page
 12. Set up Resend webhook
 13. Run full end-to-end test
+
+---
+
+## AMENDMENTS — Gap Fixes (2026-05-13)
+
+### Gap 1 Fix — Marco Notification Emails Must Use Magic Links
+
+**All emails sent TO MARCO must use `generateMarcoMagicLink()` (defined in Phase 1 amendments) for the CTA button URL, not a plain `/internal/*` deep link.**
+
+Update every template that sends to `MARCO_EMAIL`:
+
+**Templates affected:** `estimate-ready`, `estimate-sent-confirmation`, `estimate-viewed-by-client`, `estimate-accepted`, `estimate-expired-internal`
+
+**Template prop change — add `ctaUrl` as a required prop to all Marco-facing templates:**
+```typescript
+interface EstimateReadyProps {
+  jobName: string
+  grandTotal: number
+  flagCount: number
+  tradeCount: number
+  bidDueDate: string
+  estimateId: string
+  ctaUrl: string  // ← ADD: must be a magic link, NOT a plain /internal URL
+}
+```
+
+**In the API route that sends the email** (e.g., `/api/estimates/ingest`):
+```typescript
+import { generateMarcoMagicLink } from '@/lib/supabase/admin'
+
+// Generate magic link pointing to this estimate
+const marcoLink = await generateMarcoMagicLink(`/internal/estimates/${estimateId}`)
+
+// Pass to the email template
+await resend.emails.send({
+  from: process.env.RESEND_FROM_ADDRESS!,
+  to: process.env.MARCO_EMAIL!,
+  subject: `New estimate ready: ${jobName} — ${formatCurrency(grandTotal)}`,
+  react: EstimateReady({ ..., ctaUrl: marcoLink }),  // ← magic link, not plain URL
+})
+```
+
+**For revision estimates (Gap 4):** If `isRevision: true`, update the subject line:
+- `New estimate ready: [Job Name] — $[Amount]` → `Revised estimate (v[N]): [Job Name] — $[Amount] (was $[previous])`
+
+---
+
+### Gap 2 Fix — ESTIMATOR_EMAIL in All Templates
+
+**All templates that notify the estimator must use `process.env.ESTIMATOR_EMAIL` as the recipient.**
+
+Templates affected: `estimate-approved-internal`, `estimate-changes-requested`
+
+```typescript
+// In any route sending to the estimator:
+to: process.env.ESTIMATOR_EMAIL!,  // info@saddlewoodcontracting.com
+```
+
+**Also: `info@` auto-BCC on all outbound client emails.** In the compose panel send handler, the `ESTIMATOR_EMAIL` is always added as BCC (this gives the operations inbox a record of everything sent to clients):
+```typescript
+bcc: process.env.ESTIMATOR_EMAIL,  // Always BCC info@ on client-facing emails
+```
+
+---
+
+### Gap 5 Fix — Recipient Role (GC vs. Client vs. Owner)
+
+**Problem:** The compose panel sends to "the client" but in commercial work the GC is the requestor, not the building owner. The language in the client portal and acceptance confirmation must adapt.
+
+**Database change — add `recipient_role` to `export_links`:**
+```sql
+ALTER TABLE export_links 
+ADD COLUMN recipient_role TEXT NOT NULL DEFAULT 'client'
+CHECK (recipient_role IN ('client', 'gc', 'owner', 'other'));
+```
+
+**Compose panel — add role selector per recipient:**
+```
+TO:  [client@email.com]  Role: [Client ▼]    [+ Add recipient]
+     [gc@generalcontractor.com]  Role: [GC ▼]
+```
+
+Role options: Client | GC / General Contractor | Owner | Other
+
+**How role affects the experience:**
+
+| Context | client | gc | owner |
+|---|---|---|---|
+| Client portal heading | "Your Estimate" | "Proposal for Review" | "Your Estimate" |
+| Accept button label | "Accept This Estimate" | "Approve This Proposal" | "Accept This Estimate" |
+| Acceptance legal text | "By signing, you confirm agreement..." | "By signing, you confirm review and approval on behalf of the project..." | "By signing, you confirm agreement..." |
+| Confirmation email subject | "Confirmed: You've accepted..." | "Confirmed: Proposal approved by [GC Name]" | "Confirmed: You've accepted..." |
+| Client portal subheading | "Prepared for: [Name]" | "Submitted to: [GC Name] for [Project Name]" | "Prepared for: [Name]" |
+
+**Implementation:** Pass `recipient_role` to the `EstimateRenderer` component and use it to conditionally render copy. All role-conditional strings should live in a `src/lib/portal-copy.ts` constants file, not inline in components.
+
+**Multiple recipients:** When sending to multiple people, create one `export_links` row per recipient (each gets a unique token and role). The compose panel "+ Add recipient" button adds another row. Each person gets their own email with their own personalized link.
+
+---
+
+### Gap 6 Fix — Format Change Request from Recipient (Manual Workflow)
+
+**No in-portal mechanism needed — document the manual workflow instead.**
+
+Add this note to the compose panel UI and to the client delivery email:
+
+**In the client delivery email footer (all formats):**
+```
+Need a different format or have questions?
+Reply to this email or call Marco at (480) 999-6100
+```
+
+**In the compose panel (estimator UI):** Add a "Format change requested" quick-action button that appears after an estimate has been sent. Clicking it opens a pre-filled compose panel with:
+- Same recipient(s) pre-filled
+- "Re-sending in new format" note pre-filled in personal message
+- New format selector
+- Previous link auto-marked for revocation (see Gap 7)
+
+This covers the scenario without building a client-to-portal feedback channel, which would add significant complexity for minimal gain.
+
+---
+
+### Gap 7 Fix — Auto-Revoke Previous Share Link When Resending
+
+**Problem:** When a new share link is generated for the same estimate (different format, or after a revision), the old link remains active. Recipients may reference the stale link and see outdated information.
+
+**Compose panel behavior — add revocation prompt:**
+
+When the estimator clicks "Send Estimate" for a job that already has at least one active (non-revoked, non-expired) `export_links` row:
+
+```
+┌────────────────────────────────────────────────┐
+│  ⚠️  Previous link still active                │
+│                                                │
+│  [client@email.com] was sent a link on         │
+│  May 10 (Trade Summary format, opened 3×).     │
+│                                                │
+│  ☑ Revoke the previous link when sending new  │
+│    (recipient will see "expired" if they       │
+│     click the old email)                       │
+│                                                │
+│  [  SEND WITH REVOCATION  ]  [  Send both active  ]  │
+└────────────────────────────────────────────────┘
+```
+
+Default: revocation checkbox is CHECKED. The estimator must actively uncheck it to keep both links live.
+
+**API implementation in `/api/estimates/[id]/export`:**
+
+Add optional `revokeExistingLinks` boolean to the request body:
+
+```typescript
+// In the export route, before creating the new export_link:
+if (body.revokeExistingLinks !== false) {  // default true
+  await supabaseAdmin
+    .from('export_links')
+    .update({ is_revoked: true })
+    .eq('estimate_id', estimateId)
+    .eq('is_revoked', false)
+    // Only revoke links for the same recipient email if multiple recipients:
+    // .eq('recipient_email', body.recipientEmail)  
+}
+```
+
+**Activity log event:** Record `link_revoked` in `estimate_activity` when a previous link is revoked.
+
+**Expired link page behavior (already in Phase 6):** When a client clicks a revoked link, they see a message:
+> "This estimate link is no longer active. A new version has been sent to your email — please check your inbox."
+
+---
+
+### Gap 9 Fix — Change Summary for Revised Estimates
+
+**Problem:** When the estimator sends v2 to a GC who received v1, there's no automatic summary of what changed. The GC has no context on the delta.
+
+**Compose panel — auto-generate "Changes from previous version" section:**
+
+When sending a link for an estimate with `version > 1` AND the recipient previously received a link for an earlier version of the same job:
+
+1. Query: find the previous `export_links` for this `job_id` and this `recipient_email`
+2. Compare current estimate totals vs. previous estimate totals
+3. Auto-populate the personal message field with a change summary (estimator can edit before sending):
+
+```
+Hi [Recipient Name],
+
+Please find the updated estimate for [Job Name] attached. Here's what changed from the previous version:
+
+CHANGES FROM PREVIOUS VERSION:
+• Electrical: Updated from allowance ($65,000) to confirmed sub quote ($47,200) — savings of $17,800
+• Total revised: $847,500 → $829,700 (−$17,800)
+
+The previous estimate link has been deactivated.
+
+[Estimator can edit this message before sending]
+```
+
+**Implementation — `generateChangeSummary` utility:**
+
+```typescript
+// src/lib/estimate-diff.ts
+export function generateChangeSummary(
+  previousEstimate: EstimateWithTrades,
+  currentEstimate: EstimateWithTrades
+): string {
+  const changes: string[] = []
+  
+  // Compare trade totals
+  for (const currentTrade of currentEstimate.trades) {
+    const prevTrade = previousEstimate.trades.find(t => t.trade_name === currentTrade.trade_name)
+    if (!prevTrade) {
+      changes.push(`• ${currentTrade.trade_name}: Added (${formatCurrency(currentTrade.subtotal_total ?? 0)})`)
+      continue
+    }
+    const diff = (currentTrade.subtotal_total ?? 0) - (prevTrade.subtotal_total ?? 0)
+    if (Math.abs(diff) > 100) {  // ignore trivial rounding differences
+      const direction = diff > 0 ? 'increase' : 'savings'
+      changes.push(`• ${currentTrade.trade_name}: ${formatCurrency(prevTrade.subtotal_total ?? 0)} → ${formatCurrency(currentTrade.subtotal_total ?? 0)} (${formatCurrency(Math.abs(diff))} ${direction})`)
+    }
+  }
+  
+  // Total delta
+  const totalDiff = (currentEstimate.total_with_markup ?? 0) - (previousEstimate.total_with_markup ?? 0)
+  if (Math.abs(totalDiff) > 0) {
+    changes.push(`\nTotal: ${formatCurrency(previousEstimate.total_with_markup ?? 0)} → ${formatCurrency(currentEstimate.total_with_markup ?? 0)} (${totalDiff < 0 ? '−' : '+'}${formatCurrency(Math.abs(totalDiff))})`)
+  }
+  
+  return changes.length > 0 
+    ? `CHANGES FROM PREVIOUS VERSION:\n${changes.join('\n')}`
+    : 'Minor clarifications only — no significant changes to pricing.'
+}
+```
+
+**Re-acceptance flow for revised estimates:**
+
+When a GC who has already accepted v1 receives v2:
+- The acceptance record for v1 is marked `superseded = true` (add this column to `acceptance_records`)
+- The client portal for v2 shows a banner: "This is a revised estimate. Your previous acceptance has been superseded."
+- The Accept button is available again — the GC must re-accept the new amount
+- After acceptance of v2: both Marco and info@ receive the `estimate-accepted` notification with a note: "Re-accepted — revised from $865,000 to $847,500"
+
+**Database addition:**
+```sql
+ALTER TABLE acceptance_records 
+ADD COLUMN superseded_by UUID REFERENCES acceptance_records(id);
+```
