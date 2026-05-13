@@ -1043,3 +1043,108 @@ Do these steps in exact order:
 15. Run a real estimate and confirm end-to-end: local files written + portal shows new estimate
 
 **Phase 2 is complete when Step 15 succeeds.**
+
+
+---
+
+## AMENDMENTS — Gap Fixes (2026-05-13)
+
+### Gap 4 Fix — Re-Ingest Versioning (Revised Estimates for the Same Job)
+
+**Problem:** The pipeline may run multiple times for the same job — e.g., after Marco requests changes to the framing quantities, the estimator re-runs the framing agent and re-pushes. The original ingest logic upserts the `jobs` row (correct) but always creates a fresh `estimates` row without connecting it to prior versions. This means Bellevue Church v2 appears as a brand-new job, not a revision.
+
+**Updated ingest logic — versioning section:**
+
+Add this logic to the ingest route AFTER the `jobs` upsert and BEFORE creating the `estimates` row:
+
+```typescript
+// --- VERSION DETECTION ---
+// Check if a prior estimate exists for this job
+const { data: existingEstimates } = await supabaseAdmin
+  .from('estimates')
+  .select('id, version')
+  .eq('job_id', jobId)
+  .order('version', { ascending: false })
+  .limit(1)
+
+const priorEstimate = existingEstimates?.[0] ?? null
+const newVersion = priorEstimate ? priorEstimate.version + 1 : 1
+const parentEstimateId = priorEstimate?.id ?? null
+
+// Archive the prior estimate if this is a revision
+if (priorEstimate) {
+  await supabaseAdmin
+    .from('estimates')
+    .update({ review_status: 'archived' })
+    .eq('id', priorEstimate.id)
+}
+
+// Create the new estimate with correct version linkage
+const { data: newEstimate } = await supabaseAdmin
+  .from('estimates')
+  .insert({
+    job_id: jobId,
+    version: newVersion,
+    parent_estimate_id: parentEstimateId,
+    is_ai_baseline: true,
+    ingest_hash: payloadHash,
+    overhead_pct: payload.config.overhead_pct,
+    profit_pct: payload.config.profit_pct,
+    contingency_pct: payload.config.contingency_pct,
+    gc_sub_markup_pct: payload.config.gc_sub_markup_pct,
+    review_status: 'draft',
+    pipeline_version: payload.pipeline_version,
+  })
+  .select()
+  .single()
+```
+
+**Updated ingest response — include version info:**
+```typescript
+return NextResponse.json({
+  success: true,
+  estimateId: newEstimate.id,
+  jobId,
+  version: newVersion,
+  isRevision: newVersion > 1,
+  previousEstimateId: parentEstimateId,
+}, { status: 201 })
+```
+
+**Pipeline skill update (Agent W4-D):**
+When the pipeline receives a 201 response, check the `isRevision` flag:
+- `isRevision: false` → report: "✅ Portal updated — new estimate created. Marco can review at saddlewoodcontracting.com/internal"
+- `isRevision: true` → report: "✅ Portal updated — v[N] revision created for [Job Name]. Previous version archived. Marco has been notified."
+
+**Optional payload field — add to `IngestPayload` interface in `src/types/estimate.ts`:**
+```typescript
+interface IngestPayload {
+  pipeline_version: string
+  ingest_mode?: 'new' | 'revision'  // optional hint from pipeline; portal uses versioning logic regardless
+  job: { ... }
+  config: { ... }
+  trades: Array<{ ... }>
+}
+```
+
+**Dashboard display changes (Phase 3 — note for that phase):**
+- Group estimates by `job_id` on the dashboard
+- Show only the highest (non-archived) version by default
+- An "N versions" expander shows archived prior versions
+- Estimate cards show "v2", "v3" badges when `version > 1`
+- The `estimate-ready` notification email to Marco should indicate if this is a revision: "Revised estimate ready for review (v2): Bellevue Church — $847,500"
+
+**Notification email update (Phase 5 — note for that phase):**
+When `isRevision: true`, the `estimate-ready` email to Marco should say:
+- Subject: `Revised estimate ready (v2): [Job Name] — $[Amount]`
+- Body: Include a "What changed" section if the previous version's grand total differs: "Previously: $865,000 → Now: $847,500 (−$17,500)"
+
+**Testing addition:**
+After the initial ingest test, run a second ingest with a slightly modified payload for the same job. Verify:
+1. `jobs` table still has 1 row (upserted, not duplicated)
+2. `estimates` table has 2 rows: v1 with `review_status = 'archived'`, v2 with `review_status = 'draft'`
+3. `estimates.parent_estimate_id` on v2 points to v1's id
+4. API returns `{ isRevision: true, version: 2, previousEstimateId: '...' }`
+
+**Database migration note:**
+The `estimates` table already has `version INTEGER NOT NULL DEFAULT 1` and `parent_estimate_id UUID REFERENCES estimates(id)` from the original schema — no migration needed. The logic change is purely in the ingest route.
