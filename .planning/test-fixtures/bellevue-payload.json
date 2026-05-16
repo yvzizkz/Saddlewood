@@ -1,0 +1,121 @@
+{
+  "pipeline_version": "2.0",
+  "job": {
+    "name": "Bellevue Church Test",
+    "client_name": "Bellevue Community Church",
+    "address": "14800 W Tierra Buena Ln, Surprise, AZ 85374",
+    "ahj": "Surprise, AZ",
+    "bid_due_date": "2026-06-15",
+    "project_type": "Institutional",
+    "gc_name": "Turner Construction"
+  },
+  "config": {
+    "overhead_pct": 15,
+    "profit_pct": 10,
+    "contingency_pct": 5,
+    "gc_sub_markup_pct": 10
+  },
+  "trades": [
+    {
+      "trade_name": "Framing",
+      "trade_status": "SP",
+      "sort_order": 0,
+      "line_items": [
+        {
+          "description": "3-5/8\" 20ga metal stud wall @ 16\" OC",
+          "area_location": "Franklin_Hall",
+          "quantity": 842,
+          "unit": "LF",
+          "material_unit_cost": 1.18,
+          "labor_unit_cost": 2.40,
+          "labor_hours_per_unit": 0.030,
+          "dimension_type": "written",
+          "source_sheet": "A3.1",
+          "source_grid": "B/4",
+          "confidence": "high",
+          "flags": [],
+          "is_allowance": false
+        },
+        {
+          "description": "6\" 18ga metal stud wall @ 16\" OC — sound",
+          "area_location": "Sanctuary_Lobby",
+          "quantity": 312,
+          "unit": "LF",
+          "material_unit_cost": 1.65,
+          "labor_unit_cost": 2.60,
+          "labor_hours_per_unit": 0.033,
+          "dimension_type": "scaled",
+          "source_sheet": "A3.2",
+          "source_grid": "C/7",
+          "confidence": "medium",
+          "flags": ["scale-not-verified"],
+          "is_allowance": false
+        },
+        {
+          "description": "Structural header — (2) C8x11.5 @ door openings",
+          "area_location": "Franklin_Hall",
+          "quantity": 8,
+          "unit": "EA",
+          "material_unit_cost": 185.00,
+          "labor_unit_cost": 95.00,
+          "labor_hours_per_unit": 1.20,
+          "dimension_type": "schedule",
+          "source_sheet": "S2.1",
+          "source_grid": "DOOR SCHEDULE",
+          "confidence": "high",
+          "flags": [],
+          "is_allowance": false
+        }
+      ]
+    },
+    {
+      "trade_name": "Drywall",
+      "trade_status": "SP",
+      "sort_order": 1,
+      "line_items": [
+        {
+          "description": "5/8\" Type X GWB — single layer both sides",
+          "area_location": "Franklin_Hall",
+          "quantity": 6240,
+          "unit": "SF",
+          "material_unit_cost": 0.62,
+          "labor_unit_cost": 1.10,
+          "labor_hours_per_unit": 0.014,
+          "dimension_type": "calculated",
+          "source_sheet": "A3.1",
+          "source_grid": "B/4",
+          "confidence": "high",
+          "flags": [],
+          "is_allowance": false
+        },
+        {
+          "description": "Taping and Level 4 finish — all GWB",
+          "area_location": "Franklin_Hall",
+          "quantity": 6240,
+          "unit": "SF",
+          "material_unit_cost": 0.28,
+          "labor_unit_cost": 0.85,
+          "labor_hours_per_unit": 0.011,
+          "dimension_type": "calculated",
+          "source_sheet": "A3.1",
+          "source_grid": "B/4",
+          "confidence": "high",
+          "flags": [],
+          "is_allowance": false
+        },
+        {
+          "description": "Specialty acoustical ceiling — allowance",
+          "area_location": "Sanctuary_Lobby",
+          "quantity": 1,
+          "unit": "LS",
+          "material_unit_cost": 18000.00,
+          "labor_unit_cost": 7000.00,
+          "dimension_type": "assumed",
+          "confidence": "low",
+          "flags": ["RFI-001", "allowance-verify-with-specs"],
+          "is_allowance": true
+        }
+      ]
+    }
+  ]
+}
