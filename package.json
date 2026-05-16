@@ -12,7 +12,8 @@
     "images:process:reprocess": "tsx scripts/process-images.ts --reprocess"
   },
   "dependencies": {
-    "@next/swc-linux-x64-gnu": "^16.1.6",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.105.4",
     "clsx": "^2.1.1",
     "framer-motion": "^12.35.0",
     "lucide-react": "^0.577.0",
@@ -20,6 +21,9 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.5.0"
+  },
+  "optionalDependencies": {
+    "@next/swc-linux-x64-gnu": "^16.1.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
