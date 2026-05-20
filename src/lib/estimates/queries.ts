@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type {
   ConfidenceLevel,
+  DashboardEstimateRow,
   DimensionType,
   Estimate,
   EstimateBundle,
@@ -244,23 +245,6 @@ export async function getEstimateWithTrades(id: string): Promise<EstimateBundle>
 }
 
 // ─── Dashboard listing ───────────────────────────────────────────────────────
-
-export interface DashboardEstimateRow {
-  id: string
-  job_id: string
-  version: number
-  review_status: ReviewStatus
-  direct_cost: number
-  grand_total: number
-  updated_at: string
-  job: {
-    id: string
-    name: string
-    client_name: string | null
-    bid_due_date: string | null
-    project_type: string | null
-  } | null
-}
 
 export async function listEstimatesForDashboard(): Promise<DashboardEstimateRow[]> {
   const supabase = await createClient()

@@ -100,3 +100,22 @@ export interface EstimateBundle {
   trades: Trade[]
   line_items: LineItem[]
 }
+
+// Row shape returned by `listEstimatesForDashboard` — a flattened estimate
+// plus the joined job summary used by the dashboard list view.
+export interface DashboardEstimateRow {
+  id: string
+  job_id: string
+  version: number
+  review_status: ReviewStatus
+  direct_cost: number
+  grand_total: number
+  updated_at: string
+  job: {
+    id: string
+    name: string
+    client_name: string | null
+    bid_due_date: string | null
+    project_type: string | null
+  } | null
+}

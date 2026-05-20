@@ -32,7 +32,13 @@ const TRANSITION_MS = 250
 export function useBottomSheet(isOpen: boolean): UseBottomSheetResult {
   const [state, setState] = useState<BottomSheetState>('closed')
   const stateRef = useRef<BottomSheetState>('closed')
-  stateRef.current = state
+
+  // Mirror `state` into the ref via an effect (not during render). Under
+  // React concurrent rendering a render can be discarded; mutating the ref
+  // there would leave it pointing at a state value the tree never committed.
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     if (isOpen) {
