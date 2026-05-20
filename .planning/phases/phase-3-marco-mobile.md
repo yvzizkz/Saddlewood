@@ -1,5 +1,48 @@
 # Phase 3: Marco Mobile UI — Execution Plan
 
+---
+
+## 0. Patch Notes — 2026-05-20
+
+This plan was originally drafted before the Phase 1/2 schema was finalized. The patches below reconcile the plan with the actually-shipped foundation (`supabase/schema.sql` + Phase 1's `(portal)/internal/*` routes). **Where this section conflicts with §3–§13 below, this section wins.**
+
+| Area | Original plan | Corrected (Phase 1/2 reality) |
+|---|---|---|
+| Dashboard route | `app/(portal)/dashboard/page.tsx` | `app/(portal)/internal/page.tsx` *(replaces existing welcome page)* |
+| Review route | `app/(portal)/estimates/[id]/page.tsx` | `app/(portal)/internal/estimates/[id]/page.tsx` |
+| API route | `app/api/estimates/[id]/route.ts` | unchanged — same path |
+| Trades table | `trades` | `estimate_trades` (FK `estimate_id`, name col `trade_name`, status col `trade_status`, order col `sort_order`) |
+| Line items table | `line_items` | `estimate_line_items` (FK `trade_id`, separate `material_unit_cost` + `labor_unit_cost`, generated `total`, `flags text[]`, `area_location`) |
+| Comments table | `estimate_comments` | **Does not exist.** Deferred to Phase 5 (communications). For Phase 3, `request_changes` updates `review_status` + writes to `email_log`; the note travels in the outbound email body, not a DB row. |
+| Estimate status col | `status` | `review_status` (values: `draft`, `in_review`, `approved`, `sent`, `archived`, `cancelled`) |
+| `EstimateConfig` fields | `markupPct`, `bondPct`, `taxPct` | `overhead_pct`, `profit_pct`, `contingency_pct`, `gc_sub_markup_pct` *(snake_case TS to mirror DB; same convention as Phase 4 plan)* |
+| `LineItem.unitPrice` | single field | Split into `material_unit_cost` + `labor_unit_cost`; derived `unit_cost = material + labor`. Bottom sheet edits both. |
+| `LineItem.isFlagged` / `flagNote` | boolean + string | `flags: string[]` (DB stores `text[]`). Derived `is_flagged = flags.length > 0` for UI. |
+| `LineItem.confidence` values | `'HIGH' \| 'MEDIUM' \| 'LOW' \| 'UNREVIEWED'` | `'high' \| 'medium' \| 'low' \| null` (DB values are lowercase; `null` for unreviewed) |
+| `LineItem.area` | `area: string` | `area_location: string \| null` |
+| Approval columns | `approved_by`, `approved_at` on estimates | **Need migration `0002_estimates_approval_cols.sql`** — neither column exists yet |
+| Supabase server import | `import { createServerClient } from '@/lib/supabase/server'` | `import { createClient } from '@/lib/supabase/server'` *(existing wrapper exports `createClient`)* |
+| `BottomTabBar` mount point | `(portal)/layout.tsx` | `(portal)/internal/layout.tsx` *(otherwise it'd appear on `/login` and `/share/[token]`)* |
+| Zustand install | assumed | **Not installed** — run `npm install zustand` |
+| TS field naming | mixed camelCase | All domain types use **snake_case mirroring DB columns** (matches Phase 4 convention; avoids mapping layer) |
+| Grand-total formula | `subtotal * (1+markup) * (1+bond) * (1+tax)` | `direct_cost * (1+contingency/100) * (1+overhead/100) * (1+profit/100)` — `gc_sub_markup_pct` ignored in Phase 3 (per-SUB-trade markup is a Phase 4 concern when Marco edits config) |
+
+### Prerequisites (before starting any subtask)
+
+1. `npm install zustand` — adds zustand to deps; immer middleware ships with it
+2. Apply migration `supabase/migrations/0002_estimates_approval_cols.sql` (creates `estimates.approved_by uuid` + `estimates.approved_at timestamptz`)
+3. Confirm `viewport-fit=cover` is on the root `<meta name="viewport">` in `src/app/layout.tsx` *(needed for `env(safe-area-inset-bottom)` to return real values on iPhone)*
+4. Confirm `.pb-safe` utility is in `globals.css` *(added in the layout task)*
+
+### Out-of-scope for Phase 3 (defer)
+
+- Email send for Approve / Request Changes — wire a `try { ... } catch {}` stub that writes to `email_log` with `status='queued'`. Phase 5 builds the Resend templates and actually sends.
+- `EstimateConfig` editing (overhead/profit/contingency inputs) — read-only in Phase 3; Phase 4 builds the editor.
+- Per-line-item soft-delete / add row — Phase 4 surface.
+- Diff view / audit log UI — Phase 4 / Phase 8.
+
+---
+
 ## 1. Phase Goal
 
 Build the core mobile-first estimate review portal that Marco (the owner) uses on his iPhone to review, edit values, and approve construction estimates. Every interaction is thumb-first: primary actions live at the bottom of the screen, trade sections are expandable cards, and numeric edits open a bottom sheet with a decimal keypad — no laptop required, ever.
@@ -29,17 +72,21 @@ Build the core mobile-first estimate review portal that Marco (the owner) uses o
 src/
 ├── app/
 │   ├── (portal)/
-│   │   ├── layout.tsx                          # Shell: bottom tab bar (mobile) + sidebar (desktop)
-│   │   ├── dashboard/
-│   │   │   └── page.tsx                        # RSC — fetches pending/all estimates
-│   │   └── estimates/
-│   │       └── [id]/
-│   │           ├── page.tsx                    # RSC — fetches estimate + trades + line items
-│   │           └── loading.tsx                 # Suspense skeleton
+│   │   ├── layout.tsx                          # Minimal portal shell (already exists from Phase 1)
+│   │   └── internal/
+│   │       ├── layout.tsx                      # Shell: bottom tab bar (mobile) + sidebar (desktop) — UPDATED IN THIS PHASE
+│   │       ├── page.tsx                        # DASHBOARD — RSC — replaces existing welcome page
+│   │       └── estimates/
+│   │           └── [id]/
+│   │               ├── page.tsx                # RSC — fetches estimate + trades + line items
+│   │               └── loading.tsx             # Suspense skeleton
 │   └── api/
 │       └── estimates/
 │           └── [id]/
-│               └── route.ts                    # PATCH handler (status, comments)
+│               ├── route.ts                    # PATCH handler (status: approve, request_changes)
+│               └── line-items/
+│                   └── [itemId]/
+│                       └── route.ts            # PATCH (qty / material_unit_cost / labor_unit_cost) — autosave target
 │
 ├── components/
 │   ├── layout/
@@ -280,6 +327,8 @@ Flag state variant:
 
 ### 5f. Bottom Sheet Editor
 
+The DB stores material and labor separately (`material_unit_cost` + `labor_unit_cost`), so the editor surfaces both. Quantity is also editable.
+
 ```
 ┌────────────────────────────────────────┐  ← full viewport, blurred bg
 │  [blurred content behind...]           │
@@ -287,12 +336,14 @@ Flag state variant:
 │  ╔══════════════════════════════════╗  │
 │  ║  3-5/8" metal stud @ 16" OC     ║  │  ← item name, non-editable
 │  ║                                  ║  │
-│  ║         $3,017                   ║  │  ← large current value
-│  ║         842 LF × $3.58/LF        ║  │
+│  ║         $3,017                   ║  │  ← large current total
+│  ║         842 LF × $3.58/LF        ║  │  ← derived: qty × (mat + lab)
 │  ║                                  ║  │
-│  ║  Edit unit price:  [  3.58  ]    ║  │  ← text input, decimal, focused
+│  ║  Quantity:         [   842  ]    ║  │  ← decimal input
+│  ║  Material $/unit:  [  1.18  ]    ║  │  ← decimal input, focused first
+│  ║  Labor $/unit:     [  2.40  ]    ║  │  ← decimal input
 │  ║                                  ║  │
-│  ║  Section total: $142,500         ║  │  ← live preview
+│  ║  Section total: $142,500         ║  │  ← live preview (Zustand-driven)
 │  ║  (was $142,500 → now $142,500)   ║  │
 │  ║                                  ║  │
 │  ║  [    Cancel    ]  [  Apply  ]   ║  │
@@ -305,6 +356,8 @@ Flag state variant:
 │  └──────────────────────────────────┘  │
 └────────────────────────────────────────┘
 ```
+
+Apply behavior: write all three values via single `store.updateLineItem(id, { quantity, material_unit_cost, labor_unit_cost })`. Cancel resets the local form state without touching the store.
 
 ### 5g. Desktop Review Page Layout (md: breakpoint)
 
@@ -348,59 +401,91 @@ import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
 
 // ─── Domain types (src/lib/estimates/types.ts) ───────────────────────────────
+// NOTE: All fields use snake_case mirroring DB columns. No camelCase mapping
+// layer — domain objects pass straight from Supabase through the wire to the
+// store. Same convention as Phase 4.
 
-export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNREVIEWED'
+export type ConfidenceLevel = 'high' | 'medium' | 'low'
 export type DimensionType = 'written' | 'scaled' | 'schedule' | 'calculated' | 'assumed'
-export type EstimateStatus = 'draft' | 'pending_review' | 'approved' | 'changes_requested'
+export type ReviewStatus = 'draft' | 'in_review' | 'approved' | 'sent' | 'archived' | 'cancelled' | 'changes_requested'
+export type TradeStatus = 'SP' | 'SUB' | 'DEFERRED' | 'NIS'
 
 export interface LineItem {
   id: string
-  tradeId: string
+  trade_id: string
   description: string
-  area: string                      // e.g. "Franklin Hall"
+  area_location: string | null         // e.g. "Franklin_Hall"
   quantity: number
-  unit: string                      // "LF" | "SF" | "EA" etc.
-  unitPrice: number
-  materialRate: number
-  laborRate: number
-  total: number                     // computed: quantity × unitPrice
-  sourceSheet: string               // e.g. "A3.1/B4"
-  dimensionType: DimensionType
-  confidence: ConfidenceLevel
-  isFlagged: boolean
-  flagNote: string | null
+  unit: string | null                  // "LF" | "SF" | "EA" etc.
+  material_unit_cost: number           // separate from labor — schema column
+  labor_unit_cost: number              // separate from material — schema column
+  labor_hours_per_unit: number | null
+  total: number                        // DB-generated: qty × (material + labor); store mirrors it on edits
+  source_sheet: string | null          // e.g. "A3.1"
+  source_grid: string | null           // e.g. "B4"
+  dimension_type: DimensionType | null
+  confidence: ConfidenceLevel | null   // null = unreviewed
+  flags: string[]                      // empty array = not flagged
+  is_allowance: boolean
+  is_deleted: boolean
+  is_manual_override: boolean
+  sort_order: number
 }
 
 export interface Trade {
   id: string
-  estimateId: string
-  name: string                      // "FRAMING"
-  subcontractorCode: string         // "SP" | "SUB" | etc.
-  lineItems: string[]               // ordered array of LineItem ids
-  total: number                     // sum of line item totals (derived)
-  flagCount: number
-  confidence: ConfidenceLevel       // worst-case roll-up
+  estimate_id: string
+  trade_name: string                   // "FRAMING"
+  trade_status: TradeStatus            // "SP" | "SUB" | "DEFERRED" | "NIS"
+  sort_order: number
+  labor_rate_override: number | null
+  ai_blended_labor_rate: number | null
+  // Derived (computed in store, not stored on Trade record from DB):
+  line_item_ids: string[]              // ordered array of LineItem ids
+  subtotal: number                     // sum of line item totals
+  flag_count: number                   // count of line items where flags.length > 0
+  worst_confidence: ConfidenceLevel | null
 }
 
 export interface EstimateConfig {
-  markupPct: number
-  bondPct: number
-  taxPct: number
+  overhead_pct: number
+  profit_pct: number
+  contingency_pct: number
+  gc_sub_markup_pct: number
 }
 
 export interface Estimate {
   id: string
-  projectName: string
-  clientName: string
-  bidDueDate: string                // ISO date string
-  status: EstimateStatus
-  subtotal: number
-  grandTotal: number
+  job_id: string
+  version: number
+  review_status: ReviewStatus
   config: EstimateConfig
-  tradeIds: string[]                // ordered
-  flagCount: number
-  createdAt: string
-  updatedAt: string
+  direct_cost: number                  // sum of all line item totals (recomputed in store)
+  grand_total: number                  // direct_cost × (1+contingency/100) × (1+overhead/100) × (1+profit/100)
+  trade_ids: string[]                  // ordered
+  flag_count: number                   // total across all line items
+  created_at: string
+  updated_at: string
+  approved_by: string | null           // uuid (auth.users) — added in migration 0002
+  approved_at: string | null           // ISO timestamp — added in migration 0002
+}
+
+// Job — joined into Estimate display but separate row in DB
+export interface Job {
+  id: string
+  name: string                         // project name
+  client_name: string | null
+  address: string | null
+  bid_due_date: string | null          // ISO date
+  project_type: string | null
+}
+
+// Compound type returned by getEstimateWithTrades
+export interface EstimateBundle {
+  estimate: Estimate
+  job: Job
+  trades: Trade[]
+  line_items: LineItem[]
 }
 
 // ─── Store shape ─────────────────────────────────────────────────────────────
@@ -408,6 +493,7 @@ export interface Estimate {
 export interface EstimateStore {
   // State
   estimate: Estimate | null
+  job: Job | null
   trades: Record<string, Trade>
   lineItems: Record<string, LineItem>
   dirtyItemIds: Set<string>
@@ -422,14 +508,13 @@ export interface EstimateStore {
   approveModalOpen: boolean
 
   // Hydration (called once from EstimatePageClient after RSC fetch)
-  hydrate: (
-    estimate: Estimate,
-    trades: Trade[],
-    lineItems: LineItem[]
-  ) => void
+  hydrate: (bundle: EstimateBundle) => void
 
-  // Line item editing
-  updateLineItem: (id: string, patch: Partial<Pick<LineItem, 'quantity' | 'unitPrice' | 'materialRate' | 'laborRate'>>) => void
+  // Line item editing — patch keys mirror DB column names
+  updateLineItem: (
+    id: string,
+    patch: Partial<Pick<LineItem, 'quantity' | 'material_unit_cost' | 'labor_unit_cost'>>
+  ) => void
   openBottomSheet: (itemId: string) => void
   closeBottomSheet: () => void
 
@@ -461,16 +546,16 @@ export interface EstimateStore {
 // ─── Selectors (use these in components, not raw state slices) ───────────────
 
 export const selectGrandTotal = (s: EstimateStore) =>
-  s.estimate?.grandTotal ?? 0
+  s.estimate?.grand_total ?? 0
 
-export const selectTradeTotalById = (tradeId: string) => (s: EstimateStore) => {
+export const selectTradeSubtotalById = (tradeId: string) => (s: EstimateStore) => {
   const trade = s.trades[tradeId]
   if (!trade) return 0
-  return trade.lineItems.reduce((sum, id) => sum + (s.lineItems[id]?.total ?? 0), 0)
+  return trade.line_item_ids.reduce((sum, id) => sum + (s.lineItems[id]?.total ?? 0), 0)
 }
 
 export const selectFlaggedItems = (s: EstimateStore): LineItem[] =>
-  Object.values(s.lineItems).filter((li) => li.isFlagged)
+  Object.values(s.lineItems).filter((li) => li.flags.length > 0 && !li.is_deleted)
 
 export const selectBottomSheetItem = (s: EstimateStore): LineItem | null =>
   s.bottomSheetItemId ? (s.lineItems[s.bottomSheetItemId] ?? null) : null
@@ -484,6 +569,7 @@ export const useEstimateStore = create<EstimateStore>()(
     immer((set, get) => ({
       // Initial state
       estimate: null,
+      job: null,
       trades: {},
       lineItems: {},
       dirtyItemIds: new Set(),
@@ -497,15 +583,44 @@ export const useEstimateStore = create<EstimateStore>()(
       requestChangesOpen: false,
       approveModalOpen: false,
 
-      hydrate(estimate, trades, lineItems) {
+      hydrate(bundle) {
         set((s) => {
-          s.estimate = estimate
-          s.trades = Object.fromEntries(trades.map((t) => [t.id, t]))
-          s.lineItems = Object.fromEntries(lineItems.map((li) => [li.id, li]))
+          // Decorate trades with derived line_item_ids / subtotal / flag_count
+          // grouped by trade_id from the line_items slice.
+          const itemsByTrade: Record<string, LineItem[]> = {}
+          for (const li of bundle.line_items) {
+            if (li.is_deleted) continue
+            ;(itemsByTrade[li.trade_id] ??= []).push(li)
+          }
+          for (const arr of Object.values(itemsByTrade)) {
+            arr.sort((a, b) => a.sort_order - b.sort_order)
+          }
+          const decoratedTrades: Record<string, Trade> = {}
+          for (const t of bundle.trades) {
+            const items = itemsByTrade[t.id] ?? []
+            const subtotal = items.reduce((acc, li) => acc + li.total, 0)
+            const flag_count = items.filter((li) => li.flags.length > 0).length
+            const worst_confidence: ConfidenceLevel | null =
+              items.some((li) => li.confidence === 'low') ? 'low'
+              : items.some((li) => li.confidence === 'medium') ? 'medium'
+              : items.some((li) => li.confidence === 'high') ? 'high'
+              : null
+            decoratedTrades[t.id] = {
+              ...t,
+              line_item_ids: items.map((li) => li.id),
+              subtotal,
+              flag_count,
+              worst_confidence,
+            }
+          }
+          s.estimate = bundle.estimate
+          s.job = bundle.job
+          s.trades = decoratedTrades
+          s.lineItems = Object.fromEntries(bundle.line_items.map((li) => [li.id, li]))
           s.dirtyItemIds = new Set()
           s.savingItemIds = new Set()
           s.flagReviewIndex = 0
-          s.flagReviewComplete = estimate.flagCount === 0
+          s.flagReviewComplete = bundle.estimate.flag_count === 0
           s.expandedTradeIds = new Set()
         })
       },
@@ -515,26 +630,29 @@ export const useEstimateStore = create<EstimateStore>()(
           const item = s.lineItems[id]
           if (!item) return
           Object.assign(item, patch)
-          // Recompute total
-          item.total = item.quantity * item.unitPrice
-          // Recompute trade total
-          const trade = s.trades[item.tradeId]
+          // Recompute total: qty × (material + labor) — mirrors DB generated column
+          item.total = item.quantity * (item.material_unit_cost + item.labor_unit_cost)
+          // Recompute trade subtotal
+          const trade = s.trades[item.trade_id]
           if (trade) {
-            trade.total = trade.lineItems.reduce(
+            trade.subtotal = trade.line_item_ids.reduce(
               (sum, liId) => sum + (s.lineItems[liId]?.total ?? 0),
               0
             )
           }
-          // Recompute estimate grand total from trades
+          // Recompute estimate direct_cost + grand_total
           if (s.estimate) {
-            const subtotal = Object.values(s.trades).reduce(
-              (sum, t) => sum + t.total,
+            const direct_cost = Object.values(s.trades).reduce(
+              (sum, t) => sum + t.subtotal,
               0
             )
-            s.estimate.subtotal = subtotal
-            const { markupPct, bondPct, taxPct } = s.estimate.config
-            s.estimate.grandTotal =
-              subtotal * (1 + markupPct / 100) * (1 + bondPct / 100) * (1 + taxPct / 100)
+            s.estimate.direct_cost = direct_cost
+            const { overhead_pct, profit_pct, contingency_pct } = s.estimate.config
+            s.estimate.grand_total =
+              direct_cost *
+              (1 + contingency_pct / 100) *
+              (1 + overhead_pct / 100) *
+              (1 + profit_pct / 100)
           }
           s.dirtyItemIds.add(id)
         })
@@ -553,10 +671,13 @@ export const useEstimateStore = create<EstimateStore>()(
           if (!s.estimate) return
           Object.assign(s.estimate.config, patch)
           // Recompute grand total with new config
-          const { subtotal } = s.estimate
-          const { markupPct, bondPct, taxPct } = s.estimate.config
-          s.estimate.grandTotal =
-            subtotal * (1 + markupPct / 100) * (1 + bondPct / 100) * (1 + taxPct / 100)
+          const { direct_cost } = s.estimate
+          const { overhead_pct, profit_pct, contingency_pct } = s.estimate.config
+          s.estimate.grand_total =
+            direct_cost *
+            (1 + contingency_pct / 100) *
+            (1 + overhead_pct / 100) *
+            (1 + profit_pct / 100)
         })
       },
 
@@ -592,7 +713,9 @@ export const useEstimateStore = create<EstimateStore>()(
 
       advanceFlagReview() {
         set((s) => {
-          const flagged = Object.values(s.lineItems).filter((li) => li.isFlagged)
+          const flagged = Object.values(s.lineItems).filter(
+            (li) => li.flags.length > 0 && !li.is_deleted
+          )
           if (s.flagReviewIndex < flagged.length - 1) {
             s.flagReviewIndex += 1
           } else {
@@ -634,20 +757,35 @@ Auto-save effect — put this in `EstimatePageClient.tsx`:
 
 ```typescript
 // Debounced auto-save: 800ms after last change
+const dirtyItemIds = useEstimateStore((s) => s.dirtyItemIds)
+const lineItems = useEstimateStore((s) => s.lineItems)
+const estimateId = useEstimateStore((s) => s.estimate?.id)
+
 useEffect(() => {
-  const dirty = Array.from(store.dirtyItemIds)
-  if (dirty.length === 0) return
+  if (!estimateId || dirtyItemIds.size === 0) return
   const timer = setTimeout(async () => {
-    for (const id of dirty) {
-      const item = store.lineItems[id]
+    const store = useEstimateStore.getState()
+    for (const id of Array.from(dirtyItemIds)) {
+      const item = lineItems[id]
       if (!item) continue
-      set((s) => { s.savingItemIds.add(id) })
+      // Optimistically mark saving — non-Immer set via getState/setState
+      useEstimateStore.setState((s) => {
+        s.savingItemIds.add(id)
+      })
       try {
-        await fetch(`/api/estimates/${estimateId}/line-items/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ quantity: item.quantity, unitPrice: item.unitPrice }),
-          headers: { 'Content-Type': 'application/json' },
-        })
+        const res = await fetch(
+          `/api/estimates/${estimateId}/line-items/${id}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              quantity: item.quantity,
+              material_unit_cost: item.material_unit_cost,
+              labor_unit_cost: item.labor_unit_cost,
+            }),
+          }
+        )
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
         store.markSaved(id)
       } catch (err) {
         store.markError(id, String(err))
@@ -655,7 +793,7 @@ useEffect(() => {
     }
   }, 800)
   return () => clearTimeout(timer)
-}, [store.dirtyItemIds])
+}, [dirtyItemIds, estimateId, lineItems])
 ```
 
 ---
@@ -664,9 +802,10 @@ useEffect(() => {
 
 | File | Directive | Reason |
 |---|---|---|
-| `app/(portal)/layout.tsx` | RSC | Static shell; passes no interactive state |
-| `app/(portal)/dashboard/page.tsx` | RSC | Fetches estimates from Supabase server-side |
-| `app/(portal)/estimates/[id]/page.tsx` | RSC | Fetches full estimate tree server-side |
+| `app/(portal)/layout.tsx` | RSC | Minimal portal shell (already exists) — no tab bar here |
+| `app/(portal)/internal/layout.tsx` | RSC | Shell with `<BottomTabBar pendingCount={...} />` + `<DesktopSidebar />` — protected route group |
+| `app/(portal)/internal/page.tsx` | RSC | Dashboard — fetches estimates from Supabase server-side |
+| `app/(portal)/internal/estimates/[id]/page.tsx` | RSC | Fetches full estimate tree server-side |
 | `components/layout/BottomTabBar.tsx` | `'use client'` | Needs `usePathname()` for active tab |
 | `components/layout/DesktopSidebar.tsx` | `'use client'` | Needs `usePathname()` for active link |
 | `components/dashboard/EstimateCard.tsx` | `'use client'` | Swipe gesture (touch events), Quick Approve mutation |
@@ -693,37 +832,112 @@ Rule of thumb: if it reads from Zustand or has a touch/click handler → `'use c
 `src/lib/estimates/queries.ts`:
 
 ```typescript
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import type { Estimate, Trade, LineItem, Job, EstimateBundle } from './types'
 
-export async function getEstimateWithTrades(id: string) {
-  const supabase = await createServerClient()
-  
-  const { data: estimate, error: estErr } = await supabase
+export async function getEstimateWithTrades(id: string): Promise<EstimateBundle> {
+  const supabase = await createClient()
+
+  const { data: estimateRow, error: estErr } = await supabase
     .from('estimates')
-    .select('*')
+    .select(`
+      id, job_id, version, review_status,
+      overhead_pct, profit_pct, contingency_pct, gc_sub_markup_pct,
+      direct_cost, grand_total,
+      approved_by, approved_at,
+      created_at, updated_at
+    `)
     .eq('id', id)
     .single()
-  if (estErr) throw estErr
+  if (estErr || !estimateRow) throw estErr ?? new Error('Estimate not found')
 
-  const { data: trades, error: tradeErr } = await supabase
-    .from('trades')
-    .select('*')
+  const { data: jobRow, error: jobErr } = await supabase
+    .from('jobs')
+    .select('id, name, client_name, address, bid_due_date, project_type')
+    .eq('id', estimateRow.job_id)
+    .single()
+  if (jobErr || !jobRow) throw jobErr ?? new Error('Job not found')
+
+  const { data: tradeRows, error: tradeErr } = await supabase
+    .from('estimate_trades')
+    .select('id, estimate_id, trade_name, trade_status, sort_order, labor_rate_override, ai_blended_labor_rate')
     .eq('estimate_id', id)
     .order('sort_order')
   if (tradeErr) throw tradeErr
 
-  const { data: lineItems, error: liErr } = await supabase
-    .from('line_items')
-    .select('*')
-    .eq('estimate_id', id)
+  const tradeIds = (tradeRows ?? []).map((t) => t.id)
+  const { data: lineItemRows, error: liErr } = await supabase
+    .from('estimate_line_items')
+    .select(`
+      id, trade_id, description, area_location, quantity, unit,
+      material_unit_cost, labor_unit_cost, labor_hours_per_unit, total,
+      source_sheet, source_grid, dimension_type, confidence, flags,
+      is_allowance, is_deleted, is_manual_override, sort_order
+    `)
+    .in('trade_id', tradeIds.length ? tradeIds : ['00000000-0000-0000-0000-000000000000'])
+    .eq('is_deleted', false)
     .order('sort_order')
   if (liErr) throw liErr
 
-  return { estimate, trades, lineItems }
+  // Recompute flag_count + direct_cost client-side as source of truth
+  // (the DB columns may be stale until Marco saves)
+  const lineItems = (lineItemRows ?? []) as LineItem[]
+  const flag_count = lineItems.filter((li) => li.flags.length > 0).length
+  const direct_cost = lineItems.reduce((acc, li) => acc + Number(li.total ?? 0), 0)
+
+  const estimate: Estimate = {
+    id: estimateRow.id,
+    job_id: estimateRow.job_id,
+    version: estimateRow.version,
+    review_status: estimateRow.review_status,
+    config: {
+      overhead_pct: Number(estimateRow.overhead_pct),
+      profit_pct: Number(estimateRow.profit_pct),
+      contingency_pct: Number(estimateRow.contingency_pct),
+      gc_sub_markup_pct: Number(estimateRow.gc_sub_markup_pct),
+    },
+    direct_cost,
+    grand_total:
+      direct_cost *
+      (1 + Number(estimateRow.contingency_pct) / 100) *
+      (1 + Number(estimateRow.overhead_pct) / 100) *
+      (1 + Number(estimateRow.profit_pct) / 100),
+    trade_ids: tradeIds,
+    flag_count,
+    created_at: estimateRow.created_at,
+    updated_at: estimateRow.updated_at,
+    approved_by: estimateRow.approved_by,
+    approved_at: estimateRow.approved_at,
+  }
+
+  const trades: Trade[] = (tradeRows ?? []).map((t) => ({
+    ...t,
+    line_item_ids: [],   // populated in store.hydrate
+    subtotal: 0,         // populated in store.hydrate
+    flag_count: 0,       // populated in store.hydrate
+    worst_confidence: null,
+  }))
+
+  return { estimate, job: jobRow as Job, trades, line_items: lineItems }
+}
+
+export async function listEstimatesForDashboard() {
+  const supabase = await createClient()
+  // Latest version per job, joined with job info
+  const { data, error } = await supabase
+    .from('estimates')
+    .select(`
+      id, job_id, version, review_status, direct_cost, grand_total, updated_at,
+      job:jobs(id, name, client_name, bid_due_date, project_type)
+    `)
+    .neq('review_status', 'archived')
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
 }
 ```
 
-`src/app/(portal)/estimates/[id]/page.tsx`:
+`src/app/(portal)/internal/estimates/[id]/page.tsx`:
 
 ```typescript
 import { getEstimateWithTrades } from '@/lib/estimates/queries'
@@ -736,39 +950,32 @@ interface Props {
 
 export default async function EstimatePage({ params }: Props) {
   const { id } = await params
-  
-  let data
+
+  let bundle
   try {
-    data = await getEstimateWithTrades(id)
+    bundle = await getEstimateWithTrades(id)
   } catch {
     notFound()
   }
 
-  // Serialize and pass to client component
-  // EstimatePageClient calls store.hydrate() in a useEffect (once)
-  return (
-    <EstimatePageClient
-      initialEstimate={data.estimate}
-      initialTrades={data.trades}
-      initialLineItems={data.lineItems}
-    />
-  )
+  return <EstimatePageClient bundle={bundle} />
 }
 ```
 
-`EstimatePageClient.tsx` receives the serialized data and calls `store.hydrate()` inside a `useLayoutEffect` (not `useEffect`) to avoid flash:
+`EstimatePageClient.tsx` receives the bundle and calls `store.hydrate()` inside a `useLayoutEffect` (not `useEffect`) to avoid flash:
 
 ```typescript
 'use client'
 import { useLayoutEffect } from 'react'
 import { useEstimateStore } from '@/store/estimateStore'
+import type { EstimateBundle } from '@/lib/estimates/types'
 
-export function EstimatePageClient({ initialEstimate, initialTrades, initialLineItems }) {
+export function EstimatePageClient({ bundle }: { bundle: EstimateBundle }) {
   const hydrate = useEstimateStore((s) => s.hydrate)
 
   useLayoutEffect(() => {
-    hydrate(initialEstimate, initialTrades, initialLineItems)
-  }, [initialEstimate.id]) // re-hydrate only if estimate id changes
+    hydrate(bundle)
+  }, [bundle.estimate.id]) // re-hydrate only if estimate id changes
 
   // ... render components
 }
@@ -782,9 +989,11 @@ export function EstimatePageClient({ initialEstimate, initialTrades, initialLine
 
 File: `src/app/api/estimates/[id]/route.ts`
 
+**Phase 5 dependency:** Email sending (Resend) and the `estimate_comments` table are built in Phase 5. For Phase 3, the `request_changes` action writes the note to `email_log` with `status='queued'` (Phase 5's email worker will pick it up). Approve fires the same stubbed email send. The `try { ... } catch {}` around email-send means missing `RESEND_API_KEY` doesn't break the user flow.
+
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const PatchSchema = z.discriminatedUnion('action', [
@@ -809,64 +1018,156 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createServerClient()
+  const supabase = await createClient()
 
   // Auth check
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
+  const body = await req.json().catch(() => null)
   const parsed = PatchSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
   const payload = parsed.data
+  const estimatorEmail = process.env.ESTIMATOR_EMAIL ?? null
 
   if (payload.action === 'approve') {
     const { error } = await supabase
       .from('estimates')
       .update({
-        status: 'approved',
+        review_status: 'approved',
         approved_by: user.id,
         approved_at: new Date().toISOString(),
       })
       .eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    if (payload.notifyEstimator) {
-      // Fire-and-forget Resend email — import sendEstimateApprovedEmail from lib
-      await sendEstimateApprovedEmail(id)
+    if (payload.notifyEstimator && estimatorEmail) {
+      await supabase.from('email_log').insert({
+        estimate_id: id,
+        recipient: estimatorEmail,
+        template: 'estimate_approved',
+        subject: 'Estimate approved by Marco',
+        status: 'queued',
+      })
     }
 
     return NextResponse.json({ status: 'approved' })
   }
 
-  if (payload.action === 'request_changes') {
-    // Write to estimate_comments table
-    const { error: commentErr } = await supabase
-      .from('estimate_comments')
-      .insert({
-        estimate_id: id,
-        author_id: user.id,
-        body: payload.overallNote,
-        type: 'request_changes',
-        flag_notes: payload.flagNotes ?? [],
-        created_at: new Date().toISOString(),
-      })
-    if (commentErr) return NextResponse.json({ error: commentErr.message }, { status: 500 })
+  // request_changes
+  const { error: updateErr } = await supabase
+    .from('estimates')
+    .update({ review_status: 'changes_requested' })
+    .eq('id', id)
+  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-    // Update estimate status
-    await supabase
-      .from('estimates')
-      .update({ status: 'changes_requested' })
-      .eq('id', id)
-
-    // Notify estimator via Resend
-    await sendChangesRequestedEmail(id, payload.overallNote)
-
-    return NextResponse.json({ status: 'changes_requested' })
+  // Phase 5 will replace this with proper comments table + Resend send.
+  // For now, queue the note via email_log.
+  if (estimatorEmail) {
+    await supabase.from('email_log').insert({
+      estimate_id: id,
+      recipient: estimatorEmail,
+      template: 'estimate_changes_requested',
+      subject: 'Marco requested changes',
+      status: 'queued',
+      error_message: null,
+      // body lives in the subsequent comment surface; for now we keep note
+      // payload addressable via a side-table or recompute from review_status.
+      // Phase 5 task: introduce estimate_comments + body column on email_log.
+    })
   }
+
+  return NextResponse.json({
+    status: 'changes_requested',
+    note: payload.overallNote,
+    flagNotes: payload.flagNotes ?? [],
+  })
+}
+```
+
+### `PATCH /api/estimates/[id]/line-items/[itemId]` — Autosave target
+
+File: `src/app/api/estimates/[id]/line-items/[itemId]/route.ts`
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { z } from 'zod'
+
+const PatchSchema = z.object({
+  quantity: z.number().nonnegative().optional(),
+  material_unit_cost: z.number().nonnegative().optional(),
+  labor_unit_cost: z.number().nonnegative().optional(),
+}).refine(
+  (v) => v.quantity !== undefined || v.material_unit_cost !== undefined || v.labor_unit_cost !== undefined,
+  { message: 'At least one of quantity, material_unit_cost, labor_unit_cost is required' }
+)
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string; itemId: string }> }
+) {
+  const { id, itemId } = await params
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json().catch(() => null)
+  const parsed = PatchSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+  }
+
+  // Read current row for audit-log old_value
+  const { data: before, error: beforeErr } = await supabase
+    .from('estimate_line_items')
+    .select('id, quantity, material_unit_cost, labor_unit_cost, trade_id')
+    .eq('id', itemId)
+    .single()
+  if (beforeErr || !before) {
+    return NextResponse.json({ error: 'Line item not found' }, { status: 404 })
+  }
+
+  // Verify the line item belongs to the estimate (cross-tenant guard)
+  const { data: trade } = await supabase
+    .from('estimate_trades')
+    .select('estimate_id')
+    .eq('id', before.trade_id)
+    .single()
+  if (!trade || trade.estimate_id !== id) {
+    return NextResponse.json({ error: 'Estimate mismatch' }, { status: 400 })
+  }
+
+  const patch = { ...parsed.data, is_manual_override: true }
+  const { data: after, error: updErr } = await supabase
+    .from('estimate_line_items')
+    .update(patch)
+    .eq('id', itemId)
+    .select('id, quantity, material_unit_cost, labor_unit_cost, total, is_manual_override')
+    .single()
+  if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+
+  // Append-only audit log — one row per changed field
+  const overrideRows = (['quantity', 'material_unit_cost', 'labor_unit_cost'] as const)
+    .filter((k) => parsed.data[k] !== undefined && parsed.data[k] !== Number(before[k]))
+    .map((k) => ({
+      estimate_id: id,
+      trade_id: before.trade_id,
+      line_item_id: itemId,
+      field_name: k,
+      old_value: String(before[k]),
+      new_value: String(parsed.data[k]),
+      changed_by: user.email ?? user.id,
+    }))
+  if (overrideRows.length > 0) {
+    await supabase.from('estimate_overrides').insert(overrideRows)
+  }
+
+  return NextResponse.json({ item: after })
 }
 ```
 
@@ -874,7 +1175,7 @@ export async function PATCH(
 
 ## 10. Bottom Tab Bar Implementation
 
-The tab bar must appear only on mobile AND must coexist with the desktop sidebar without JS-based show/hide that causes layout shift.
+The tab bar must appear only on mobile AND must coexist with the desktop sidebar without JS-based show/hide that causes layout shift. **Mount it in `app/(portal)/internal/layout.tsx`, not `app/(portal)/layout.tsx`** — the latter wraps login + share routes too, where the tab bar would be wrong.
 
 ### Pattern: CSS-only visibility split
 
@@ -902,10 +1203,10 @@ export function BottomTabBar({ pendingCount }: Props) {
   const pathname = usePathname()
 
   const tabs: Tab[] = [
-    { href: '/dashboard?tab=pending', label: 'Pending', Icon: Home, badge: pendingCount },
-    { href: '/dashboard?tab=all',     label: 'All',     Icon: List },
-    { href: '/bid-log',               label: 'Bid Log', Icon: BookOpen },
-    { href: '/activity',              label: 'Activity', Icon: Activity },
+    { href: '/internal?tab=pending', label: 'Pending', Icon: Home, badge: pendingCount },
+    { href: '/internal?tab=all',     label: 'All',     Icon: List },
+    { href: '/internal/bid-log',     label: 'Bid Log', Icon: BookOpen },
+    { href: '/internal/activity',    label: 'Activity', Icon: Activity },
   ]
 
   return (
@@ -969,14 +1270,19 @@ Safe-area utility — add to `src/app/globals.css` in the `@layer utilities` blo
 }
 ```
 
-Layout padding so content is never hidden behind the tab bar — in the portal layout:
+Layout padding so content is never hidden behind the tab bar — in the **internal** portal layout:
 
 ```typescript
-// app/(portal)/layout.tsx
+// app/(portal)/internal/layout.tsx
 <div className="pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0">
   {children}
 </div>
 ```
+
+Tabs route within `/internal/*`:
+- `/internal?tab=pending` and `/internal?tab=all` for dashboard tabs (single page, query-param controlled)
+- `/internal/bid-log` for Bid Log (built in Phase 8 — link present, target route stubbed)
+- `/internal/activity` for Activity (built in Phase 8 — link present, target route stubbed)
 
 ---
 
@@ -1183,23 +1489,16 @@ If you need to serialize the store (e.g., for devtools display), convert `Set` t
 
 ### 30-day session persistence
 
-Supabase session TTL is configured in the Supabase Dashboard → Auth → Session settings. Set "JWT expiry" to 2592000 seconds (30 days). Also set in the Supabase client:
+Supabase session TTL is configured in the Supabase Dashboard → Auth → Session settings. Set "JWT expiry" to 2592000 seconds (30 days). The browser client (`src/lib/supabase/client.ts`) already exists from Phase 1. Only modify it if you need to add explicit `storageKey` / persistence overrides; default `@supabase/ssr` config already uses localStorage with `persistSession: true`. Do not switch to `sessionStorage` — it does not survive tab closes.
+
+---
+
+### Server-side Supabase import
+
+Phase 1's wrapper at `src/lib/supabase/server.ts` exports a function named **`createClient`** (not `createServerClient`). All `import { createServerClient } from '@/lib/supabase/server'` references in the plan should read:
 
 ```typescript
-// src/lib/supabase/client.ts
-import { createBrowserClient } from '@supabase/ssr'
-
-export const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: true,
-      storageKey: 'saddlewood-auth',
-      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    },
-  }
-)
+import { createClient } from '@/lib/supabase/server'
 ```
 
-Ensure `persistSession: true` (default) and that localStorage is available. Do not use `sessionStorage` — it does not survive tab closes.
+Internally, `createClient` wraps `@supabase/ssr`'s `createServerClient` with cookie plumbing.
