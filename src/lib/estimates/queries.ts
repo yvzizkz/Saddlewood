@@ -246,6 +246,16 @@ export async function getEstimateWithTrades(id: string): Promise<EstimateBundle>
 
 // ─── Dashboard listing ───────────────────────────────────────────────────────
 
+export async function countPendingEstimates(): Promise<number> {
+  const supabase = await createClient()
+  const { count, error } = await supabase
+    .from('estimates')
+    .select('id', { count: 'exact', head: true })
+    .in('review_status', ['draft', 'in_review', 'changes_requested'])
+  if (error) throw error
+  return count ?? 0
+}
+
 export async function listEstimatesForDashboard(): Promise<DashboardEstimateRow[]> {
   const supabase = await createClient()
 
