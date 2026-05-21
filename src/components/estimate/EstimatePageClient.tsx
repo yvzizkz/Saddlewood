@@ -7,6 +7,7 @@ import { useEstimateStore } from '@/store/estimateStore'
 import type { EstimateBundle } from '@/lib/estimates/types'
 import { EstimateSummaryHeader } from './EstimateSummaryHeader'
 import { TradeSection } from './TradeSection'
+import { BottomSheetEditor } from './BottomSheetEditor'
 
 interface EstimatePageClientProps {
   bundle: EstimateBundle
@@ -38,6 +39,45 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
     // the whole bundle, so re-renders with the same estimate don't re-hydrate.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bundle.estimate.id, hydrate])
+
+  // Debounced auto-save: 800ms after last dirty change
+  const dirtyItemIds = useEstimateStore((s) => s.dirtyItemIds)
+  const lineItems = useEstimateStore((s) => s.lineItems)
+  const estimateId = useEstimateStore((s) => s.estimate?.id ?? null)
+
+  useEffect(() => {
+    if (!estimateId || dirtyItemIds.size === 0) return
+    const timer = setTimeout(async () => {
+      const store = useEstimateStore.getState()
+      for (const id of Array.from(dirtyItemIds)) {
+        const item = lineItems[id]
+        if (!item) continue
+        useEstimateStore.setState((s) => {
+          s.savingItemIds.add(id)
+        })
+        try {
+          const res = await fetch(
+            `/api/estimates/${estimateId}/line-items/${id}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                quantity: item.quantity,
+                material_unit_cost: item.material_unit_cost,
+                labor_unit_cost: item.labor_unit_cost,
+              }),
+            }
+          )
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          store.markSaved(id)
+        } catch (err) {
+          console.error('Autosave failed for', id, err)
+          store.markError(id, String(err))
+        }
+      }
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [dirtyItemIds, estimateId, lineItems])
 
   // Pre-hydration: render the same shape as loading.tsx to keep layout stable.
   if (!isHydrated) {
@@ -97,6 +137,8 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
 
       {/* Spacer for bottom tab bar clearance — matches the layout's padding. */}
       <div className="h-[calc(56px+env(safe-area-inset-bottom,0px))] md:hidden" />
+
+      <BottomSheetEditor />
     </div>
   )
 }
