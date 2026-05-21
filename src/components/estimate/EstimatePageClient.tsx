@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useEstimateStore } from '@/store/estimateStore'
+import { useAutosave } from '@/hooks/useAutosave'
 import type { EstimateBundle } from '@/lib/estimates/types'
+import { AutosaveIndicator } from './AutosaveIndicator'
 import { EstimateSkeleton } from './EstimateSkeleton'
 import { EstimateSummaryHeader } from './EstimateSummaryHeader'
 import { TradeSection } from './TradeSection'
@@ -44,51 +46,13 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bundle.estimate.id, bundle.estimate.review_status, bundle.estimate.updated_at, hydrate])
 
-  // Debounced auto-save: 800ms after ANY dirty change.
-  // This is a GLOBAL debounce — if Marco edits item A then starts editing item B
-  // 500ms later, A's save is delayed until 800ms after B settles. This is safe
-  // for the Phase 3 bottom-sheet UX (one Apply per item, batched commits), but
-  // will need rethinking when Phase 4 adds inline-editable fields.
-  const dirtyItemIds = useEstimateStore((s) => s.dirtyItemIds)
-  const lineItems = useEstimateStore((s) => s.lineItems)
-  const estimateId = useEstimateStore((s) => s.estimate?.id ?? null)
-
-  useEffect(() => {
-    if (!estimateId || dirtyItemIds.size === 0) return
-    const timer = setTimeout(async () => {
-      const store = useEstimateStore.getState()
-      for (const id of Array.from(dirtyItemIds)) {
-        const item = lineItems[id]
-        if (!item) continue
-        // Guard against concurrent in-flight save for the same id. Read the
-        // latest snapshot directly (we deliberately don't subscribe here).
-        if (useEstimateStore.getState().savingItemIds.has(id)) continue
-        useEstimateStore.setState((s) => {
-          s.savingItemIds.add(id)
-        })
-        try {
-          const res = await fetch(
-            `/api/estimates/${estimateId}/line-items/${id}`,
-            {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                quantity: item.quantity,
-                material_unit_cost: item.material_unit_cost,
-                labor_unit_cost: item.labor_unit_cost,
-              }),
-            }
-          )
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          store.markSaved(id)
-        } catch (err) {
-          console.error('Autosave failed for', id, err)
-          store.markError(id, String(err))
-        }
-      }
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [dirtyItemIds, estimateId, lineItems])
+  // Per-item debounced autosave (replaces Phase 3's global 800ms debounce).
+  // Each line item flushes 2s after its own last edit, independent of edits
+  // to sibling items — so Marco editing item A then immediately tabbing to
+  // item B doesn't defer A's save until B settles.
+  const { status: saveStatus, lastSavedAt, triggerSave } = useAutosave({
+    estimateId: bundle.estimate.id,
+  })
 
   // Pre-hydration: render the same shape as loading.tsx to keep layout stable.
   if (!isHydrated) {
@@ -101,18 +65,25 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
     <div className="min-h-screen bg-[var(--color-cream)]">
       {/* Sticky back nav */}
       <div className="sticky top-0 z-10 bg-[var(--color-cream)] border-b border-[var(--color-stone)]">
-        <Link
-          href="/internal"
-          className="flex items-center gap-2 px-4 py-3 text-[var(--color-charcoal)] font-medium min-h-[44px]"
-        >
-          <span aria-hidden="true">{'←'}</span>
-          <span
-            style={{ fontFamily: 'var(--font-fraunces)' }}
-            className="text-base uppercase tracking-wide truncate"
+        <div className="flex items-center justify-between gap-3 px-4 py-3 min-h-[44px]">
+          <Link
+            href="/internal"
+            className="flex items-center gap-2 text-[var(--color-charcoal)] font-medium min-w-0"
           >
-            {jobName}
-          </span>
-        </Link>
+            <span aria-hidden="true">{'←'}</span>
+            <span
+              style={{ fontFamily: 'var(--font-fraunces)' }}
+              className="text-base uppercase tracking-wide truncate"
+            >
+              {jobName}
+            </span>
+          </Link>
+          <AutosaveIndicator
+            status={saveStatus}
+            lastSavedAt={lastSavedAt}
+            onRetry={triggerSave}
+          />
+        </div>
       </div>
 
       <div className="px-4 max-w-3xl mx-auto">
