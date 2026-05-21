@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { DashboardEstimateRow } from '@/lib/estimates/types'
@@ -52,10 +53,6 @@ export function EstimateCard({ estimate }: EstimateCardProps) {
   const restingOffset = swipeOpen ? -120 : 0
   const visualOffset = swipeOffsetX < 0 ? dragOffset : restingOffset
 
-  function navigateToDetail() {
-    router.push(`/internal/estimates/${estimate.id}`)
-  }
-
   async function handleQuickApprove() {
     if (flagged || approving) return
     setApproving(true)
@@ -103,16 +100,15 @@ export function EstimateCard({ estimate }: EstimateCardProps) {
         >
           {'✓ Approve'}
         </button>
-        <button
-          type="button"
+        <Link
+          href={`/internal/estimates/${estimate.id}`}
           onClick={() => {
             setSwipeOpen(false)
-            navigateToDetail()
           }}
           className="h-10 px-3 rounded text-sm font-medium border border-[var(--color-stone)] bg-white text-[var(--color-charcoal)]"
         >
           {'↩ Changes'}
-        </button>
+        </Link>
       </div>
 
       <div
@@ -195,16 +191,15 @@ export function EstimateCard({ estimate }: EstimateCardProps) {
           >
             {approving ? 'Approving…' : 'Quick Approve'}
           </button>
-          <button
-            type="button"
+          <Link
+            href={`/internal/estimates/${estimate.id}`}
             onClick={(e) => {
               e.stopPropagation()
-              navigateToDetail()
             }}
             className="flex-1 h-10 rounded text-sm font-medium border border-[var(--color-stone)] bg-white text-[var(--color-charcoal)] hover:bg-[var(--color-cream)] transition-colors"
           >
             {'Review →'}
-          </button>
+          </Link>
         </div>
       </div>
     </div>
