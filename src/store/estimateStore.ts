@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
 import { enableMapSet } from 'immer'
+import { countActiveFlagged, isActiveFlagged } from '@/lib/estimates/flags'
 import type {
   ConfidenceLevel,
   Estimate,
@@ -29,7 +30,7 @@ enableMapSet()
  */
 function flaggedItemsSorted(lineItems: Record<string, LineItem>): LineItem[] {
   return Object.values(lineItems)
-    .filter((li) => li.flags.length > 0 && !li.is_deleted)
+    .filter(isActiveFlagged)
     .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
 }
 
@@ -136,10 +137,7 @@ export const selectFlaggedItems = (s: EstimateStore): LineItem[] =>
   flaggedItemsSorted(s.lineItems)
 
 export const selectFlaggedCount = (s: EstimateStore): number =>
-  Object.values(s.lineItems).reduce(
-    (n, li) => n + (li.flags.length > 0 && !li.is_deleted ? 1 : 0),
-    0
-  )
+  countActiveFlagged(Object.values(s.lineItems))
 
 export const selectBottomSheetItem = (s: EstimateStore): LineItem | null =>
   s.bottomSheetItemId ? (s.lineItems[s.bottomSheetItemId] ?? null) : null
@@ -184,7 +182,9 @@ export const useEstimateStore = create<EstimateStore>()(
           for (const t of bundle.trades) {
             const items = itemsByTrade[t.id] ?? []
             const subtotal = items.reduce((acc, li) => acc + li.total, 0)
-            const flag_count = items.filter((li) => li.flags.length > 0).length
+            // Use canonical predicate so the count stays correct when Phase 4
+            // soft-delete leaves is_deleted items in the per-trade arrays.
+            const flag_count = countActiveFlagged(items)
             const worst_confidence: ConfidenceLevel | null = items.some(
               (li) => li.confidence === 'low'
             )

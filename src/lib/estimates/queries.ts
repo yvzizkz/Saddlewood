@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { countActiveFlagged } from './flags'
 import type {
   ConfidenceLevel,
   DashboardEstimateRow,
@@ -177,10 +178,7 @@ export async function getEstimateWithTrades(id: string): Promise<EstimateBundle>
 
   // Recompute flag_count + direct_cost client-side. The DB columns may be
   // stale until Marco saves, so we don't trust them here.
-  const flag_count = lineItems.reduce(
-    (acc, li) => (li.flags.length > 0 ? acc + 1 : acc),
-    0
-  )
+  const flag_count = countActiveFlagged(lineItems)
   const direct_cost = lineItems.reduce((acc, li) => acc + li.total, 0)
 
   const overhead_pct = num(estRow.overhead_pct)
@@ -294,7 +292,10 @@ export async function listEstimatesForDashboard(): Promise<DashboardEstimateRow[
     tradeIds.push(tradeId)
   }
 
-  // Step 3: count flagged line items per estimate.
+  // Step 3: count flagged line items per estimate. The `is_deleted = false`
+  // filter at the query level + the `flags.length > 0` check below together
+  // implement the `isActiveFlagged` predicate (see @/lib/estimates/flags.ts);
+  // keep these in sync if the predicate changes.
   const flagCountByEstimate = new Map<string, number>()
   if (tradeIds.length > 0) {
     const { data: flaggedItems, error: itemErr } = await supabase
