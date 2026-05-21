@@ -27,13 +27,13 @@ export default function DesktopSidebar({ pendingCount }: DesktopSidebarProps) {
   function isActive(href: string): boolean {
     const base = href.split('?')[0]
     if (base === '/internal') return pathname === '/internal'
-    return pathname === base
+    return pathname === base || pathname.startsWith(base + '/')
   }
 
   return (
     <aside
       aria-label="Primary"
-      className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-[--color-background] border-r border-[--color-stone] py-6 px-4 z-40"
+      className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-[var(--color-background)] border-r border-[var(--color-stone)] py-6 px-4 z-40"
     >
       <div
         className="px-3 mb-6 text-xl font-[family-name:var(--font-fraunces)]"
@@ -55,8 +55,8 @@ export default function DesktopSidebar({ pendingCount }: DesktopSidebarProps) {
               className={
                 'flex items-center gap-3 py-2 px-3 rounded transition-colors ' +
                 (active
-                  ? 'bg-[--color-teal] text-white'
-                  : 'text-[--color-charcoal] hover:bg-[--color-stone]')
+                  ? 'bg-[var(--color-teal)] text-white'
+                  : 'text-[var(--color-charcoal)] hover:bg-[var(--color-stone)]')
               }
             >
               <Icon className="size-5" aria-hidden="true" />
@@ -68,14 +68,16 @@ export default function DesktopSidebar({ pendingCount }: DesktopSidebarProps) {
         })}
       </nav>
 
-      <span
+      <button
+        type="button"
+        disabled
         aria-disabled="true"
-        className="flex items-center gap-3 py-2 px-3 rounded text-sm font-medium opacity-50 cursor-not-allowed"
+        className="flex items-center gap-3 py-2 px-3 rounded text-sm font-medium opacity-50 cursor-not-allowed text-left bg-transparent border-0"
         style={{ color: 'var(--color-charcoal)' }}
       >
         <Settings className="size-5" aria-hidden="true" />
         Settings
-      </span>
+      </button>
     </aside>
   )
 }

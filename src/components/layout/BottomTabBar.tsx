@@ -31,13 +31,13 @@ export default function BottomTabBar({ pendingCount }: BottomTabBarProps) {
     // For tabs that share the /internal route (pending + all), highlight both
     // when we're on /internal regardless of query.
     if (base === '/internal') return pathname === '/internal'
-    return pathname === base
+    return pathname === base || pathname.startsWith(base + '/')
   }
 
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-[--color-background] border-t border-[--color-stone] pb-safe flex"
+      className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-[var(--color-background)] border-t border-[var(--color-stone)] pb-safe flex"
     >
       {tabs.map((tab) => {
         const Icon = tab.icon
@@ -54,12 +54,15 @@ export default function BottomTabBar({ pendingCount }: BottomTabBarProps) {
             <span className="relative">
               <Icon className="size-6" aria-hidden="true" />
               {showBadge && (
-                <span
-                  aria-label={`${tab.badge} pending`}
-                  className="absolute -top-1 -right-2 size-4 text-[10px] font-bold bg-[--color-gold] text-white rounded-full flex items-center justify-center"
-                >
-                  {tab.badge}
-                </span>
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-1 -right-2 size-4 text-[10px] font-bold bg-[var(--color-gold)] text-white rounded-full flex items-center justify-center"
+                  >
+                    {tab.badge}
+                  </span>
+                  <span className="sr-only">{tab.badge} pending</span>
+                </>
               )}
             </span>
             <span className="text-[11px] font-medium">{tab.label}</span>
