@@ -21,6 +21,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // interactiveWidget=resizes-content makes the layout viewport shrink when the
+  // iOS soft keyboard appears, so 100dvh on bottom sheets actually reflects the
+  // visible area instead of leaving the sheet behind the keyboard.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

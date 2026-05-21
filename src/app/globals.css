@@ -246,3 +246,19 @@ img {
     --stone: #FFFFFF;
   }
 }
+
+/* ===== BOTTOM SHEET ===== */
+@keyframes bottom-sheet-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.bottom-sheet-enter {
+  animation: bottom-sheet-slide-up 300ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-sheet-enter {
+    animation: none;
+  }
+}
