@@ -7,6 +7,7 @@ import { enableMapSet } from 'immer'
 import { countActiveFlagged, isActiveFlagged } from '@/lib/estimates/flags'
 import type {
   ConfidenceLevel,
+  EditableLineItemField,
   Estimate,
   EstimateBundle,
   EstimateConfig,
@@ -56,6 +57,27 @@ function recomputeEstimateTotals(
     (1 + profit_pct / 100)
 }
 
+/**
+ * Recomputes `subtotal` and `flag_count` on a trade by scanning its
+ * `line_item_ids`. Skips items that are missing from the map (defensive) or
+ * soft-deleted (so post-delete the row stays selectable for "Show deleted"
+ * but doesn't contribute to either aggregate). Mutates `trade` in place —
+ * only safe inside an Immer producer.
+ */
+function recomputeTradeAggregates(
+  trade: Trade,
+  lineItems: Record<string, LineItem>
+): void {
+  const items = trade.line_item_ids
+    .map((id) => lineItems[id])
+    .filter((li): li is LineItem => Boolean(li))
+  trade.subtotal = items.reduce(
+    (sum, li) => (li.is_deleted ? sum : sum + li.total),
+    0
+  )
+  trade.flag_count = countActiveFlagged(items)
+}
+
 // ─── Store shape ─────────────────────────────────────────────────────────────
 
 export interface EstimateStore {
@@ -78,13 +100,34 @@ export interface EstimateStore {
   // Hydration (called once from EstimatePageClient after RSC fetch)
   hydrate: (bundle: EstimateBundle) => void
 
-  // Line item editing — patch keys mirror DB column names
+  // Line item editing — patch keys mirror DB column names.
+  // updateLineItem (multi-field patch, used by BottomSheetEditor "Apply") and
+  // updateLineItemField (single-field, used by inline desktop editing +
+  // NumericBottomSheet) both end up in the same dirty set; the autosave hook
+  // doesn't care which produced the change.
   updateLineItem: (
     id: string,
     patch: Partial<Pick<LineItem, 'quantity' | 'material_unit_cost' | 'labor_unit_cost'>>
   ) => void
+  updateLineItemField: (
+    id: string,
+    field: EditableLineItemField,
+    value: string | number | null
+  ) => void
   openBottomSheet: (itemId: string) => void
   closeBottomSheet: () => void
+
+  // Add-row / soft-delete. Both mutate local state only — the UI is
+  // responsible for firing the POST / DELETE request and reconciling the
+  // result (via replaceLineItemId on POST success, or by toggling
+  // is_deleted back via softDeleteLineItem-style action on DELETE failure).
+  addLineItem: (
+    tradeId: string,
+    draft: { id: string; description?: string; area_location?: string | null }
+  ) => void
+  softDeleteLineItem: (id: string) => void
+  /** Swap a temp client-generated id for the real server-assigned id. */
+  replaceLineItemId: (tempId: string, realId: string) => void
 
   // Estimate-level config
   updateEstimateConfig: (patch: Partial<EstimateConfig>) => void
@@ -96,6 +139,9 @@ export interface EstimateStore {
   // Save tracking (called by auto-save effect)
   markSaved: (id: string) => void
   markError: (id: string, err: string) => void
+  /** Bulk clean — used by useAutosave's Promise.allSettled batch path so only
+   *  successfully-PATCHed ids are removed from the dirty set. */
+  markItemsClean: (ids: string[]) => void
 
   // Flag review flow
   advanceFlagReview: () => void
@@ -224,19 +270,124 @@ export const useEstimateStore = create<EstimateStore>()(
           // Recompute total: qty × (material + labor) — mirrors DB generated column
           item.total =
             item.quantity * (item.material_unit_cost + item.labor_unit_cost)
-          // Recompute trade subtotal
+          const trade = s.trades[item.trade_id]
+          if (trade) recomputeTradeAggregates(trade, s.lineItems)
+          if (s.estimate) recomputeEstimateTotals(s.estimate, s.trades)
+          s.dirtyItemIds.add(id)
+        })
+      },
+
+      updateLineItemField(id, field, value) {
+        set((s) => {
+          const item = s.lineItems[id]
+          if (!item) return
+          // Per-field dispatch keeps the assignment type-safe (the union
+          // covers number and string|null fields).
+          switch (field) {
+            case 'quantity':
+            case 'material_unit_cost':
+            case 'labor_unit_cost': {
+              const n = typeof value === 'number' ? value : Number(value)
+              if (!Number.isFinite(n)) return
+              item[field] = n
+              item.total =
+                item.quantity *
+                (item.material_unit_cost + item.labor_unit_cost)
+              break
+            }
+            case 'description': {
+              item.description = value === null ? '' : String(value)
+              break
+            }
+            case 'area_location': {
+              // Empty string normalises to null so the DB column matches its
+              // nullable type instead of carrying empty strings around.
+              const s2 = value === null ? null : String(value)
+              item.area_location = s2 === '' ? null : s2
+              break
+            }
+          }
+          item.is_manual_override = true
+          const trade = s.trades[item.trade_id]
+          if (trade) recomputeTradeAggregates(trade, s.lineItems)
+          if (s.estimate) recomputeEstimateTotals(s.estimate, s.trades)
+          s.dirtyItemIds.add(id)
+        })
+      },
+
+      addLineItem(tradeId, draft) {
+        set((s) => {
+          const trade = s.trades[tradeId]
+          if (!trade) return
+          // Append at end: max(sort_order in this trade) + 1, or 0 if empty.
+          const maxOrder = trade.line_item_ids.reduce((m, liId) => {
+            const li = s.lineItems[liId]
+            return li && li.sort_order > m ? li.sort_order : m
+          }, -1)
+          const newItem: LineItem = {
+            id: draft.id,
+            trade_id: tradeId,
+            description: draft.description ?? '',
+            area_location: draft.area_location ?? null,
+            quantity: 0,
+            unit: null,
+            material_unit_cost: 0,
+            labor_unit_cost: 0,
+            labor_hours_per_unit: null,
+            total: 0,
+            source_sheet: 'MANUAL',
+            source_grid: null,
+            dimension_type: null,
+            confidence: null,
+            flags: [],
+            is_allowance: false,
+            is_deleted: false,
+            is_manual_override: true,
+            sort_order: maxOrder + 1,
+          }
+          s.lineItems[draft.id] = newItem
+          trade.line_item_ids.push(draft.id)
+          recomputeTradeAggregates(trade, s.lineItems)
+          if (s.estimate) recomputeEstimateTotals(s.estimate, s.trades)
+          // NOTE: not added to dirtyItemIds — autosave only knows PATCH; the
+          // UI is responsible for firing POST and calling replaceLineItemId
+          // when the server returns the real row.
+        })
+      },
+
+      softDeleteLineItem(id) {
+        set((s) => {
+          const item = s.lineItems[id]
+          if (!item || item.is_deleted) return
+          item.is_deleted = true
+          const trade = s.trades[item.trade_id]
+          if (trade) recomputeTradeAggregates(trade, s.lineItems)
+          if (s.estimate) recomputeEstimateTotals(s.estimate, s.trades)
+        })
+      },
+
+      replaceLineItemId(tempId, realId) {
+        set((s) => {
+          const item = s.lineItems[tempId]
+          if (!item || tempId === realId) return
+          item.id = realId
+          s.lineItems[realId] = item
+          delete s.lineItems[tempId]
           const trade = s.trades[item.trade_id]
           if (trade) {
-            trade.subtotal = trade.line_item_ids.reduce(
-              (sum, liId) => sum + (s.lineItems[liId]?.total ?? 0),
-              0
-            )
+            const idx = trade.line_item_ids.indexOf(tempId)
+            if (idx !== -1) trade.line_item_ids[idx] = realId
           }
-          // Recompute estimate direct_cost + grand_total
-          if (s.estimate) {
-            recomputeEstimateTotals(s.estimate, s.trades)
+          // Migrate dirty/saving membership so subsequent saves use the
+          // server-assigned id.
+          if (s.dirtyItemIds.has(tempId)) {
+            s.dirtyItemIds.delete(tempId)
+            s.dirtyItemIds.add(realId)
           }
-          s.dirtyItemIds.add(id)
+          if (s.savingItemIds.has(tempId)) {
+            s.savingItemIds.delete(tempId)
+            s.savingItemIds.add(realId)
+          }
         })
       },
 
@@ -291,6 +442,18 @@ export const useEstimateStore = create<EstimateStore>()(
           // Note: id stays in dirtyItemIds so auto-save retries on next cycle.
           s.savingItemIds.delete(id)
           s.saveError = err
+        })
+      },
+
+      markItemsClean(ids) {
+        if (ids.length === 0) return
+        set((s) => {
+          for (const id of ids) {
+            s.dirtyItemIds.delete(id)
+            s.savingItemIds.delete(id)
+          }
+          s.lastSavedAt = new Date()
+          s.saveError = null
         })
       },
 

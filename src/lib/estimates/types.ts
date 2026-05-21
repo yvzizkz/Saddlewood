@@ -24,6 +24,15 @@ export type ReviewStatus =
 
 export type TradeStatus = 'SP' | 'SUB' | 'DEFERRED' | 'NIS'
 
+// Fields on a LineItem that Marco can edit. Other fields are AI-owned and
+// the PATCH API route strips anything outside this union before write.
+export type EditableLineItemField =
+  | 'quantity'
+  | 'material_unit_cost'
+  | 'labor_unit_cost'
+  | 'description'
+  | 'area_location'
+
 export interface LineItem {
   id: string
   trade_id: string

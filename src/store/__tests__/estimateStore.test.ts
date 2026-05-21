@@ -461,6 +461,384 @@ describe('estimateStore selectors', () => {
   })
 })
 
+describe('estimateStore.updateLineItemField', () => {
+  it('updates a numeric field, sets is_manual_override, recomputes total + aggregates', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [
+        makeLineItem({
+          id: 'li-1',
+          trade_id: 't-1',
+          quantity: 100,
+          material_unit_cost: 1,
+          labor_unit_cost: 2,
+        }),
+      ],
+    })
+    useEstimateStore.getState().hydrate(bundle)
+    useEstimateStore.getState().updateLineItemField('li-1', 'quantity', 200)
+
+    const s = useEstimateStore.getState()
+    expect(s.lineItems['li-1'].quantity).toBe(200)
+    expect(s.lineItems['li-1'].total).toBe(600)
+    expect(s.lineItems['li-1'].is_manual_override).toBe(true)
+    expect(s.trades['t-1'].subtotal).toBe(600)
+    expect(s.dirtyItemIds.has('li-1')).toBe(true)
+  })
+
+  it('coerces string numeric inputs and ignores NaN', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [
+        makeLineItem({
+          id: 'li-1',
+          trade_id: 't-1',
+          quantity: 5,
+          material_unit_cost: 1,
+          labor_unit_cost: 2,
+        }),
+      ],
+    })
+    useEstimateStore.getState().hydrate(bundle)
+
+    useEstimateStore.getState().updateLineItemField('li-1', 'quantity', '10')
+    expect(useEstimateStore.getState().lineItems['li-1'].quantity).toBe(10)
+
+    // NaN input: no-op, value unchanged.
+    useEstimateStore.getState().updateLineItemField('li-1', 'quantity', 'abc')
+    expect(useEstimateStore.getState().lineItems['li-1'].quantity).toBe(10)
+  })
+
+  it('normalises empty-string area_location to null', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+
+    useEstimateStore
+      .getState()
+      .updateLineItemField('li-1', 'area_location', 'East wall')
+    expect(useEstimateStore.getState().lineItems['li-1'].area_location).toBe(
+      'East wall'
+    )
+
+    useEstimateStore.getState().updateLineItemField('li-1', 'area_location', '')
+    expect(useEstimateStore.getState().lineItems['li-1'].area_location).toBeNull()
+  })
+
+  it('writes description as-is including empty string', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+
+    useEstimateStore.getState().updateLineItemField('li-1', 'description', '')
+    expect(useEstimateStore.getState().lineItems['li-1'].description).toBe('')
+  })
+
+  it('is a no-op for an unknown id', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+    const sBefore = useEstimateStore.getState()
+    const dirtyBefore = sBefore.dirtyItemIds.size
+
+    useEstimateStore.getState().updateLineItemField('does-not-exist', 'quantity', 1)
+    expect(useEstimateStore.getState().dirtyItemIds.size).toBe(dirtyBefore)
+  })
+})
+
+describe('estimateStore.markItemsClean', () => {
+  it('removes multiple ids from dirty + saving sets, sets lastSavedAt, clears saveError', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+    useEstimateStore.getState().updateLineItem('li-1', { quantity: 1 })
+    useEstimateStore.getState().updateLineItem('li-2', { quantity: 2 })
+    useEstimateStore.setState((s) => {
+      s.savingItemIds = new Set(['li-1', 'li-2'])
+      s.saveError = 'previous'
+    })
+
+    useEstimateStore.getState().markItemsClean(['li-1', 'li-2'])
+    const s = useEstimateStore.getState()
+    expect(s.dirtyItemIds.has('li-1')).toBe(false)
+    expect(s.dirtyItemIds.has('li-2')).toBe(false)
+    expect(s.savingItemIds.size).toBe(0)
+    expect(s.lastSavedAt).toBeInstanceOf(Date)
+    expect(s.saveError).toBeNull()
+  })
+
+  it('is a no-op when given an empty array (does not touch lastSavedAt)', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+    expect(useEstimateStore.getState().lastSavedAt).toBeNull()
+
+    useEstimateStore.getState().markItemsClean([])
+    expect(useEstimateStore.getState().lastSavedAt).toBeNull()
+  })
+
+  it('only clears the ids passed in — other dirty items are untouched', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+    useEstimateStore.getState().updateLineItem('li-1', { quantity: 1 })
+    useEstimateStore.getState().updateLineItem('li-2', { quantity: 2 })
+
+    useEstimateStore.getState().markItemsClean(['li-1'])
+    const s = useEstimateStore.getState()
+    expect(s.dirtyItemIds.has('li-1')).toBe(false)
+    expect(s.dirtyItemIds.has('li-2')).toBe(true)
+  })
+})
+
+describe('estimateStore.addLineItem', () => {
+  it('appends a MANUAL row with default values and recomputes trade aggregates', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [
+        makeLineItem({
+          id: 'li-1',
+          trade_id: 't-1',
+          sort_order: 0,
+          quantity: 10,
+          material_unit_cost: 1,
+          labor_unit_cost: 1,
+        }),
+      ],
+    })
+    useEstimateStore.getState().hydrate(bundle)
+    expect(useEstimateStore.getState().trades['t-1'].subtotal).toBe(20)
+
+    useEstimateStore
+      .getState()
+      .addLineItem('t-1', { id: 'temp-1', description: 'new manual row' })
+
+    const s = useEstimateStore.getState()
+    const newItem = s.lineItems['temp-1']
+    expect(newItem).toBeDefined()
+    expect(newItem.description).toBe('new manual row')
+    expect(newItem.source_sheet).toBe('MANUAL')
+    expect(newItem.is_manual_override).toBe(true)
+    expect(newItem.is_deleted).toBe(false)
+    expect(newItem.quantity).toBe(0)
+    expect(newItem.total).toBe(0)
+    expect(newItem.sort_order).toBe(1)
+    expect(s.trades['t-1'].line_item_ids).toEqual(['li-1', 'temp-1'])
+    // subtotal unchanged because new row has $0 total
+    expect(s.trades['t-1'].subtotal).toBe(20)
+    // NOT in dirty set — UI POSTs explicitly
+    expect(s.dirtyItemIds.has('temp-1')).toBe(false)
+  })
+
+  it('starts sort_order at 0 when the trade is empty', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [],
+    })
+    useEstimateStore.getState().hydrate(bundle)
+
+    useEstimateStore.getState().addLineItem('t-1', { id: 'temp-1' })
+    expect(useEstimateStore.getState().lineItems['temp-1'].sort_order).toBe(0)
+  })
+
+  it('is a no-op for an unknown trade id', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+    const before = useEstimateStore.getState()
+    const itemsBefore = Object.keys(before.lineItems).length
+
+    useEstimateStore.getState().addLineItem('not-a-trade', { id: 'temp-1' })
+    expect(Object.keys(useEstimateStore.getState().lineItems).length).toBe(
+      itemsBefore
+    )
+  })
+})
+
+describe('estimateStore.softDeleteLineItem', () => {
+  it('marks is_deleted, excludes from trade subtotal, recomputes estimate totals', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [
+        makeLineItem({
+          id: 'li-1',
+          trade_id: 't-1',
+          quantity: 100,
+          material_unit_cost: 1,
+          labor_unit_cost: 1,
+        }),
+        makeLineItem({
+          id: 'li-2',
+          trade_id: 't-1',
+          sort_order: 1,
+          quantity: 50,
+          material_unit_cost: 1,
+          labor_unit_cost: 1,
+        }),
+      ],
+      config: {
+        contingency_pct: 0,
+        overhead_pct: 0,
+        profit_pct: 0,
+        gc_sub_markup_pct: 0,
+      },
+    })
+    useEstimateStore.getState().hydrate(bundle)
+    expect(useEstimateStore.getState().trades['t-1'].subtotal).toBe(300)
+    expect(useEstimateStore.getState().estimate?.direct_cost).toBe(300)
+
+    useEstimateStore.getState().softDeleteLineItem('li-1')
+    const s = useEstimateStore.getState()
+    expect(s.lineItems['li-1'].is_deleted).toBe(true)
+    // li-2 contributes 50 × ($1 + $1) = 100
+    expect(s.trades['t-1'].subtotal).toBe(100)
+    expect(s.estimate?.direct_cost).toBe(100)
+    expect(s.estimate?.grand_total).toBe(100)
+    // li-1 stays in line_item_ids so "Show deleted" can re-reveal it.
+    expect(s.trades['t-1'].line_item_ids).toContain('li-1')
+  })
+
+  it('also clears the deleted item from the trade flag_count', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [
+        makeLineItem({ id: 'li-1', trade_id: 't-1', flags: ['low_conf'] }),
+        makeLineItem({
+          id: 'li-2',
+          trade_id: 't-1',
+          sort_order: 1,
+          flags: ['rfi'],
+        }),
+      ],
+    })
+    useEstimateStore.getState().hydrate(bundle)
+    expect(useEstimateStore.getState().trades['t-1'].flag_count).toBe(2)
+
+    useEstimateStore.getState().softDeleteLineItem('li-1')
+    expect(useEstimateStore.getState().trades['t-1'].flag_count).toBe(1)
+  })
+
+  it('is idempotent — calling twice does not double-affect totals', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [
+        makeLineItem({
+          id: 'li-1',
+          trade_id: 't-1',
+          quantity: 10,
+          material_unit_cost: 1,
+          labor_unit_cost: 1,
+        }),
+      ],
+      config: {
+        contingency_pct: 0,
+        overhead_pct: 0,
+        profit_pct: 0,
+        gc_sub_markup_pct: 0,
+      },
+    })
+    useEstimateStore.getState().hydrate(bundle)
+
+    useEstimateStore.getState().softDeleteLineItem('li-1')
+    const afterFirst = useEstimateStore.getState().trades['t-1'].subtotal
+    useEstimateStore.getState().softDeleteLineItem('li-1')
+    expect(useEstimateStore.getState().trades['t-1'].subtotal).toBe(afterFirst)
+  })
+
+  it('is a no-op for an unknown id', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+    const before = useEstimateStore.getState().trades['t-1'].subtotal
+
+    useEstimateStore.getState().softDeleteLineItem('does-not-exist')
+    expect(useEstimateStore.getState().trades['t-1'].subtotal).toBe(before)
+  })
+})
+
+describe('estimateStore.replaceLineItemId', () => {
+  it('swaps the key in lineItems, the entry in trade.line_item_ids, and migrates dirty/saving membership', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [],
+    })
+    useEstimateStore.getState().hydrate(bundle)
+
+    useEstimateStore
+      .getState()
+      .addLineItem('t-1', { id: 'temp-abc', description: 'pending' })
+    // Pretend an edit happened on the temp row so it's also in dirty set.
+    useEstimateStore.setState((s) => {
+      s.dirtyItemIds = new Set(['temp-abc'])
+      s.savingItemIds = new Set(['temp-abc'])
+    })
+
+    useEstimateStore.getState().replaceLineItemId('temp-abc', 'real-xyz')
+    const s = useEstimateStore.getState()
+
+    expect(s.lineItems['real-xyz']).toBeDefined()
+    expect(s.lineItems['real-xyz'].id).toBe('real-xyz')
+    expect(s.lineItems['temp-abc']).toBeUndefined()
+    expect(s.trades['t-1'].line_item_ids).toEqual(['real-xyz'])
+    expect(s.dirtyItemIds.has('real-xyz')).toBe(true)
+    expect(s.dirtyItemIds.has('temp-abc')).toBe(false)
+    expect(s.savingItemIds.has('real-xyz')).toBe(true)
+    expect(s.savingItemIds.has('temp-abc')).toBe(false)
+  })
+
+  it('is a no-op when tempId === realId', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+    const before = useEstimateStore.getState().lineItems['li-1']
+
+    useEstimateStore.getState().replaceLineItemId('li-1', 'li-1')
+    expect(useEstimateStore.getState().lineItems['li-1']).toEqual(before)
+  })
+
+  it('is a no-op for an unknown tempId', () => {
+    const bundle = makeBundle()
+    useEstimateStore.getState().hydrate(bundle)
+    const before = Object.keys(useEstimateStore.getState().lineItems).length
+
+    useEstimateStore.getState().replaceLineItemId('not-here', 'real-id')
+    expect(Object.keys(useEstimateStore.getState().lineItems).length).toBe(before)
+    expect(useEstimateStore.getState().lineItems['real-id']).toBeUndefined()
+  })
+})
+
+describe('estimateStore.updateLineItem — deleted item subtotal regression', () => {
+  it('excludes soft-deleted items from the recomputed trade subtotal after a sibling edit', () => {
+    const bundle = makeBundle({
+      trades: [makeTrade({ id: 't-1', sort_order: 0 })],
+      line_items: [
+        makeLineItem({
+          id: 'li-1',
+          trade_id: 't-1',
+          quantity: 10,
+          material_unit_cost: 1,
+          labor_unit_cost: 1,
+        }),
+        makeLineItem({
+          id: 'li-2',
+          trade_id: 't-1',
+          sort_order: 1,
+          quantity: 5,
+          material_unit_cost: 1,
+          labor_unit_cost: 1,
+        }),
+      ],
+      config: {
+        contingency_pct: 0,
+        overhead_pct: 0,
+        profit_pct: 0,
+        gc_sub_markup_pct: 0,
+      },
+    })
+    useEstimateStore.getState().hydrate(bundle)
+
+    useEstimateStore.getState().softDeleteLineItem('li-2')
+    expect(useEstimateStore.getState().trades['t-1'].subtotal).toBe(20)
+
+    // Editing the surviving item must not bring the deleted one back into
+    // the subtotal — this was the bug the new recomputeTradeAggregates
+    // helper fixes.
+    useEstimateStore.getState().updateLineItem('li-1', { quantity: 20 })
+    expect(useEstimateStore.getState().trades['t-1'].subtotal).toBe(40)
+  })
+})
+
 describe('estimateStore.updateEstimateConfig', () => {
   it('recomputes grand_total with new config', () => {
     const bundle = makeBundle({
