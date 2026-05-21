@@ -37,15 +37,13 @@ export function EstimateList({ estimates, activeTab }: EstimateListProps) {
 
   return (
     <div>
-      <div
-        role="tablist"
+      <nav
         aria-label="Estimate filter"
         className="flex items-center gap-2 mb-5"
       >
         <Link
           href="/internal?tab=pending"
-          role="tab"
-          aria-selected={pendingActive}
+          aria-current={pendingActive ? 'page' : undefined}
           className={
             'inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium transition-colors ' +
             (pendingActive
@@ -57,8 +55,7 @@ export function EstimateList({ estimates, activeTab }: EstimateListProps) {
         </Link>
         <Link
           href="/internal?tab=all"
-          role="tab"
-          aria-selected={allActive}
+          aria-current={allActive ? 'page' : undefined}
           className={
             'inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium transition-colors ' +
             (allActive
@@ -68,7 +65,7 @@ export function EstimateList({ estimates, activeTab }: EstimateListProps) {
         >
           All
         </Link>
-      </div>
+      </nav>
 
       {filtered.length === 0 ? (
         <div

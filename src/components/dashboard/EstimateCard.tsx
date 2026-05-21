@@ -73,7 +73,8 @@ export function EstimateCard({ estimate }: EstimateCardProps) {
         return
       }
       router.refresh()
-    } catch {
+    } catch (e) {
+      console.error('Quick approve failed:', e)
       window.alert('Approve failed — check your connection and retry.')
     } finally {
       setApproving(false)
@@ -96,6 +97,8 @@ export function EstimateCard({ estimate }: EstimateCardProps) {
             void handleQuickApprove()
           }}
           disabled={flagged || approving}
+          tabIndex={swipeOpen ? 0 : -1}
+          aria-hidden={!swipeOpen}
           className="h-10 px-3 rounded text-white text-sm font-medium bg-[var(--color-teal)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {'✓ Approve'}
@@ -105,6 +108,8 @@ export function EstimateCard({ estimate }: EstimateCardProps) {
           onClick={() => {
             setSwipeOpen(false)
           }}
+          tabIndex={swipeOpen ? 0 : -1}
+          aria-hidden={!swipeOpen}
           className="h-10 px-3 rounded text-sm font-medium border border-[var(--color-stone)] bg-white text-[var(--color-charcoal)]"
         >
           {'↩ Changes'}
