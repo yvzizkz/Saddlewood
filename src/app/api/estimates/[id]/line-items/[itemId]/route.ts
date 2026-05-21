@@ -67,7 +67,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Line item not found" }, { status: 404 });
   }
 
-  // Cross-tenant guard: confirm this line item lives under the URL's estimate.
+  // Sanity check: the URL's estimate id must match the trade's estimate_id.
+  // NOT a tenancy boundary — RLS is wide-open today (using true / with check
+  // true on every table), so this only catches typo'd URLs and refactoring
+  // bugs, not malicious cross-estimate access. Tighten RLS when multi-user
+  // support lands in a later phase.
   const { data: trade, error: tradeErr } = await supabase
     .from("estimate_trades")
     .select("estimate_id")
@@ -92,17 +96,20 @@ export async function PATCH(
 
   // Append-only audit log — one row per *actually changed* field.
   // Supabase returns numeric columns as strings, hence Number() coercion.
+  // Round to 4 decimals (numeric(14,4)) before compare AND write so input
+  // like 5.00001 isn't flagged as a change against stored "5.0000".
+  const round4 = (n: number): number => Math.round(n * 10000) / 10000;
   const overrideRows = EDITABLE_FIELDS.filter((k) => {
     const next = parsed.data[k];
     if (next === undefined) return false;
-    return next !== Number(before[k]);
+    return round4(next) !== Number(before[k]);
   }).map((k) => ({
     estimate_id: id,
     trade_id: before.trade_id,
     line_item_id: itemId,
     field_name: k,
     old_value: String(before[k]),
-    new_value: String(parsed.data[k]),
+    new_value: String(round4(parsed.data[k]!)),
     changed_by: user.email ?? user.id,
   }));
 

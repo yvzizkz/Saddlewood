@@ -59,7 +59,7 @@ create table if not exists public.estimates (
   parent_estimate_id  uuid references public.estimates(id) on delete set null,
   is_ai_baseline      boolean not null default true,
   review_status       text not null default 'draft',
-    -- values: draft, in_review, approved, sent, archived, cancelled
+    -- values: draft, in_review, approved, sent, archived, cancelled, changes_requested
   overhead_pct        numeric(5,2) not null default 15,
   profit_pct          numeric(5,2) not null default 10,
   contingency_pct     numeric(5,2) not null default 5,

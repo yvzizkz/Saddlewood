@@ -330,6 +330,86 @@ describe('PATCH /api/estimates/[id]/line-items/[itemId] — happy path + side ef
     consoleSpy.mockRestore()
   })
 
+  it('does not record a spurious audit row when input differs only beyond numeric(14,4) precision', async () => {
+    // DB stores numeric(14,4) so anything past the 4th decimal is rounded
+    // off on store. The route must round input the same way before comparing
+    // to `before` so 5.00001 -> "5.0000" isn't flagged as a change.
+    const before = {
+      id: ITEM_ID,
+      quantity: '5.0000',
+      material_unit_cost: '1.00',
+      labor_unit_cost: '2.00',
+      trade_id: TRADE_ID,
+    }
+    const after = {
+      id: ITEM_ID,
+      quantity: 5,
+      material_unit_cost: 1.0,
+      labor_unit_cost: 2.0,
+      total: 15,
+      is_manual_override: true,
+    }
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: before, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+        { data: after, error: null },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await PATCH(
+      makeRequest({ quantity: 5.00001 }) as never,
+      { params }
+    )
+
+    expect(res.status).toBe(200)
+    // No audit insert — only 3 .from() calls.
+    expect(mock.fromCalls).toHaveLength(3)
+  })
+
+  it('rounds new_value to 4 decimals in the audit row', async () => {
+    const before = {
+      id: ITEM_ID,
+      quantity: '5.0000',
+      material_unit_cost: '1.00',
+      labor_unit_cost: '2.00',
+      trade_id: TRADE_ID,
+    }
+    const after = {
+      id: ITEM_ID,
+      quantity: 7.12345,
+      material_unit_cost: 1.0,
+      labor_unit_cost: 2.0,
+      total: 21.3703,
+      is_manual_override: true,
+    }
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: before, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+        { data: after, error: null },
+        { error: null },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await PATCH(
+      makeRequest({ quantity: 7.12345 }) as never,
+      { params }
+    )
+
+    expect(res.status).toBe(200)
+    const auditCall = mock.fromCalls[3]
+    const rows = payloadOf(auditCall, 'insert') as Array<Record<string, unknown>>
+    expect(rows).toHaveLength(1)
+    // 7.12345 rounded to 4 decimals = 7.1235
+    expect(rows[0].new_value).toBe('7.1235')
+    expect(rows[0].old_value).toBe('5.0000')
+  })
+
   it('uses user.id as changed_by when user.email is absent', async () => {
     const before = {
       id: ITEM_ID,

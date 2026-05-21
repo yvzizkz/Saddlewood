@@ -105,7 +105,6 @@ export async function PATCH(
       template: "estimate_changes_requested",
       subject: "Marco requested changes",
       status: "queued",
-      error_message: null,
     });
     if (logErr) {
       console.error("[estimates PATCH] email_log insert failed:", logErr);
