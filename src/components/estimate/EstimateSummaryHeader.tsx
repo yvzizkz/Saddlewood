@@ -24,6 +24,7 @@ function formatCurrency(value: number): string {
 export function EstimateSummaryHeader() {
   const grandTotal = useEstimateStore(selectGrandTotal)
   const flagCount = useEstimateStore(selectFlaggedCount)
+  const openRequestChanges = useEstimateStore((s) => s.openRequestChanges)
 
   return (
     <div className="py-6 md:py-8">
@@ -58,6 +59,16 @@ export function EstimateSummaryHeader() {
       </div>
 
       <ApproveButton />
+
+      <div className="text-center">
+        <button
+          type="button"
+          onClick={openRequestChanges}
+          className="mt-3 text-sm text-[var(--color-charcoal)] underline opacity-70 hover:opacity-100 min-h-[44px]"
+        >
+          Request changes
+        </button>
+      </div>
     </div>
   )
 }

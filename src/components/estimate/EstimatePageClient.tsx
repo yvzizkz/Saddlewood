@@ -8,6 +8,8 @@ import type { EstimateBundle } from '@/lib/estimates/types'
 import { EstimateSummaryHeader } from './EstimateSummaryHeader'
 import { TradeSection } from './TradeSection'
 import { BottomSheetEditor } from './BottomSheetEditor'
+import { RequestChangesPanel } from './RequestChangesPanel'
+import { ApproveModal } from './ApproveModal'
 
 interface EstimatePageClientProps {
   bundle: EstimateBundle
@@ -139,6 +141,8 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
       <div className="h-[calc(56px+env(safe-area-inset-bottom,0px))] md:hidden" />
 
       <BottomSheetEditor />
+      <RequestChangesPanel />
+      <ApproveModal />
     </div>
   )
 }
