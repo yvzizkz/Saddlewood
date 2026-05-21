@@ -8,8 +8,7 @@ import { useBottomSheet } from '@/hooks/useBottomSheet'
 /**
  * Slide-up bottom sheet for the "Request Changes" flow. Owner enters a single
  * overall note describing what needs to change; on send, PATCHes the estimate
- * with `action: 'request_changes'`. The endpoint lands in Task 9, so a 404 is
- * surfaced inline as a friendly "coming soon" alert.
+ * with `action: 'request_changes'`.
  */
 export function RequestChangesPanel() {
   const router = useRouter()
@@ -55,11 +54,6 @@ export function RequestChangesPanel() {
           flagNotes: [],
         }),
       })
-      if (res.status === 404) {
-        alert('Request-changes endpoint coming soon.')
-        closeRequestChanges()
-        return
-      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       closeRequestChanges()
       router.refresh()

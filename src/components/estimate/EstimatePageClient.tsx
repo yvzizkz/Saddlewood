@@ -34,12 +34,20 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
   // prevents flash, and useLayoutEffect produces an SSR warning.
   useEffect(() => {
     hydrate(bundle)
-    // We deliberately depend on bundle.estimate.id (and hydrate) rather than
-    // the whole bundle, so re-renders with the same estimate don't re-hydrate.
+    // Depend on the estimate id PLUS fields that change on server-side updates
+    // (review_status, updated_at). Without updated_at, a router.refresh() after
+    // approve/request-changes would bring back a new bundle with the same id
+    // and the store would keep stale data (e.g., "APPROVE & SEND" still
+    // showing after approval). updated_at is bumped by the set_updated_at()
+    // trigger on any row mutation, so it's a reliable re-hydrate signal.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bundle.estimate.id, hydrate])
+  }, [bundle.estimate.id, bundle.estimate.review_status, bundle.estimate.updated_at, hydrate])
 
-  // Debounced auto-save: 800ms after last dirty change
+  // Debounced auto-save: 800ms after ANY dirty change.
+  // This is a GLOBAL debounce — if Marco edits item A then starts editing item B
+  // 500ms later, A's save is delayed until 800ms after B settles. This is safe
+  // for the Phase 3 bottom-sheet UX (one Apply per item, batched commits), but
+  // will need rethinking when Phase 4 adds inline-editable fields.
   const dirtyItemIds = useEstimateStore((s) => s.dirtyItemIds)
   const lineItems = useEstimateStore((s) => s.lineItems)
   const estimateId = useEstimateStore((s) => s.estimate?.id ?? null)
@@ -51,6 +59,9 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
       for (const id of Array.from(dirtyItemIds)) {
         const item = lineItems[id]
         if (!item) continue
+        // Guard against concurrent in-flight save for the same id. Read the
+        // latest snapshot directly (we deliberately don't subscribe here).
+        if (useEstimateStore.getState().savingItemIds.has(id)) continue
         useEstimateStore.setState((s) => {
           s.savingItemIds.add(id)
         })

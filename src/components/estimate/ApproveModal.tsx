@@ -8,8 +8,7 @@ import { useBottomSheet } from '@/hooks/useBottomSheet'
 /**
  * Centered confirmation modal for the Approve action. Shows the grand total,
  * an optional "Notify estimator" checkbox, and PATCHes the estimate with
- * `action: 'approve'`. The endpoint arrives in Task 9; 404 surfaces a
- * "coming soon" alert.
+ * `action: 'approve'`.
  */
 export function ApproveModal() {
   const router = useRouter()
@@ -52,11 +51,6 @@ export function ApproveModal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'approve', notifyEstimator: notify }),
       })
-      if (res.status === 404) {
-        alert('Approve endpoint coming soon.')
-        closeApproveModal()
-        return
-      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       closeApproveModal()
       router.refresh()

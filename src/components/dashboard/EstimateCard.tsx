@@ -62,16 +62,7 @@ export function EstimateCard({ estimate }: EstimateCardProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'approve', notifyEstimator: false }),
       })
-      if (!res.ok) {
-        // PATCH endpoint is built in a later phase-3 task; surface a
-        // lightweight error rather than blocking the UX.
-        if (res.status === 404) {
-          window.alert('Quick approve endpoint coming soon.')
-        } else {
-          window.alert(`Approve failed (${res.status}).`)
-        }
-        return
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       router.refresh()
     } catch (e) {
       console.error('Quick approve failed:', e)
