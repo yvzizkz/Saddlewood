@@ -111,6 +111,7 @@ export interface DashboardEstimateRow {
   direct_cost: number
   grand_total: number
   updated_at: string
+  flag_count: number
   job: {
     id: string
     name: string

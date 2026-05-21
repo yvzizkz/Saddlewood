@@ -9,13 +9,6 @@ interface EstimateCardProps {
   estimate: DashboardEstimateRow
 }
 
-// Phase 3 places flag_count on the joined row in a later task. For now we
-// derive a "flagged" boolean from review_status === 'changes_requested' as a
-// stand-in so the UI shows the two visual branches (clean vs. flagged).
-function deriveFlagCount(row: DashboardEstimateRow): number {
-  return row.review_status === 'changes_requested' ? 1 : 0
-}
-
 function formatBidDue(iso: string | null): string {
   if (!iso) return 'No bid date'
   const d = new Date(iso)
@@ -42,7 +35,7 @@ export function EstimateCard({ estimate }: EstimateCardProps) {
     threshold: 80,
   })
 
-  const flagCount = deriveFlagCount(estimate)
+  const flagCount = estimate.flag_count
   const flagged = flagCount > 0
 
   const job = estimate.job

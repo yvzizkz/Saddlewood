@@ -259,6 +259,7 @@ export async function countPendingEstimates(): Promise<number> {
 export async function listEstimatesForDashboard(): Promise<DashboardEstimateRow[]> {
   const supabase = await createClient()
 
+  // Step 1: estimates + joined job summary.
   const { data, error } = await supabase
     .from('estimates')
     .select(
@@ -272,6 +273,47 @@ export async function listEstimatesForDashboard(): Promise<DashboardEstimateRow[
 
   if (error) throw error
   const rows: Row[] = (data ?? []) as Row[]
+  if (rows.length === 0) return []
+
+  // Step 2: trades for those estimates, so we can map trade_id → estimate_id.
+  // supabase-js can't express the estimates→trades→line_items aggregation as
+  // a single query, so we do it in two extra round trips and aggregate in JS.
+  const estimateIds: string[] = rows.map((r) => asString(r.id))
+
+  const { data: tradeRows, error: tradeErr } = await supabase
+    .from('estimate_trades')
+    .select('id, estimate_id')
+    .in('estimate_id', estimateIds)
+  if (tradeErr) throw tradeErr
+
+  const tradeIdToEstimate = new Map<string, string>()
+  const tradeIds: string[] = []
+  for (const t of (tradeRows ?? []) as Row[]) {
+    const tradeId = asString(t.id)
+    tradeIdToEstimate.set(tradeId, asString(t.estimate_id))
+    tradeIds.push(tradeId)
+  }
+
+  // Step 3: count flagged line items per estimate.
+  const flagCountByEstimate = new Map<string, number>()
+  if (tradeIds.length > 0) {
+    const { data: flaggedItems, error: itemErr } = await supabase
+      .from('estimate_line_items')
+      .select('trade_id, flags')
+      .in('trade_id', tradeIds)
+      .eq('is_deleted', false)
+    if (itemErr) throw itemErr
+    for (const li of (flaggedItems ?? []) as Row[]) {
+      const flags = asStringArray(li.flags)
+      if (flags.length === 0) continue
+      const estimateId = tradeIdToEstimate.get(asString(li.trade_id))
+      if (!estimateId) continue
+      flagCountByEstimate.set(
+        estimateId,
+        (flagCountByEstimate.get(estimateId) ?? 0) + 1
+      )
+    }
+  }
 
   return rows.map((row): DashboardEstimateRow => {
     // The PostgREST `job:jobs(...)` shape comes back as a single object when
@@ -284,14 +326,17 @@ export async function listEstimatesForDashboard(): Promise<DashboardEstimateRow[
       jobObj = rawJob as Row
     }
 
+    const id = asString(row.id)
+
     return {
-      id: asString(row.id),
+      id,
       job_id: asString(row.job_id),
       version: Math.trunc(num(row.version)),
       review_status: asReviewStatus(row.review_status),
       direct_cost: num(row.direct_cost),
       grand_total: num(row.grand_total),
       updated_at: asString(row.updated_at),
+      flag_count: flagCountByEstimate.get(id) ?? 0,
       job: jobObj
         ? {
             id: asString(jobObj.id),
