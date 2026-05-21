@@ -28,9 +28,23 @@ class FromBuilder {
     this.ops.push({ method: 'eq', args })
     return this
   }
-  // `.single()` resolves with the canned result.
+  order(...args: unknown[]) {
+    this.ops.push({ method: 'order', args })
+    return this
+  }
+  limit(...args: unknown[]) {
+    this.ops.push({ method: 'limit', args })
+    return this
+  }
+  // `.single()` and `.maybeSingle()` both resolve with the canned result.
+  // maybeSingle is supabase-js's no-throw variant for 0-or-1 rows; the
+  // route treats `data: null, error: null` as "no row found".
   single() {
     this.ops.push({ method: 'single', args: [] })
+    return Promise.resolve(this.result)
+  }
+  maybeSingle() {
+    this.ops.push({ method: 'maybeSingle', args: [] })
     return Promise.resolve(this.result)
   }
   // PromiseLike so `await builder` works for chains that don't end in

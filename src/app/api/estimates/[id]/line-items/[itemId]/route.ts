@@ -8,23 +8,30 @@ const PatchSchema = z
     quantity: z.number().nonnegative().optional(),
     material_unit_cost: z.number().nonnegative().optional(),
     labor_unit_cost: z.number().nonnegative().optional(),
+    description: z.string().max(500).optional(),
+    area_location: z.string().max(200).nullable().optional(),
   })
   .refine(
     (v) =>
       v.quantity !== undefined ||
       v.material_unit_cost !== undefined ||
-      v.labor_unit_cost !== undefined,
+      v.labor_unit_cost !== undefined ||
+      v.description !== undefined ||
+      v.area_location !== undefined,
     {
       message:
-        "At least one of quantity, material_unit_cost, labor_unit_cost is required",
+        "At least one editable field is required",
     },
   );
 
-const EDITABLE_FIELDS = [
+// Order matters for the audit log only insofar as multiple-changed-fields-at-once
+// will sort by this array order in the resulting rows.
+const NUMERIC_FIELDS = [
   "quantity",
   "material_unit_cost",
   "labor_unit_cost",
 ] as const;
+const TEXT_FIELDS = ["description", "area_location"] as const;
 
 export async function PATCH(
   req: NextRequest,
@@ -60,7 +67,9 @@ export async function PATCH(
   // Read current row for audit-log old_value + cross-tenant guard.
   const { data: before, error: beforeErr } = await supabase
     .from("estimate_line_items")
-    .select("id, quantity, material_unit_cost, labor_unit_cost, trade_id")
+    .select(
+      "id, quantity, material_unit_cost, labor_unit_cost, description, area_location, trade_id",
+    )
     .eq("id", itemId)
     .single();
   if (beforeErr || !before) {
@@ -87,7 +96,7 @@ export async function PATCH(
     .update(patch)
     .eq("id", itemId)
     .select(
-      "id, quantity, material_unit_cost, labor_unit_cost, total, is_manual_override",
+      "id, quantity, material_unit_cost, labor_unit_cost, description, area_location, total, is_manual_override",
     )
     .single();
   if (updErr) {
@@ -99,19 +108,38 @@ export async function PATCH(
   // Round to 4 decimals (numeric(14,4)) before compare AND write so input
   // like 5.00001 isn't flagged as a change against stored "5.0000".
   const round4 = (n: number): number => Math.round(n * 10000) / 10000;
-  const overrideRows = EDITABLE_FIELDS.filter((k) => {
+  const overrideRows: Array<Record<string, unknown>> = [];
+
+  for (const k of NUMERIC_FIELDS) {
     const next = parsed.data[k];
-    if (next === undefined) return false;
-    return round4(next) !== Number(before[k]);
-  }).map((k) => ({
-    estimate_id: id,
-    trade_id: before.trade_id,
-    line_item_id: itemId,
-    field_name: k,
-    old_value: String(before[k]),
-    new_value: String(round4(parsed.data[k]!)),
-    changed_by: user.email ?? user.id,
-  }));
+    if (next === undefined) continue;
+    if (round4(next) === Number(before[k])) continue;
+    overrideRows.push({
+      estimate_id: id,
+      trade_id: before.trade_id,
+      line_item_id: itemId,
+      field_name: k,
+      old_value: String(before[k]),
+      new_value: String(round4(next)),
+      changed_by: user.email ?? user.id,
+    });
+  }
+  for (const k of TEXT_FIELDS) {
+    const next = parsed.data[k];
+    if (next === undefined) continue;
+    // null vs '' on area_location should match the DB shape — Supabase
+    // returns null as the JS value `null`, so a direct compare is safe.
+    if (next === before[k]) continue;
+    overrideRows.push({
+      estimate_id: id,
+      trade_id: before.trade_id,
+      line_item_id: itemId,
+      field_name: k,
+      old_value: before[k] === null ? null : String(before[k]),
+      new_value: next === null ? null : String(next),
+      changed_by: user.email ?? user.id,
+    });
+  }
 
   if (overrideRows.length > 0) {
     const { error: auditErr } = await supabase
@@ -126,4 +154,72 @@ export async function PATCH(
   }
 
   return NextResponse.json({ item: after });
+}
+
+// Soft delete. Returns 200 + { ok: true } on success. Idempotent — re-DELETE
+// of an already-deleted item is a no-op, returns 200.
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; itemId: string }> },
+) {
+  const { id, itemId } = await params;
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Cross-estimate sanity check via the trade.
+  const { data: before, error: beforeErr } = await supabase
+    .from("estimate_line_items")
+    .select("id, trade_id, is_deleted")
+    .eq("id", itemId)
+    .single();
+  if (beforeErr || !before) {
+    return NextResponse.json({ error: "Line item not found" }, { status: 404 });
+  }
+
+  const { data: trade, error: tradeErr } = await supabase
+    .from("estimate_trades")
+    .select("estimate_id")
+    .eq("id", before.trade_id)
+    .single();
+  if (tradeErr || !trade || trade.estimate_id !== id) {
+    return NextResponse.json({ error: "Estimate mismatch" }, { status: 400 });
+  }
+
+  if (before.is_deleted) {
+    // Idempotent: caller can retry without seeing 4xx.
+    return NextResponse.json({ ok: true });
+  }
+
+  const { error: updErr } = await supabase
+    .from("estimate_line_items")
+    .update({ is_deleted: true })
+    .eq("id", itemId);
+  if (updErr) {
+    return NextResponse.json({ error: updErr.message }, { status: 500 });
+  }
+
+  // Single audit row for the deletion.
+  const { error: auditErr } = await supabase.from("estimate_overrides").insert({
+    estimate_id: id,
+    trade_id: before.trade_id,
+    line_item_id: itemId,
+    field_name: "is_deleted",
+    old_value: "false",
+    new_value: "true",
+    changed_by: user.email ?? user.id,
+  });
+  if (auditErr) {
+    console.error(
+      "[line-items DELETE] estimate_overrides insert failed:",
+      auditErr,
+    );
+  }
+
+  return NextResponse.json({ ok: true });
 }

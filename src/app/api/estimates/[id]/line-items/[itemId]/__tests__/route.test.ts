@@ -5,7 +5,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
 
-import { PATCH } from '../route'
+import { PATCH, DELETE } from '../route'
 import { createClient } from '@/lib/supabase/server'
 
 const USER = { id: 'user-marco', email: 'marco@example.com' }
@@ -443,5 +443,267 @@ describe('PATCH /api/estimates/[id]/line-items/[itemId] — happy path + side ef
     const auditCall = mock.fromCalls[3]
     const rows = payloadOf(auditCall, 'insert') as Array<Record<string, unknown>>
     expect(rows[0].changed_by).toBe('svc-bot')
+  })
+})
+
+describe('PATCH /api/estimates/[id]/line-items/[itemId] — text fields (description, area_location)', () => {
+  it('updates description and writes an audit row', async () => {
+    const before = {
+      id: ITEM_ID,
+      quantity: '10',
+      material_unit_cost: '1.00',
+      labor_unit_cost: '2.00',
+      description: 'original desc',
+      area_location: null,
+      trade_id: TRADE_ID,
+    }
+    const after = {
+      id: ITEM_ID,
+      quantity: 10,
+      material_unit_cost: 1.0,
+      labor_unit_cost: 2.0,
+      description: 'new desc',
+      area_location: null,
+      total: 30,
+      is_manual_override: true,
+    }
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: before, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+        { data: after, error: null },
+        { error: null },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await PATCH(
+      makeRequest({ description: 'new desc' }) as never,
+      { params }
+    )
+
+    expect(res.status).toBe(200)
+    const auditCall = mock.fromCalls[3]
+    const rows = payloadOf(auditCall, 'insert') as Array<Record<string, unknown>>
+    expect(rows).toHaveLength(1)
+    expect(rows[0].field_name).toBe('description')
+    expect(rows[0].old_value).toBe('original desc')
+    expect(rows[0].new_value).toBe('new desc')
+  })
+
+  it('updates area_location and records null transition correctly', async () => {
+    const before = {
+      id: ITEM_ID,
+      quantity: '10',
+      material_unit_cost: '1.00',
+      labor_unit_cost: '2.00',
+      description: 'desc',
+      area_location: null,
+      trade_id: TRADE_ID,
+    }
+    const after = {
+      id: ITEM_ID,
+      quantity: 10,
+      material_unit_cost: 1.0,
+      labor_unit_cost: 2.0,
+      description: 'desc',
+      area_location: 'East wall',
+      total: 30,
+      is_manual_override: true,
+    }
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: before, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+        { data: after, error: null },
+        { error: null },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await PATCH(
+      makeRequest({ area_location: 'East wall' }) as never,
+      { params }
+    )
+
+    expect(res.status).toBe(200)
+    const auditCall = mock.fromCalls[3]
+    const rows = payloadOf(auditCall, 'insert') as Array<Record<string, unknown>>
+    expect(rows).toHaveLength(1)
+    expect(rows[0].field_name).toBe('area_location')
+    expect(rows[0].old_value).toBeNull()
+    expect(rows[0].new_value).toBe('East wall')
+  })
+
+  it('skips the audit row when text field is sent unchanged', async () => {
+    const before = {
+      id: ITEM_ID,
+      quantity: '10',
+      material_unit_cost: '1.00',
+      labor_unit_cost: '2.00',
+      description: 'same desc',
+      area_location: null,
+      trade_id: TRADE_ID,
+    }
+    const after = { ...before, quantity: 10, total: 30, is_manual_override: true }
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: before, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+        { data: after, error: null },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await PATCH(
+      makeRequest({ description: 'same desc' }) as never,
+      { params }
+    )
+
+    expect(res.status).toBe(200)
+    // Only 3 from() calls — no audit insert.
+    expect(mock.fromCalls).toHaveLength(3)
+  })
+
+  it('text-only patch (no numerics) is valid', async () => {
+    const before = {
+      id: ITEM_ID,
+      quantity: '10',
+      material_unit_cost: '1.00',
+      labor_unit_cost: '2.00',
+      description: 'old',
+      area_location: null,
+      trade_id: TRADE_ID,
+    }
+    const after = { ...before, quantity: 10, description: 'new', total: 30, is_manual_override: true }
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: before, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+        { data: after, error: null },
+        { error: null },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await PATCH(
+      makeRequest({ description: 'new' }) as never,
+      { params }
+    )
+    expect(res.status).toBe(200)
+  })
+})
+
+describe('DELETE /api/estimates/[id]/line-items/[itemId] — soft delete', () => {
+  it('returns 401 when no user', async () => {
+    const mock = makeSupabase({ user: null })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await DELETE(new Request('http://localhost/x', { method: 'DELETE' }) as never, { params })
+
+    expect(res.status).toBe(401)
+    expect(mock.client.from).not.toHaveBeenCalled()
+  })
+
+  it('returns 404 when the line item does not exist', async () => {
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [{ data: null, error: { message: 'no rows' } }],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await DELETE(new Request('http://localhost/x', { method: 'DELETE' }) as never, { params })
+
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: 'Line item not found' })
+  })
+
+  it('returns 400 on cross-estimate mismatch', async () => {
+    const otherEstimate = '99999999-9999-4999-8999-999999999999'
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: { id: ITEM_ID, trade_id: TRADE_ID, is_deleted: false }, error: null },
+        { data: { estimate_id: otherEstimate }, error: null },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await DELETE(new Request('http://localhost/x', { method: 'DELETE' }) as never, { params })
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Estimate mismatch' })
+  })
+
+  it('soft-deletes the row + writes audit row + returns 200', async () => {
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: { id: ITEM_ID, trade_id: TRADE_ID, is_deleted: false }, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+        { error: null }, // update
+        { error: null }, // audit insert
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await DELETE(new Request('http://localhost/x', { method: 'DELETE' }) as never, { params })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true })
+
+    const updateCall = mock.fromCalls[2]
+    expect(updateCall.table).toBe('estimate_line_items')
+    const patch = payloadOf(updateCall, 'update') as Record<string, unknown>
+    expect(patch).toEqual({ is_deleted: true })
+
+    const auditCall = mock.fromCalls[3]
+    expect(auditCall.table).toBe('estimate_overrides')
+    const auditPayload = payloadOf(auditCall, 'insert') as Record<string, unknown>
+    expect(auditPayload.field_name).toBe('is_deleted')
+    expect(auditPayload.old_value).toBe('false')
+    expect(auditPayload.new_value).toBe('true')
+  })
+
+  it('is idempotent — already-deleted row returns 200 with no update', async () => {
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: { id: ITEM_ID, trade_id: TRADE_ID, is_deleted: true }, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+
+    const res = await DELETE(new Request('http://localhost/x', { method: 'DELETE' }) as never, { params })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true })
+    // Only the 2 lookup calls — no update, no audit insert.
+    expect(mock.fromCalls).toHaveLength(2)
+  })
+
+  it('swallows audit insert failures without breaking the response', async () => {
+    const mock = makeSupabase({
+      user: USER,
+      fromResults: [
+        { data: { id: ITEM_ID, trade_id: TRADE_ID, is_deleted: false }, error: null },
+        { data: { estimate_id: ESTIMATE_ID }, error: null },
+        { error: null },
+        { error: { message: 'audit table broken' } },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(mock.client as never)
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = await DELETE(new Request('http://localhost/x', { method: 'DELETE' }) as never, { params })
+
+    expect(res.status).toBe(200)
+    expect(consoleSpy).toHaveBeenCalled()
+    consoleSpy.mockRestore()
   })
 })
