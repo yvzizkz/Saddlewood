@@ -48,7 +48,10 @@ export function NumericBottomSheet({
   const [raw, setRaw] = useState<string>(currentValue.toFixed(decimals))
 
   // Re-seed the input whenever the sheet opens with a fresh item/value.
+  // setState-in-effect is the simplest way to express "reset draft on
+  // open"; same pattern as BottomSheetEditor.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isOpen) setRaw(currentValue.toFixed(decimals))
   }, [isOpen, currentValue, decimals])
 
