@@ -1,40 +1,29 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { listEstimatesForDashboard } from '@/lib/estimates/queries'
+import { EstimateList } from '@/components/dashboard/EstimateList'
 
-export default async function InternalDashboard() {
-  const supabase = await createClient();
+interface DashboardPageProps {
+  searchParams: Promise<{ tab?: string }>
+}
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+export default async function DashboardPage({
+  searchParams,
+}: DashboardPageProps) {
+  const { tab } = await searchParams
+  const activeTab: 'pending' | 'all' = tab === 'all' ? 'all' : 'pending'
 
-  if (!user || error) {
-    redirect("/login");
-  }
-
-  const displayName =
-    user.email === "marco@saddlewoodcontracting.com" ? "Marco" : user.email;
+  // Auth is enforced by the (portal)/internal layout, so we can hit the
+  // query directly without re-checking the session here.
+  const estimates = await listEstimatesForDashboard()
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ backgroundColor: "var(--color-background)" }}
-    >
-      <div className="max-w-lg w-full text-center">
-        <h1
-          className="text-3xl mb-4"
-          style={{
-            fontFamily: "var(--font-fraunces)",
-            color: "var(--color-charcoal)",
-          }}
-        >
-          Welcome, {displayName}
-        </h1>
-        <p style={{ color: "var(--color-charcoal)", opacity: 0.7 }}>
-          Estimates will appear here once the pipeline is connected.
-        </p>
-      </div>
+    <div className="px-4 pt-6 md:px-8 md:pt-10 max-w-3xl mx-auto">
+      <h1
+        style={{ fontFamily: 'var(--font-fraunces)' }}
+        className="text-3xl mb-6 text-[var(--color-charcoal)]"
+      >
+        Estimates
+      </h1>
+      <EstimateList estimates={estimates} activeTab={activeTab} />
     </div>
-  );
+  )
 }
