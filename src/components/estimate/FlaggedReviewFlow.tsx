@@ -43,6 +43,16 @@ export function FlaggedReviewFlow({ isOpen, onClose }: FlaggedReviewFlowProps) {
     }
   }, [isOpen, total, flagReviewComplete, onClose])
 
+  // Esc-to-close for keyboard-only users.
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
+
   if (!isOpen || !current) return null
 
   function handleSkip() {

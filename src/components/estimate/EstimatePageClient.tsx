@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useLayoutEffect } from 'react'
+import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useEstimateStore } from '@/store/estimateStore'
 import type { EstimateBundle } from '@/lib/estimates/types'
@@ -30,9 +30,9 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
   )
   const job = useEstimateStore((s) => s.job)
 
-  // useLayoutEffect (not useEffect) so the store is populated before the
-  // first paint — avoids a flash of the empty-state skeleton.
-  useLayoutEffect(() => {
+  // useEffect rather than useLayoutEffect: pre-hydration skeleton already
+  // prevents flash, and useLayoutEffect produces an SSR warning.
+  useEffect(() => {
     hydrate(bundle)
     // We deliberately depend on bundle.estimate.id (and hydrate) rather than
     // the whole bundle, so re-renders with the same estimate don't re-hydrate.
