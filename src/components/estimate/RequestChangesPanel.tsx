@@ -30,15 +30,15 @@ export function RequestChangesPanel() {
     }
   }, [requestChangesOpen])
 
-  // Esc closes the sheet.
+  // Esc closes the sheet (only when not mid-submit).
   useEffect(() => {
     if (!requestChangesOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRequestChanges()
+      if (e.key === 'Escape' && !submitting) closeRequestChanges()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [requestChangesOpen, closeRequestChanges])
+  }, [requestChangesOpen, closeRequestChanges, submitting])
 
   if (!shouldRender || !estimateId) return null
 

@@ -17,11 +17,8 @@ interface EstimatePageClientProps {
 
 /**
  * Top-level client wrapper for the estimate review page. Hydrates the Zustand
- * store from the server-fetched bundle and renders the page structure.
- *
- * Bottom sheet editor, request-changes panel, and approve modal are Task 8 —
- * the store actions exist and are wired through child components, but the
- * visual surfaces aren't rendered yet.
+ * store from the server-fetched bundle and renders the page structure,
+ * including the bottom sheet editor, request-changes panel, and approve modal.
  */
 export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
   const hydrate = useEstimateStore((s) => s.hydrate)
