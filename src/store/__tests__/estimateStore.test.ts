@@ -256,6 +256,23 @@ describe('estimateStore.updateLineItem', () => {
 
     expect(useEstimateStore.getState().dirtyItemIds.has('li-1')).toBe(true)
   })
+
+  it('sets is_manual_override=true so the yellow override decoration appears immediately', () => {
+    const bundle = makeBundle({
+      line_items: [
+        makeLineItem({
+          id: 'li-1',
+          trade_id: 't-1',
+          is_manual_override: false,
+        }),
+      ],
+    })
+    useEstimateStore.getState().hydrate(bundle)
+    expect(useEstimateStore.getState().lineItems['li-1'].is_manual_override).toBe(false)
+
+    useEstimateStore.getState().updateLineItem('li-1', { quantity: 99 })
+    expect(useEstimateStore.getState().lineItems['li-1'].is_manual_override).toBe(true)
+  })
 })
 
 describe('estimateStore.markSaved / markError', () => {

@@ -267,6 +267,11 @@ export const useEstimateStore = create<EstimateStore>()(
           const item = s.lineItems[id]
           if (!item) return
           Object.assign(item, patch)
+          // Force is_manual_override true on every edit so the yellow
+          // override decoration appears immediately (the PATCH API does
+          // the same server-side; this keeps local state aligned without
+          // waiting for a re-hydrate).
+          item.is_manual_override = true
           // Recompute total: qty × (material + labor) — mirrors DB generated column
           item.total =
             item.quantity * (item.material_unit_cost + item.labor_unit_cost)

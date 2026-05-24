@@ -164,6 +164,29 @@ describe('flushDirty', () => {
     expect(fetchFn).toHaveBeenCalledTimes(1)
   })
 
+  it('silently skips temp-prefixed ids without firing PATCH', async () => {
+    // Optimistically-added rows live in the dirty set under a temp- id until
+    // the POST returns. PATCHing them would 404 and pin status to 'error'.
+    const items: Record<string, LineItem> = {
+      'temp-1779587903958-1': makeLineItem({ id: 'temp-1779587903958-1' }),
+      'real-id': makeLineItem({ id: 'real-id' }),
+    }
+    const fetchFn = makeFetchOk()
+
+    const result = await flushDirty({
+      estimateId: 'e-1',
+      ids: ['temp-1779587903958-1', 'real-id'],
+      getCurrentItem: (id) => items[id],
+      fetchFn,
+    })
+
+    expect(result.cleanIds).toEqual(['real-id'])
+    expect(result.failedIds).toEqual([])
+    expect(fetchFn).toHaveBeenCalledTimes(1)
+    const call = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(call[0]).toBe('/api/estimates/e-1/line-items/real-id')
+  })
+
   it('partial mid-save edits: clean the unchanged item, leave the changed one dirty', async () => {
     const snapshots: Record<string, LineItem> = {
       'li-1': makeLineItem({ id: 'li-1', quantity: 10 }),

@@ -56,6 +56,9 @@ function snapshotsEqual(a: EditableSnapshot, b: EditableSnapshot): boolean {
  *
  * "Clean" means the PATCH succeeded AND the item's value at flush completion
  * still equals the snapshot we sent. Items edited mid-PATCH stay dirty.
+ *
+ * Temp-prefixed ids are silently skipped: they belong to optimistically-
+ * added rows whose POST hasn't returned yet, so PATCHing them would 404.
  */
 export async function flushDirty(opts: {
   estimateId: string
@@ -69,9 +72,12 @@ export async function flushDirty(opts: {
     return { cleanIds: [], failedIds: [] }
   }
 
-  // Snapshot before PATCH.
+  // Snapshot before PATCH. Skip temp-prefixed ids — they don't exist
+  // server-side yet, so they'd 404 and pin the status to 'error' for the
+  // entire window of the optimistic add.
   const snapshots = new Map<string, EditableSnapshot>()
   for (const id of opts.ids) {
+    if (id.startsWith('temp-')) continue
     const item = opts.getCurrentItem(id)
     if (item) snapshots.set(id, snapshotEditableFields(item))
   }
@@ -175,8 +181,12 @@ export function useAutosave({
   )
 
   // Schedule / reschedule per-item timers as items change.
+  // Temp-prefixed ids belong to optimistically-added rows whose POST hasn't
+  // returned yet — PATCHing them would 404. They'll get picked up after
+  // replaceLineItemId migrates the dirty membership to the real server id.
   useEffect(() => {
     for (const id of dirtyItemIds) {
+      if (id.startsWith('temp-')) continue
       const current = lineItems[id]
       const prev = prevLineItemsRef.current[id]
       if (current && current !== prev) {
@@ -203,7 +213,9 @@ export function useAutosave({
   }, [])
 
   const triggerSave = useCallback(() => {
-    const ids = Array.from(useEstimateStore.getState().dirtyItemIds)
+    const ids = Array.from(useEstimateStore.getState().dirtyItemIds).filter(
+      (id) => !id.startsWith('temp-')
+    )
     for (const t of timersRef.current.values()) clearTimeout(t)
     timersRef.current.clear()
     if (ids.length > 0) void runFlush(ids)
