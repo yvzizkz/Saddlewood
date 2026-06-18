@@ -43,6 +43,10 @@ export function JsonLd() {
         name: "Pinnacle Peak Country Club, Scottsdale, AZ 85255",
       },
       {
+        "@type": "Place",
+        name: "Paradise Valley, AZ 85253",
+      },
+      {
         "@type": "City",
         name: "Scottsdale",
         containedInPlace: {
@@ -100,12 +104,6 @@ export function JsonLd() {
     sameAs: [
       // Add social profiles here when available
     ],
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "5",
-      reviewCount: "47",
-      bestRating: "5",
-    },
   };
 
   const serviceSchema = {
