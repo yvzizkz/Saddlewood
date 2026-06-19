@@ -8,7 +8,10 @@ import { Resend } from "resend";
  * through up to two independent channels and only reports success if at least
  * one of them actually succeeds:
  *
- *   1. GoHighLevel  — primary CRM delivery (webhook, or direct API as fallback).
+ *   1. GoHighLevel  — primary CRM delivery via the Contacts upsert API, which is
+ *      the only path that maps the FULL lead (project message → custom field,
+ *      plus source + tags) onto the contact. Falls back to the inbound webhook
+ *      if the API isn't configured or fails.
  *   2. Resend email — defense-in-depth notification to the team inbox, sent
  *      whenever RESEND_API_KEY is configured, even if GHL also succeeds.
  *
@@ -17,9 +20,14 @@ import { Resend } from "resend";
  * to call instead) rather than seeing a false "sent" confirmation.
  *
  * SETUP (Vercel env vars):
- *   GHL_WEBHOOK_URL   — Inbound Webhook URL from a GoHighLevel workflow (primary).
- *   GHL_API_KEY       — (optional) direct API key, used only if no webhook URL.
- *   GHL_LOCATION_ID   — (optional) required alongside GHL_API_KEY.
+ *   GHL_API_KEY       — GHL Private Integration token (pit-…). Enables the
+ *                       primary full-mapping upsert. Needs Contacts read+write.
+ *   GHL_LOCATION_ID   — the Saddlewood sub-account location id (required with
+ *                       GHL_API_KEY).
+ *   GHL_CF_VISION_ID  — (optional) custom-field id the project message maps to.
+ *                       Defaults to the "Tell Us About Your Vision" field.
+ *   GHL_WEBHOOK_URL   — Inbound Webhook URL; used as a FALLBACK only (it does not
+ *                       map the message/custom fields on its own).
  *   RESEND_API_KEY    — enables the fail-safe email. Requires a verified sender
  *                       domain in Resend (see FROM below).
  */
@@ -27,6 +35,10 @@ import { Resend } from "resend";
 const GHL_WEBHOOK_URL = process.env.GHL_WEBHOOK_URL || "";
 const GHL_API_KEY = process.env.GHL_API_KEY || "";
 const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || "";
+// Custom-field id for the free-text project message ("Tell Us About Your Vision",
+// LARGE_TEXT). GHL custom fields are written by id, not key. Overridable via env.
+const GHL_CF_VISION_ID =
+  process.env.GHL_CF_VISION_ID || "bPd6r0bYyAKBbrn2wXVn";
 
 // Team inbox for lead notifications. `info@` is the canonical address used
 // across the site. The FROM address must live on a domain VERIFIED in Resend.
@@ -170,42 +182,53 @@ async function forwardToGhlWebhook(body: ContactBody): Promise<boolean> {
 }
 
 /**
- * Create the contact directly via the GHL API. Used only when no webhook URL is
- * configured but an API key + location ID are. Returns true only on success.
+ * Upsert the contact directly via the GHL Contacts API — the PRIMARY CRM path.
+ * Unlike the inbound webhook, this maps the full lead: the free-text project
+ * message lands in the "Tell Us About Your Vision" custom field, and source +
+ * tags (which carry the project type and neighborhood) are set on the contact.
+ * Upsert dedupes by email/phone within the location, so re-submits update the
+ * same contact instead of creating duplicates. No-ops (false) without creds.
+ *
+ * Note: custom fields must be written by id (keys are silently ignored by the
+ * API). project_type and neighborhood are already carried as tags by the client,
+ * so they are captured without a brittle write to GHL's single-option dropdowns.
  */
-async function forwardToGhlApi(body: ContactBody): Promise<boolean> {
+async function upsertToGhl(body: ContactBody): Promise<boolean> {
   if (!GHL_API_KEY || !GHL_LOCATION_ID) return false;
   try {
-    const res = await fetch("https://services.leadconnectorhq.com/contacts/", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GHL_API_KEY}`,
-        "Content-Type": "application/json",
-        Version: "2021-07-28",
-      },
-      body: JSON.stringify({
-        firstName: body.firstName,
-        lastName: body.lastName,
-        email: body.email,
-        phone: body.phone,
-        locationId: GHL_LOCATION_ID,
-        source: body.source || "Website Contact Form",
-        tags: body.tags || ["website-lead"],
-        customFields: [
-          { key: "neighborhood", field_value: body.neighborhood },
-          { key: "project_type", field_value: body.projectType },
-          { key: "project_description", field_value: body.message },
-        ],
-      }),
-    });
+    const customFields = body.message
+      ? [{ id: GHL_CF_VISION_ID, field_value: body.message }]
+      : [];
+    const res = await fetch(
+      "https://services.leadconnectorhq.com/contacts/upsert",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${GHL_API_KEY}`,
+          "Content-Type": "application/json",
+          Version: "2021-07-28",
+        },
+        body: JSON.stringify({
+          locationId: GHL_LOCATION_ID,
+          firstName: body.firstName,
+          lastName: body.lastName,
+          name: body.name,
+          email: body.email,
+          phone: body.phone,
+          source: body.source || "Website Contact Form",
+          tags: body.tags?.length ? body.tags : ["website-lead"],
+          customFields,
+        }),
+      }
+    );
     if (!res.ok) {
       const errorBody = await res.text();
-      console.error("[GHL API error]", res.status, errorBody);
+      console.error("[GHL upsert error]", res.status, errorBody);
       return false;
     }
     return true;
   } catch (err) {
-    console.error("[GHL API error]", err);
+    console.error("[GHL upsert error]", err);
     return false;
   }
 }
@@ -235,17 +258,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // Deliver to GHL (webhook preferred, API as fallback) AND always email the
-  // team via Resend when configured. Run in parallel; each fails soft.
-  const [ghlWebhookOk, resendOk] = await Promise.all([
-    forwardToGhlWebhook(body),
+  // Deliver to GHL (direct upsert preferred — it maps the full lead — with the
+  // inbound webhook as fallback) AND always email the team via Resend when
+  // configured. Upsert + email run in parallel; each fails soft.
+  const [ghlApiOk, resendOk] = await Promise.all([
+    upsertToGhl(body),
     sendEmail(body),
   ]);
 
-  // Only try the direct API path if the webhook wasn't configured/didn't fire.
-  const ghlApiOk = ghlWebhookOk ? false : await forwardToGhlApi(body);
+  // Only forward to the webhook if the direct upsert wasn't configured/didn't fire.
+  const ghlWebhookOk = ghlApiOk ? false : await forwardToGhlWebhook(body);
 
-  const delivered = ghlWebhookOk || ghlApiOk || resendOk;
+  const delivered = ghlApiOk || ghlWebhookOk || resendOk;
 
   if (!delivered) {
     // Nothing accepted the lead — never report success. Log the full payload
