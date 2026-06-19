@@ -1,7 +1,7 @@
 import { PageHero } from "@/components/PageHero";
 
 export const metadata = {
-  title: "Privacy Policy | Saddlewood Contracting",
+  title: { absolute: "Privacy Policy | Saddlewood Contracting" },
   description:
     "Privacy Policy for Saddlewood Contracting LLC — how we collect, use, and protect your personal information.",
   alternates: { canonical: "/privacy" },
