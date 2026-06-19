@@ -2,7 +2,7 @@ import { ContactForm } from "@/components/ContactForm";
 import { PageHero } from "@/components/PageHero";
 
 export const metadata = {
-  title: "Free Remodeling Consultation in Scottsdale | Contact Saddlewood",
+  title: { absolute: "Free Remodeling Consultation in Scottsdale | Contact Saddlewood" },
   description:
     "Schedule your free, no-obligation design consultation with Scottsdale's trusted remodeling contractor. Serving McCormick Ranch, Gainey Ranch, and Pinnacle Peak. Call (480) 999-6100.",
   alternates: { canonical: "/contact" },

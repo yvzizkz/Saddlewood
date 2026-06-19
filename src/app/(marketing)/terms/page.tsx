@@ -1,7 +1,7 @@
 import { PageHero } from "@/components/PageHero";
 
 export const metadata = {
-  title: "Terms of Service | Saddlewood Contracting",
+  title: { absolute: "Terms of Service | Saddlewood Contracting" },
   description:
     "Terms of Service for Saddlewood Contracting LLC — home remodeling services in Scottsdale, AZ.",
   alternates: { canonical: "/terms" },

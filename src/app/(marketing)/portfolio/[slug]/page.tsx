@@ -21,13 +21,13 @@ export async function generateMetadata({
 
   if (!project) {
     return {
-      title: "Project Not Found — Saddlewood Contracting",
+      title: { absolute: "Project Not Found — Saddlewood Contracting" },
       description: "The project you're looking for could not be found.",
     };
   }
 
   return {
-    title: `${project.title} — Saddlewood Contracting`,
+    title: { absolute: `${project.title} — Saddlewood Contracting` },
     description: project.description,
     alternates: { canonical: `/portfolio/${project.slug}` },
   };

@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { JsonLd } from "@/components/JsonLd";
+import { StickyMobileBar } from "@/components/StickyMobileBar";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -88,6 +89,7 @@ export default function MarketingLayout({
       <Navbar />
       <main id="main-content">{children}</main>
       <Footer />
+      <StickyMobileBar />
       <Script
         src="https://widgets.leadconnectorhq.com/loader.js"
         data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js"

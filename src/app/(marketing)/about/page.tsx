@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import AboutContent from "./AboutContent";
 
 export const metadata: Metadata = {
-  title: "About Saddlewood Contracting | Scottsdale's In-House Remodeling Team",
+  title: { absolute: "About Saddlewood Contracting | Scottsdale's In-House Remodeling Team" },
   description:
     "Meet Saddlewood Contracting — Scottsdale remodeler with 4 ROC licenses (General, HVAC, Electrical, Plumbing) and in-house crews. No subcontractor coordination.",
   alternates: {
