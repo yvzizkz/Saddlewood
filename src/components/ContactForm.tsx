@@ -4,8 +4,6 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Phone, Mail, MapPin, Clock, Loader2 } from "lucide-react";
 
-const GHL_WEBHOOK_URL = process.env.NEXT_PUBLIC_GHL_WEBHOOK_URL || "";
-
 export function ContactForm() {
   const [formData, setFormData] = useState({
     name: "",
@@ -15,6 +13,8 @@ export function ContactForm() {
     projectType: "",
     message: "",
     consent: false,
+    // Honeypot — must stay empty. A bot that fills this is dropped server-side.
+    company: "",
   });
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
@@ -37,31 +37,23 @@ export function ContactForm() {
       // Source tracking
       source: "Website Contact Form",
       tags: ["website-lead", formData.projectType, formData.neighborhood].filter(Boolean),
+      // Honeypot — bots fill this; humans never see it.
+      company: formData.company,
     };
 
     try {
-      if (GHL_WEBHOOK_URL) {
-        // Send to GoHighLevel webhook
-        const response = await fetch(GHL_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+      // Always submit through our server route. It delivers the lead to
+      // GoHighLevel (and emails the team as a fail-safe) and only reports
+      // success if a channel actually accepted it. The webhook URL stays
+      // server-side and never ships in client JS.
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-        if (!response.ok) {
-          throw new Error(`GoHighLevel webhook failed: ${response.status}`);
-        }
-      } else {
-        // Fallback: send to our API route which handles GHL integration
-        const response = await fetch("/api/contact", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          throw new Error("Form submission failed");
-        }
+      if (!response.ok) {
+        throw new Error("Form submission failed");
       }
 
       setStatus("success");
@@ -73,6 +65,7 @@ export function ContactForm() {
         projectType: "",
         message: "",
         consent: false,
+        company: "",
       });
     } catch {
       console.error("Form submission error");
@@ -119,6 +112,26 @@ export function ContactForm() {
                 </motion.div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-6" aria-label="Contact form">
+                  {/* Honeypot — positioned off-screen so humans never see or tab to
+                      it, but bots that auto-fill every field will trip it. The
+                      server route silently drops any submission where this is set. */}
+                  <div
+                    aria-hidden="true"
+                    style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }}
+                  >
+                    <label htmlFor="contact-company">Company (leave this field empty)</label>
+                    <input
+                      id="contact-company"
+                      type="text"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={formData.company}
+                      onChange={(e) =>
+                        setFormData({ ...formData, company: e.target.value })
+                      }
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                       <label htmlFor="contact-name" className="block text-sm text-charcoal-light font-light mb-3">
