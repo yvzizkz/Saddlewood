@@ -73,9 +73,8 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  alternates: {
-    canonical: siteUrl,
-  },
+  // No blanket canonical here — each page sets its own self-canonical via its
+  // metadata.alternates.canonical so it doesn't inherit the homepage URL.
 };
 
 export default function MarketingLayout({
