@@ -129,4 +129,24 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
       },
     ],
   },
+  "arcadia": {
+    slug: "arcadia",
+    name: "Arcadia",
+    fullName: "Arcadia",
+    zip: "85251",
+    tagline: "Elevating Arcadia Homes with Thoughtful, Trusted Remodeling",
+    heroImage: "/images/arcadia-hero.jpg",
+    description: [
+      "Arcadia, with its verdant landscapes and distinctive architecture, embodies a timeless Scottsdale elegance. Homeowners here appreciate a blend of cherished heritage and contemporary comfort, seeking thoughtful remodels that enhance their lifestyle while honoring the neighborhood's unique character. Transforming your home in Arcadia means respecting its legacy while introducing modern luxury and seamless indoor-outdoor living.",
+      "Saddlewood Contracting understands the discerning tastes of Arcadia homeowners. We bring a refined approach to luxury kitchen remodels, spa-grade bathrooms, and whole-home renovations, ensuring every detail reflects your vision. Our design-build process emphasizes clear communication, meticulous planning, and a commitment to completing your project on time and on budget, minimizing disruption to your daily life.",
+      "For homeowners in Arcadia, the complexity of a remodel is simplified with Saddlewood Contracting. Our unique advantage lies in holding four Arizona ROC licenses – General Contractor, Electrical, HVAC, and Plumbing. This means all critical trades are in-house, ensuring superior craftsmanship, seamless project coordination, and unparalleled quality control from concept to completion for your Arcadia residence.",
+    ],
+    features: [
+      "Expert integration of classic Arcadia architecture with modern luxury.",
+      "Crafting seamless indoor-outdoor living spaces for the Arizona lifestyle.",
+      "Thoughtful design and material selection for enduring elegance.",
+      "Streamlined whole-home renovations respecting your property's character.",
+    ],
+    testimonials: [],
+  },
 };
