@@ -47,6 +47,22 @@ export function JsonLd() {
         name: "Paradise Valley, AZ 85253",
       },
       {
+        "@type": "Place",
+        name: "Silverleaf, Scottsdale, AZ 85255",
+      },
+      {
+        "@type": "Place",
+        name: "DC Ranch, Scottsdale, AZ 85255",
+      },
+      {
+        "@type": "Place",
+        name: "Grayhawk, Scottsdale, AZ 85255",
+      },
+      {
+        "@type": "Place",
+        name: "Arcadia, Scottsdale, AZ 85251",
+      },
+      {
         "@type": "City",
         name: "Scottsdale",
         containedInPlace: {
