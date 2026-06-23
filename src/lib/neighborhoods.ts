@@ -129,4 +129,24 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
       },
     ],
   },
+  "silverleaf": {
+    slug: "silverleaf",
+    name: "Silverleaf",
+    fullName: "Silverleaf",
+    zip: "85255",
+    tagline: "Elevating Silverleaf Homes with Refined Craftsmanship",
+    heroImage: "/images/silverleaf-hero.jpg",
+    description: [
+      "Nestled against the McDowell Mountains, Silverleaf embodies a distinct Scottsdale elegance, characterized by its stunning Desert Contemporary, Spanish Colonial, and Mediterranean architecture. Homeowners in this esteemed 85255 community value privacy, exceptional design, and a seamless integration of luxury with natural beauty. Remodeling in Silverleaf demands a contractor who understands this unique aesthetic, ensuring every enhancement respects and elevates the property's inherent sophistication and value.",
+      "Saddlewood Contracting brings a deeply rooted understanding of Scottsdale's luxury living to every project. We approach each Silverleaf remodel with a warm, confident professionalism, much like a trusted neighbor. Our focus is on collaborative design-build, ensuring your vision for a transformed kitchen, spa-grade bathroom, or whole-home renovation is realized with meticulous attention to detail, clear communication, and a commitment to completing your project on time and on budget.",
+      "For Silverleaf homeowners, the advantage of Saddlewood Contracting lies in our comprehensive, in-house capabilities. With four Arizona ROC licenses – General Contractor, Electrical, HVAC, and Plumbing – all trades are managed by our skilled team. This integrated approach ensures a cohesive process, superior quality control, and a singular point of accountability, providing peace of mind as your exquisite Silverleaf residence is transformed. Expect nothing less than precision and unparalleled service.",
+    ],
+    features: [
+      "Expertise in Silverleaf's Distinct Architectural Styles",
+      "Seamless Integration of Luxury Finishes and Materials",
+      "Comprehensive Design-Build for High-End Renovations",
+      "Dedicated Project Management for Elegant Transformations",
+    ],
+    testimonials: [],
+  },
 };
