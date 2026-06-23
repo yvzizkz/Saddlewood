@@ -129,4 +129,24 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
       },
     ],
   },
+  "grayhawk": {
+    slug: "grayhawk",
+    name: "Grayhawk",
+    fullName: "Grayhawk",
+    zip: "85255",
+    tagline: "Elevating Grayhawk Homes with Thoughtful, Skilled Remodeling",
+    heroImage: "/images/grayhawk-hero.jpg",
+    description: [
+      "Nestled within Scottsdale’s vibrant 85255 zip code, Grayhawk offers a distinct blend of desert elegance and active community living. Its homes, often reflecting sophisticated Southwest and contemporary architectural styles, are designed for both comfort and connection to the stunning Arizona landscape. Remodeling in Grayhawk presents an opportunity to refine these residences, enhancing their inherent beauty and functionality to perfectly suit your lifestyle and the community's refined aesthetic.",
+      "Saddlewood Contracting brings a deep understanding of Scottsdale's luxury home market and a commitment to exceptional craftsmanship to every project. We recognize that entrusting your home to a remodeler requires confidence, which is why our approach emphasizes clear communication, meticulous planning, and a respect for your daily life. Homeowners in Grayhawk can expect a remodeling experience that is as seamless as it is transformative, guided by a team dedicated to delivering your vision with precision and care.",
+      "Our unique advantage for Grayhawk homeowners lies in our comprehensive in-house capabilities. Holding four Arizona ROC licenses—General Contractor, Electrical, HVAC, and Plumbing—Saddlewood ensures every aspect of your luxury kitchen, spa-grade bathroom, or whole-home renovation is expertly managed by our skilled team. This integrated approach means superior quality control, streamlined scheduling, and a single point of accountability, providing unparalleled peace of mind throughout your remodel in Grayhawk.",
+    ],
+    features: [
+      "Seamless integration of luxury kitchen and bath designs.",
+      "Expert whole-home renovations tailored to Grayhawk's aesthetic.",
+      "Dedicated craftsmanship for enhancing indoor-outdoor living.",
+      "Transparent communication and meticulous project management.",
+    ],
+    testimonials: [],
+  },
 };

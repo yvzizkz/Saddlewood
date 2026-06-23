@@ -47,6 +47,10 @@ export function JsonLd() {
         name: "Paradise Valley, AZ 85253",
       },
       {
+        "@type": "Place",
+        name: "Grayhawk, Scottsdale, AZ 85255",
+      },
+      {
         "@type": "City",
         name: "Scottsdale",
         containedInPlace: {
