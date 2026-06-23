@@ -129,4 +129,24 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
       },
     ],
   },
+  "dc-ranch": {
+    slug: "dc-ranch",
+    name: "DC Ranch",
+    fullName: "DC Ranch",
+    zip: "85255",
+    tagline: "Refining DC Ranch Homes with Thoughtful Design-Build Remodels",
+    heroImage: "/images/dc-ranch-hero.jpg",
+    description: [
+      "DC Ranch, with its distinctive Sonoran Desert architecture and vibrant community spirit, embodies a refined Scottsdale lifestyle. Homeowners here appreciate design that harmonizes with the stunning natural landscape while offering modern comfort and luxury. Remodeling in this esteemed community means enhancing a home's inherent character, often focusing on seamless indoor-outdoor living and sophisticated, enduring aesthetics.",
+      "Saddlewood Contracting understands this unique balance. We bring a warm, confident approach to every remodel, treating your home with the care and respect it deserves. Our design-build process is crafted to be a reassuring experience, emphasizing clear communication, meticulous planning, and a commitment to maintaining a clean, organized worksite. Homeowners in DC Ranch can expect a partner dedicated to transforming their vision into a beautifully crafted reality, on time and on budget.",
+      "Our comprehensive in-house capabilities distinguish us, ensuring a streamlined and superior remodeling journey. As an Arizona licensed General Contractor, Electrical, HVAC, and Plumbing provider, Saddlewood Contracting offers an integrated approach where every detail is managed by our own skilled tradespeople. This means greater efficiency, unwavering quality control, and a singular point of accountability for your luxury kitchen, spa-grade bathroom, whole-home renovation, or outdoor living space in DC Ranch.",
+    ],
+    features: [
+      "Integrating desert-modern aesthetics specific to DC Ranch.",
+      "Crafting elegant indoor-outdoor living spaces.",
+      "Expert selection of sophisticated, durable materials.",
+      "Seamless project coordination with in-house trades.",
+    ],
+    testimonials: [],
+  },
 };
