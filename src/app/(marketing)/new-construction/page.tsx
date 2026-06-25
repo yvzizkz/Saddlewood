@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { PageHero } from "@/components/PageHero";
 import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
@@ -122,6 +123,55 @@ export default function NewConstructionPage() {
             <p>
               By keeping the structure in-house and managing all four critical trades (general, electrical, plumbing, and HVAC) under our own licenses, we eliminate scheduling gaps, reduce miscommunications, and maintain uncompromising quality from the day we break ground.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* On Site Now — Steel Construction Project */}
+      <section className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-t border-b border-stone-mid/20">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="h-px w-8 bg-gold" />
+            <span className="section-label">On Site Now</span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+            <div className="lg:col-span-5">
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2 mb-6">
+                Currently breaking ground in Paradise Valley.
+              </h2>
+              <p className="text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base mb-6">
+                We are currently self-performing the structural phase on an active custom estate in Paradise Valley. The steel skeleton is going up now, setting a precise foundation for the home&apos;s framing.
+              </p>
+              <p className="text-charcoal-light/80 font-light leading-relaxed text-sm">
+                <em>Note: This is an active, in-progress steel-frame build. The demolition-to-finish sequence shown below highlights a separate, completed wood-framed home (our 40th Street project) to demonstrate the complete lifecycle of our construction process.</em>
+              </p>
+            </div>
+            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="group">
+                <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
+                  <Image
+                    src="/images/pv-newbuild-steel-frame.jpg"
+                    alt="Steel skeleton erected on the foundation of a Paradise Valley new build"
+                    fill
+                    sizes="(min-width: 1024px) 35vw, 100vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                </div>
+                <p className="text-charcoal-light text-xs font-light">The steel skeleton erected on the foundation.</p>
+              </div>
+              <div className="group">
+                <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
+                  <Image
+                    src="/images/pv-newbuild-steel-joists.jpg"
+                    alt="Stacked galvanized structural steel members staged on site"
+                    fill
+                    sizes="(min-width: 1024px) 35vw, 100vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                </div>
+                <p className="text-charcoal-light text-xs font-light">Galvanized structural steel staged on site before erection.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

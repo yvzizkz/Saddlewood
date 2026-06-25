@@ -8,7 +8,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracti
 export const metadata = {
   title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood",
   description:
-    "A licensed Arizona framing contractor (ROC #305762) self-performing structural wood framing, concrete slab to roof trusses, on schedule in Scottsdale and Paradise Valley.",
+    "A licensed Arizona framing contractor (ROC #305762) self-performing structural framing, concrete slab to roof trusses, on schedule in Scottsdale and Paradise Valley.",
   keywords: [
     "framing contractor scottsdale",
     "framing subcontractor arizona",
@@ -23,7 +23,7 @@ export const metadata = {
   openGraph: {
     title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood",
     description: "A licensed Arizona framing crew that self-performs — slab to trusses, on schedule.",
-    images: [{ url: "/images/pv-process-02-framing-ext.jpg", alt: "Structural home framing by Saddlewood Contracting" }],
+    images: [{ url: "/images/pv-newbuild-steel-aerial.jpg", alt: "Aerial view of structural steel framing on a ground-up custom home in Paradise Valley by Saddlewood Contracting" }],
   },
 };
 
@@ -34,9 +34,63 @@ export default function FramingPage() {
         label="Framing Subcontractor"
         title="A licensed AZ framing crew that self-performs."
         description="From slab to trusses, we deliver structural precision on schedule. The reliable framing partner for Scottsdale's premier builders."
-        image="/images/pv-process-02-framing-ext.jpg"
-        imageAlt="Exterior framing of a custom home in Paradise Valley by Saddlewood Contracting"
+        image="/images/pv-newbuild-steel-aerial.jpg"
+        imageAlt="Aerial view of structural steel framing on a ground-up custom home in Paradise Valley by Saddlewood Contracting"
       />
+
+      {/* On Site Now — Steel Framing Gallery */}
+      <section className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-b border-stone-mid/20">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="h-px w-8 bg-gold" />
+            <span className="section-label">On Site Now</span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start mb-12">
+            <div className="lg:col-span-6">
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2 mb-6">
+                Structural steel, ground-up — Paradise Valley.
+              </h2>
+            </div>
+            <div className="lg:col-span-6">
+              <p className="text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base">
+                An active ground-up build we are self-performing; the structural steel skeleton is currently going up. This project is in its framing stage and demonstrates our team&apos;s capacity for complex custom home engineering.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                src: "/images/pv-newbuild-steel-aerial.jpg",
+                alt: "Aerial of structural steel roof framing on a Paradise Valley custom home build",
+                caption: "Structural steel framing taking shape over a new Paradise Valley estate."
+              },
+              {
+                src: "/images/pv-newbuild-steel-frame.jpg",
+                alt: "Steel skeleton erected on the foundation of a Paradise Valley new build",
+                caption: "The steel skeleton set on the foundation — self-performed, ground-up."
+              },
+              {
+                src: "/images/pv-newbuild-steel-joists.jpg",
+                alt: "Stacked galvanized structural steel members staged on site",
+                caption: "Galvanized structural steel staged on site before erection."
+              }
+            ].map((img, idx) => (
+              <div key={idx} className="group">
+                <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-4">
+                  <Image
+                    src={img.src}
+                    alt={img.alt}
+                    fill
+                    sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                </div>
+                <p className="text-charcoal-light text-xs sm:text-sm font-light leading-relaxed">{img.caption}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* What We Frame */}
       <section className="bg-cream py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12">
@@ -84,12 +138,15 @@ export default function FramingPage() {
         <div className="max-w-[1200px] mx-auto">
           <div className="flex items-center gap-4 mb-8">
             <div className="h-px w-8 bg-gold" />
-            <span className="section-label">Proof in Pictures</span>
+            <span className="section-label">Completed Build</span>
           </div>
           <div className="mb-12">
             <h2 className="font-heading text-3xl sm:text-4xl lg:text-[40px] font-light text-charcoal leading-tight">
-              On-Site Structural Execution
+              Wood-Framed Process: Slab to Trusses
             </h2>
+            <p className="mt-4 text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base max-w-[720px]">
+              A retrospective look at a separate, completed 40th Street whole-home build. This wood-framed project demonstrates our structural execution and self-performed crew timeline from slab to roof trusses.
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
