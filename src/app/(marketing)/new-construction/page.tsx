@@ -4,6 +4,7 @@ import { PageHero } from "@/components/PageHero";
 import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
 import { getProjectBySlug } from "@/data/projects";
+import { VideoReel } from "@/components/VideoReel";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -146,30 +147,43 @@ export default function NewConstructionPage() {
                 <em>Note: This is an active, in-progress steel-frame build. The demolition-to-finish sequence shown below highlights a separate, completed wood-framed home (our 40th Street project) to demonstrate the complete lifecycle of our construction process.</em>
               </p>
             </div>
-            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="group">
-                <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
-                  <Image
-                    src="/images/pv-newbuild-steel-frame.jpg"
-                    alt="Steel skeleton erected on the foundation of a Paradise Valley new build"
-                    fill
-                    sizes="(min-width: 1024px) 35vw, 100vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                </div>
-                <p className="text-charcoal-light text-xs font-light">The steel skeleton erected on the foundation.</p>
+            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-12 gap-6 items-end">
+              <div className="sm:col-span-5 flex flex-col justify-end">
+                <VideoReel
+                  src="/videos/breaking-ground-steel-9x16.mp4"
+                  poster="/videos/breaking-ground-steel-9x16-poster.jpg"
+                  label="On-site footage of structural steel framing progress in Paradise Valley"
+                  aspect="9x16"
+                  mode="autoloop"
+                  className="mb-3"
+                />
+                <p className="text-charcoal-light text-xs font-light">On-site footage of the active Paradise Valley steel framing.</p>
               </div>
-              <div className="group">
-                <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
-                  <Image
-                    src="/images/pv-newbuild-steel-joists.jpg"
-                    alt="Stacked galvanized structural steel members staged on site"
-                    fill
-                    sizes="(min-width: 1024px) 35vw, 100vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
+              <div className="sm:col-span-7 flex flex-col gap-6">
+                <div className="group">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
+                    <Image
+                      src="/images/pv-newbuild-steel-frame.jpg"
+                      alt="Steel skeleton erected on the foundation of a Paradise Valley new build"
+                      fill
+                      sizes="(min-width: 1024px) 35vw, 100vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  </div>
+                  <p className="text-charcoal-light text-xs font-light">The steel skeleton erected on the foundation.</p>
                 </div>
-                <p className="text-charcoal-light text-xs font-light">Galvanized structural steel staged on site before erection.</p>
+                <div className="group">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
+                    <Image
+                      src="/images/pv-newbuild-steel-joists.jpg"
+                      alt="Stacked galvanized structural steel members staged on site"
+                      fill
+                      sizes="(min-width: 1024px) 35vw, 100vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  </div>
+                  <p className="text-charcoal-light text-xs font-light">Galvanized structural steel staged on site before erection.</p>
+                </div>
               </div>
             </div>
           </div>

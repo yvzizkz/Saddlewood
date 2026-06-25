@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { PageHero } from "@/components/PageHero";
 import { CTABanner } from "@/components/CTABanner";
+import { VideoReel } from "@/components/VideoReel";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -57,37 +58,50 @@ export default function FramingPage() {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                src: "/images/pv-newbuild-steel-aerial.jpg",
-                alt: "Aerial of structural steel roof framing on a Paradise Valley custom home build",
-                caption: "Structural steel framing taking shape over a new Paradise Valley estate."
-              },
-              {
-                src: "/images/pv-newbuild-steel-frame.jpg",
-                alt: "Steel skeleton erected on the foundation of a Paradise Valley new build",
-                caption: "The steel skeleton set on the foundation — self-performed, ground-up."
-              },
-              {
-                src: "/images/pv-newbuild-steel-joists.jpg",
-                alt: "Stacked galvanized structural steel members staged on site",
-                caption: "Galvanized structural steel staged on site before erection."
-              }
-            ].map((img, idx) => (
-              <div key={idx} className="group">
-                <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-4">
-                  <Image
-                    src={img.src}
-                    alt={img.alt}
-                    fill
-                    sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-3 flex flex-col justify-end">
+              <VideoReel
+                src="/videos/breaking-ground-steel-9x16.mp4"
+                poster="/videos/breaking-ground-steel-9x16-poster.jpg"
+                label="On-site footage of Paradise Valley custom home structural steel framing progress"
+                aspect="9x16"
+                mode="autoloop"
+                className="mb-4"
+              />
+              <p className="text-charcoal-light text-xs font-light">On-site footage of the active Paradise Valley steel framing.</p>
+            </div>
+            <div className="lg:col-span-9 grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {[
+                {
+                  src: "/images/pv-newbuild-steel-aerial.jpg",
+                  alt: "Aerial of structural steel roof framing on a Paradise Valley custom home build",
+                  caption: "Structural steel framing taking shape over a new Paradise Valley estate."
+                },
+                {
+                  src: "/images/pv-newbuild-steel-frame.jpg",
+                  alt: "Steel skeleton erected on the foundation of a Paradise Valley new build",
+                  caption: "The steel skeleton set on the foundation — self-performed, ground-up."
+                },
+                {
+                  src: "/images/pv-newbuild-steel-joists.jpg",
+                  alt: "Stacked galvanized structural steel members staged on site",
+                  caption: "Galvanized structural steel staged on site before erection."
+                }
+              ].map((img, idx) => (
+                <div key={idx} className="group">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-4">
+                    <Image
+                      src={img.src}
+                      alt={img.alt}
+                      fill
+                      sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 100vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  </div>
+                  <p className="text-charcoal-light text-xs sm:text-sm font-light leading-relaxed">{img.caption}</p>
                 </div>
-                <p className="text-charcoal-light text-xs sm:text-sm font-light leading-relaxed">{img.caption}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -148,59 +162,74 @@ export default function FramingPage() {
               A retrospective look at a separate, completed 40th Street whole-home build. This wood-framed project demonstrates our structural execution and self-performed crew timeline from slab to roof trusses.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                src: "/images/pv-process-01-slab.jpg",
-                alt: "Concrete foundation and slab preparation showing rebar grid",
-                title: "01 / Foundation & Slab",
-                caption: "Precision concrete work forming the structural footprint."
-              },
-              {
-                src: "/images/pv-process-02-framing-ext.jpg",
-                alt: "Exterior wood framing of custom home structure against blue sky",
-                title: "02 / Exterior Framing",
-                caption: "Heavier structural members and wall plates erected on slab."
-              },
-              {
-                src: "/images/pv-process-03-framing-int.jpg",
-                alt: "Interior wood studs framing rooms and hallways",
-                title: "03 / Interior Framing",
-                caption: "Room configurations and load-bearing partition walls."
-              },
-              {
-                src: "/images/pv-process-04-trusses.jpg",
-                alt: "Engineered roof trusses installed on top of framing",
-                title: "04 / Roof Trusses",
-                caption: "Complex engineered truss layout securing the roofline."
-              },
-              {
-                src: "/images/pv-process-05-crew.jpg",
-                alt: "Framing crew members working on top of structural framing",
-                title: "05 / In-House Crew",
-                caption: "Our dedicated framing carpenters on-site."
-              },
-              {
-                src: "/images/pv-process-00-demo.jpg",
-                alt: "Heavy machinery doing demolition and site preparation",
-                title: "06 / Demolition & Prep",
-                caption: "Clean site clearing before structural building begins."
-              }
-            ].map((img, idx) => (
-              <div key={idx} className="group">
-                <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-4">
-                  <Image
-                    src={img.src}
-                    alt={img.alt}
-                    fill
-                    sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-3 flex flex-col justify-end">
+              <VideoReel
+                src="/videos/process-timeline-9x16.mp4"
+                poster="/videos/process-timeline-9x16-poster.jpg"
+                label="Retrospective timeline of the completed 40th Street custom wood-frame whole-home build from foundation to finish"
+                aspect="9x16"
+                mode="clickToPlay"
+                className="mb-4"
+              />
+              <p className="text-charcoal-light text-xs font-light">
+                Process timeline showing the studs-to-finish lifecycle of the completed 40th Street wood build.
+              </p>
+            </div>
+            <div className="lg:col-span-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                {
+                  src: "/images/pv-process-01-slab.jpg",
+                  alt: "Concrete foundation and slab preparation showing rebar grid",
+                  title: "01 / Foundation & Slab",
+                  caption: "Precision concrete work forming the structural footprint."
+                },
+                {
+                  src: "/images/pv-process-02-framing-ext.jpg",
+                  alt: "Exterior wood framing of custom home structure against blue sky",
+                  title: "02 / Exterior Framing",
+                  caption: "Heavier structural members and wall plates erected on slab."
+                },
+                {
+                  src: "/images/pv-process-03-framing-int.jpg",
+                  alt: "Interior wood studs framing rooms and hallways",
+                  title: "03 / Interior Framing",
+                  caption: "Room configurations and load-bearing partition walls."
+                },
+                {
+                  src: "/images/pv-process-04-trusses.jpg",
+                  alt: "Engineered roof trusses installed on top of framing",
+                  title: "04 / Roof Trusses",
+                  caption: "Complex engineered truss layout securing the roofline."
+                },
+                {
+                  src: "/images/pv-process-05-crew.jpg",
+                  alt: "Framing crew members working on top of structural framing",
+                  title: "05 / In-House Crew",
+                  caption: "Our dedicated framing carpenters on-site."
+                },
+                {
+                  src: "/images/pv-process-00-demo.jpg",
+                  alt: "Heavy machinery doing demolition and site preparation",
+                  title: "06 / Demolition & Prep",
+                  caption: "Clean site clearing before structural building begins."
+                }
+              ].map((img, idx) => (
+                <div key={idx} className="group">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-4">
+                    <Image
+                      src={img.src}
+                      alt={img.alt}
+                      fill
+                      sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 100vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  </div>
+                  <h3 className="font-heading text-base font-light text-charcoal mb-1">{img.title}</h3>
+                  <p className="text-charcoal-light text-xs font-light">{img.caption}</p>
                 </div>
-                <h3 className="font-heading text-base font-light text-charcoal mb-1">{img.title}</h3>
-                <p className="text-charcoal-light text-xs font-light">{img.caption}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
