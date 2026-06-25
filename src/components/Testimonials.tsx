@@ -38,6 +38,7 @@ export function Testimonials() {
               src="/images/pp-spa-shower.jpg"
               alt="Master bath shower with travertine walls, built-in niche, and natural light"
               fill
+              sizes="(min-width:1024px) 50vw, 100vw"
               className="object-cover"
             />
           </motion.div>

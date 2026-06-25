@@ -46,6 +46,7 @@ export function WorkShowcase() {
                 src={project.heroImage}
                 alt={project.caption || project.title}
                 fill
+                sizes="(min-width:1024px) 50vw, 100vw"
                 className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[rgba(26,47,47,0.85)] via-[rgba(26,47,47,0.3)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400" />

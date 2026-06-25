@@ -70,6 +70,7 @@ export function NeighborhoodCards() {
                 src={hood.image}
                 alt={hood.imageAlt}
                 fill
+                sizes="(min-width:1024px) 25vw, (min-width:640px) 50vw, 100vw"
                 className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[rgba(26,47,47,0.85)] via-[rgba(26,47,47,0.2)_60%] to-[rgba(26,47,47,0.35)] group-hover:from-[rgba(26,47,47,0.9)] group-hover:via-[rgba(26,47,47,0.3)_60%] group-hover:to-[rgba(26,47,47,0.15)] transition-all duration-400" />

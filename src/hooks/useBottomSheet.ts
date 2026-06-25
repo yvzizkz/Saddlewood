@@ -42,9 +42,9 @@ export function useBottomSheet(isOpen: boolean): UseBottomSheetResult {
 
   useEffect(() => {
     if (isOpen) {
-      setState('opening')
       let raf2: number | null = null
       const raf1 = window.requestAnimationFrame(() => {
+        setState('opening')
         // Two rAFs so the browser has committed the `opening` styles before
         // we transition to `open`. One rAF works on most engines; the
         // second is cheap insurance against batched commits.
@@ -64,17 +64,20 @@ export function useBottomSheet(isOpen: boolean): UseBottomSheetResult {
       return
     }
 
-    setState('closing')
+    const raf = window.requestAnimationFrame(() => {
+      setState('closing')
+    })
     const timer = setTimeout(() => {
       setState('closed')
     }, TRANSITION_MS)
     return () => {
+      window.cancelAnimationFrame(raf)
       clearTimeout(timer)
     }
   }, [isOpen])
 
   return {
     state,
-    shouldRender: state !== 'closed',
+    shouldRender: isOpen || state !== 'closed',
   }
 }
