@@ -21,6 +21,7 @@ const navLinks = [
     label: "Areas",
     href: "#",
     children: [
+      { label: "All Areas", href: "/neighborhoods" },
       { label: "McCormick Ranch", href: "/neighborhoods/mccormick-ranch" },
       { label: "Gainey Ranch", href: "/neighborhoods/gainey-ranch" },
       { label: "Arcadia", href: "/neighborhoods/arcadia" },
