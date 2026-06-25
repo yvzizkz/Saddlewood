@@ -4,7 +4,6 @@ import { IntroStrip } from "@/components/IntroStrip";
 import { WorkShowcase } from "@/components/WorkShowcase";
 import { ServicesGrid } from "@/components/ServicesGrid";
 import { NeighborhoodCards } from "@/components/NeighborhoodCards";
-import { Testimonials } from "@/components/Testimonials";
 import { CTABanner } from "@/components/CTABanner";
 
 export const metadata: Metadata = {
@@ -21,7 +20,6 @@ export default function Home() {
       <WorkShowcase />
       <ServicesGrid />
       <NeighborhoodCards />
-      <Testimonials />
       <CTABanner />
     </>
   );

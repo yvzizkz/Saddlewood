@@ -33,18 +33,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
       "Structural wall removals and space optimization",
       "Renovations tailored to lakeside and golf-side properties",
     ],
-    testimonials: [
-      {
-        quote: "Saddlewood completely transformed our McCormick Ranch kitchen. The attention to detail was incredible — from the custom island to the under-cabinet lighting, every element was thoughtfully designed.",
-        name: "Sarah & Tom K.",
-        project: "Kitchen Remodel",
-      },
-      {
-        quote: "The outdoor living space they designed has become our favorite room in the house. Perfect for Arizona evenings.",
-        name: "Robert P.",
-        project: "Outdoor Living",
-      },
-    ],
+    testimonials: [],
   },
   "gainey-ranch": {
     slug: "gainey-ranch",
@@ -64,18 +53,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
       "Familiarity with Gainey Ranch architectural guidelines",
       "Custom built-ins and sophisticated contemporary cabinetry",
     ],
-    testimonials: [
-      {
-        quote: "We interviewed five contractors before choosing Saddlewood. Their professionalism and the fact that they hold four ROC licenses gave us complete confidence. The finished master bath is stunning.",
-        name: "Michael R.",
-        project: "Master Bathroom",
-      },
-      {
-        quote: "Having electrical, plumbing, HVAC, and general contracting all under one license holder made the entire process seamless. No finger-pointing between different subcontractors.",
-        name: "Lisa M.",
-        project: "Kitchen & Bath Remodel",
-      },
-    ],
+    testimonials: [],
   },
   "pinnacle-peak": {
     slug: "pinnacle-peak",
@@ -95,13 +73,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
       "Integration of modern, high-efficiency HVAC systems for desert heat",
       "Expertise in large-format tile and natural stone installations",
     ],
-    testimonials: [
-      {
-        quote: "From the first consultation to the final walkthrough, the Saddlewood team was exceptional. They respected our home, stayed on schedule, and delivered beyond our expectations.",
-        name: "Jennifer & David L.",
-        project: "Whole-Home Remodel",
-      },
-    ],
+    testimonials: [],
   },
   "paradise-valley": {
     slug: "paradise-valley",
@@ -121,13 +93,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
       "Full in-house capabilities: structural, electrical, plumbing, HVAC",
       "Proven track record with high-end finishes and custom millwork",
     ],
-    testimonials: [
-      {
-        quote: "Saddlewood took our 40th Street property from a dated ranch home to a modern desert estate. The scope was massive — full demo to finished luxury — and they handled every phase with professionalism and precision. We couldn't be happier with the result.",
-        name: "The Morrison Family",
-        project: "Whole-Home Transformation",
-      },
-    ],
+    testimonials: [],
   },
   "silverleaf": {
     slug: "silverleaf",
