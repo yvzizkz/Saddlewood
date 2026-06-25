@@ -77,6 +77,7 @@ export function Footer() {
           <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mb-4 sm:mb-5 not-italic">Areas We Serve</h4>
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
             {[
+              { label: "All Areas", href: "/neighborhoods" },
               { label: "McCormick Ranch", href: "/neighborhoods/mccormick-ranch" },
               { label: "Gainey Ranch", href: "/neighborhoods/gainey-ranch" },
               { label: "Arcadia", href: "/neighborhoods/arcadia" },
