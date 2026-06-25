@@ -25,6 +25,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
           src={data.heroImage}
           alt={`${data.fullName} remodeling by Saddlewood Contracting`}
           fill
+          sizes="100vw"
           priority
           className="object-cover"
         />
@@ -160,6 +161,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                     src={projects[0].heroImage}
                     alt={projects[0].title}
                     fill
+                    sizes="(min-width:1024px) 50vw, 100vw"
                     className="object-cover"
                   />
                   <div className="absolute top-4 left-4">
@@ -201,6 +203,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                     src={project.heroImage}
                     alt={project.title}
                     fill
+                    sizes="(min-width:768px) 33vw, 100vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute top-4 left-4">
@@ -283,6 +286,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                       src={step.image}
                       alt={step.label}
                       fill
+                      sizes="(min-width:768px) 33vw, 100vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute top-4 left-4">

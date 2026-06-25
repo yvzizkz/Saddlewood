@@ -14,6 +14,7 @@ export function Footer() {
                 src="/images/logo.png"
                 alt="Saddlewood Contracting LLC"
                 fill
+                sizes="80px"
                 className="object-contain"
               />
             </div>

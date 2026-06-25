@@ -24,20 +24,11 @@ export function BottomSheetEditor() {
   const isOpen = bottomSheetItemId !== null
   const { state, shouldRender } = useBottomSheet(isOpen)
 
-  const [quantity, setQuantity] = useState('')
-  const [material, setMaterial] = useState('')
-  const [labor, setLabor] = useState('')
+  const [quantity, setQuantity] = useState(() => item ? String(item.quantity) : '')
+  const [material, setMaterial] = useState(() => item ? item.material_unit_cost.toFixed(2) : '')
+  const [labor, setLabor] = useState(() => item ? item.labor_unit_cost.toFixed(2) : '')
 
   const materialRef = useRef<HTMLInputElement>(null)
-
-  // Seed local form whenever the target item changes. Keyed on item.id so
-  // re-renders that keep the same item don't clobber in-progress edits.
-  useEffect(() => {
-    if (!item) return
-    setQuantity(String(item.quantity))
-    setMaterial(item.material_unit_cost.toFixed(2))
-    setLabor(item.labor_unit_cost.toFixed(2))
-  }, [item?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-focus the material input once the sheet has finished sliding in.
   useEffect(() => {

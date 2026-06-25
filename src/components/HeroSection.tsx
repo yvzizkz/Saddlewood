@@ -85,7 +85,10 @@ export function HeroSection() {
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    setIndex(Math.floor(Math.random() * heroImages.length));
+    const handle = requestAnimationFrame(() => {
+      setIndex(Math.floor(Math.random() * heroImages.length));
+    });
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   const hero = heroImages[index];

@@ -34,12 +34,17 @@ export function ProjectLightbox({
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const touchStartX = useRef<number | null>(null);
 
-  // Sync index when re-opened with a different initialIndex
-  useEffect(() => {
-    if (isOpen) {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [prevInitialIndex, setPrevInitialIndex] = useState(initialIndex);
+
+  if (isOpen !== prevIsOpen || (isOpen && initialIndex !== prevInitialIndex)) {
+    setPrevIsOpen(isOpen);
+    setPrevInitialIndex(initialIndex);
+    if (isOpen && (!prevIsOpen || initialIndex !== prevInitialIndex)) {
       setIndex(initialIndex);
+      setChromeVisible(true);
     }
-  }, [isOpen, initialIndex]);
+  }
 
   const total = images.length;
   const goPrev = useCallback(() => {
@@ -72,12 +77,15 @@ export function ProjectLightbox({
       closeButtonRef.current?.focus();
     }, 50);
 
-    armChromeTimer();
+    const rafHandle = requestAnimationFrame(() => {
+      armChromeTimer();
+    });
 
     return () => {
       document.body.style.overflow = prevOverflow;
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
       window.clearTimeout(focusTimer);
+      cancelAnimationFrame(rafHandle);
       previouslyFocused.current?.focus?.();
     };
   }, [isOpen, armChromeTimer]);

@@ -32,6 +32,7 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
     useShallow((s) => s.estimate?.trade_ids ?? [])
   )
   const job = useEstimateStore((s) => s.job)
+  const bottomSheetItemId = useEstimateStore((s) => s.bottomSheetItemId)
 
   // useEffect rather than useLayoutEffect: pre-hydration skeleton already
   // prevents flash, and useLayoutEffect produces an SSR warning.
@@ -99,7 +100,7 @@ export function EstimatePageClient({ bundle }: EstimatePageClientProps) {
       {/* Spacer for bottom tab bar clearance — matches the layout's padding. */}
       <div className="h-[calc(56px+env(safe-area-inset-bottom,0px))] md:hidden" />
 
-      <BottomSheetEditor />
+      <BottomSheetEditor key={bottomSheetItemId ?? 'none'} />
       <RequestChangesPanel />
       <ApproveModal />
     </div>
