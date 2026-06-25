@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-02T19:01:30.324Z",
+  "generated_at": "2026-06-25T07:56:51.004Z",
   "images": {
     "bathroom1.jpg": {
       "source": "public/images/bathroom1.jpg",
@@ -1569,6 +1569,54 @@
       "upscaled": false,
       "exif_stripped": true,
       "processed_at": "2026-05-02T19:01:30.323Z"
+    },
+    "pv-newbuild-steel-aerial.jpg": {
+      "source": "raw-images/pvmetal-aerial.jpg",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 2160,
+        "height": 1440
+      },
+      "output_dimensions": {
+        "width": 2160,
+        "height": 1440
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-06-25T07:56:50.329Z"
+    },
+    "pv-newbuild-steel-frame.jpg": {
+      "source": "raw-images/pvmetal-skeleton.jpg",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 2160,
+        "height": 1620
+      },
+      "output_dimensions": {
+        "width": 2160,
+        "height": 1620
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-06-25T07:56:50.666Z"
+    },
+    "pv-newbuild-steel-joists.jpg": {
+      "source": "raw-images/pvmetal-joists.jpg",
+      "source_mode": "intake",
+      "original_dimensions": {
+        "width": 2160,
+        "height": 1620
+      },
+      "output_dimensions": {
+        "width": 2160,
+        "height": 1620
+      },
+      "resized": false,
+      "upscaled": false,
+      "exif_stripped": true,
+      "processed_at": "2026-06-25T07:56:51.003Z"
     }
   }
 }
