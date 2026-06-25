@@ -9,6 +9,8 @@ import { Menu, X, ChevronDown } from "lucide-react";
 const navLinks = [
   { label: "Work", href: "/portfolio" },
   { label: "Services", href: "/services" },
+  { label: "New Construction", href: "/new-construction" },
+  { label: "Framing", href: "/framing" },
   {
     label: "Neighborhoods",
     href: "#",
@@ -214,7 +216,7 @@ export function Navbar() {
         </Link>
 
         {/* Desktop Nav Links */}
-        <div className="hidden lg:flex items-center gap-8 xl:gap-10">
+        <div className="hidden lg:flex items-center gap-5 xl:gap-8">
           {navLinks.map((link) =>
             link.children ? (
               <div

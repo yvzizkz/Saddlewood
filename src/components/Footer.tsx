@@ -54,9 +54,19 @@ export function Footer() {
         <div>
           <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mb-4 sm:mb-5 not-italic">Services</h4>
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
-            {["Kitchen Remodeling", "Bathroom Renovation", "Whole-Home Remodels", "Outdoor Living", "Electrical", "HVAC", "Plumbing"].map((svc) => (
-              <li key={svc}>
-                <Link href="/services" className="text-sm text-white/75 font-light hover:text-gold transition-colors no-underline">{svc}</Link>
+            {[
+              { label: "New Construction", href: "/new-construction" },
+              { label: "Framing Crew", href: "/framing" },
+              { label: "Kitchen Remodeling", href: "/services" },
+              { label: "Bathroom Renovation", href: "/services" },
+              { label: "Whole-Home Remodels", href: "/services" },
+              { label: "Outdoor Living", href: "/services" },
+              { label: "Electrical", href: "/services" },
+              { label: "HVAC", href: "/services" },
+              { label: "Plumbing", href: "/services" },
+            ].map((svc) => (
+              <li key={svc.label}>
+                <Link href={svc.href} className="text-sm text-white/75 font-light hover:text-gold transition-colors no-underline">{svc.label}</Link>
               </li>
             ))}
           </ul>
