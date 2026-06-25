@@ -74,13 +74,17 @@ export function Footer() {
 
         {/* Neighborhoods + Company */}
         <div>
-          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mb-4 sm:mb-5 not-italic">Neighborhoods</h4>
+          <h4 className="font-sans text-[11px] font-medium tracking-[0.2em] uppercase text-gold/80 mb-4 sm:mb-5 not-italic">Areas We Serve</h4>
           <ul className="space-y-2 sm:space-y-2.5 list-none p-0 m-0">
             {[
               { label: "McCormick Ranch", href: "/neighborhoods/mccormick-ranch" },
               { label: "Gainey Ranch", href: "/neighborhoods/gainey-ranch" },
+              { label: "Arcadia", href: "/neighborhoods/arcadia" },
               { label: "Paradise Valley", href: "/neighborhoods/paradise-valley" },
-              { label: "Pinnacle Peak CC", href: "/neighborhoods/pinnacle-peak" },
+              { label: "Silverleaf", href: "/neighborhoods/silverleaf" },
+              { label: "DC Ranch", href: "/neighborhoods/dc-ranch" },
+              { label: "Grayhawk", href: "/neighborhoods/grayhawk" },
+              { label: "Pinnacle Peak", href: "/neighborhoods/pinnacle-peak" },
             ].map((n) => (
               <li key={n.href}>
                 <Link href={n.href} className="text-sm text-white/75 font-light hover:text-gold transition-colors no-underline">{n.label}</Link>

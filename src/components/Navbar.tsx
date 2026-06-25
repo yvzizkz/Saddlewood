@@ -8,16 +8,26 @@ import { Menu, X, ChevronDown } from "lucide-react";
 
 const navLinks = [
   { label: "Work", href: "/portfolio" },
-  { label: "Services", href: "/services" },
-  { label: "New Construction", href: "/new-construction" },
-  { label: "Framing", href: "/framing" },
   {
-    label: "Neighborhoods",
+    label: "Services",
+    href: "#",
+    children: [
+      { label: "All Services", href: "/services" },
+      { label: "New Construction", href: "/new-construction" },
+      { label: "Framing", href: "/framing" },
+    ],
+  },
+  {
+    label: "Areas",
     href: "#",
     children: [
       { label: "McCormick Ranch", href: "/neighborhoods/mccormick-ranch" },
       { label: "Gainey Ranch", href: "/neighborhoods/gainey-ranch" },
+      { label: "Arcadia", href: "/neighborhoods/arcadia" },
       { label: "Paradise Valley", href: "/neighborhoods/paradise-valley" },
+      { label: "Silverleaf", href: "/neighborhoods/silverleaf" },
+      { label: "DC Ranch", href: "/neighborhoods/dc-ranch" },
+      { label: "Grayhawk", href: "/neighborhoods/grayhawk" },
       { label: "Pinnacle Peak", href: "/neighborhoods/pinnacle-peak" },
     ],
   },
@@ -28,13 +38,43 @@ const navLinks = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [hoodOpen, setHoodOpen] = useState(false);
-  const [activeMenuIndex, setActiveMenuIndex] = useState(-1);
+  const [menuOpenStates, setMenuOpenStates] = useState<Record<string, boolean>>({});
+  const [menuActiveIndices, setMenuActiveIndices] = useState<Record<string, number>>({});
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const menuItemsRef = useRef<(HTMLAnchorElement | null)[]>([]);
+  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const menuItemsRefs = useRef<Record<string, (HTMLAnchorElement | null)[]>>({});
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
+
+  const openMenu = useCallback((label: string) => {
+    setMenuOpenStates(() => {
+      const next = {} as Record<string, boolean>;
+      next[label] = true;
+      return next;
+    });
+    setMenuActiveIndices((prev) => ({
+      ...prev,
+      [label]: -1,
+    }));
+  }, []);
+
+  const closeMenu = useCallback((label: string) => {
+    setMenuOpenStates((prev) => ({
+      ...prev,
+      [label]: false,
+    }));
+    setMenuActiveIndices((prev) => ({
+      ...prev,
+      [label]: -1,
+    }));
+  }, []);
+
+  const setMenuIndex = useCallback((label: string, index: number) => {
+    setMenuActiveIndices((prev) => ({
+      ...prev,
+      [label]: index,
+    }));
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -97,88 +137,93 @@ export function Navbar() {
 
   // Keyboard navigation for dropdown menu
   const handleDropdownKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      const neighborhoodLink = navLinks.find((l) => l.children);
-      if (!neighborhoodLink?.children) return;
-      const itemCount = neighborhoodLink.children.length;
+    (e: React.KeyboardEvent, label: string) => {
+      const link = navLinks.find((l) => l.label === label);
+      if (!link?.children) return;
+      const itemCount = link.children.length;
+      const isOpen = !!menuOpenStates[label];
+      const activeIdx = menuActiveIndices[label] ?? -1;
 
       switch (e.key) {
         case "Enter":
         case " ":
           e.preventDefault();
-          if (!hoodOpen) {
-            setHoodOpen(true);
-            setActiveMenuIndex(0);
+          if (!isOpen) {
+            openMenu(label);
+            setMenuIndex(label, 0);
           }
           break;
         case "ArrowDown":
           e.preventDefault();
-          if (!hoodOpen) {
-            setHoodOpen(true);
-            setActiveMenuIndex(0);
+          if (!isOpen) {
+            openMenu(label);
+            setMenuIndex(label, 0);
           } else {
-            setActiveMenuIndex((prev) => (prev + 1) % itemCount);
+            setMenuIndex(label, (activeIdx + 1) % itemCount);
           }
           break;
         case "ArrowUp":
           e.preventDefault();
-          if (hoodOpen) {
-            setActiveMenuIndex((prev) => (prev - 1 + itemCount) % itemCount);
+          if (isOpen) {
+            setMenuIndex(label, (activeIdx - 1 + itemCount) % itemCount);
           }
           break;
         case "Escape":
           e.preventDefault();
-          setHoodOpen(false);
-          setActiveMenuIndex(-1);
+          closeMenu(label);
           break;
         case "Tab":
-          if (hoodOpen) {
-            setHoodOpen(false);
-            setActiveMenuIndex(-1);
+          if (isOpen) {
+            closeMenu(label);
           }
           break;
       }
     },
-    [hoodOpen]
+    [menuOpenStates, menuActiveIndices, openMenu, closeMenu, setMenuIndex]
   );
 
   // Focus menu items when activeMenuIndex changes
   useEffect(() => {
-    if (activeMenuIndex >= 0 && menuItemsRef.current[activeMenuIndex]) {
-      menuItemsRef.current[activeMenuIndex]?.focus();
+    const openMenuLabel = Object.keys(menuOpenStates).find((k) => menuOpenStates[k]);
+    if (openMenuLabel) {
+      const activeIndex = menuActiveIndices[openMenuLabel];
+      if (activeIndex !== undefined && activeIndex >= 0) {
+        const items = menuItemsRefs.current[openMenuLabel];
+        if (items && items[activeIndex]) {
+          items[activeIndex]?.focus();
+        }
+      }
     }
-  }, [activeMenuIndex]);
+  }, [menuOpenStates, menuActiveIndices]);
 
   // Handle keydown within dropdown menu items
   const handleMenuItemKeyDown = useCallback(
-    (e: React.KeyboardEvent, index: number) => {
-      const neighborhoodLink = navLinks.find((l) => l.children);
-      if (!neighborhoodLink?.children) return;
-      const itemCount = neighborhoodLink.children.length;
+    (e: React.KeyboardEvent, label: string, index: number) => {
+      const link = navLinks.find((l) => l.label === label);
+      if (!link?.children) return;
+      const itemCount = link.children.length;
 
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setActiveMenuIndex((index + 1) % itemCount);
+          setMenuIndex(label, (index + 1) % itemCount);
           break;
         case "ArrowUp":
           e.preventDefault();
-          setActiveMenuIndex((index - 1 + itemCount) % itemCount);
+          setMenuIndex(label, (index - 1 + itemCount) % itemCount);
           break;
         case "Escape":
           e.preventDefault();
-          setHoodOpen(false);
-          setActiveMenuIndex(-1);
+          closeMenu(label);
           // Return focus to the dropdown trigger
-          dropdownRef.current?.querySelector("button")?.focus();
+          dropdownRefs.current[label]?.querySelector("button")?.focus();
           break;
         case "Tab":
-          setHoodOpen(false);
-          setActiveMenuIndex(-1);
+          closeMenu(label);
           break;
       }
     },
-    []
+    [closeMenu, setMenuIndex]
   );
 
   return (
@@ -222,24 +267,22 @@ export function Navbar() {
               <div
                 key={link.label}
                 className="relative"
-                ref={dropdownRef}
-                onMouseEnter={() => setHoodOpen(true)}
+                ref={(el) => { dropdownRefs.current[link.label] = el; }}
+                onMouseEnter={() => openMenu(link.label)}
                 onMouseLeave={() => {
-                  setHoodOpen(false);
-                  setActiveMenuIndex(-1);
+                  closeMenu(link.label);
                 }}
               >
                 <button
                   className="flex items-center gap-1.5 text-[15px] xl:text-base font-normal text-white/80 hover:text-white transition-colors tracking-wide bg-transparent border-none cursor-pointer"
-                  aria-expanded={hoodOpen}
+                  aria-expanded={!!menuOpenStates[link.label]}
                   aria-haspopup="true"
-                  onKeyDown={handleDropdownKeyDown}
-                  onFocus={() => setHoodOpen(true)}
+                  onKeyDown={(e) => handleDropdownKeyDown(e, link.label)}
+                  onFocus={() => openMenu(link.label)}
                   onBlur={(e) => {
                     // Close if focus moves outside the dropdown container
-                    if (!dropdownRef.current?.contains(e.relatedTarget as Node)) {
-                      setHoodOpen(false);
-                      setActiveMenuIndex(-1);
+                    if (!dropdownRefs.current[link.label]?.contains(e.relatedTarget as Node)) {
+                      closeMenu(link.label);
                     }
                   }}
                 >
@@ -247,7 +290,7 @@ export function Navbar() {
                   <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
                 <AnimatePresence>
-                  {hoodOpen && (
+                  {!!menuOpenStates[link.label] && (
                     <motion.div
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -255,23 +298,27 @@ export function Navbar() {
                       transition={{ duration: 0.15 }}
                       className="absolute top-full left-0 mt-2 min-w-[220px] bg-[rgba(26,47,47,0.95)] backdrop-blur-xl border border-white/[0.06] py-2 rounded-sm"
                       role="menu"
-                      aria-label="Neighborhoods submenu"
+                      aria-label={`${link.label} submenu`}
                     >
                       {link.children.map((child, idx) => (
                         <Link
                           key={child.href}
                           href={child.href}
-                          ref={(el) => { menuItemsRef.current[idx] = el; }}
+                          ref={(el) => {
+                            if (!menuItemsRefs.current[link.label]) {
+                              menuItemsRefs.current[link.label] = [];
+                            }
+                            menuItemsRefs.current[link.label][idx] = el;
+                          }}
                           className={`block px-5 py-3 text-[15px] text-white/70 hover:text-gold hover:bg-white/[0.03] transition-colors no-underline ${
-                            idx === activeMenuIndex ? "text-gold bg-white/[0.03]" : ""
+                            idx === (menuActiveIndices[link.label] ?? -1) ? "text-gold bg-white/[0.03]" : ""
                           }`}
                           role="menuitem"
                           tabIndex={-1}
-                          onKeyDown={(e) => handleMenuItemKeyDown(e, idx)}
+                          onKeyDown={(e) => handleMenuItemKeyDown(e, link.label, idx)}
                           onBlur={(e) => {
-                            if (!dropdownRef.current?.contains(e.relatedTarget as Node)) {
-                              setHoodOpen(false);
-                              setActiveMenuIndex(-1);
+                            if (!dropdownRefs.current[link.label]?.contains(e.relatedTarget as Node)) {
+                              closeMenu(link.label);
                             }
                           }}
                         >
