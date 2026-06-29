@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { JsonLd } from "@/components/JsonLd";
@@ -90,12 +89,6 @@ export default function MarketingLayout({
       <main id="main-content">{children}</main>
       <Footer />
       <StickyMobileBar />
-      <Script
-        src="https://widgets.leadconnectorhq.com/loader.js"
-        data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js"
-        data-widget-id="6939cccae9d476259f5f6719"
-        strategy="lazyOnload"
-      />
     </>
   );
 }
