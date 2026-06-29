@@ -96,7 +96,7 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative h-screen min-h-[600px] sm:min-h-[700px] flex items-end overflow-hidden"
+      className="relative h-[100svh] min-h-[600px] sm:min-h-[700px] flex items-end overflow-hidden"
       aria-label="Hero"
     >
       <div key={hero.src} className="absolute inset-0 ken-burns-active">

@@ -283,7 +283,7 @@ export default function FramingPage() {
           </p>
           <Link
             href="/contact"
-            className="inline-flex items-center gap-2 text-sm text-stone hover:text-gold transition-colors tracking-[0.05em] border-b border-stone/30 hover:border-gold pb-1"
+            className="inline-flex items-center gap-2 text-sm text-stone hover:text-gold transition-colors tracking-[0.05em] border-b border-stone/30 hover:border-gold py-2"
           >
             Request a framing bid <span aria-hidden="true">&rarr;</span>
           </Link>
