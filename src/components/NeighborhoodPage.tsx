@@ -20,7 +20,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
   return (
     <>
       {/* Hero */}
-      <section className="relative h-screen min-h-[600px] flex items-end overflow-hidden bg-teal-dark">
+      <section className="relative h-[100svh] min-h-[600px] flex items-end overflow-hidden bg-teal-dark">
         <Image
           src={data.heroImage}
           alt={`${data.fullName} remodeling by Saddlewood Contracting`}
@@ -65,7 +65,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                 <div className="h-px w-8 bg-gold" />
                 <span className="section-label">About</span>
               </div>
-              <h2 className="font-heading text-3xl sm:text-4xl lg:text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-6 sm:mb-8 leading-tight">
+              <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-6 sm:mb-8 leading-tight">
                 Why Saddlewood for
                 <br />
                 {data.name}?

@@ -15,7 +15,7 @@ export function ProjectGrid() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.5, delay: Math.min(index * 0.02, 0.2) }}
-          className={project.tall ? "md:row-span-2" : ""}
+          className={project.tall ? "sm:row-span-2" : ""}
         >
           <Link
             href={`/portfolio/${project.slug}`}

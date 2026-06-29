@@ -221,7 +221,7 @@ export default function ServicesPage() {
           </p>
           <Link
             href="/contact"
-            className="inline-flex items-center gap-2 text-sm text-charcoal hover:text-gold-accessible transition-colors tracking-[0.05em] border-b border-charcoal/30 hover:border-gold-accessible pb-1"
+            className="inline-flex items-center gap-2 text-sm text-charcoal hover:text-gold-accessible transition-colors tracking-[0.05em] border-b border-charcoal/30 hover:border-gold-accessible py-2"
           >
             Start a conversation{" "}
             <span aria-hidden="true">&rarr;</span>
