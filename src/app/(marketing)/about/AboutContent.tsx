@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Phone } from "lucide-react";
 import Image from "next/image";
 import { PageHero } from "@/components/PageHero";
+import { ProcoreBadge } from "@/components/ProcoreBadge";
 
 const credentials = [
   {
@@ -182,6 +183,19 @@ export default function AboutContent() {
               </motion.div>
             ))}
           </div>
+
+          {/* Verified on the Procore Network */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mt-14 flex flex-col items-center gap-3"
+          >
+            <p className="text-charcoal-light text-sm font-light tracking-wide">
+              Verified on the Procore Network
+            </p>
+            <ProcoreBadge width={168} />
+          </motion.div>
         </div>
       </section>
 

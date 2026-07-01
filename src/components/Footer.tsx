@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Instagram, Facebook, Linkedin } from "lucide-react";
+import { ProcoreBadge } from "./ProcoreBadge";
 
 export function Footer() {
   return (
@@ -48,6 +49,10 @@ export function Footer() {
             >
               <Linkedin className="w-5 h-5" strokeWidth={1.5} />
             </a>
+          </div>
+          {/* Verified on the Procore Network — dofollow backlink */}
+          <div className="mt-7">
+            <ProcoreBadge width={132} />
           </div>
         </div>
 
@@ -98,6 +103,7 @@ export function Footer() {
             {[
               { label: "Our Work", href: "/portfolio" },
               { label: "About", href: "/about" },
+              { label: "Trade Partners", href: "/trade-partners" },
               { label: "Contact", href: "/contact" },
             ].map((c) => (
               <li key={c.href}>

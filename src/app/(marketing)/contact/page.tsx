@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 import { PageHero } from "@/components/PageHero";
 
@@ -18,6 +19,20 @@ export default function ContactPage() {
         image="/images/living1.jpg"
         imageAlt="Luxury living room remodel in Scottsdale by Saddlewood Contracting"
       />
+      {/* Subcontractor / vendor prompt → bid-list page */}
+      <div className="bg-teal-dark">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
+          <span className="text-stone/80 text-sm font-light">
+            Are you a subcontractor or vendor?
+          </span>
+          <Link
+            href="/trade-partners"
+            className="text-gold text-sm font-light border-b border-gold/40 hover:border-gold transition-colors no-underline"
+          >
+            Get on our bid list →
+          </Link>
+        </div>
+      </div>
       <ContactForm />
     </>
   );

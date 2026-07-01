@@ -33,6 +33,7 @@ const navLinks = [
     ],
   },
   { label: "About", href: "/about" },
+  { label: "Trade Partners", href: "/trade-partners" },
   { label: "Contact", href: "/contact" },
 ];
 
