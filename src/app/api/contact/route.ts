@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { renderNotificationEmail } from "@/lib/emailTemplate";
 
 /**
  * Contact Form API Route — lead fail-safe
@@ -60,63 +61,29 @@ interface ContactBody {
   company?: string;
 }
 
-function row(label: string, value?: string) {
-  if (!value) return "";
-  return `
-    <tr>
-      <td style="padding:6px 0;color:#6b6256;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;width:160px;vertical-align:top;">${label}</td>
-      <td style="padding:6px 0;color:#1a1a1a;font-size:15px;vertical-align:top;">${value}</td>
-    </tr>`;
-}
-
 function buildHtml(b: ContactBody) {
-  const tagList = Array.isArray(b.tags) ? b.tags.filter(Boolean).join(", ") : "";
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8" /></head>
-<body style="margin:0;padding:0;background:#f5f2ec;font-family:system-ui,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <td align="center" style="padding:40px 16px;">
-        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:4px;overflow:hidden;">
-          <tr>
-            <td style="background:#1f2a24;padding:32px 40px;">
-              <p style="margin:0;color:#c9a96a;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;">New Lead</p>
-              <h1 style="margin:8px 0 0;color:#f5f2ec;font-size:24px;font-weight:500;">${b.name ?? "Someone"} reached out</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e8e5e0;">
-                ${row("Email", b.email)}
-                ${row("Phone", b.phone)}
-                ${row("Neighborhood", b.neighborhood)}
-                ${row("Project type", b.projectType)}
-                ${row("Source", b.source)}
-                ${row("Tags", tagList)}
-              </table>
-              ${b.message ? `
-              <div style="margin-top:24px;padding:20px;background:#f5f2ec;border-radius:4px;">
-                <p style="margin:0 0 8px;color:#6b6256;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;">Message</p>
-                <p style="margin:0;color:#1a1a1a;font-size:15px;line-height:1.6;">${b.message}</p>
-              </div>` : ""}
-              ${b.email ? `
-              <div style="margin-top:32px;padding-top:24px;border-top:1px solid #e8e5e0;">
-                <a href="mailto:${b.email}" style="display:inline-block;background:#1f2a24;color:#f5f2ec;padding:12px 24px;border-radius:4px;font-size:14px;font-weight:500;text-decoration:none;">Reply to ${b.name ?? "this lead"}</a>
-              </div>` : ""}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:20px 40px;background:#f5f2ec;border-top:1px solid #e8e5e0;">
-              <p style="margin:0;color:#b0a99e;font-size:11px;">Sent from the saddlewoodcontracting.com contact form</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  const phoneHref = b.phone
+    ? `tel:${b.phone.replace(/[^0-9+]/g, "")}`
+    : undefined;
+
+  return renderNotificationEmail({
+    eyebrow: "New website lead",
+    heading: `${b.name ?? "Someone"} reached out`,
+    intro:
+      "You've got a new lead from the website. Here's the quick version — hit reply to get back to them.",
+    rows: [
+      { label: "Name", value: b.name },
+      { label: "Email", value: b.email, href: b.email ? `mailto:${b.email}` : undefined },
+      { label: "Phone", value: b.phone, href: phoneHref },
+      { label: "Neighborhood", value: b.neighborhood },
+      { label: "Project type", value: b.projectType },
+    ],
+    noteLabel: "Their message",
+    noteText: b.message,
+    replyEmail: b.email,
+    replyLabel: b.name ? `Reply to ${b.name}` : "Reply",
+    footerNote: "Sent from the contact form at saddlewoodcontracting.com",
+  });
 }
 
 /**
