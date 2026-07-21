@@ -12,8 +12,8 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: {
-    default: "Saddlewood Contracting",
-    template: "%s | Saddlewood Contracting",
+    default: "Saddlewood | Luxury Remodeling & Framing in Scottsdale, AZ",
+    template: "%s",
   },
   description: "Luxury remodeling in Scottsdale, AZ.",
 };

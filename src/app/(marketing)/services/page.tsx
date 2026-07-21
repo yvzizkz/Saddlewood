@@ -6,7 +6,7 @@ import { CTABanner } from "@/components/CTABanner";
 import { getProjectBySlug } from "@/data/projects";
 
 export const metadata = {
-  title: "Services | Kitchen, Bathroom, Whole-Home & Outdoor Living in Scottsdale",
+  title: "Services | Kitchen, Bathroom, Whole-Home & Outdoor Living in Scottsdale | Saddlewood",
   description:
     "Saddlewood Contracting handles every trade in-house — general, electrical, plumbing, and HVAC. From a Paradise Valley demo day to a finished whole-home build, see how four ROC licenses on one crew gets your project from start to finish.",
   alternates: { canonical: "/services" },
