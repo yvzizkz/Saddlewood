@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Phone } from "lucide-react";
+import { CareersForm } from "@/components/CareersForm";
 
 export const metadata: Metadata = {
   title: "Careers | Build With Saddlewood in Scottsdale | Saddlewood",
@@ -120,13 +121,17 @@ export default function CareersPage() {
                 ))}
               </ul>
               <a
-                href={`mailto:info@saddlewoodcontracting.com?subject=Application: ${encodeURIComponent(r.title)}`}
+                href="#apply"
                 className="inline-block mt-7 px-7 py-3 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase no-underline hover:bg-[#d4a94c] transition-all"
               >
-                Apply — email your resume
+                Apply below
               </a>
             </article>
           ))}
+        </div>
+
+        <div id="apply" className="mt-14 scroll-mt-28">
+          <CareersForm />
         </div>
 
         <div className="mt-12 text-center text-[14px] text-charcoal/60 font-light">

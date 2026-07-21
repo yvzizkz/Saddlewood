@@ -104,6 +104,7 @@ export function Footer() {
               { label: "Our Work", href: "/portfolio" },
               { label: "About", href: "/about" },
               { label: "Trade Partners", href: "/trade-partners" },
+              { label: "Careers", href: "/careers" },
               { label: "Contact", href: "/contact" },
             ].map((c) => (
               <li key={c.href}>
@@ -139,6 +140,8 @@ export function Footer() {
           <Link href="/privacy" className="hover:text-gold transition-colors no-underline">Privacy</Link>
           <span>&middot;</span>
           <Link href="/terms" className="hover:text-gold transition-colors no-underline">Terms</Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/llm-info" className="hover:text-gold transition-colors no-underline">Company Facts</Link>
           <span>&middot;</span>
           <span>Licensed &middot; Bonded &middot; Insured &middot; Arizona ROC</span>
         </div>
