@@ -191,26 +191,31 @@ export default function FramingCapabilitiesPage() {
         </div>
       </section>
 
-      {/* ============ PROOF — builder pull-quote ============ */}
+      {/* ============ PROOF — on site now ============ */}
       <section className="px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-        <div className="max-w-[900px] mx-auto text-center">
-          <span className="font-heading text-gold text-7xl leading-none block" aria-hidden="true">
-            &ldquo;
-          </span>
-          <blockquote className="font-heading text-2xl sm:text-[34px] font-light text-charcoal leading-[1.35] tracking-[-0.01em] -mt-4">
-            A Friday night, when most people are shutting it down for the week — one
-            of our key vendors showed up in a big way.{" "}
-            <em className="italic text-teal">
-              Immediate response. Total ownership. No hesitation.
-            </em>
-          </blockquote>
-          <p className="text-[12px] tracking-[0.2em] uppercase text-charcoal-light mt-8">
-            AFT Construction — builder partner, public post, June 2026
-          </p>
-          <p className="text-[13px] text-charcoal-light/80 font-light mt-2">
-            Posted about our crew after a late-day structural call-out on a Paradise
-            Valley custom build.
-          </p>
+        <div className="max-w-[1100px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          <div className="lg:col-span-6">
+            <p className="section-label">On site now</p>
+            <h2 className="font-heading text-3xl sm:text-4xl font-light text-charcoal leading-[1.2]">
+              A ground-up custom in Paradise Valley —{" "}
+              <em className="italic text-teal">steel skeleton by our crew.</em>
+            </h2>
+            <p className="text-charcoal-light text-[15px] font-light leading-relaxed mt-5 max-w-[48ch]">
+              Moment frames set, bolted and welded by the same crew that frames the
+              wood — one sub, one schedule, no finger-pointing at the wood-to-steel
+              interface. Ask to walk it; active work answers questions a brochure
+              can&apos;t.
+            </p>
+          </div>
+          <div className="lg:col-span-6">
+            <Image
+              src="/images/pv-newbuild-steel-aerial.jpg"
+              alt="Aerial view of the structural steel skeleton on a Paradise Valley ground-up custom framed by Saddlewood"
+              width={1200}
+              height={800}
+              className="w-full border border-stone"
+            />
+          </div>
         </div>
       </section>
 
