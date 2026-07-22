@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Phone } from "lucide-react";
 import { CareersForm } from "@/components/CareersForm";
+import { PageHero } from "@/components/PageHero";
 
 export const metadata: Metadata = {
-  title: "Careers | Build With Saddlewood in Scottsdale | Saddlewood",
+  title: "Careers — Build With Saddlewood in Scottsdale",
   description:
     "Saddlewood is hiring in Scottsdale: framing carpenters, an estimating & sales admin, and a part-time bookkeeper. Real projects, steady work, a team that pays attention.",
 };
@@ -88,21 +89,23 @@ export default function CareersPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jobPostingJsonLd()) }}
       />
-      <section className="bg-teal-dark px-4 sm:px-6 lg:px-12 pt-28 pb-16 text-center">
-        <h1 className="font-heading text-4xl lg:text-6xl text-white font-medium leading-[1.1] tracking-[-0.02em]">
-          Build with <em className="italic text-gold font-normal">Saddlewood.</em>
-        </h1>
-        <p className="text-[15px] text-white/60 max-w-[560px] mx-auto font-light leading-relaxed mt-6">
-          We&apos;re a Scottsdale builder — luxury remodels, new construction, and a
-          self-performing framing crew. We&apos;re small enough that your work is visible
-          and growing fast enough that the next role up usually exists.
-        </p>
-      </section>
+      <PageHero
+        label="Careers at Saddlewood"
+        title="Build with Saddlewood."
+        description="We're a Scottsdale builder — luxury remodels, new construction, and a self-performing framing crew. We're small enough that your work is visible and growing fast enough that the next role up usually exists."
+        image="/images/pv-process-05-crew.jpg"
+        imageAlt="Saddlewood crew framing a custom home in Paradise Valley"
+      />
 
       <section className="px-4 sm:px-6 lg:px-12 py-14 max-w-[880px] mx-auto">
+        <p className="section-label">Open roles</p>
         <div className="space-y-10">
           {roles.map((r) => (
-            <article key={r.id} id={r.id} className="bg-white border border-stone p-7 sm:p-9">
+            <article
+              key={r.id}
+              id={r.id}
+              className="bg-white border border-stone p-7 sm:p-9 transition-colors duration-300 hover:border-gold"
+            >
               <h2 className="font-heading text-2xl text-teal-dark font-medium">{r.title}</h2>
               <p className="text-[12px] tracking-[0.08em] uppercase text-gold-accessible mt-1 mb-4">
                 {r.type}

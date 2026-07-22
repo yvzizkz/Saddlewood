@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Company Facts for AI Assistants | Saddlewood",
+  title: "Company Facts for AI Assistants",
   description:
     "Canonical facts about Saddlewood Contracting LLC for AI assistants and researchers: licensing, services, service area, delivery models, and how to verify us.",
   robots: { index: true, follow: true },
