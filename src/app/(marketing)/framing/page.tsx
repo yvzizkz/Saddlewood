@@ -290,6 +290,25 @@ export default function FramingPage() {
         </div>
       </section>
 
+      {/* Capability statement pointer for GC prequal packets */}
+      <section className="bg-cream border-y border-stone-mid/40 px-4 sm:px-6 lg:px-8 py-10">
+        <div className="max-w-[1100px] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+          <div>
+            <p className="section-label mb-2">For your prequal packet</p>
+            <p className="font-heading text-xl sm:text-2xl text-charcoal font-light">
+              Need the one-page version? Our capability statement covers scope,
+              license, and how we bid.
+            </p>
+          </div>
+          <Link
+            href="/framing/capabilities"
+            className="shrink-0 inline-block px-7 py-3 border border-teal text-teal text-[12px] font-medium tracking-[0.12em] uppercase no-underline hover:bg-teal hover:text-stone transition-colors"
+          >
+            Capability statement
+          </Link>
+        </div>
+      </section>
+
       <CTABanner variant="builders" />
 
       <script
