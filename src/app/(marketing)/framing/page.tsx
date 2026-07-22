@@ -290,7 +290,7 @@ export default function FramingPage() {
         </div>
       </section>
 
-      <CTABanner />
+      <CTABanner variant="builders" />
 
       <script
         type="application/ld+json"

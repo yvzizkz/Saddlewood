@@ -4,7 +4,7 @@ import { NeighborhoodsGrid } from "@/components/NeighborhoodsGrid";
 import { CTABanner } from "@/components/CTABanner";
 
 export const metadata: Metadata = {
-  title: "Areas We Serve | Scottsdale & Paradise Valley Remodeling",
+  title: "Areas We Serve | Scottsdale & Paradise Valley Remodeling | Saddlewood",
   description:
     "Saddlewood Contracting serves Scottsdale and Paradise Valley's premier neighborhoods. Explore our service areas and custom design-build remodeling projects.",
   keywords: [

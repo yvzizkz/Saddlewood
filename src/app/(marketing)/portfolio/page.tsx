@@ -3,7 +3,7 @@ import { PageHero } from "@/components/PageHero";
 import { VideoReel } from "@/components/VideoReel";
 
 export const metadata = {
-  title: "Remodeling Portfolio | Scottsdale Kitchen & Bath Projects",
+  title: "Remodeling Portfolio | Scottsdale Kitchen & Bath Projects | Saddlewood",
   description:
     "Browse luxury kitchen, bathroom, and whole-home remodeling projects in McCormick Ranch, Gainey Ranch, and Pinnacle Peak. See real Saddlewood Contracting transformations in Scottsdale, AZ.",
   alternates: { canonical: "/portfolio" },
