@@ -4,16 +4,16 @@ import Image from "next/image";
 export const metadata = {
   title: "Framing Capability Statement — Wood & Steel, Slab to Trusses",
   description:
-    "Saddlewood Contracting capability statement for builders and GCs: licensed AZ framing (ROC #305762), self-performed wood and structural steel framing, Scottsdale & Phoenix metro. Send plans to info@saddlewoodcontracting.com.",
+    "Saddlewood Contracting capability statement for builders and GCs: licensed AZ framing (ROC #305762), self-performed custom wood and light-gauge metal stud framing, Scottsdale & Phoenix metro. Send plans to info@saddlewoodcontracting.com.",
   alternates: { canonical: "/framing/capabilities" },
   openGraph: {
     title: "Saddlewood — Framing Capability Statement",
     description:
-      "Licensed AZ framing crew, self-performing wood & structural steel, slab to trusses.",
+      "Licensed AZ framing crew, self-performing custom wood & metal stud, slab to trusses.",
     images: [
       {
         url: "/images/pv-newbuild-steel-frame.jpg",
-        alt: "Structural steel framing by Saddlewood Contracting in Paradise Valley",
+        alt: "Framing by Saddlewood Contracting in Paradise Valley",
       },
     ],
   },
@@ -25,7 +25,7 @@ const FACTS: [string, string][] = [
   ["Operating since", "2013"],
   ["Base", "Scottsdale, Arizona"],
   ["Service area", "Scottsdale · Paradise Valley · Phoenix metro"],
-  ["Systems", "Wood framing · structural steel · hybrid"],
+  ["Systems", "Custom wood framing · light-gauge metal stud · hybrid"],
   ["Delivery", "Lumber-and-labor or labor-only"],
   ["Crew language", "English & Spanish — bilingual field leadership"],
   ["Insurance", "COI issued on request, certificate holder named"],
@@ -46,7 +46,7 @@ const SCOPE = [
   {
     n: "03",
     t: "Beams, headers & steel",
-    d: "Glulam, LVL, PSL and structural steel — moment frames and long-span members set, bolted and welded by our own crew.",
+    d: "Glulam, LVL and PSL engineered members plus light-gauge metal stud systems — set and framed by our own crew, coordinated tight with the structural trades.",
   },
   {
     n: "04",
@@ -99,7 +99,7 @@ export default function FramingCapabilitiesPage() {
             Slab to trusses.
           </h1>
           <p className="text-stone/75 text-base sm:text-lg font-light leading-relaxed max-w-[52ch] mt-7">
-            Wood and structural steel by one accountable crew — no broker layer, no
+            Custom wood and metal stud by one accountable crew — no broker layer, no
             borrowed labor. This page is our capability statement; print it, forward
             it, or send us the plans and skip the paperwork.
           </p>
@@ -210,7 +210,7 @@ export default function FramingCapabilitiesPage() {
           <div className="lg:col-span-6">
             <Image
               src="/images/pv-newbuild-steel-aerial.jpg"
-              alt="Aerial view of the structural steel skeleton on a Paradise Valley ground-up custom framed by Saddlewood"
+              alt="Aerial view of the metal stud + custom wood framing skeleton on a Paradise Valley ground-up custom framed by Saddlewood"
               width={1200}
               height={800}
               className="w-full border border-stone"
