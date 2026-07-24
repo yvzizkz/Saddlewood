@@ -79,8 +79,8 @@ export default function FramingPage() {
                 },
                 {
                   src: "/images/pv-newbuild-steel-frame.jpg",
-                  alt: "Steel skeleton erected on the foundation of a Paradise Valley new build",
-                  caption: "The steel skeleton set on the foundation — self-performed, ground-up."
+                  alt: "Structural frame erected on the foundation of a Paradise Valley new build",
+                  caption: "The structural frame set on the foundation; our crews carry the framing from here."
                 },
                 {
                   src: "/images/pv-newbuild-steel-joists.jpg",

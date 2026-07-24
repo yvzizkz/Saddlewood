@@ -128,7 +128,7 @@ export default function NewConstructionPage() {
         </div>
       </section>
 
-      {/* On Site Now — Steel Construction Project */}
+      {/* On Site Now — Ground-Up Construction Project */}
       <section className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-t border-b border-stone-mid/20">
         <div className="max-w-[1200px] mx-auto">
           <div className="flex items-center gap-4 mb-8">
