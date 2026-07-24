@@ -24,7 +24,7 @@ export const metadata = {
   openGraph: {
     title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood",
     description: "A licensed Arizona framing crew that self-performs — slab to trusses, on schedule.",
-    images: [{ url: "/images/pv-newbuild-steel-aerial.jpg", alt: "Aerial view of structural steel framing on a ground-up custom home in Paradise Valley by Saddlewood Contracting" }],
+    images: [{ url: "/images/pv-newbuild-steel-aerial.jpg", alt: "Aerial view of framing on a ground-up custom home in Paradise Valley by Saddlewood Contracting" }],
   },
 };
 
@@ -36,10 +36,10 @@ export default function FramingPage() {
         title="A licensed AZ framing crew that self-performs."
         description="From slab to trusses, we deliver structural precision on schedule. The reliable framing partner for Scottsdale's premier builders."
         image="/images/pv-newbuild-steel-aerial.jpg"
-        imageAlt="Aerial view of structural steel framing on a ground-up custom home in Paradise Valley by Saddlewood Contracting"
+        imageAlt="Aerial view of framing on a ground-up custom home in Paradise Valley by Saddlewood Contracting"
       />
 
-      {/* On Site Now — Steel Framing Gallery */}
+      {/* On Site Now — Framing Gallery */}
       <section className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-b border-stone-mid/20">
         <div className="max-w-[1200px] mx-auto">
           <div className="flex items-center gap-4 mb-8">
@@ -49,12 +49,12 @@ export default function FramingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start mb-12">
             <div className="lg:col-span-6">
               <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2 mb-6">
-                Structural steel, ground-up — Paradise Valley.
+                Ground-up framing — Paradise Valley.
               </h2>
             </div>
             <div className="lg:col-span-6">
               <p className="text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base">
-                An active ground-up build we are self-performing; the structural steel skeleton is currently going up. This project is in its framing stage and demonstrates our team&apos;s capacity for complex custom home engineering.
+                An active ground-up build we are self-performing; the structural phase is underway. This project is in its framing stage and demonstrates our team&apos;s capacity for complex custom home engineering.
               </p>
             </div>
           </div>
@@ -63,19 +63,19 @@ export default function FramingPage() {
               <VideoReel
                 src="/videos/breaking-ground-steel-9x16.mp4"
                 poster="/videos/breaking-ground-steel-9x16-poster.jpg"
-                label="On-site footage of Paradise Valley custom home structural steel framing progress"
+                label="On-site footage of Paradise Valley custom home framing progress"
                 aspect="9x16"
                 mode="autoloop"
                 className="mb-4"
               />
-              <p className="text-charcoal-light text-xs font-light">On-site footage of the active Paradise Valley steel framing.</p>
+              <p className="text-charcoal-light text-xs font-light">On-site footage of the active Paradise Valley build in its structural phase.</p>
             </div>
             <div className="lg:col-span-9 grid grid-cols-1 sm:grid-cols-3 gap-6">
               {[
                 {
                   src: "/images/pv-newbuild-steel-aerial.jpg",
-                  alt: "Aerial of structural steel roof framing on a Paradise Valley custom home build",
-                  caption: "Structural steel framing taking shape over a new Paradise Valley estate."
+                  alt: "Aerial of structural-phase steel (set by the project's steel trade) roof framing on a Paradise Valley custom home build",
+                  caption: "framing taking shape over a new Paradise Valley estate."
                 },
                 {
                   src: "/images/pv-newbuild-steel-frame.jpg",
@@ -84,8 +84,8 @@ export default function FramingPage() {
                 },
                 {
                   src: "/images/pv-newbuild-steel-joists.jpg",
-                  alt: "Stacked galvanized structural steel members staged on site",
-                  caption: "Galvanized structural steel staged on site before erection."
+                  alt: "Stacked galvanized structural-phase steel (set by the project's steel trade) members staged on site",
+                  caption: "Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection."
                 }
               ].map((img, idx) => (
                 <div key={idx} className="group">
