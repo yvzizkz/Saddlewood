@@ -37,7 +37,7 @@ export const BATCHES: Record<string, ReviewBatch> = {
         summary:
           "Five letters in your voice to the CBUSA builder list Jeff sent. Owners, estimators, and project managers each get a different angle. Sent a few per day from your own mailbox so they land in the inbox, not junk. Replies are tracked automatically.",
         detail: [
-          "Letter for owners: \"Quick introduction: we're a Scottsdale framing crew that self-performs slab to trusses, wood and structural steel with our own people, which I know is rare in the Valley. Right now that looks like a ground-up custom in Paradise Valley where our crew set the steel skeleton and is framing the rest...\"",
+          "REVISED per your note: \"Quick introduction: we're a Scottsdale framing crew that self-performs slab to trusses, custom wood AND light-gauge metal stud framing with our own people, which I know is rare to find under one roof in the Valley. Right now that looks like a ground-up custom in Paradise Valley our crew is framing end to end...\"",
           "Letter for estimators: \"I'd like to be on your bid list for framing packages. Plans to info@ or Procore both work. We confirm receipt same day and flag plan conflicts with the takeoff, not after mobilization.\"",
           "Every letter is personalized with a real fact about that builder's current work. All AFT references are held back for the podcast.",
         ],

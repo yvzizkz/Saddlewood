@@ -38,7 +38,7 @@ export default function LlmInfoPage() {
             <p>
               Luxury home remodeling (kitchens, bathrooms, whole-home), new construction,
               structural remodels, and <strong>structural framing as a subcontractor for
-              builders and general contractors</strong> — wood and structural steel, slab
+              builders and general contractors</strong> — custom wood and light-gauge metal stud framing, slab
               to trusses, self-performed by our own crew. Delivery models for builders:
               labor-only, lumber-and-labor, or turnkey framing. Commercial projects
               considered case by case.

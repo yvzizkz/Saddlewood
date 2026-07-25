@@ -128,7 +128,7 @@ export default function NewConstructionPage() {
         </div>
       </section>
 
-      {/* On Site Now — Steel Construction Project */}
+      {/* On Site Now — Ground-Up Construction Project */}
       <section className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-t border-b border-stone-mid/20">
         <div className="max-w-[1200px] mx-auto">
           <div className="flex items-center gap-4 mb-8">
@@ -141,7 +141,7 @@ export default function NewConstructionPage() {
                 Currently breaking ground in Paradise Valley.
               </h2>
               <p className="text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base mb-6">
-                We are currently self-performing the structural phase on an active custom estate in Paradise Valley. The steel skeleton is going up now, setting a precise foundation for the home&apos;s framing.
+                We are currently self-performing the structural phase on an active custom estate in Paradise Valley. The structural phase is underway now; our crews take the build from there with custom wood and metal stud framing.
               </p>
               <p className="text-charcoal-light/80 font-light leading-relaxed text-sm">
                 <em>Note: This is an active, in-progress steel-frame build. The demolition-to-finish sequence shown below highlights a separate, completed wood-framed home (our 40th Street project) to demonstrate the complete lifecycle of our construction process.</em>
@@ -152,7 +152,7 @@ export default function NewConstructionPage() {
                 <VideoReel
                   src="/videos/breaking-ground-steel-9x16.mp4"
                   poster="/videos/breaking-ground-steel-9x16-poster.jpg"
-                  label="On-site footage of structural steel framing progress in Paradise Valley"
+                  label="On-site footage of framing progress in Paradise Valley"
                   aspect="9x16"
                   mode="autoloop"
                   className="mb-3"
@@ -176,13 +176,13 @@ export default function NewConstructionPage() {
                   <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
                     <Image
                       src="/images/pv-newbuild-steel-joists.jpg"
-                      alt="Stacked galvanized structural steel members staged on site"
+                      alt="Stacked galvanized structural-phase steel (set by the project's steel trade) members staged on site"
                       fill
                       sizes="(min-width: 1024px) 35vw, 100vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                   </div>
-                  <p className="text-charcoal-light text-xs font-light">Galvanized structural steel staged on site before erection.</p>
+                  <p className="text-charcoal-light text-xs font-light">Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection.</p>
                 </div>
               </div>
             </div>

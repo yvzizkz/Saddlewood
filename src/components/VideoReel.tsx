@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 interface VideoReelProps {
   src: string;            // e.g. "/videos/breaking-ground-steel-9x16.mp4"
   poster: string;         // e.g. "/videos/breaking-ground-steel-9x16-poster.jpg"
-  label: string;          // aria-label / context, e.g. "Structural steel framing on site in Paradise Valley"
+  label: string;          // aria-label / context, e.g. "framing on site in Paradise Valley"
   aspect: "9x16" | "16x9" | "1x1";
   mode?: "autoloop" | "clickToPlay";  // default "autoloop"
   className?: string;
