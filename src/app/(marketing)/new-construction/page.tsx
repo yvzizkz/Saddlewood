@@ -164,13 +164,13 @@ export default function NewConstructionPage() {
                   <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
                     <Image
                       src="/images/pv-newbuild-steel-frame.jpg"
-                      alt="Steel skeleton erected on the foundation of a Paradise Valley new build"
+                      alt="Structural frame erected on the foundation of a Paradise Valley new build"
                       fill
                       sizes="(min-width: 1024px) 35vw, 100vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                   </div>
-                  <p className="text-charcoal-light text-xs font-light">The steel skeleton erected on the foundation.</p>
+                  <p className="text-charcoal-light text-xs font-light">The structural frame erected on the foundation.</p>
                 </div>
                 <div className="group">
                   <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
