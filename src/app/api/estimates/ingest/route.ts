@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
   IngestPayload,
   IngestSuccessResponse,
@@ -104,6 +104,20 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<IngestSuccessResponse | IngestErrorResponse>> {
   if (!validateBearerToken(request)) return unauthorized();
+
+  // After the auth check, so an unauthenticated caller learns nothing about
+  // how this environment is configured.
+  let supabaseAdmin: ReturnType<typeof getSupabaseAdmin>;
+  try {
+    supabaseAdmin = getSupabaseAdmin();
+  } catch (e) {
+    console.error("[ingest] admin client unavailable:", e);
+    return badRequest(
+      "Server is not configured for ingest",
+      "CONFIG_ERROR",
+      500,
+    );
+  }
 
   let rawBody: string;
   try {
