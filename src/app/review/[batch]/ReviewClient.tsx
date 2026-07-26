@@ -1,10 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import type { ReviewBatch, ReviewItem } from "@/lib/reviewData";
 
-type Sent = { decision: string; comment?: string };
+type Sent = { decision: string; comment?: string; files?: number };
+type Att = { name: string; type: string; b64: string; bytes: number; url: string };
+
+const MAX_FILES = 4;
+// Must stay under the server's decoded ceiling, which is itself set by
+// Vercel's 4.5 MB request-body limit. Anything larger has to go by email.
+const MAX_TOTAL_BYTES = 3_000_000;
+const MAX_EDGE = 1600; // a 1600px long edge is plenty to read a job-site detail
+
+function b64(buf: ArrayBuffer) {
+  // Chunked: String.fromCharCode(...wholeArray) overflows the call stack on a
+  // multi-megabyte photo, which on a phone reads as "the button did nothing".
+  const bytes = new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(s);
+}
+
+/** Shrink a photo in the browser. A modern phone camera file is 3-5 MB, which
+ *  a single one of would blow the request budget; re-encoding also turns iOS
+ *  HEIC into a JPEG anyone can open. Non-images and failures pass through. */
+async function prepare(file: File): Promise<Att> {
+  const raw = async (): Promise<Att> => ({
+    name: file.name,
+    type: file.type || "application/octet-stream",
+    b64: b64(await file.arrayBuffer()),
+    bytes: file.size,
+    url: URL.createObjectURL(file),
+  });
+  if (!file.type.startsWith("image/")) return raw();
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale);
+    c.height = Math.round(bmp.height * scale);
+    const ctx = c.getContext("2d");
+    if (!ctx) return raw();
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    const blob: Blob | null = await new Promise((r) =>
+      c.toBlob(r, "image/jpeg", 0.72),
+    );
+    if (!blob) return raw();
+    return {
+      name: file.name.replace(/\.[^.]+$/, "") + ".jpg",
+      type: "image/jpeg",
+      b64: b64(await blob.arrayBuffer()),
+      bytes: blob.size,
+      url: URL.createObjectURL(blob),
+    };
+  } catch {
+    return raw();
+  }
+}
 
 export function ReviewClient({ batch, token }: { batch: ReviewBatch; token: string }) {
   const [sent, setSent] = useState<Record<string, Sent>>({});
@@ -12,13 +67,75 @@ export function ReviewClient({ batch, token }: { batch: ReviewBatch; token: stri
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [atts, setAtts] = useState<Record<string, Att[]>>({});
+  const pickers = useRef<Record<string, HTMLInputElement | null>>({});
 
   const done = Object.keys(sent).length;
   const total = batch.items.length;
 
+  async function addFiles(itemId: string, list: FileList | null) {
+    if (!list?.length) return;
+    setBusy(itemId);
+    setError(null);
+    try {
+      const have = atts[itemId] || [];
+      const room = MAX_FILES - have.length;
+      if (room <= 0) {
+        setError(`You can attach up to ${MAX_FILES} files per item.`);
+        return;
+      }
+      const prepared = await Promise.all(
+        Array.from(list).slice(0, room).map(prepare),
+      );
+      // Take what fits rather than refusing the batch. Rejecting four photos
+      // because the fourth is oversized loses three that were fine.
+      const next = [...have];
+      let bytes = have.reduce((n, a) => n + a.bytes, 0);
+      const rejected: string[] = [];
+      for (const p of prepared) {
+        if (bytes + p.bytes > MAX_TOTAL_BYTES) {
+          rejected.push(p.name);
+          URL.revokeObjectURL(p.url);
+          continue;
+        }
+        bytes += p.bytes;
+        next.push(p);
+      }
+      setAtts((a) => ({ ...a, [itemId]: next }));
+      const overflow = list.length - room;
+      if (rejected.length || overflow > 0) {
+        const parts = [];
+        if (rejected.length) parts.push(`${rejected.join(", ")} too large`);
+        if (overflow > 0) parts.push(`${MAX_FILES} files max`);
+        setError(
+          `Not everything fit (${parts.join("; ")}). What you see below will ` +
+            `send. For the rest, reply to the email and attach them there — ` +
+            `that path has no size limit.`,
+        );
+      }
+    } catch {
+      setError("Couldn't read those files. Try one at a time.");
+    } finally {
+      setBusy(null);
+      const el = pickers.current[itemId];
+      // Clear it, or picking the same photo twice in a row fires no change event.
+      if (el) el.value = "";
+    }
+  }
+
+  function removeFile(itemId: string, idx: number) {
+    setAtts((a) => {
+      const list = [...(a[itemId] || [])];
+      const [gone] = list.splice(idx, 1);
+      if (gone) URL.revokeObjectURL(gone.url);
+      return { ...a, [itemId]: list };
+    });
+  }
+
   async function submit(item: ReviewItem, decision: string, comment?: string) {
     setBusy(item.id);
     setError(null);
+    const files = atts[item.id] || [];
     try {
       const res = await fetch("/api/review", {
         method: "POST",
@@ -30,10 +147,23 @@ export function ReviewClient({ batch, token }: { batch: ReviewBatch; token: stri
           itemTitle: item.title,
           decision,
           comment: comment || "",
+          files: files.map((f) => ({ name: f.name, type: f.type, b64: f.b64 })),
         }),
       });
+      if (res.status === 413) {
+        // Say which half failed. "Saved" with the photo missing is the one
+        // outcome that would quietly lose information.
+        setError(
+          "Your answer was NOT saved — the files are too large for this page. " +
+            "Remove one, or reply to the email with them attached.",
+        );
+        return;
+      }
       if (!res.ok) throw new Error("send failed");
-      setSent((s) => ({ ...s, [item.id]: { decision, comment } }));
+      setSent((s) => ({
+        ...s,
+        [item.id]: { decision, comment, files: files.length },
+      }));
       setOpenNote((o) => ({ ...o, [item.id]: false }));
     } catch {
       setError("That didn't save. Check your connection and tap again.");
@@ -137,6 +267,11 @@ export function ReviewClient({ batch, token }: { batch: ReviewBatch; token: stri
                         “{answer.comment}”
                       </span>
                     ) : null}
+                    {answer.files ? (
+                      <span className="text-[#5A5A5A] font-normal whitespace-nowrap">
+                        + {answer.files} file{answer.files > 1 ? "s" : ""}
+                      </span>
+                    ) : null}
                     <button
                       className="ml-auto text-[12px] text-[#8B6914] underline"
                       onClick={() => setSent((s) => {
@@ -150,6 +285,64 @@ export function ReviewClient({ batch, token }: { batch: ReviewBatch; token: stri
                   </div>
                 ) : (
                   <>
+                    <div className="mb-3">
+                      <input
+                        ref={(el) => {
+                          pickers.current[item.id] = el;
+                        }}
+                        type="file"
+                        multiple
+                        accept="image/*,application/pdf,.txt"
+                        className="hidden"
+                        onChange={(e) => addFiles(item.id, e.target.files)}
+                      />
+                      <button
+                        type="button"
+                        disabled={busy === item.id}
+                        onClick={() => pickers.current[item.id]?.click()}
+                        className="text-[13px] font-semibold text-[#8B6914] underline disabled:opacity-40"
+                      >
+                        + Add photos or a file
+                      </button>
+                      <span className="text-[12px] text-[#5A5A5A] ml-2">
+                        optional — they go with your answer
+                      </span>
+
+                      {(atts[item.id] || []).length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {(atts[item.id] || []).map((a, i) => (
+                            <div
+                              key={`${a.name}-${i}`}
+                              className="relative w-[72px]"
+                            >
+                              {a.type.startsWith("image/") ? (
+                                // Blob URL of a file the owner just picked;
+                                // next/image would want a remote loader.
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={a.url}
+                                  alt={a.name}
+                                  className="w-[72px] h-[72px] object-cover rounded-lg border border-[#e2dbd0]"
+                                />
+                              ) : (
+                                <div className="w-[72px] h-[72px] rounded-lg border border-[#e2dbd0] bg-[#f5f0e8] flex items-center justify-center text-[10px] text-[#5A5A5A] px-1 text-center break-all">
+                                  {a.name.slice(-14)}
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                aria-label={`Remove ${a.name}`}
+                                onClick={() => removeFile(item.id, i)}
+                                className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#8f3b2d] text-white text-[13px] leading-none"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {item.kind === "choice" && item.options ? (
                       <div className="grid grid-cols-2 gap-2.5">
                         {item.options.map((o) => (
