@@ -24,6 +24,33 @@ function b64(buf: ArrayBuffer) {
   return btoa(s);
 }
 
+/** Filename an artifact lands under. The stored names (rv-design-b.jpeg) mean
+ *  nothing in a Downloads folder a week later, and several items reuse the same
+ *  file -- so name by what it IS, not where it came from. */
+function assetName(batchId: string, item: ReviewItem, i: number) {
+  const ext = (item.images?.[i]?.src.split(".").pop() || "jpg").split("?")[0];
+  const slug = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  const caption = item.images?.[i]?.caption || "";
+  const tail = caption ? `-${slug(caption)}` : item.images!.length > 1 ? `-${i + 1}` : "";
+  return `saddlewood-${batchId}-${slug(item.title)}${tail}.${ext}`;
+}
+
+function downloadAll(batchId: string, item: ReviewItem) {
+  // Staggered: browsers throttle or silently drop a burst of simultaneous
+  // programmatic downloads, which looks like only the first one working.
+  (item.images || []).forEach((img, i) => {
+    setTimeout(() => {
+      const a = document.createElement("a");
+      a.href = img.src;
+      a.download = assetName(batchId, item, i);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }, i * 350);
+  });
+}
+
 /** Shrink a photo in the browser. A modern phone camera file is 3-5 MB, which
  *  a single one of would blow the request budget; re-encoding also turns iOS
  *  HEIC into a JPEG anyone can open. Non-images and failures pass through. */
@@ -236,7 +263,16 @@ export function ReviewClient({ batch, token }: { batch: ReviewBatch; token: stri
 
               {item.images && (
                 <div className="px-5 pb-4 space-y-4">
-                  {item.images.map((img) => (
+                  {item.images.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => downloadAll(batch.id, item)}
+                      className="text-[13px] font-semibold text-[#8B6914] underline"
+                    >
+                      Download all {item.images.length}
+                    </button>
+                  )}
+                  {item.images.map((img, i) => (
                     <figure key={img.src}>
                       <a href={img.src} target="_blank" rel="noreferrer">
                         <Image
@@ -248,7 +284,14 @@ export function ReviewClient({ batch, token }: { batch: ReviewBatch; token: stri
                         />
                       </a>
                       <figcaption className="text-[12px] text-[#5A5A5A] mt-1.5">
-                        {img.caption} <span className="text-[#8B6914]">Tap to zoom.</span>
+                        {img.caption} <span className="text-[#8B6914]">Tap to zoom.</span>{" "}
+                        <a
+                          href={img.src}
+                          download={assetName(batch.id, item, i)}
+                          className="text-[#8B6914] font-semibold underline"
+                        >
+                          Download
+                        </a>
                       </figcaption>
                     </figure>
                   ))}
