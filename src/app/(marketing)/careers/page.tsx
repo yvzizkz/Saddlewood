@@ -48,12 +48,12 @@ const roles = [
     salary: { min: 24, max: 34, unit: "HOUR" },
     type: "Full-time · Field · Scottsdale & Phoenix metro",
     blurb:
-      "Self-performing crew on custom homes and structural remodels — slab to trusses, wood and steel. Steady work on real projects for builders who care how it's done.",
+      "Self-performing crew on custom homes and structural remodels — slab to trusses, custom wood and metal stud. Steady work on real projects for builders who care how it's done.",
     blurbEs:
-      "Cuadrilla propia en casas custom y remodelaciones estructurales — de losa a armaduras, madera y acero. Trabajo estable en proyectos reales.",
+      "Cuadrilla propia en casas custom y remodelaciones estructurales — de losa a armaduras, madera y metal stud. Trabajo estable en proyectos reales.",
     points: [
       "Layout, walls, beams, rooflines to plan — tolerances matter here",
-      "Experience framing custom residential; steel experience a plus",
+      "Experience framing custom residential; metal stud framing experience a plus",
       "Se habla español — la mitad de nuestro equipo trabaja en español",
       "Pay matched to what you can do, reviewed against real production",
     ],
