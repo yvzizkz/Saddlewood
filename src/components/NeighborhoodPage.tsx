@@ -6,14 +6,14 @@
  * section (description paragraphs, expertise list, project index,
  * process phases, testimonials, localized CTA) renders as type and
  * hairlines on the dark page ground. Copy comes verbatim from
- * src/lib/neighborhoods.ts and src/data/projects.ts.
+ * src/lib/neighborhoods.ts and src/data/case-studies.ts.
  */
 
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, Phone } from "lucide-react";
 import type { NeighborhoodData } from "@/lib/neighborhoods";
-import { getProjectBySlug, getProjectsByNeighborhood } from "@/data/projects";
+import { caseStudies, getCaseStudy } from "@/data/case-studies";
 import { PageHero } from "@/components/PageHero";
 import { NeighborhoodPlat } from "@/components/linework";
 
@@ -39,14 +39,22 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
   const initial = prefersReducedMotion ? "visible" : "hidden";
   const viewport = { once: true, margin: "-36px" } as const;
 
-  const projects = getProjectsByNeighborhood(data.name);
-  // PV's whole-home build is the master case study for the construction
-  // process phases; only Paradise Valley currently surfaces processSteps.
-  const wholeHomeMaster = getProjectBySlug(
-    "paradise-valley-40th-street-whole-home-build",
-  );
+  const projects = caseStudies
+    .filter((cs) => cs.neighborhood === data.name)
+    .map((cs) => ({
+      slug: cs.slug,
+      title: cs.title,
+      category: cs.category,
+      description: (cs.narrative[0] ?? "").split(". ")[0] + ".",
+    }));
+  // The framing case study carries the real six-phase build sequence;
+  // only Paradise Valley surfaces it.
   const processSteps =
-    data.slug === "paradise-valley" ? wholeHomeMaster?.processSteps : undefined;
+    data.slug === "paradise-valley"
+      ? getCaseStudy("fortieth-street-breaking-ground")?.timelinePhases?.map(
+          (p) => ({ label: p.phase }),
+        )
+      : undefined;
 
   return (
     <>

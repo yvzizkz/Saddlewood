@@ -2,7 +2,13 @@ import { describe, it, expect } from "vitest";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { caseStudies, getAllCaseStudySlugs, getCaseStudy, getLegacyRedirectMap } from "../case-studies";
-import { getAllSlugs } from "../projects";
+
+// Frozen record of the retired projects.ts catalog (deleted in the redesign).
+// The legacySlugs arrays across case-studies.ts ARE the redirect contract now;
+// this count pins it so an accidental edit can't silently drop a 301.
+const FROZEN_LEGACY_SLUG_COUNT = 68;
+const getAllSlugs = () =>
+  caseStudies.flatMap((study) => study.legacySlugs);
 
 const ALLOWED_LINEWORK = ["plan-fragment", "massing", "wall-section", "steel-beam", "plat"];
 
@@ -21,7 +27,7 @@ const REAL_VIDEO_POSTERS = [
 describe("case studies", () => {
   it("absorbs every legacy portfolio slug in exactly one case study", () => {
     const legacySlugs = getAllSlugs();
-    expect(legacySlugs.length).toBeGreaterThan(0);
+    expect(legacySlugs.length).toBe(FROZEN_LEGACY_SLUG_COUNT);
 
     const counts = new Map<string, number>();
     for (const study of caseStudies) {

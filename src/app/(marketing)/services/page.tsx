@@ -4,7 +4,7 @@ import { ServicesCategories } from "@/components/ServicesCategories";
 import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
 import { WallSection } from "@/components/linework";
-import { getProjectBySlug } from "@/data/projects";
+import { getCaseStudy } from "@/data/case-studies";
 
 export const metadata = {
   title: "Services | Kitchen, Bathroom, Whole-Home & Outdoor Living in Scottsdale | Saddlewood",
@@ -36,7 +36,7 @@ const trades = [
 
 // What each construction phase of the 40th Street build became in the
 // finished home. The narrative stays grounded in the matching project
-// entries in projects.ts.
+// entries in case-studies.ts.
 const phaseOutcomes = [
   "The cleared site became the entry: exposed beams, oak floors, and arched mirrors at arrival.",
   "The slab became the chef's kitchen: natural stone island, coffered ceiling, pendant light.",
@@ -47,13 +47,13 @@ const phaseOutcomes = [
 ];
 
 export default function ServicesPage() {
-  const wholeHome = getProjectBySlug("paradise-valley-40th-street-whole-home-build");
-  const processSteps = wholeHome?.processSteps ?? [];
+  const buildSequence =
+    getCaseStudy("fortieth-street-breaking-ground")?.timelinePhases ?? [];
 
   // Defensive: if processSteps is shorter than expected, only build what we have.
-  const phases = processSteps.map((step, i) => ({
+  const phases = buildSequence.map((step, i) => ({
     number: String(i + 1).padStart(2, "0"),
-    label: step.label,
+    label: step.phase,
     outcome: phaseOutcomes[i] ?? phaseOutcomes[phaseOutcomes.length - 1],
   }));
 

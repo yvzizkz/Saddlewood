@@ -140,32 +140,6 @@ img {
   background: var(--charcoal-light);
 }
 
-/* ===== EDITORIAL TRANSITIONS ===== */
-.editorial-hover img {
-  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.editorial-hover:hover img {
-  transform: scale(1.05);
-}
-
-/* ===== HERO KEN BURNS ===== */
-@keyframes ken-burns-zoom {
-  from { transform: scale(1) translate(0, 0); }
-  to   { transform: scale(1.08) translate(-1.5%, -1%); }
-}
-
-.ken-burns-active {
-  animation: ken-burns-zoom 15s ease-in-out forwards;
-  will-change: transform;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ken-burns-active {
-    animation: none;
-  }
-}
-
 /* ===== RESPONSIVE TYPOGRAPHY ===== */
 @media (max-width: 640px) {
   h1 {
@@ -199,9 +173,6 @@ img {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-  .editorial-hover:hover img {
-    transform: none;
   }
 }
 

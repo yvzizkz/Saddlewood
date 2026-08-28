@@ -1,3 +1,5 @@
+> SUPERSEDED (2026-08-27): the image pipeline and photo hero were removed in the Night Blueprint photo-free redesign. Kept for history.
+
 # Image Processing Pipeline — Design
 
 **Date:** 2026-05-01
