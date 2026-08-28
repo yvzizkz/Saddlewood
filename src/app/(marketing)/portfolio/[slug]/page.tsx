@@ -1,235 +1,292 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
-import { getAllSlugs, getProjectBySlug } from "@/data/projects";
-import { ProjectGallery } from "@/components/ProjectGallery";
+import { ArrowRight } from "lucide-react";
+import { getAllCaseStudySlugs, getCaseStudy } from "@/data/case-studies";
+import { CTABanner } from "@/components/CTABanner";
+import { SpecTable } from "@/components/SpecTable";
+import { TimelinePhases } from "@/components/TimelinePhases";
+import { VideoReel } from "@/components/VideoReel";
+import {
+  MassingDiagram,
+  NeighborhoodPlat,
+  PlanFragment,
+  SteelBeam,
+  WallSection,
+} from "@/components/linework";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
 export function generateStaticParams() {
-  return getAllSlugs().map((slug) => ({ slug }));
+  return getAllCaseStudySlugs().map((slug) => ({ slug }));
+}
+
+/** First two sentences of narrative[0], verbatim — the lede and the meta description. */
+function narrativeLede(paragraph: string): string {
+  const two = paragraph.split(". ").slice(0, 2).join(". ");
+  return two.endsWith(".") ? two : `${two}.`;
 }
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const project = getProjectBySlug(slug);
+  const study = getCaseStudy(slug);
 
-  if (!project) {
+  if (!study) {
     return {
-      title: { absolute: "Project Not Found — Saddlewood Contracting" },
-      description: "The project you're looking for could not be found.",
+      title: "Case Study Not Found",
+      description: "The case study you're looking for could not be found.",
     };
   }
 
   return {
-    title: { absolute: `${project.title} — Saddlewood Contracting` },
-    description: project.description,
-    alternates: { canonical: `/portfolio/${project.slug}` },
+    title: `${study.title} | ${study.category} Case Study`,
+    description: narrativeLede(study.narrative[0] ?? ""),
+    alternates: { canonical: `/portfolio/${study.slug}` },
   };
 }
 
-export default async function ProjectCaseStudyPage({ params }: PageProps) {
-  const { slug } = await params;
-  const project = getProjectBySlug(slug);
+/**
+ * Drawn hero plate per linework key — the registry components accept only
+ * className, so the hero (which needs glow and, for the plat, opacity) maps
+ * keys to concrete figures. Captions describe what each drawing depicts.
+ */
+function heroPlate(key: string): { figure: ReactNode; caption: string } | null {
+  switch (key) {
+    case "plan-fragment":
+      return {
+        figure: (
+          <PlanFragment className="mx-auto block h-auto w-full max-w-[640px]" glow />
+        ),
+        caption: "Plan fragment · Great room opening to the pool terrace",
+      };
+    case "massing":
+      return {
+        figure: (
+          <MassingDiagram className="mx-auto block h-auto w-full max-w-[560px]" glow />
+        ),
+        caption: "Massing study · Stepped volumes on the ground line",
+      };
+    case "wall-section":
+      return {
+        figure: (
+          <WallSection className="mx-auto block h-auto w-full max-w-[480px]" glow />
+        ),
+        caption: "Wall section · Footing to roof line",
+      };
+    case "steel-beam":
+      return {
+        figure: (
+          <SteelBeam className="mx-auto block h-auto w-full max-w-[480px]" glow />
+        ),
+        caption: "Structural detail · Steel column at baseplate",
+      };
+    case "plat":
+      return {
+        figure: (
+          <NeighborhoodPlat
+            className="mx-auto block h-auto w-full max-w-[480px]"
+            opacity={0.9}
+            glow
+          />
+        ),
+        caption: "Survey plat · Lot lines and road alignment",
+      };
+    default:
+      return null;
+  }
+}
 
-  if (!project) {
+/** Splits the display title so the last word carries the gold italic accent. */
+function splitTitle(title: string): { head: string; accent: string } {
+  const words = title.split(" ");
+  return {
+    head: words.slice(0, -1).join(" "),
+    accent: words[words.length - 1] ?? "",
+  };
+}
+
+export default async function CaseStudyPage({ params }: PageProps) {
+  const { slug } = await params;
+  const study = getCaseStudy(slug);
+
+  if (!study) {
     notFound();
   }
 
-  const eyebrow = (project.category || "Project").toUpperCase();
+  const plate = heroPlate(study.linework);
+  const { head, accent } = splitTitle(study.title);
+  const [lede, ...body] = study.narrative;
 
   return (
-    <article className="bg-off-white">
-      {/* a. Title block — quiet typography, account for fixed nav */}
-      <header className="pt-32 sm:pt-36 lg:pt-40 pb-12 sm:pb-16 lg:pb-20">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="section-label">{eyebrow}</div>
-          <h1 className="font-heading text-4xl md:text-5xl lg:text-[56px] font-light text-charcoal leading-[1.1] tracking-[-0.02em] mt-2">
-            {project.title}
+    <article className="relative">
+      {/* ---- Title block ---- */}
+      <header className="pb-[clamp(40px,6vh,72px)] pt-32 sm:pt-36 lg:pt-40">
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <span className="section-label !mb-0 flex-wrap">
+            <span className="whitespace-nowrap">{study.neighborhood}</span>
+            <span className="text-off-white/50">· {study.category}</span>
+          </span>
+          <h1 className="mt-6 max-w-[16ch] font-heading text-[clamp(38px,5.4vw,76px)] font-medium leading-[1.08] tracking-[-0.02em] text-off-white">
+            {head}{" "}
+            <em className="font-normal italic text-gold">{accent}</em>
           </h1>
-          <p className="mt-6 text-sm sm:text-[15px] text-charcoal-light font-light tracking-wide">
-            {project.location}
-            {project.scope.length > 0 && (
-              <>
-                <span className="mx-3 text-charcoal-light/50" aria-hidden="true">
-                  ·
-                </span>
-                {project.scope.join(" · ")}
-              </>
-            )}
-          </p>
         </div>
       </header>
 
-      {/* b. Hero image (full-bleed) + c. narrative slot + d. body gallery
-          — all owned by the client wrapper so the lightbox state can be shared. */}
-      <ProjectGallery project={project}>
-        <section className="py-20 sm:py-24 lg:py-28 bg-off-white">
-          <div className="max-w-[720px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="font-heading text-xl sm:text-2xl lg:text-[26px] font-light text-charcoal leading-[1.55] italic">
-              {project.description}
+      {/* ---- Drawn hero plate ---- */}
+      {plate ? (
+        <section
+          className="pb-[clamp(56px,8vh,96px)]"
+          aria-label="Project drawing"
+        >
+          <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+            <figure className="m-0">
+              <div
+                className="border border-off-white/[0.12] px-[clamp(20px,6vw,88px)] py-[clamp(32px,6vh,72px)]"
+                aria-hidden="true"
+              >
+                {plate.figure}
+              </div>
+              <figcaption className="mt-3.5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-[10.5px] uppercase tracking-[0.18em] text-off-white/60">
+                <span>{plate.caption}</span>
+                <span className="text-off-white/40">
+                  Saddlewood Contracting · Scottsdale, AZ
+                </span>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ---- Narrative ---- */}
+      <section className="pb-[clamp(64px,9vh,120px)]" aria-label="The story">
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <span className="section-label !mb-0">The Story</span>
+          {lede ? (
+            <p className="mt-7 max-w-[32em] font-heading text-[clamp(19px,2.2vw,24px)] font-medium leading-[1.55] tracking-[-0.01em] text-off-white/85">
+              {lede}
             </p>
-
-            {(project.scope.length > 0 || project.timeline) && (
-              <div className="mt-12 sm:mt-14 grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 text-left max-w-md mx-auto">
-                {project.scope.map((item) => (
-                  <div
-                    key={item}
-                    className="text-[13px] text-charcoal-light font-light tracking-wide flex items-baseline gap-2"
-                  >
-                    <span
-                      className="w-1 h-1 rounded-full bg-gold shrink-0 translate-y-[-3px]"
-                      aria-hidden="true"
-                    />
-                    <span>{item}</span>
-                  </div>
-                ))}
-                {project.timeline && (
-                  <div className="text-[13px] text-charcoal-light font-light tracking-wide flex items-baseline gap-2 sm:col-span-2 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-stone-mid/50">
-                    <span className="text-charcoal/60 uppercase tracking-[0.18em] text-[11px]">
-                      Timeline
-                    </span>
-                    <span>{project.timeline}</span>
-                  </div>
-                )}
-              </div>
-            )}
+          ) : null}
+          <div className="mt-7 max-w-[65ch] space-y-6">
+            {body.map((paragraph) => (
+              <p
+                key={paragraph.slice(0, 32)}
+                className="text-[15.5px] leading-[1.8] text-off-white/70"
+              >
+                {paragraph}
+              </p>
+            ))}
           </div>
-        </section>
-      </ProjectGallery>
-
-      {/* e. Process timeline (conditional) */}
-      {project.processSteps && project.processSteps.length > 0 && (
-        <section className="py-20 sm:py-28 lg:py-32 bg-cream">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-14 sm:mb-20">
-              <div className="section-label justify-center">Build Process</div>
-              <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mt-2">
-                Construction Timeline
-              </h2>
-            </div>
-
-            <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 sm:gap-12 lg:gap-14">
-              {project.processSteps.map((step, i) => (
-                <li key={step.image} className="flex flex-col">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-stone">
-                    <Image
-                      src={step.image}
-                      alt={step.label}
-                      fill
-                      loading="lazy"
-                      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="mt-5 flex items-baseline gap-4">
-                    <span className="font-heading text-2xl sm:text-3xl text-gold-accessible font-light">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span className="text-[13px] sm:text-sm text-charcoal tracking-wide">
-                      {step.label}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-      )}
-
-      {/* f. Before / After (conditional) */}
-      {project.beforeImage && project.afterImage && (
-        <section className="py-20 sm:py-28 lg:py-32 bg-off-white">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-              <figure>
-                <span className="block text-[11px] tracking-[0.25em] uppercase text-charcoal-light font-medium mb-3">
-                  Before
-                </span>
-                <div className="relative aspect-[4/3] overflow-hidden bg-stone">
-                  <Image
-                    src={project.beforeImage}
-                    alt={`${project.title} — before`}
-                    fill
-                    loading="lazy"
-                    sizes="(min-width: 768px) 50vw, 100vw"
-                    className="object-cover"
-                  />
-                </div>
-              </figure>
-              <figure>
-                <span className="block text-[11px] tracking-[0.25em] uppercase text-gold-accessible font-medium mb-3">
-                  After
-                </span>
-                <div className="relative aspect-[4/3] overflow-hidden bg-stone">
-                  <Image
-                    src={project.afterImage}
-                    alt={`${project.title} — after`}
-                    fill
-                    loading="lazy"
-                    sizes="(min-width: 768px) 50vw, 100vw"
-                    className="object-cover"
-                  />
-                </div>
-              </figure>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* g. Testimonial (conditional) */}
-      {project.testimonial && (
-        <section className="py-20 sm:py-28 lg:py-32 bg-off-white">
-          <div className="max-w-[820px] mx-auto px-4 sm:px-6 lg:px-8">
-            <blockquote className="font-heading text-xl lg:text-[26px] font-normal italic text-teal leading-[1.5] pl-8 border-l-2 border-gold">
-              {project.testimonial.quote}
-            </blockquote>
-            <div className="mt-6 pl-8">
-              <div className="text-[11px] tracking-[0.25em] uppercase text-charcoal-light font-medium">
-                {project.testimonial.author}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* h1. Conversion CTA — quiet but present, before the back/forward nav */}
-      <section className="bg-cream py-20 sm:py-24 lg:py-28">
-        <div className="max-w-[820px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="font-heading text-2xl sm:text-3xl lg:text-[34px] font-medium text-teal leading-[1.25] tracking-[-0.01em] mb-8">
-            Ready to build something like this?
-          </p>
-          <Link
-            href="/contact"
-            className="inline-block px-10 py-4 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase rounded-sm no-underline hover:bg-[#d4a94c] transition-all hover:-translate-y-px"
-          >
-            Book Your Consultation
-          </Link>
         </div>
       </section>
 
-      {/* h2. Footer nav — quiet */}
-      <section className="border-t border-stone-mid/60 py-14 sm:py-16">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <Link
-            href="/portfolio"
-            className="text-sm text-charcoal-light hover:text-teal transition-colors tracking-wide"
-          >
-            <span aria-hidden="true">&larr;</span> Back to all work
-          </Link>
-          <Link
-            href="/contact"
-            className="text-sm text-charcoal hover:text-gold-accessible transition-colors tracking-wide"
-          >
-            Start a similar project <span aria-hidden="true">&rarr;</span>
-          </Link>
+      {/* ---- Colophon ---- */}
+      <section className="pb-[clamp(64px,9vh,120px)]" aria-label="Project details">
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <span className="section-label !mb-0">Title Block</span>
+          <SpecTable specs={study.specs} className="mt-8 max-w-[720px]" />
         </div>
       </section>
+
+      {/* ---- Build sequence ---- */}
+      {study.timelinePhases.length > 0 ? (
+        <section
+          className="pb-[clamp(64px,9vh,120px)]"
+          aria-label="Build sequence"
+        >
+          <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+            <span className="section-label !mb-0">Build Sequence</span>
+            <h2 className="mt-6 font-heading text-[clamp(28px,3.4vw,44px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              Phase by <em className="font-normal italic text-gold">phase.</em>
+            </h2>
+            <TimelinePhases
+              phases={study.timelinePhases}
+              className="mt-9 max-w-[840px]"
+            />
+          </div>
+        </section>
+      ) : null}
+
+      {/* ---- On-site reel ---- */}
+      {study.reel ? (
+        <section
+          className="pb-[clamp(72px,10vh,128px)]"
+          aria-label="On-site footage"
+        >
+          <div className="mx-auto flex w-full max-w-[1240px] flex-col items-center px-5 text-center sm:px-8">
+            <span className="inline-flex items-center gap-3.5 text-[11px] font-medium uppercase tracking-[0.25em] text-gold">
+              <span className="h-px w-6 bg-gold" aria-hidden="true" />
+              On Site
+              <span className="h-px w-6 bg-gold" aria-hidden="true" />
+            </span>
+            <div className="night-reel night-reel--dusk mt-9 w-[min(320px,80vw)]">
+              <VideoReel
+                src={study.reel.src}
+                poster={study.reel.poster}
+                label={study.reel.label}
+                aspect="9x16"
+                mode="autoloop"
+                className="rounded-none bg-teal-dark"
+              />
+              <span className="night-reel-chip">On Site</span>
+            </div>
+            <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
+              Filmed on site · {study.neighborhood}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ---- Selected scope ---- */}
+      <section className="pb-[clamp(72px,10vh,128px)]" aria-label="Selected scope">
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <div className="text-[10.5px] font-medium uppercase tracking-[0.25em] text-gold">
+            Selected Scope
+          </div>
+          <ul className="mt-5 grid max-w-[960px] list-none grid-cols-1 gap-x-7 gap-y-2.5 p-0 min-[480px]:grid-cols-2 lg:grid-cols-3">
+            {study.scope.map((item) => (
+              <li
+                key={item}
+                className="relative pl-5 text-[13.5px] leading-snug text-off-white/80"
+              >
+                <span
+                  className="absolute left-0 top-[0.62em] h-px w-2.5 bg-gold"
+                  aria-hidden="true"
+                />
+                {item}
+              </li>
+            ))}
+          </ul>
+
+          {/* Quiet footer nav */}
+          <div className="mt-[clamp(56px,8vh,88px)] flex flex-col items-start justify-between gap-5 border-t border-off-white/[0.14] pt-9 sm:flex-row sm:items-center">
+            <Link
+              href="/portfolio"
+              className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-off-white/60 no-underline transition-colors hover:text-gold"
+            >
+              <ArrowRight
+                className="h-3.5 w-3.5 rotate-180"
+                aria-hidden="true"
+              />
+              All case studies
+            </Link>
+            <Link
+              href="/contact"
+              className="inline-flex items-center gap-2 border-b border-gold/40 pb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:border-gold"
+            >
+              Start a similar project
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <CTABanner />
     </article>
   );
 }

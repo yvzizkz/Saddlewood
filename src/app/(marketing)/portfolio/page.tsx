@@ -1,97 +1,132 @@
-import { ProjectGrid } from "@/components/ProjectGrid";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { PageHero } from "@/components/PageHero";
-import { VideoReel } from "@/components/VideoReel";
+import { CTABanner } from "@/components/CTABanner";
+import { SpecTable } from "@/components/SpecTable";
+import { caseStudies, type CaseStudy } from "@/data/case-studies";
+import { lineworkRegistry, NeighborhoodPlat } from "@/components/linework";
 
 export const metadata = {
-  title: "Remodeling Portfolio | Scottsdale Kitchen & Bath Projects | Saddlewood",
+  title: "Portfolio | Remodeling & New Construction Case Studies in Scottsdale",
   description:
-    "Browse luxury kitchen, bathroom, and whole-home remodeling projects in McCormick Ranch, Gainey Ranch, and Pinnacle Peak. See real Saddlewood Contracting transformations in Scottsdale, AZ.",
+    "Case studies of luxury kitchen, bath, and whole-home remodeling in McCormick Ranch, Gainey Ranch, and Pinnacle Peak, plus a ground-up estate build in Paradise Valley, all by Saddlewood Contracting's in-house crews.",
   alternates: { canonical: "/portfolio" },
 };
+
+/** First two sentences of the study's narrative, verbatim from the data. */
+function excerpt(study: CaseStudy): string {
+  const opening = study.narrative[0] ?? "";
+  const two = opening.split(". ").slice(0, 2).join(". ");
+  return two.endsWith(".") ? two : `${two}.`;
+}
 
 export default function PortfolioPage() {
   return (
     <>
       <PageHero
-        label="Portfolio"
-        title="Our Work"
-        description="Luxury remodels across Scottsdale's most prestigious neighborhoods."
-        image="/images/pv-exterior-fireplace-twilight.jpg"
-        imageAlt="Paradise Valley outdoor fireplace and covered patio at twilight"
+        label="Selected Work"
+        title="Case Studies"
+        description="Luxury kitchen, bath, and whole-home remodels across McCormick Ranch, Gainey Ranch, and Pinnacle Peak, and a ground-up estate in Paradise Valley."
+        linework={
+          <NeighborhoodPlat
+            className="block h-auto w-full max-w-[460px]"
+            opacity={0.65}
+            glow
+          />
+        }
       />
 
-      {/* Project Grid */}
-      <section className="py-10 sm:py-12 lg:py-16 bg-cream">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ProjectGrid />
+      {/* ---- The ledger — six case studies as editorial rows ---- */}
+      <section
+        className="relative pb-[clamp(80px,11vh,140px)] pt-[clamp(24px,4vh,48px)]"
+        aria-label="Case studies"
+      >
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <p className="max-w-[640px] text-[15.5px] leading-[1.8] text-off-white/70">
+            Every build here was carried by our own licensed crews across all
+            four trades, general, electrical, plumbing, and HVAC, from
+            demolition to the final fixture. Six case studies, told the way we
+            plan them: drawn first, then built.
+          </p>
+
+          <div className="mt-[clamp(44px,6vh,72px)] border-t border-off-white/[0.14]">
+            {caseStudies.map((study, i) => {
+              const Motif = lineworkRegistry[study.linework];
+              return (
+                <article
+                  key={study.slug}
+                  className="group border-b border-off-white/[0.14]"
+                >
+                  <div className="grid gap-x-[clamp(40px,5vw,88px)] gap-y-9 py-[clamp(44px,7vh,84px)] lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                    {/* Plate: index numeral, drawn motif, spec preview */}
+                    <div>
+                      <div className="text-[10.5px] font-medium tracking-[0.25em] text-gold">
+                        {String(i + 1).padStart(2, "0")}
+                        <span className="text-off-white/40"> / 06</span>
+                      </div>
+                      <div className="mt-7" aria-hidden="true">
+                        {study.linework === "plat" ? (
+                          /* The plat defaults to 0.35 background opacity —
+                             lift it so the motif reads at ledger scale. */
+                          <NeighborhoodPlat
+                            className="block h-[clamp(140px,15vw,190px)] w-full max-w-[400px]"
+                            opacity={0.85}
+                          />
+                        ) : Motif ? (
+                          <Motif className="block h-[clamp(140px,15vw,190px)] w-full max-w-[400px]" />
+                        ) : null}
+                      </div>
+                      <SpecTable
+                        specs={study.specs.filter(
+                          (spec) => spec.label !== "Category"
+                        )}
+                        className="mt-8 hidden max-w-[400px] lg:block"
+                      />
+                    </div>
+
+                    {/* Entry: meta, title, narrative excerpt, scope line */}
+                    <div className="flex flex-col items-start">
+                      <div className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-gold">
+                        {study.neighborhood}
+                        <span className="text-off-white/50">
+                          {" "}
+                          · {study.category}
+                        </span>
+                      </div>
+                      <h2 className="mt-5 font-heading text-[clamp(28px,3.4vw,44px)] font-medium leading-[1.15] tracking-[-0.02em]">
+                        <Link
+                          href={`/portfolio/${study.slug}`}
+                          className="text-off-white no-underline transition-colors duration-500 group-hover:text-gold"
+                        >
+                          {study.title}
+                        </Link>
+                      </h2>
+                      <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
+                        {excerpt(study)}
+                      </p>
+                      <p className="mt-6 max-w-[560px] text-[13px] leading-[1.7] text-off-white/60">
+                        {study.scope.slice(0, 4).join(" · ")}
+                      </p>
+                      <Link
+                        href={`/portfolio/${study.slug}`}
+                        className="mt-9 inline-flex items-center gap-2 border-b border-gold/40 pb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:border-gold"
+                      >
+                        Read the case study
+                        <ArrowRight
+                          className="h-3.5 w-3.5 transition-transform duration-500 group-hover:translate-x-1"
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* Our Work in Motion Section */}
-      <section className="py-20 sm:py-24 lg:py-28 bg-off-white border-t border-stone-mid/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-12">
-            <div className="section-label">Media Gallery</div>
-            <h2 className="font-heading text-3xl sm:text-4xl lg:text-[40px] font-light text-charcoal leading-tight">
-              Our Work in Motion
-            </h2>
-            <p className="mt-4 text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base max-w-[720px]">
-              Watch our building process and finished craftsmanship unfold. Click any reel below to play.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-            <div className="flex flex-col gap-3">
-              <VideoReel
-                src="/videos/stitched-reel-9x16.mp4"
-                poster="/videos/stitched-reel-9x16-poster.jpg"
-                label="Stitched highlights reel showing completed luxury residential construction projects"
-                aspect="9x16"
-                mode="clickToPlay"
-              />
-              <div>
-                <h3 className="font-heading text-lg font-light text-charcoal">Finished Projects Showcase</h3>
-                <p className="text-charcoal-light text-xs sm:text-sm font-light leading-relaxed mt-1">
-                  A stitched highlights reel of our completed luxury residential work.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <VideoReel
-                src="/videos/process-timeline-9x16.mp4"
-                poster="/videos/process-timeline-9x16-poster.jpg"
-                label="Retrospective timeline of the completed 40th Street wood-framed build"
-                aspect="9x16"
-                mode="clickToPlay"
-              />
-              <div>
-                <h3 className="font-heading text-lg font-light text-charcoal">40th Street Wood Build</h3>
-                <p className="text-charcoal-light text-xs sm:text-sm font-light leading-relaxed mt-1">
-                  Retrospective process timeline of our completed wood-frame whole-home build.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <VideoReel
-                src="/videos/kitchen-kenburns-16x9.mp4"
-                poster="/videos/kitchen-kenburns-16x9-poster.jpg"
-                label="Ken-Burns motion clip over finished kitchen remodel photography"
-                aspect="16x9"
-                mode="clickToPlay"
-              />
-              <div>
-                <h3 className="font-heading text-lg font-light text-charcoal">Luxury Kitchen Finish</h3>
-                <p className="text-charcoal-light text-xs sm:text-sm font-light leading-relaxed mt-1">
-                  Slow-motion cinematic view showing the details of a completed chef&apos;s kitchen.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <CTABanner />
     </>
   );
 }
-
