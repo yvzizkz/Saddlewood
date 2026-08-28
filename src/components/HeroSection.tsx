@@ -78,6 +78,10 @@ export function HeroSection() {
         poster="/videos/saddlewood-hero-loop-wide-poster.jpg"
         label="Steel framing underway on the active Paradise Valley build"
         className="absolute inset-0 h-full w-full scale-[1.02] object-cover"
+        // One slow pass on arrival, then the hero rests on its closing
+        // frame — the page settles instead of churning behind the copy.
+        preload="auto"
+        replay
       />
 
       {/* Grade: hold the copy zone dark, let the footage breathe up top.

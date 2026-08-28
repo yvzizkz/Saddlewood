@@ -158,7 +158,7 @@ export function FramingPairSection() {
                 <VideoPanel
                   src="/videos/saddlewood-scaffold-loop.mp4"
                   poster="/videos/saddlewood-scaffold-loop-poster.jpg"
-                  label="Half-speed loop of scaffold work on the active Paradise Valley build"
+                  label="Slowed pass of scaffold work on the active Paradise Valley build"
                 />
               ),
             }}

@@ -2,7 +2,7 @@
 
 /**
  * Full-bleed subpage hero — the premium-standard treatment applied per the
- * page map: edge-to-edge media (looping video or graded still, optional
+ * page map: edge-to-edge media (single-pass video or graded still, optional
  * slow Ken Burns) under the dark grade and 5% grain, mono eyebrow +
  * Fraunces title bottom-left with a text shadow, optional truth chip and
  * media caption. Renders must pass a mediaCaption beginning "Rendering".
@@ -87,6 +87,8 @@ export function FullBleedHero({
           poster={media.poster}
           label={label}
           className="absolute inset-0 h-full w-full scale-[1.02] object-cover"
+          preload="auto"
+          replay
         />
       ) : (
         <div className="absolute inset-0 overflow-hidden">

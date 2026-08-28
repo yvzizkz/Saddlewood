@@ -215,7 +215,7 @@ export default function ServicesPage() {
                 poster="/videos/saddlewood-reel-troon-remodel-poster.jpg"
                 label="Walkthrough of an in-progress remodel in Troon"
                 aspect="9x16"
-                mode="autoloop"
+                mode="autoplay"
                 className="rounded-none bg-teal-dark"
               />
               <span className="night-reel-chip">Troon · Remodel</span>

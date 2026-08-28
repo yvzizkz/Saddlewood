@@ -168,7 +168,7 @@ export default function FramingPage() {
                 poster="/videos/saddlewood-steel-framing-full-poster.jpg"
                 label="The full steel framing reel from the active Paradise Valley build"
                 aspect="9x16"
-                mode="autoloop"
+                mode="autoplay"
                 className="rounded-none bg-teal-dark"
               />
               <span className="night-reel-chip">

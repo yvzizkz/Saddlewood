@@ -56,7 +56,7 @@ export function PlanBuildAim() {
         <VideoPanel
           src="/videos/saddlewood-sparks-loop.mp4"
           poster="/videos/saddlewood-sparks-loop-poster.jpg"
-          label="Half-speed loop of a crew member cutting steel on the active build"
+          label="Slowed pass of a crew member cutting steel on the active build"
         />
       ),
     },

@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * Full-width transition band — a muted looping video strip between homepage
+ * Full-width transition band — a muted video strip between homepage
  * sections (round-2 directive), with a dark gradient scrim and a single
  * mono eyebrow line. Wire two of these into the homepage (band A after the
  * elevation section, band B before Service Area) once the round-2 media
  * pack's band videos are placed in /public/videos.
  *
- * <video muted autoplay loop playsinline>; plays only while visible;
- * reduced motion shows the poster frame.
+ * <video muted autoplay playsinline>: one slow pass on first view, then it
+ * rests on its closing frame behind a Replay control. Reduced motion shows
+ * the poster frame.
  */
 
 import { VideoPanel } from "@/components/VideoPanel";
@@ -29,7 +30,13 @@ export function TransitionBand({ src, poster, eyebrow, label }: TransitionBandPr
       className="relative h-[clamp(240px,36vh,420px)] overflow-hidden"
       aria-label={label}
     >
-      <VideoPanel src={src} poster={poster} label={label} />
+      <VideoPanel
+        src={src}
+        poster={poster}
+        label={label}
+        replay
+        replayClassName="right-5 top-5 sm:right-8"
+      />
       {/* Scrim: hold the night ground at the edges so the band reads as part
           of the page, not a break in it. */}
       <div
