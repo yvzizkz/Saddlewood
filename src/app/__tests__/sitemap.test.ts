@@ -24,3 +24,15 @@ describe("sitemap", () => {
     expect(homeEntry?.priority).toBe(1);
   });
 });
+
+describe("sitemap case studies", () => {
+  it("includes every case study slug as a /portfolio/ entry", async () => {
+    const { getAllCaseStudySlugs } = await import("@/data/case-studies");
+    const urls = sitemap();
+    for (const slug of getAllCaseStudySlugs()) {
+      const entry = urls.find((e) => e.url.endsWith(`/portfolio/${slug}`));
+      expect(entry, `missing sitemap entry for ${slug}`).toBeDefined();
+      expect(entry?.priority).toBe(0.8);
+    }
+  });
+});
