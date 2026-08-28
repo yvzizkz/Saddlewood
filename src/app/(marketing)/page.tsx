@@ -8,6 +8,7 @@ import {
   FramingPairSection,
 } from "@/components/HomeServicePairs";
 import { NeighborhoodLedger } from "@/components/NeighborhoodLedger";
+import { TransitionBand } from "@/components/TransitionBand";
 import { CTABanner } from "@/components/CTABanner";
 
 export const metadata: Metadata = {
@@ -28,9 +29,21 @@ export default function Home() {
       <HeroSection />
       <IntroStrip />
       <SameHouseSection />
+      <TransitionBand
+        src="/videos/saddlewood-transition-band.mp4"
+        poster="/videos/saddlewood-transition-band-poster.jpg"
+        eyebrow="Self-Performed · Paradise Valley"
+        label="Aerial of the steel-deck canopy and crew on the active Paradise Valley build"
+      />
       <PlanBuildAim />
       <KitchenPairSection />
       <FramingPairSection />
+      <TransitionBand
+        src="/videos/saddlewood-transition-band-b.mp4"
+        poster="/videos/saddlewood-transition-band-b-poster.jpg"
+        eyebrow="Steel Framing · Filmed On Site"
+        label="Interior steel stud walls of the active Paradise Valley build"
+      />
       <NeighborhoodLedger />
       <CTABanner />
     </>

@@ -64,9 +64,8 @@ export default function ServicesPage() {
   }));
 
   // Round-2 ruling: no recycled drawings on these cards. Media only where a
-  // truthful asset exists; renders are always captioned as renderings.
-  // Bathroom and Outdoor Living await their render crops from the round-2
-  // media pack and stay typographic until those land.
+  // truthful asset exists; renders are always captioned as renderings so
+  // nothing reads as a finished photo.
   const categories = [
     {
       name: "Kitchen",
@@ -84,6 +83,11 @@ export default function ServicesPage() {
       name: "Bathroom",
       scope:
         "Bookmatched stone, freestanding tubs, frameless glass, heated floors. Plumbed and wired by our own licensed crew.",
+      media: {
+        src: "/images/render-poolspa.jpg",
+        alt: "Rendering of the estate's raised spa and pool terrace",
+        caption: "Rendering · Estate in progress, Paradise Valley",
+      },
       href: "/portfolio",
       hrefLabel: "Bathroom projects",
     },
@@ -103,6 +107,11 @@ export default function ServicesPage() {
       name: "Outdoor Living",
       scope:
         "Pools, covered patios, outdoor kitchens, and architectural lighting designed for 300+ days of Sonoran sun.",
+      media: {
+        src: "/images/render-firepit.jpg",
+        alt: "Rendering of the fire pit, lounge seating, and pool at the estate",
+        caption: "Rendering · Estate in progress, Paradise Valley",
+      },
       href: "/portfolio",
       hrefLabel: "Outdoor projects",
     },
