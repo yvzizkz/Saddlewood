@@ -28,12 +28,12 @@ export function PlanSketch({ className, glow = false }: PlanSketchProps) {
       preserveAspectRatio="xMidYMid meet"
     >
       {/* Site line */}
-      <Stroke d="M30 228 H370" width={1.4} />
+      <Stroke d="M30 228 H370" tone="cream" width={1.8} />
       {/* Massing outlines */}
-      <Stroke d="M60 228 V150 H150 V228" width={1.4} />
-      <Stroke d="M52 150 H158" width={1.4} />
-      <Stroke d="M150 228 V118 H230 V228 M144 118 H236" width={1.4} />
-      <Stroke d="M230 228 V162 H352 V228 M224 162 H360" width={1.4} />
+      <Stroke d="M60 228 V150 H150 V228" tone="cream" width={1.8} />
+      <Stroke d="M52 150 H158" tone="cream" width={1.8} />
+      <Stroke d="M150 228 V118 H230 V228 M144 118 H236" tone="cream" width={1.8} />
+      <Stroke d="M230 228 V162 H352 V228 M224 162 H360" tone="cream" width={1.8} />
       {/* Interior partitions */}
       <Stroke d="M70 228 V166 H140 V228 M105 166 V228" {...THIN} />
       <Stroke d="M160 228 V134 H184 V228 M196 134 H220 V180 H196 Z" {...THIN} />

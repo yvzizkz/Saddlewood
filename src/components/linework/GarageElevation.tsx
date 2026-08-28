@@ -36,18 +36,18 @@ export function GarageElevation({ className, glow = false }: GarageElevationProp
       preserveAspectRatio="xMidYMid meet"
     >
       {/* Ground line */}
-      <Stroke d="M30 270 H930" width={1.5} />
+      <Stroke d="M30 270 H930" tone="cream" width={2.4} />
 
       {/* Far-left slat fence */}
-      <Stroke d="M40 232 H120" width={1.5} />
+      <Stroke d="M40 232 H120" tone="cream" width={2} />
       <Stroke
         d="M46 232 V270 M54 232 V270 M62 232 V270 M70 232 V270 M78 232 V270 M86 232 V270 M94 232 V270 M102 232 V270 M110 232 V270 M118 232 V270"
         {...THIN}
       />
 
       {/* Left low wing: cantilevered roof plane with thick fascia */}
-      <Stroke d="M105 196 H315 M105 188 H315 M105 188 V196 M315 188 V196" width={1.5} />
-      <Stroke d="M120 196 V270 M300 196 V270" width={1.5} />
+      <Stroke d="M105 196 H315 M105 188 H315 M105 188 V196 M315 188 V196" tone="cream" width={2} />
+      <Stroke d="M120 196 V270 M300 196 V270" tone="cream" width={2} />
       {/* Slat screen */}
       <Stroke
         d="M132 204 V270 M141 204 V270 M150 204 V270 M159 204 V270 M168 204 V270 M177 204 V270 M186 204 V270 M195 204 V270 M204 204 V270"
@@ -57,8 +57,8 @@ export function GarageElevation({ className, glow = false }: GarageElevationProp
       <Stroke d="M218 270 V206 H290 V270 M254 206 V270" {...THIN} />
 
       {/* Center tall mass: main roof plane */}
-      <Stroke d="M288 118 H482 M288 108 H482 M288 108 V118 M482 108 V118" width={1.5} />
-      <Stroke d="M300 118 V270 M470 118 V270" width={1.5} />
+      <Stroke d="M288 118 H482 M288 108 H482 M288 108 V118 M482 108 V118" tone="cream" width={2} />
+      <Stroke d="M300 118 V270 M470 118 V270" tone="cream" width={2} />
       {/* Clerestory band */}
       <Stroke
         d="M308 128 H462 M308 146 H462 M308 128 V146 M332 128 V146 M356 128 V146 M380 128 V146 M404 128 V146 M428 128 V146 M452 128 V146 M462 128 V146"
@@ -71,8 +71,8 @@ export function GarageElevation({ className, glow = false }: GarageElevationProp
       <Stroke d="M352 108 V100 H392 V108" {...THIN} />
 
       {/* Right garage volume: long low roof plane */}
-      <Stroke d="M458 162 H884 M458 154 H884 M458 154 V162 M884 154 V162" width={1.5} />
-      <Stroke d="M470 162 V270 M870 162 V270" width={1.5} />
+      <Stroke d="M458 162 H884 M458 154 H884 M458 154 V162 M884 154 V162" tone="cream" width={2} />
+      <Stroke d="M470 162 V270 M870 162 V270" tone="cream" width={2} />
       {/* Garage door A: panel grid */}
       <Stroke
         d="M500 270 V186 H660 V270 M500 207 H660 M500 228 H660 M500 249 H660 M520 186 V270 M540 186 V270 M560 186 V270 M580 186 V270 M600 186 V270 M620 186 V270 M640 186 V270"

@@ -418,10 +418,12 @@ img {
 }
 
 /* Ink scope — renders AnimatedLinework sheets in accessible drafting ink
-   when they sit on cream grounds (gold #c8a55a fails contrast on cream). */
+   when they sit on cream grounds (gold #c8a55a fails contrast on cream).
+   Drawing-upgrade standard (hero-v2 handoff): two ink weights — heavy dark
+   structure (the "cream" tone maps to warm ink) and brass detail. */
 .linework-ink {
   --gold: var(--gold-accessible);
-  --cream: #44514a;
+  --cream: #3a2f1d;
 }
 
 /* Corner ticks for the hero reel card (drafting registration marks). */

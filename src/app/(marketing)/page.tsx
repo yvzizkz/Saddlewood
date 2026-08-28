@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { HeroSection } from "@/components/HeroSection";
-import { IntroStrip } from "@/components/IntroStrip";
 import { SameHouseSection } from "@/components/SameHouseSection";
 import { PlanBuildAim } from "@/components/PlanBuildAim";
 import {
@@ -18,16 +17,16 @@ export const metadata: Metadata = {
 };
 
 /**
- * Homepage, handoff composition (2026-08-28): live hero reel → stats band →
- * cream working-set elevation → plan/build/aim trio → kitchen pair (cream) →
- * framing pair (dark) → neighborhood ledger → CTA. Grounds alternate; the
- * only photography is the delivered steel/render/kitchen set and the reels.
+ * Homepage, Hero V2 composition (2026-08-28): full-bleed video hero with
+ * the stats inside it → cream working-set elevation → canopy transition
+ * band → plan/build/aim trio → kitchen pair (cream) → framing pair (dark) →
+ * studs transition band → neighborhood ledger → CTA. Ground rhythm rule:
+ * no two adjacent sections share a ground; video counts as its own ground.
  */
 export default function Home() {
   return (
     <>
       <HeroSection />
-      <IntroStrip />
       <SameHouseSection />
       <TransitionBand
         src="/videos/saddlewood-transition-band.mp4"

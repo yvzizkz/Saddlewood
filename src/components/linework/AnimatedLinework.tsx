@@ -380,3 +380,25 @@ export function FigurePath({ d, dash, delay = 0, ...styleProps }: FigurePathProp
     <motion.path d={d} {...attrs} variants={fadeVariants(ctx.figureDelay + delay)} />
   );
 }
+
+export interface FigureGroupProps {
+  children: ReactNode;
+  /** Extra delay (s) after the shared figure fade-in starts. */
+  delay?: number;
+}
+
+/**
+ * A group of arbitrary SVG shapes (poché fills, hatches, glows, sky hints)
+ * that fades in with the annotations. The drawing-upgrade standard fills
+ * cut surfaces and adds one piece of life per sheet; fills can't draw on
+ * via pathLength, so they arrive with the figures instead.
+ */
+export function FigureGroup({ children, delay = 0 }: FigureGroupProps) {
+  const ctx = useContext(LineworkContext);
+  if (ctx.reduced) {
+    return <g>{children}</g>;
+  }
+  return (
+    <motion.g variants={fadeVariants(ctx.figureDelay + delay)}>{children}</motion.g>
+  );
+}

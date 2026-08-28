@@ -36,8 +36,8 @@ export function ShearWallSheet({ className, glow = false }: ShearWallSheetProps)
       preserveAspectRatio="xMidYMid meet"
     >
       {/* Top track and floor */}
-      <Stroke d="M40 66 H520 M40 74 H520" width={1.5} />
-      <Stroke d="M40 318 H520 M40 326 H520" width={1.5} />
+      <Stroke d="M40 66 H520 M40 74 H520" tone="cream" width={2} />
+      <Stroke d="M40 318 H520 M40 326 H520" tone="cream" width={2} />
       {/* Studs, left bay */}
       <Stroke d="M64 74 V318 M72 74 V318" {...THIN} />
       <Stroke
@@ -45,7 +45,7 @@ export function ShearWallSheet({ className, glow = false }: ShearWallSheetProps)
         {...THIN}
       />
       {/* Lintel over opening */}
-      <Stroke d="M136 140 H264 M136 152 H264" width={1.5} />
+      <Stroke d="M136 140 H264 M136 152 H264" tone="cream" width={2} />
       <Stroke
         d="M140 152 L152 140 M156 152 L168 140 M172 152 L184 140 M188 152 L200 140 M204 152 L216 140 M220 152 L232 140 M236 152 L248 140 M252 152 L260 144"
         {...THIN}
@@ -59,7 +59,7 @@ export function ShearWallSheet({ className, glow = false }: ShearWallSheetProps)
       <StrokeCircle cx={84} cy={307} r={3} {...THIN} />
       <StrokeCircle cx={93} cy={307} r={3} {...THIN} />
       {/* Sheathing panel, right */}
-      <Stroke d="M292 74 H500 V318 H292 Z" width={1.5} />
+      <Stroke d="M292 74 H500 V318 H292 Z" tone="cream" width={2} />
       <Stroke d="M292 196 H500" {...THIN} />
       {/* Field screws — dots fade in with the annotations (a pathLength
           draw would distort the dot pattern) */}

@@ -18,6 +18,7 @@ import { WallSection } from "./WallSection";
 export {
   AnimatedLinework,
   Figure,
+  FigureGroup,
   FigurePath,
   Stroke,
   StrokeCircle,
@@ -25,6 +26,7 @@ export {
 } from "./AnimatedLinework";
 export type {
   AnimatedLineworkProps,
+  FigureGroupProps,
   FigurePathProps,
   FigureProps,
   PreparedLineworkVariants,
