@@ -5,7 +5,7 @@ import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
 import { VideoReel } from "@/components/VideoReel";
 import { SheetPair } from "@/components/SheetPair";
-import { PhotoWipe } from "@/components/PhotoWipe";
+import { VideoPanel } from "@/components/VideoPanel";
 import { KitchenSheet, WallSection } from "@/components/linework";
 import { getCaseStudy } from "@/data/case-studies";
 
@@ -63,12 +63,20 @@ export default function ServicesPage() {
     outcome: phaseOutcomes[i] ?? phaseOutcomes[phaseOutcomes.length - 1],
   }));
 
+  // Round-2 ruling: no recycled drawings on these cards. Media only where a
+  // truthful asset exists; renders are always captioned as renderings.
+  // Bathroom and Outdoor Living await their render crops from the round-2
+  // media pack and stay typographic until those land.
   const categories = [
     {
       name: "Kitchen",
       scope:
         "Custom cabinetry, natural-stone islands, integrated appliances, and the lighting and millwork to tie it together.",
-      linework: "plan-fragment",
+      media: {
+        src: "/images/troon-kitchen-frame.jpg",
+        alt: "Kitchen of the in-progress Troon remodel: range, hood, and stone island",
+        caption: "From the Troon remodel walkthrough",
+      },
       href: "/portfolio",
       hrefLabel: "Kitchen projects",
     },
@@ -76,7 +84,6 @@ export default function ServicesPage() {
       name: "Bathroom",
       scope:
         "Bookmatched stone, freestanding tubs, frameless glass, heated floors. Plumbed and wired by our own licensed crew.",
-      linework: "wall-section",
       href: "/portfolio",
       hrefLabel: "Bathroom projects",
     },
@@ -84,7 +91,11 @@ export default function ServicesPage() {
       name: "Whole-Home",
       scope:
         "Full transformations from demolition through final reveal. One contract, one crew, every trade under our four ROC licenses.",
-      linework: "massing",
+      media: {
+        src: "/images/render-rear.jpg",
+        alt: "Rendering of the rear terrace and pool of the estate in progress",
+        caption: "Rendering · Estate in progress, Paradise Valley",
+      },
       href: "/portfolio/paradise-valley-whole-home-build",
       hrefLabel: "Read the case study",
     },
@@ -92,7 +103,6 @@ export default function ServicesPage() {
       name: "Outdoor Living",
       scope:
         "Pools, covered patios, outdoor kitchens, and architectural lighting designed for 300+ days of Sonoran sun.",
-      linework: "plat",
       href: "/portfolio",
       hrefLabel: "Outdoor projects",
     },
@@ -116,7 +126,7 @@ export default function ServicesPage() {
           photograph. Sits between two dark sections so the two cream
           interludes on this page never touch. */}
       <section
-        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(90px,11vh,140px)] text-charcoal"
+        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
         aria-label="Kitchen and bath, drawn and delivered"
       >
         <div className="night-cream-grid" aria-hidden="true" />
@@ -145,13 +155,14 @@ export default function ServicesPage() {
                 ),
               }}
               right={{
-                tag: "Delivered",
-                caption: "Completed kitchen remodel · Scottsdale",
+                tag: "Troon · Remodel",
+                caption: "Kitchen remodel underway · filmed on site",
                 aspect: "min-h-[320px]",
                 children: (
-                  <PhotoWipe
-                    src="/images/kitchen-built.jpg"
-                    alt="Finished kitchen with waterfall island and custom oak millwork"
+                  <VideoPanel
+                    src="/videos/saddlewood-reel-troon-kitchen-9x16.mp4"
+                    poster="/videos/saddlewood-reel-troon-kitchen-9x16-poster.jpg"
+                    label="Kitchen segment of the in-progress Troon remodel walkthrough"
                   />
                 ),
               }}
@@ -170,7 +181,7 @@ export default function ServicesPage() {
       {/* From the Field — the in-progress Troon remodel reel, two-column
           layout modeled on the framing page's On Site Now section. */}
       <section
-        className="relative border-t border-off-white/[0.08] py-[clamp(90px,11vh,140px)]"
+        className="relative border-t border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
         aria-label="Remodel in progress in Troon"
       >
         <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
