@@ -95,7 +95,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     name: "Silverleaf",
     fullName: "Silverleaf",
     zip: "85255",
-    tagline: "Elevated Luxury Remodeling and Custom Details in the McDowell Canyons",
+    tagline: "Luxury Remodeling and Custom Details in the McDowell Canyons",
     description: [
       "Silverleaf is set against the McDowell Mountains, offering spectacular canyon views and guard-gated privacy. The architecture is a blend of Mediterranean, Spanish Colonial, and modern estates. Every home here is designed to make a statement of enduring quality.",
       "We partner with Silverleaf homeowners to execute high-end design-build renovations. Our focus is on custom details, from hand-carved stone fireplaces to intricate ceiling treatments and custom cabinetry. We understand the level of detail required for these estate homes.",
@@ -114,7 +114,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     name: "DC Ranch",
     fullName: "DC Ranch",
     zip: "85255",
-    tagline: "Seamless Indoor-Outdoor Living and Custom Desert-Modern Remodels",
+    tagline: "Indoor-Outdoor Living and Custom Desert-Modern Remodels",
     description: [
       "DC Ranch is a master-planned community in the Sonoran Desert foothills. Known for its connected pathways, parks, and rustic desert-modern architecture, it emphasizes family living. The homes are designed to connect with the desert surroundings.",
       "Saddlewood Contracting specializes in updating DC Ranch homes to improve flow and utility. We install large multi-slide doors that connect indoor spaces to outdoor patios. We use natural stone, wood accents, and desert-inspired palettes that match the landscape.",

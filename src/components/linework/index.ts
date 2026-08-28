@@ -64,6 +64,22 @@ export type { DimensionTicksProps } from "./DimensionTicks";
 export { BlueprintDivider } from "./BlueprintDivider";
 export type { BlueprintDividerProps } from "./BlueprintDivider";
 
+/* Area panoramas — drawn hero horizons for the Areas pages. */
+export {
+  ArcadiaScape,
+  GaineyRanchScape,
+  McCormickRanchScape,
+  ParadiseValleyScape,
+} from "./AreaScapesSouth";
+export type { AreaScapeProps } from "./AreaScapesSouth";
+export {
+  DCRanchScape,
+  GrayhawkScape,
+  PinnaclePeakScape,
+  SilverleafScape,
+} from "./AreaScapesNorth";
+export { areaScapeRegistry } from "./areaScapes";
+
 /**
  * String-keyed registry for content-driven placement (e.g. service diagrams
  * chosen by a CMS/config field).

@@ -102,6 +102,14 @@ export const caseStudies: CaseStudy[] = [
         src: "/images/render-firepit.jpg",
         alt: "Rendering of the fire pit beside the pool of the estate in progress in Paradise Valley",
       },
+      {
+        src: "/images/render-entry.jpg",
+        alt: "Rendering of the entry courtyard and walkway of the estate in progress in Paradise Valley",
+      },
+      {
+        src: "/images/render-garage-wide.jpg",
+        alt: "Rendering of the garage side of the estate in progress in Paradise Valley",
+      },
     ],
     linework: "massing",
     legacySlugs: [

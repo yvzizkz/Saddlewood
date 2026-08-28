@@ -15,7 +15,7 @@ import {
   REVEAL_STEP,
   REVEAL_VIEWPORT,
 } from "@/lib/reveal";
-import { GarageElevation } from "@/components/linework";
+import { DrawingToRender } from "@/components/DrawingToRender";
 
 export function SameHouseSection() {
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -48,8 +48,8 @@ export function SameHouseSection() {
           className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light"
         >
           The elevation below is traced from the working drawings of the
-          estate framing above. It sketches itself in as you scroll; every
-          page of the site carries its own sheet.
+          estate framing above. It sketches itself in, then sweeps into the
+          client-approved rendering of the same view.
         </motion.p>
 
         <motion.div
@@ -58,9 +58,8 @@ export function SameHouseSection() {
           initial="hidden"
           whileInView="visible"
           viewport={REVEAL_VIEWPORT}
-          className="linework-ink mt-11 overflow-x-auto border border-stone-mid bg-[#faf6ea] px-6 py-10"
         >
-          <GarageElevation className="mx-auto block h-auto w-full min-w-[640px] max-w-[960px]" />
+          <DrawingToRender />
         </motion.div>
         <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.14em] text-gold-accessible">
           Garage side · traced from the project&apos;s working set · Paradise Valley

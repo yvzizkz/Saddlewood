@@ -18,7 +18,7 @@ import { ArrowRight, Phone } from "lucide-react";
 import type { NeighborhoodData } from "@/lib/neighborhoods";
 import { caseStudies, getCaseStudy } from "@/data/case-studies";
 import { PageHero } from "@/components/PageHero";
-import { NeighborhoodPlat } from "@/components/linework";
+import { NeighborhoodPlat, areaScapeRegistry } from "@/components/linework";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -58,6 +58,9 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
           (p) => ({ label: p.phase }),
         )
       : undefined;
+  // Drawn hero panorama of the area's real geography (two-ink drafting
+  // standard) — rendered on the same cream ground as the hero above.
+  const AreaScape = areaScapeRegistry[data.slug];
 
   return (
     <>
@@ -74,6 +77,24 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
           </div>
         }
       />
+
+      {/* Drawn panorama band — the area's real geography in drafting ink,
+          continuing the hero's cream ground */}
+      {AreaScape ? (
+        <section
+          className="night-on-cream bg-off-white"
+          aria-label={`Drawn panorama of ${data.name}`}
+        >
+          <div className="mx-auto w-full max-w-[1240px] px-5 pb-[clamp(40px,6vh,64px)] sm:px-8">
+            <div className="linework-ink">
+              <AreaScape className="block h-auto w-full" />
+            </div>
+            <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-gold-accessible">
+              Drawn panorama · {data.name}
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       {/* About — the SEO body copy, on the dark page ground */}
       <section
