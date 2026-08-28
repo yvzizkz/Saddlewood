@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
@@ -219,6 +220,50 @@ export default async function CaseStudyPage({ params }: PageProps) {
               phases={study.timelinePhases}
               className="mt-9 max-w-[840px]"
             />
+          </div>
+        </section>
+      ) : null}
+
+      {/* ---- Approved renderings ----
+           Content rule (2026-08-28): renderings appear only here, inside the
+           case study, and every figure is captioned as a rendering. */}
+      {study.renders?.length ? (
+        <section
+          className="pb-[clamp(64px,9vh,120px)]"
+          aria-label="Approved renderings"
+        >
+          <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+            <span className="section-label !mb-0">The Approved Renderings</span>
+            <h2 className="mt-6 font-heading text-[clamp(28px,3.4vw,44px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              Where this build is{" "}
+              <em className="font-normal italic text-gold">headed.</em>
+            </h2>
+            <p className="mt-6 max-w-[62ch] text-[15.5px] leading-[1.8] text-off-white/70">
+              These are the client-approved renderings of the estate in
+              progress; the job-site reels and stills elsewhere on the site
+              show the same build under construction.
+            </p>
+            <div className="mt-9 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {study.renders.map((render) => (
+                <figure
+                  key={render.src}
+                  className="m-0 border border-off-white/[0.12] p-2.5"
+                >
+                  <div className="relative aspect-[16/9] overflow-hidden">
+                    <Image
+                      src={render.src}
+                      alt={render.alt}
+                      fill
+                      sizes="(min-width: 1280px) 384px, (min-width: 640px) 50vw, 100vw"
+                      className="object-cover"
+                    />
+                  </div>
+                  <figcaption className="px-1 pb-1 pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-off-white/60">
+                    Rendering · Estate in progress, Paradise Valley
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
           </div>
         </section>
       ) : null}

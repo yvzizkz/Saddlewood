@@ -25,6 +25,13 @@ export interface CaseStudy {
   narrative: string[];
   testimonial?: { quote: string; author: string };
   reel?: { src: string; poster: string; label: string };
+  /**
+   * Client-approved renderings of the build. Content rule (2026-08-28):
+   * renderings may only be shown inside the case study itself, never as
+   * generic page imagery, and every one must be captioned as a rendering
+   * ("Rendering · Estate in progress, Paradise Valley").
+   */
+  renders?: { src: string; alt: string }[];
   /** Linework registry key: "plan-fragment" | "massing" | "wall-section" | "steel-beam" | "plat" */
   linework: string;
   legacySlugs: string[];
@@ -70,6 +77,32 @@ export const caseStudies: CaseStudy[] = [
     ],
     // No reel: the finished-interior footage of this build is retired media
     // (content rule: only the new steel framing images/reels stay on site).
+    renders: [
+      {
+        src: "/images/render-rear.jpg",
+        alt: "Rendering of the rear terrace and pool of the estate in progress in Paradise Valley",
+      },
+      {
+        src: "/images/render-poolwide.jpg",
+        alt: "Rendering of the widest rear view across the pool of the estate in progress in Paradise Valley",
+      },
+      {
+        src: "/images/render-poolfront.jpg",
+        alt: "Rendering of the pool and glass walls at the rear of the estate in progress in Paradise Valley",
+      },
+      {
+        src: "/images/render-poollounge.jpg",
+        alt: "Rendering of the patio lounge beside the pool of the estate in progress in Paradise Valley",
+      },
+      {
+        src: "/images/render-poolspa.jpg",
+        alt: "Rendering of the raised spa and pool of the estate in progress in Paradise Valley",
+      },
+      {
+        src: "/images/render-firepit.jpg",
+        alt: "Rendering of the fire pit beside the pool of the estate in progress in Paradise Valley",
+      },
+    ],
     linework: "massing",
     legacySlugs: [
       "paradise-valley-pool-at-golden-hour",

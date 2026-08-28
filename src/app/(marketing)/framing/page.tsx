@@ -263,41 +263,45 @@ export default function FramingPage() {
         </div>
       </section>
 
-      {/* Completed build — drawn wood-framed process ledger */}
+      {/* Completed build — drawn wood-framed process ledger on the cream
+          interlude: off-white ground, teal drafting grid, charcoal type. */}
       <section
-        className="relative border-y border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
+        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
         aria-label="Completed wood-framed build process"
       >
-        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+        <div className="night-cream-grid" aria-hidden="true" />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <span className="section-label !mb-0">Completed Build</span>
-          <h2 className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+          <h2 className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
             Wood-Framed Process: Slab to Trusses
           </h2>
-          <p className="mt-6 max-w-[720px] text-[15.5px] leading-[1.8] text-off-white/70">
+          <p className="mt-6 max-w-[720px] text-[15.5px] leading-[1.8] text-charcoal-light">
             A retrospective look at a separate, completed wood-framed whole-home build in Paradise Valley. The project demonstrates our structural execution and self-performed crew timeline from slab to roof trusses.
           </p>
 
           {/* Drawn wall section above the phase ledger, single flow */}
           <div className="mt-[clamp(44px,6vh,72px)] max-w-[880px]">
             <figure className="mb-0 ml-0 mr-0" aria-hidden="true">
-              <WallSection className="block h-auto w-full max-w-[320px]" />
-              <figcaption className="mt-3.5 text-[10.5px] uppercase tracking-[0.18em] text-off-white/60">
+              <div className="linework-ink max-w-[320px]">
+                <WallSection className="block h-auto w-full" />
+              </div>
+              <figcaption className="mt-3.5 text-[10.5px] uppercase tracking-[0.18em] text-charcoal/[0.65]">
                 Wall section · Footing to double top plate
               </figcaption>
             </figure>
-            <ol className="mt-10 list-none border-t border-off-white/[0.14] p-0" role="list">
+            <ol className="mt-10 list-none border-t border-charcoal/[0.14] p-0" role="list">
               {woodPhases.map((phase) => (
                 <li
                   key={phase.number}
-                  className="grid grid-cols-[56px_1fr] items-baseline gap-x-5 border-b border-off-white/[0.14] py-5 sm:grid-cols-[64px_180px_1fr] sm:gap-x-6"
+                  className="grid grid-cols-[56px_1fr] items-baseline gap-x-5 border-b border-charcoal/[0.14] py-5 sm:grid-cols-[64px_180px_1fr] sm:gap-x-6"
                 >
-                  <span className="font-heading text-[26px] font-medium leading-none text-gold sm:text-[30px]">
+                  <span className="font-heading text-[26px] font-medium leading-none text-gold-accessible sm:text-[30px]">
                     {phase.number}
                   </span>
-                  <h3 className="m-0 text-[11.5px] font-medium uppercase tracking-[0.2em] text-off-white">
+                  <h3 className="m-0 text-[11.5px] font-medium uppercase tracking-[0.2em] text-charcoal">
                     {phase.title}
                   </h3>
-                  <p className="col-span-2 m-0 mt-2 text-[13.5px] leading-[1.7] text-off-white/[0.65] sm:col-span-1 sm:mt-0">
+                  <p className="col-span-2 m-0 mt-2 text-[13.5px] leading-[1.7] text-charcoal-light sm:col-span-1 sm:mt-0">
                     {phase.caption}
                   </p>
                 </li>

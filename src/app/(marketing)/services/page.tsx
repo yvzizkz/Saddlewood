@@ -64,9 +64,10 @@ export default function ServicesPage() {
     outcome: phaseOutcomes[i] ?? phaseOutcomes[phaseOutcomes.length - 1],
   }));
 
-  // Round-2 ruling: no recycled drawings on these cards. Media only where a
-  // truthful asset exists; renders are always captioned as renderings so
-  // nothing reads as a finished photo.
+  // Round-2 ruling: no recycled drawings on these cards. Round-3 ruling:
+  // no renderings here either; they live in the case study. Media only
+  // where a truthful asset from a real job exists; cards without one stay
+  // typographic.
   const categories = [
     {
       name: "Kitchen",
@@ -85,9 +86,9 @@ export default function ServicesPage() {
       scope:
         "Bookmatched stone, freestanding tubs, frameless glass, heated floors. Plumbed and wired by our own licensed crew.",
       media: {
-        src: "/images/render-poolspa.jpg",
-        alt: "Rendering of the estate's raised spa and pool terrace",
-        caption: "Rendering · Estate in progress, Paradise Valley",
+        src: "/images/troon-bath-frame.jpg",
+        alt: "Freestanding tub against curved glass with mountain views, from the in-progress Troon remodel",
+        caption: "From the Troon remodel walkthrough",
       },
       href: "/portfolio",
       hrefLabel: "Bathroom projects",
@@ -97,9 +98,9 @@ export default function ServicesPage() {
       scope:
         "Full transformations from demolition through final reveal. One contract, one crew, every trade under our four ROC licenses.",
       media: {
-        src: "/images/render-rear.jpg",
-        alt: "Rendering of the rear terrace and pool of the estate in progress",
-        caption: "Rendering · Estate in progress, Paradise Valley",
+        src: "/images/steel-aerial-frame.jpg",
+        alt: "Drone aerial of the steel deck on the active Paradise Valley build",
+        caption: "From the active Paradise Valley build",
       },
       href: "/portfolio/paradise-valley-whole-home-build",
       hrefLabel: "Read the case study",
@@ -108,11 +109,6 @@ export default function ServicesPage() {
       name: "Outdoor Living",
       scope:
         "Pools, covered patios, outdoor kitchens, and architectural lighting designed for 300+ days of Sonoran sun.",
-      media: {
-        src: "/images/render-firepit.jpg",
-        alt: "Rendering of the fire pit, lounge seating, and pool at the estate",
-        caption: "Rendering · Estate in progress, Paradise Valley",
-      },
       href: "/portfolio",
       hrefLabel: "Outdoor projects",
     },

@@ -123,29 +123,32 @@ export default function TradePartnersPage() {
         </div>
       </section>
 
-      {/* Intro — dark page ground, hairline-framed bid-list plate */}
+      {/* Intro — cream interlude between the deep hero and the cream form:
+          off-white ground, teal drafting grid, charcoal type, the bid-list
+          plate as an off-white panel on stone hairlines. */}
       <section
-        className="relative pb-[clamp(80px,10vh,120px)] pt-[clamp(56px,8vh,96px)]"
+        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
         aria-label="Subcontractors and vendors"
       >
-        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+        <div className="night-cream-grid" aria-hidden="true" />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <div className="grid items-start gap-[clamp(44px,6vw,90px)] lg:grid-cols-2">
             <div>
               <span className="section-label !mb-0">
                 Subcontractors &amp; Vendors
               </span>
-              <h2 className="mt-5 max-w-[14em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              <h2 className="mt-5 max-w-[14em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
                 Build With Scottsdale&apos;s In-House{" "}
-                <em className="font-normal italic text-gold">Contractor</em>
+                <em className="font-normal italic text-gold-display">Contractor</em>
               </h2>
-              <p className="mt-7 max-w-[540px] text-[15.5px] leading-[1.8] text-off-white/70">
+              <p className="mt-7 max-w-[540px] text-[15.5px] leading-[1.8] text-charcoal-light">
                 Saddlewood Contracting builds ground-up new construction,
                 self-performs framing, and delivers luxury remodels across
                 Scottsdale and Paradise Valley. As our pipeline grows, we
                 partner with trusted subcontractors and suppliers who share our
                 standard of craftsmanship.
               </p>
-              <p className="mt-5 max-w-[540px] text-[15.5px] leading-[1.8] text-off-white/70">
+              <p className="mt-5 max-w-[540px] text-[15.5px] leading-[1.8] text-charcoal-light">
                 Add your company to our bid list and, when a project matching
                 your trade goes out for bid, we&apos;ll email you the plans and
                 architectural drawings directly. No chasing, no guesswork. Tell
@@ -154,21 +157,21 @@ export default function TradePartnersPage() {
             </div>
 
             <div>
-              <div className="rounded-[2px] border border-off-white/[0.12] bg-teal-dark p-8 lg:p-10">
-                <h3 className="font-heading text-[clamp(22px,2.2vw,26px)] font-medium leading-[1.25] text-off-white">
+              <div className="rounded-[2px] border border-stone-mid bg-off-white p-8 lg:p-10">
+                <h3 className="font-heading text-[clamp(22px,2.2vw,26px)] font-medium leading-[1.25] text-charcoal">
                   How the bid list works
                 </h3>
                 <ol className="m-0 mt-7 list-none space-y-6 p-0">
                   {bidListSteps.map((step) => (
                     <li key={step.n} className="flex gap-5">
-                      <span className="shrink-0 font-heading text-[20px] font-medium text-gold">
+                      <span className="shrink-0 font-heading text-[20px] font-medium text-gold-accessible">
                         {step.n}
                       </span>
                       <div>
-                        <p className="text-[15px] font-medium text-off-white">
+                        <p className="text-[15px] font-medium text-charcoal">
                           {step.t}
                         </p>
-                        <p className="mt-1 text-[13.5px] leading-[1.7] text-off-white/[0.62]">
+                        <p className="mt-1 text-[13.5px] leading-[1.7] text-charcoal-light">
                           {step.d}
                         </p>
                       </div>
@@ -179,8 +182,10 @@ export default function TradePartnersPage() {
 
               {/* Quiet sheet fragment from the structural set */}
               <figure className="m-0 mt-10 max-w-[360px]" aria-hidden="true">
-                <ShearWallSheet className="block h-auto w-full" />
-                <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-off-white/[0.55]">
+                <div className="linework-ink">
+                  <ShearWallSheet className="block h-auto w-full" />
+                </div>
+                <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-charcoal/[0.65]">
                   Perforated shear wall detail · S-series
                 </figcaption>
               </figure>

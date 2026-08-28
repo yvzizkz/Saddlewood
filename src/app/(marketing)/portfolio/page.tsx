@@ -26,12 +26,12 @@ export default function PortfolioPage() {
       <FullBleedHero
         media={{
           kind: "image",
-          src: "/images/render-poolwide.jpg",
-          alt: "Rendering of the rear of the estate in progress in Paradise Valley",
+          src: "/images/work-hero-aerial.jpg",
+          alt: "Drone aerial of the steel deck on the active Paradise Valley build",
           kenBurns: true,
         }}
-        label="Rendering of the estate in progress, Paradise Valley"
-        mediaCaption="Rendering · Estate in progress, Paradise Valley"
+        label="Drone aerial of the steel deck on the active Paradise Valley build"
+        mediaCaption="Filmed over the active Paradise Valley build"
         eyebrow="The Work"
         title={
           <>

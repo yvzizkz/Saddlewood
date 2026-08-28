@@ -18,7 +18,6 @@ import {
   REVEAL_VIEWPORT,
 } from "@/lib/reveal";
 import { SheetPair } from "@/components/SheetPair";
-import { PhotoWipe } from "@/components/PhotoWipe";
 import { VideoPanel } from "@/components/VideoPanel";
 import { KitchenSheet, ShearWallSheet } from "@/components/linework";
 
@@ -156,9 +155,10 @@ export function FramingPairSection() {
               caption: "Structural phase · Paradise Valley · self-performed",
               aspect: "min-h-[320px]",
               children: (
-                <PhotoWipe
-                  src="/images/steel-built.jpg"
-                  alt="Steel framing installed on site"
+                <VideoPanel
+                  src="/videos/saddlewood-scaffold-loop.mp4"
+                  poster="/videos/saddlewood-scaffold-loop-poster.jpg"
+                  label="Half-speed loop of scaffold work on the active Paradise Valley build"
                 />
               ),
             }}

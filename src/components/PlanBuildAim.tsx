@@ -21,6 +21,7 @@ import {
   REVEAL_VIEWPORT,
 } from "@/lib/reveal";
 import { PhotoWipe } from "@/components/PhotoWipe";
+import { VideoPanel } from "@/components/VideoPanel";
 import { PlanSketch } from "@/components/linework";
 
 interface Beat {
@@ -52,9 +53,10 @@ export function PlanBuildAim() {
       caption:
         "Steel framing underway, self-performed. The reel above is this site.",
       media: (
-        <PhotoWipe
-          src="/images/steel-built.jpg"
-          alt="Steel framing underway on site"
+        <VideoPanel
+          src="/videos/saddlewood-sparks-loop.mp4"
+          poster="/videos/saddlewood-sparks-loop-poster.jpg"
+          label="Half-speed loop of a crew member cutting steel on the active build"
         />
       ),
     },

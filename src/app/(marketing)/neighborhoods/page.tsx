@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { PageHero } from "@/components/PageHero";
 import { NeighborhoodsGrid } from "@/components/NeighborhoodsGrid";
 import { CTABanner } from "@/components/CTABanner";
@@ -35,30 +34,9 @@ export default function NeighborhoodsHubPage() {
         variant="cream"
       />
 
-      {/* One media moment — the only imagery allowed on Areas pages:
-          the address-free garage-side render, plated on the cream ground */}
-      <section
-        className="night-on-cream relative bg-off-white pb-[clamp(64px,9vh,104px)]"
-        aria-label="Estate rendering"
-      >
-        <div className="night-cream-grid" aria-hidden="true" />
-        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
-          <figure className="mx-auto my-0 max-w-[760px] border border-charcoal/[0.18] bg-white p-2.5 sm:p-3">
-            <Image
-              src="/images/render-garage.jpg"
-              alt="Rendering of the garage side of the estate in progress"
-              width={493}
-              height={263}
-              sizes="(min-width: 800px) 736px, 100vw"
-              className="block h-auto w-full"
-            />
-            <figcaption className="px-1 pb-1 pt-3 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-charcoal-light">
-              Rendering · Estate in progress, Paradise Valley
-            </figcaption>
-          </figure>
-        </div>
-      </section>
-
+      {/* No imagery on Areas pages — renderings are case-study-only
+          (content rule 2026-08-28), so the cream hero hands straight
+          off to the neighborhood ledger. */}
       <NeighborhoodsGrid />
       <CTABanner />
     </>
