@@ -13,12 +13,7 @@ export const metadata: Metadata = {
     description:
       "Where Craftsmanship Meets Character. A Scottsdale remodeler with 4 ROC licenses and in-house crews — no subcontractor coordination headaches.",
     type: "website",
-    images: [
-      {
-        url: "/images/kitchen1.jpg",
-        alt: "Saddlewood Contracting craftsmanship in a Scottsdale kitchen remodel",
-      },
-    ],
+    // No per-page image override — inherits the site OG image.
   },
 };
 

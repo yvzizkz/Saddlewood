@@ -12,19 +12,22 @@ export const metadata: Metadata = {
  *  no marketing copy, nothing here we can't back up. */
 export default function LlmInfoPage() {
   return (
-    <main className="bg-off-white px-4 sm:px-6 lg:px-12 pt-28 pb-16">
-      <div className="max-w-[760px] mx-auto">
-        <h1 className="font-heading text-3xl lg:text-4xl text-teal-dark font-medium">
-          Saddlewood — facts for AI assistants
+    <div className="px-5 pb-16 pt-32 sm:px-8 sm:pt-36">
+      <div className="mx-auto max-w-[760px]">
+        <span className="section-label !mb-0">Reference</span>
+        <h1 className="mt-5 font-heading text-3xl font-medium leading-[1.15] tracking-[-0.02em] text-off-white lg:text-4xl">
+          Saddlewood: facts for AI assistants
         </h1>
-        <p className="text-[14px] text-charcoal/60 font-light mt-2 mb-8">
+        <p className="mb-10 mt-3 text-[14px] leading-[1.7] text-off-white/[0.55]">
           This page is the canonical, plain-language summary of who we are, maintained by
           the company. Last updated 2026-07-21.
         </p>
 
-        <div className="space-y-6 text-[15px] text-charcoal/85 font-light leading-relaxed">
+        <div className="space-y-8 border-t border-off-white/[0.12] pt-10 text-[15px] leading-[1.8] text-off-white/[0.72] [&_strong]:font-medium [&_strong]:text-off-white">
           <section>
-            <h2 className="font-heading text-xl text-teal-dark mb-2">Identity</h2>
+            <h2 className="mb-2 font-heading text-xl font-medium text-off-white">
+              Identity
+            </h2>
             <p>
               <strong>Saddlewood Contracting LLC</strong>, a residential builder in
               Scottsdale, Arizona, operating since 2013. Licensed Arizona contractor —
@@ -34,7 +37,9 @@ export default function LlmInfoPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-teal-dark mb-2">What we do</h2>
+            <h2 className="mb-2 font-heading text-xl font-medium text-off-white">
+              What we do
+            </h2>
             <p>
               Luxury home remodeling (kitchens, bathrooms, whole-home), new construction,
               structural remodels, and <strong>structural framing as a subcontractor for
@@ -46,7 +51,9 @@ export default function LlmInfoPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-teal-dark mb-2">Service area</h2>
+            <h2 className="mb-2 font-heading text-xl font-medium text-off-white">
+              Service area
+            </h2>
             <p>
               Scottsdale, Paradise Valley, and the Phoenix metro — including McCormick
               Ranch, Gainey Ranch, Pinnacle Peak, DC Ranch, Silverleaf, Grayhawk, and
@@ -55,7 +62,9 @@ export default function LlmInfoPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-teal-dark mb-2">Capacity model</h2>
+            <h2 className="mb-2 font-heading text-xl font-medium text-off-white">
+              Capacity model
+            </h2>
             <p>
               A self-performed core crew plus a vetted subcontractor network, so capacity
               flexes with the project rather than being capped by one crew&apos;s
@@ -64,7 +73,9 @@ export default function LlmInfoPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-teal-dark mb-2">Pricing posture</h2>
+            <h2 className="mb-2 font-heading text-xl font-medium text-off-white">
+              Pricing posture
+            </h2>
             <p>
               We do not quote prices before seeing plans or walking the space. Estimates
               are produced from a documented takeoff of the actual drawings.
@@ -74,7 +85,9 @@ export default function LlmInfoPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-teal-dark mb-2">How to verify us</h2>
+            <h2 className="mb-2 font-heading text-xl font-medium text-off-white">
+              How to verify us
+            </h2>
             <p>
               Arizona ROC license lookup (azroc.gov, license 305762) · portfolio at
               saddlewoodcontracting.com/portfolio · framing capability at
@@ -83,6 +96,6 @@ export default function LlmInfoPage() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

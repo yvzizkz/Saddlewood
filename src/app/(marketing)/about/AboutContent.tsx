@@ -1,11 +1,21 @@
 "use client";
 
-import { motion } from "framer-motion";
+/**
+ * About — Night Blueprint v2. No photography: the hero carries a wall-section
+ * drawing (the craft, drawn rather than photographed), the story and values
+ * sit on the dark page ground, credentials read as numbered license plates,
+ * and the service area closes on a teal band. All copy preserved from the
+ * previous version (punctuation only: no em dashes).
+ */
+
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import Link from "next/link";
 import { Phone } from "lucide-react";
-import Image from "next/image";
 import { PageHero } from "@/components/PageHero";
 import { ProcoreBadge } from "@/components/ProcoreBadge";
+import { BlueprintDivider, WallSection } from "@/components/linework";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 const credentials = [
   {
@@ -21,7 +31,7 @@ const credentials = [
   {
     title: "Electrical License",
     detail: "ROC #350715",
-    description: "Licensed electricians on every project — no outside subs needed.",
+    description: "Licensed electricians on every project. No outside subs needed.",
   },
   {
     title: "Plumbing License",
@@ -33,165 +43,201 @@ const credentials = [
 const values = [
   {
     title: "Craftsmanship First",
-    description: "We never cut corners. Every joint, every seam, every finish is executed to the highest standard.",
+    description:
+      "We never cut corners. Every joint, every seam, every finish is executed to the highest standard.",
   },
   {
     title: "Client Partnership",
-    description: "Your home, your vision. We listen first, advise second, and build exactly what you want.",
+    description:
+      "Your home, your vision. We listen first, advise second, and build exactly what you want.",
   },
   {
     title: "Local Expertise",
-    description: "We know Scottsdale's HOA requirements, permit processes, and architectural styles inside and out.",
+    description:
+      "We know Scottsdale's HOA requirements, permit processes, and architectural styles inside and out.",
   },
 ];
 
+const serviceAreas = [
+  "McCormick Ranch · 85258",
+  "Gainey Ranch · 85258",
+  "Paradise Valley · 85253",
+  "Pinnacle Peak CC · 85255",
+];
+
+const goldBtn =
+  "inline-block rounded-[2px] bg-gold px-[34px] py-[15px] text-[12px] font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:bg-[#d4a94c] hover:shadow-[0_10px_34px_rgba(200,165,90,0.28)]";
+
+const lineBtn =
+  "inline-flex items-center gap-2 rounded-[2px] border border-off-white/25 px-[26px] py-[14px] text-[12px] font-medium uppercase tracking-[0.08em] text-off-white/80 no-underline transition-colors hover:border-gold hover:text-gold";
+
+const revealVariants: Variants = {
+  hidden: { opacity: 0, y: 22 },
+  visible: (delay: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 1, ease: EASE, delay },
+  }),
+};
+
 export default function AboutContent() {
+  const prefersReducedMotion = useReducedMotion();
+  const initial = prefersReducedMotion ? "visible" : "hidden";
+  const viewport = { once: true, margin: "-36px" } as const;
+
   return (
     <>
       <PageHero
         label="About Us"
         title="Our Story"
         description="Built on a foundation of integrity, quality, and a deep love for transforming Scottsdale homes."
-        image="/images/kitchen1.jpg"
-        imageAlt="Saddlewood Contracting craftsmanship in a Scottsdale kitchen remodel"
+        linework={
+          <WallSection className="ml-auto block h-auto w-full max-w-[440px]" glow />
+        }
       />
 
-      {/* Story Section */}
-      <section className="py-24 bg-off-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-start">
-            {/* Image */}
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="relative h-[500px] border border-charcoal-light"
-            >
-              <Image
-                src="/images/pv-shower-dual-brass.jpg"
-                alt="Luxury dual rain shower with brass fixtures in a Paradise Valley remodel"
-                fill
-                className="object-cover"
-              />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-charcoal to-charcoal/0 p-8">
-                <p className="text-gold text-sm font-light">Paradise Valley</p>
-                <p className="text-stone/60 text-xs font-light">Full Home Remodel</p>
-              </div>
-            </motion.div>
-
-            {/* Text */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <div className="flex items-center gap-4 mb-8">
-                <div className="h-px w-8 bg-gold" />
-                <span className="section-label">Heritage</span>
-              </div>
-              <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-8 leading-tight">
-                Where Craftsmanship Meets Character
-              </h2>
-              <div className="space-y-6 text-charcoal-light font-light leading-relaxed">
-                <p>
-                  Saddlewood Contracting was founded with a simple belief: homeowners in Scottsdale&apos;s finest neighborhoods deserve a contractor who treats their home with the same care and attention to detail as if it were their own.
-                </p>
-                <p>
-                  What sets us apart is our ability to handle every aspect of your remodel in-house. With four active ROC licenses — General, HVAC, Electrical, and Plumbing — we eliminate the coordination headaches that come with managing multiple subcontractors.
-                </p>
-                <p>
-                  We specialize in the communities we know best: McCormick Ranch, Gainey Ranch, Paradise Valley, and Pinnacle Peak Country Club. This hyper-local focus means we understand the architectural styles, HOA requirements, and design preferences that make each neighborhood unique.
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Values */}
-      <section className="py-24 bg-cream">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mb-20"
-          >
-            <div className="flex items-center gap-4 mb-6">
-              <div className="h-px w-8 bg-gold" />
-              <span className="section-label">Values</span>
-            </div>
-            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal">
-              What Drives Us
-            </h2>
-          </motion.div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {values.map((v, i) => (
+      {/* Story — dark page ground, the blueprint grid shows through */}
+      <section
+        className="relative pb-[clamp(80px,10vh,120px)] pt-[clamp(56px,8vh,96px)]"
+        aria-label="Our story"
+      >
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <div className="grid gap-[clamp(44px,6vw,100px)] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <div>
               <motion.div
-                key={v.title}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
+                variants={revealVariants}
+                initial={initial}
+                whileInView="visible"
+                viewport={viewport}
               >
-                <div className="border-b border-gold mb-6 pb-6">
-                  <h3 className="font-heading text-2xl font-light text-charcoal mb-4">
-                    {v.title}
-                  </h3>
-                </div>
-                <p className="text-charcoal-light font-light leading-relaxed text-sm">
-                  {v.description}
-                </p>
+                <span className="section-label !mb-0">Heritage</span>
+                <h2 className="mt-5 max-w-[11em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+                  Where Craftsmanship Meets{" "}
+                  <em className="font-normal italic text-gold">Character</em>
+                </h2>
               </motion.div>
-            ))}
+              <motion.div
+                variants={revealVariants}
+                custom={0.12}
+                initial={initial}
+                whileInView="visible"
+                viewport={viewport}
+              >
+                <p className="mt-7 max-w-[540px] text-[15.5px] leading-[1.8] text-off-white/70">
+                  Saddlewood Contracting was founded with a simple belief:
+                  homeowners in Scottsdale&apos;s finest neighborhoods deserve a
+                  contractor who treats their home with the same care and
+                  attention to detail as if it were their&nbsp;own.
+                </p>
+                <p className="mt-5 max-w-[540px] text-[15.5px] leading-[1.8] text-off-white/70">
+                  What sets us apart is our ability to handle every aspect of
+                  your remodel{" "}
+                  <span className="whitespace-nowrap">in-house</span>. With four
+                  active ROC licenses in General, HVAC, Electrical, and
+                  Plumbing, we eliminate the coordination headaches that come
+                  with managing multiple&nbsp;subcontractors.
+                </p>
+                <p className="mt-5 max-w-[540px] text-[15.5px] leading-[1.8] text-off-white/70">
+                  We specialize in the communities we know best: McCormick
+                  Ranch, Gainey Ranch, Paradise Valley, and Pinnacle Peak
+                  Country Club. This hyper-local focus means we understand the
+                  architectural styles, HOA requirements, and design
+                  preferences that make each neighborhood unique.
+                </p>
+                <div className="mt-9 text-[11px] font-medium uppercase tracking-[0.25em] text-gold">
+                  Est. 2007 · Licensed, Bonded &amp; Insured
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Values rail — gold hairlines in place of the old project photo */}
+            <motion.div
+              variants={revealVariants}
+              custom={0.18}
+              initial={initial}
+              whileInView="visible"
+              viewport={viewport}
+            >
+              <span className="section-label !mb-0">Values</span>
+              <h3 className="mt-5 font-heading text-[clamp(24px,2.4vw,32px)] font-medium leading-[1.2] tracking-[-0.02em] text-off-white">
+                What Drives Us
+              </h3>
+              <div className="mt-7 flex flex-col border-t border-gold/[0.35]">
+                {values.map((value) => (
+                  <div
+                    key={value.title}
+                    className="flex flex-1 flex-col justify-center border-b border-gold/[0.35] py-6"
+                  >
+                    <h4 className="font-heading text-[21px] font-medium leading-[1.3] text-off-white">
+                      {value.title}
+                    </h4>
+                    <p className="mt-2 text-[13.5px] leading-[1.7] text-off-white/[0.62]">
+                      {value.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Credentials */}
-      <section className="py-24 bg-off-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Credentials — numbered license plates in the services-grid frame */}
+      <section
+        className="relative pb-[clamp(90px,11vh,140px)]"
+        aria-label="Credentials"
+      >
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mb-20"
+            variants={revealVariants}
+            initial={initial}
+            whileInView="visible"
+            viewport={viewport}
           >
-            <div className="flex items-center gap-4 mb-6">
-              <div className="h-px w-8 bg-gold" />
-              <span className="section-label">Credentials</span>
-            </div>
-            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal">
-              Licensed, Bonded & Insured
+            <BlueprintDivider className="mb-10 block h-[24px] w-[180px]" />
+            <span className="section-label !mb-0">Credentials</span>
+            <h2 className="mt-6 font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              Licensed, Bonded &amp;{" "}
+              <em className="font-normal italic text-gold">Insured</em>
             </h2>
           </motion.div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+          <div className="mt-[clamp(40px,6vh,64px)] grid grid-cols-1 gap-px border border-off-white/[0.12] bg-off-white/[0.12] sm:grid-cols-2 lg:grid-cols-4">
             {credentials.map((c, i) => (
               <motion.div
                 key={c.title}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="bg-cream border border-charcoal-light p-8"
+                className="h-full"
+                variants={revealVariants}
+                custom={i * 0.1}
+                initial={initial}
+                whileInView="visible"
+                viewport={viewport}
               >
-                <h3 className="font-heading text-lg font-light text-charcoal mb-2">
-                  {c.title}
-                </h3>
-                <p className="text-gold font-light text-sm mb-4">{c.detail}</p>
-                <p className="text-charcoal-light text-sm font-light leading-relaxed">{c.description}</p>
+                <div className="flex h-full flex-col bg-teal-dark p-7 lg:p-9">
+                  <div className="mb-5 text-[10.5px] font-medium tracking-[0.25em] text-gold">
+                    {c.detail}
+                  </div>
+                  <h3 className="font-heading text-[19px] font-medium leading-[1.3] text-off-white">
+                    {c.title}
+                  </h3>
+                  <p className="mt-3 text-[13.5px] leading-[1.7] text-off-white/[0.62]">
+                    {c.description}
+                  </p>
+                </div>
               </motion.div>
             ))}
           </div>
 
           {/* Verified on the Procore Network */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mt-14 flex flex-col items-center gap-3"
+            className="mt-[clamp(44px,6vh,64px)] flex flex-col items-center gap-4"
+            variants={revealVariants}
+            custom={0.1}
+            initial={initial}
+            whileInView="visible"
+            viewport={viewport}
           >
-            <p className="text-charcoal-light text-sm font-light tracking-wide">
+            <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-off-white/65">
               Verified on the Procore Network
             </p>
             <ProcoreBadge width={168} />
@@ -199,50 +245,53 @@ export default function AboutContent() {
         </div>
       </section>
 
-      {/* Service Area */}
-      <section className="py-24 bg-charcoal">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Service area — teal band with gold hairlines, CTA close */}
+      <section
+        className="relative overflow-hidden border-y border-gold/[0.22] bg-teal py-[clamp(80px,10vh,120px)]"
+        aria-label="Service area"
+      >
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden="true"
+          style={{
+            background:
+              "radial-gradient(ellipse 55% 70% at 50% 50%, rgba(200,165,90,0.10), transparent 70%)",
+          }}
+        />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            variants={revealVariants}
+            initial={initial}
+            whileInView="visible"
+            viewport={viewport}
           >
-            <div className="flex items-center gap-4 mb-6">
-              <div className="h-px w-8 bg-gold" />
-              <span className="text-gold text-sm tracking-[0.2em] uppercase font-light">
-                Service Area
-              </span>
-            </div>
-            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-stone mb-6 leading-tight">
-              Proudly Serving Scottsdale
+            <span className="section-label !mb-0">Service Area</span>
+            <h2 className="mt-6 font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              Proudly Serving{" "}
+              <em className="font-normal italic text-gold">Scottsdale</em>
             </h2>
-            <p className="text-stone/70 max-w-2xl font-light leading-relaxed mb-12">
-              Our hyper-local focus means deeper expertise and stronger relationships in the communities where we work.
+            <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/[0.68]">
+              Our hyper-local focus means deeper expertise and stronger
+              relationships in the communities where we work.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mb-12">
-              {["McCormick Ranch · 85258", "Gainey Ranch · 85258", "Paradise Valley · 85253", "Pinnacle Peak CC · 85255"].map(
-                (area) => (
-                  <div
-                    key={area}
-                    className="bg-stone/10 border border-gold/30 px-6 py-4"
-                  >
-                    <p className="text-stone text-sm font-light">{area}</p>
-                  </div>
-                )
-              )}
+            <div className="mt-12 grid max-w-[1000px] grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {serviceAreas.map((area) => (
+                <div
+                  key={area}
+                  className="rounded-[2px] border border-gold/[0.3] bg-off-white/[0.04] px-6 py-4"
+                >
+                  <p className="text-[13px] font-medium uppercase tracking-[0.08em] text-off-white/85">
+                    {area}
+                  </p>
+                </div>
+              ))}
             </div>
-            <div className="flex flex-col sm:flex-row items-start gap-4">
-              <Link
-                href="/contact"
-                className="bg-gold hover:bg-gold-muted text-charcoal px-8 py-3 font-light transition-all border border-gold"
-              >
+            <div className="mt-12 flex flex-wrap items-center gap-4">
+              <Link href="/contact" className={goldBtn}>
                 Schedule Consultation
               </Link>
-              <a
-                href="tel:4809996100"
-                className="flex items-center gap-2 text-stone/80 hover:text-gold transition-colors font-light border-b border-stone/20 hover:border-gold pb-2"
-              >
-                <Phone className="w-5 h-5" />
+              <a href="tel:4809996100" className={lineBtn}>
+                <Phone className="h-3.5 w-3.5" aria-hidden="true" />
                 (480) 999-6100
               </a>
             </div>

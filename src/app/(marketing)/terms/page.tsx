@@ -15,8 +15,12 @@ export default function TermsPage() {
         title="Terms of Service"
         description="Please review our terms of service carefully before using our website or engaging our services."
       />
-      <section className="py-16 sm:py-20 px-4 sm:px-6 lg:px-12 bg-cream">
-        <div className="max-w-[800px] mx-auto prose-custom">
+      {/* prose-custom assumes a light ground, so the legal text sits on a
+          contained cream sheet over the dark page ground. */}
+      <section className="px-5 pb-[clamp(80px,10vh,120px)] pt-4 sm:px-8">
+        <div className="night-on-cream relative mx-auto max-w-[860px] rounded-[2px] border border-gold/[0.3] bg-off-white px-6 py-12 text-charcoal sm:px-10 sm:py-14">
+          <div className="night-cream-grid" aria-hidden="true" />
+          <div className="prose-custom relative">
           <p className="text-sm text-charcoal-light font-light mb-8">
             Last updated: March 6, 2026
           </p>
@@ -145,6 +149,7 @@ export default function TermsPage() {
               info@saddlewoodcontracting.com
             </a>
           </p>
+          </div>
         </div>
       </section>
     </>
