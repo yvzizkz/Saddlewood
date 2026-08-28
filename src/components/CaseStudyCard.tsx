@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_STEP, REVEAL_VIEWPORT } from "@/lib/reveal";
 import { ArrowRight } from "lucide-react";
 import type { CaseStudy } from "@/data/case-studies";
 import { lineworkRegistry } from "@/components/linework";
@@ -30,10 +31,10 @@ export function CaseStudyCard({ study, index = 0 }: CaseStudyCardProps) {
   return (
     <motion.article
       className="h-full"
-      initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
+      initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0.12, y: 22 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-36px" }}
-      transition={{ duration: 0.9, ease: EASE, delay: (index % 3) * 0.12 }}
+      viewport={REVEAL_VIEWPORT}
+      transition={{ duration: 0.9, ease: EASE, delay: (index % 3) * REVEAL_STEP }}
     >
       <Link
         href={`/portfolio/${study.slug}`}

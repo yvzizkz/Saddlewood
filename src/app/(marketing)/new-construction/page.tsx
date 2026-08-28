@@ -35,9 +35,9 @@ const trades = [
   { name: "Plumbing", roc: "ROC #350716" },
 ];
 
-// What each construction phase of the 40th Street build became in the
-// finished home. The narrative stays grounded in the matching project
-// entries in case-studies.ts.
+// What each construction phase of the completed Paradise Valley wood build
+// became in the finished home. The narrative stays grounded in the matching
+// project entries in case-studies.ts.
 const phaseOutcomes = [
   "The cleared site became the entry: exposed beams, oak floors, and arched mirrors at arrival.",
   "The slab became the chef's kitchen: natural stone island, coffered ceiling, pendant light.",
@@ -55,7 +55,7 @@ const siteNotes = [
 
 export default function NewConstructionPage() {
   const buildSequence =
-    getCaseStudy("fortieth-street-breaking-ground")?.timelinePhases ?? [];
+    getCaseStudy("paradise-valley-structural-phase")?.timelinePhases ?? [];
 
   const phases = buildSequence.map((step, i) => ({
     number: String(i + 1).padStart(2, "0"),
@@ -109,7 +109,7 @@ export default function NewConstructionPage() {
               We are currently self-performing the structural phase on an active custom estate in Paradise Valley. The structural phase is underway now; our crews take the build from there with custom wood and metal stud framing.
             </p>
             <p className="mt-5 max-w-[560px] text-[13.5px] leading-[1.75] text-off-white/[0.55]">
-              <em>Note: This is an active, in-progress steel-frame build. The demolition-to-finish sequence shown below highlights a separate, completed wood-framed home (our 40th Street project) to demonstrate the complete lifecycle of our construction process.</em>
+              <em>Note: This is an active, in-progress steel-frame build. The demolition-to-finish sequence shown below highlights a separate, completed wood-framed home in Paradise Valley to demonstrate the complete lifecycle of our construction process.</em>
             </p>
 
             {/* Drawn steel detail + field notes replace the site photos */}
@@ -141,14 +141,17 @@ export default function NewConstructionPage() {
           <div className="flex flex-col items-start lg:sticky lg:top-[110px] lg:items-center">
             <div className="night-reel night-reel--dusk w-[min(320px,80vw)]">
               <VideoReel
-                src="/videos/breaking-ground-steel-9x16.mp4"
-                poster="/videos/breaking-ground-steel-9x16-poster.jpg"
-                label="On-site footage of framing progress in Paradise Valley"
+                src="/videos/saddlewood-reel-how-it-started.mp4"
+                poster="/videos/saddlewood-reel-how-it-started-poster.jpg"
+                label="How it started vs how it's going: the active Paradise Valley steel build"
                 aspect="9x16"
                 mode="autoloop"
                 className="rounded-none bg-teal-dark"
               />
-              <span className="night-reel-chip">On Site</span>
+              <span className="night-reel-chip">
+                <i className="night-live-dot" aria-hidden="true" />
+                On site now
+              </span>
             </div>
             <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
               Active Paradise Valley steel framing
@@ -166,7 +169,8 @@ export default function NewConstructionPage() {
       )}
 
       {/* Trades / ROC credential strip — the one cream interlude in the
-          page rhythm, following the HeritageInterlude treatment. */}
+          page rhythm: off-white ground, teal drafting grid, accessible gold
+          for small type, gold-display for the italic accent. */}
       <section
         className="night-on-cream relative border-t border-gold/[0.35] bg-off-white py-[clamp(80px,10vh,120px)] text-charcoal"
         aria-label="Licensed trades and ROC numbers"

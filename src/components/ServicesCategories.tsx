@@ -4,15 +4,16 @@
  * ServicesCategories — Night Blueprint plates.
  *
  * Four core scopes (Kitchen / Bathroom / Whole-Home / Outdoor Living) as
- * hairline-framed linework + type plates, following the homepage
- * ServicesGrid treatment: gold index numeral, self-drawing diagram from
- * the linework registry, Fraunces title, one scope line, and a quiet link
- * into the relevant work. No photography.
+ * hairline-framed linework + type plates, in the house plate treatment:
+ * gold index numeral, self-drawing diagram from the linework registry,
+ * Fraunces title, one scope line, and a quiet link into the relevant
+ * work. No photography.
  */
 
 import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import { ArrowRight } from "lucide-react";
 import { lineworkRegistry } from "@/components/linework";
 
@@ -36,7 +37,7 @@ interface ServicesCategoriesProps {
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const revealVariants: Variants = {
-  hidden: { opacity: 0, y: 22 },
+  hidden: { opacity: 0.12, y: 22 },
   visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,
@@ -47,7 +48,7 @@ const revealVariants: Variants = {
 export function ServicesCategories({ categories }: ServicesCategoriesProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
-  const viewport = { once: true, margin: "-36px" } as const;
+  const viewport = REVEAL_VIEWPORT;
 
   return (
     <section

@@ -3,13 +3,16 @@ import { PageHero } from "@/components/PageHero";
 import { ServicesCategories } from "@/components/ServicesCategories";
 import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
-import { WallSection } from "@/components/linework";
+import { VideoReel } from "@/components/VideoReel";
+import { SheetPair } from "@/components/SheetPair";
+import { PhotoWipe } from "@/components/PhotoWipe";
+import { KitchenSheet, WallSection } from "@/components/linework";
 import { getCaseStudy } from "@/data/case-studies";
 
 export const metadata = {
   title: "Services | Kitchen, Bathroom, Whole-Home & Outdoor Living in Scottsdale | Saddlewood",
   description:
-    "Saddlewood Contracting handles every trade in-house — general, electrical, plumbing, and HVAC. From a Paradise Valley demo day to a finished whole-home build, see how four ROC licenses on one crew gets your project from start to finish.",
+    "Saddlewood Contracting handles every trade in-house: general, electrical, plumbing, and HVAC. From a Paradise Valley demo day to a finished whole-home build, see how four ROC licenses on one crew gets your project from start to finish.",
   alternates: { canonical: "/services" },
 };
 
@@ -20,11 +23,14 @@ export const metadata = {
  *   1. PageHero — gold kicker, Fraunces title, wall-section linework
  *   2. ServicesCategories — Kitchen / Bathroom / Whole-Home / Outdoor Living
  *      as hairline linework + type plates
- *   3. ServicesProcess — the six construction phases of the 40th Street
- *      whole-home build as a drawn, typographic timeline
- *   4. Trades / credentials strip — the one cream interlude in the rhythm
- *   5. Quiet bottom CTA — single text link, conversion lives in the sticky nav
- *   6. Existing CTABanner — kept for parity with other top-level pages
+ *   3. Kitchen & Bath sheet pair — cream interlude, traced millwork
+ *      elevation beside the delivered kitchen photograph
+ *   4. ServicesProcess — the six construction phases of the completed
+ *      Paradise Valley whole-home build as a drawn, typographic timeline
+ *   5. From the Field — the in-progress Troon remodel reel
+ *   6. Trades / credentials strip — the second cream interlude
+ *   7. Quiet bottom CTA — single text link, conversion lives in the sticky nav
+ *   8. Existing CTABanner — kept for parity with other top-level pages
  */
 
 const trades = [
@@ -34,9 +40,9 @@ const trades = [
   { name: "Plumbing", roc: "ROC #350716" },
 ];
 
-// What each construction phase of the 40th Street build became in the
-// finished home. The narrative stays grounded in the matching project
-// entries in case-studies.ts.
+// What each construction phase of the completed Paradise Valley whole-home
+// build became in the finished home. The narrative stays grounded in the
+// matching project entries in case-studies.ts.
 const phaseOutcomes = [
   "The cleared site became the entry: exposed beams, oak floors, and arched mirrors at arrival.",
   "The slab became the chef's kitchen: natural stone island, coffered ceiling, pendant light.",
@@ -48,7 +54,7 @@ const phaseOutcomes = [
 
 export default function ServicesPage() {
   const buildSequence =
-    getCaseStudy("fortieth-street-breaking-ground")?.timelinePhases ?? [];
+    getCaseStudy("paradise-valley-structural-phase")?.timelinePhases ?? [];
 
   // Defensive: if processSteps is shorter than expected, only build what we have.
   const phases = buildSequence.map((step, i) => ({
@@ -79,7 +85,7 @@ export default function ServicesPage() {
       scope:
         "Full transformations from demolition through final reveal. One contract, one crew, every trade under our four ROC licenses.",
       linework: "massing",
-      href: "/portfolio/paradise-valley-40th-street-whole-home-build",
+      href: "/portfolio/paradise-valley-whole-home-build",
       hrefLabel: "Read the case study",
     },
     {
@@ -105,6 +111,55 @@ export default function ServicesPage() {
 
       <ServicesCategories categories={categories} />
 
+      {/* Kitchen & Bath sheet pair — cream interlude: off-white ground,
+          teal drafting grid, traced millwork elevation beside the delivered
+          photograph. Sits between two dark sections so the two cream
+          interludes on this page never touch. */}
+      <section
+        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(90px,11vh,140px)] text-charcoal"
+        aria-label="Kitchen and bath, drawn and delivered"
+      >
+        <div className="night-cream-grid" aria-hidden="true" />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <span className="section-label !mb-0">Services · Kitchen &amp; Bath</span>
+          <h2 className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,4.4vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-charcoal">
+            Built to the{" "}
+            <em className="font-normal italic text-gold-display">sixteenth.</em>
+          </h2>
+          <p className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light">
+            Every kitchen starts as a dimensioned elevation and ends flush to
+            it. Waterfall edges, custom millwork, stone specified to the
+            profile. Drawing and delivery, side by side.
+          </p>
+
+          <div className="mt-11">
+            <SheetPair
+              tone="cream"
+              left={{
+                tag: "Drawn",
+                caption: "Traced from the project's millwork set",
+                children: (
+                  <div className="linework-ink w-full p-4">
+                    <KitchenSheet className="block h-auto w-full" />
+                  </div>
+                ),
+              }}
+              right={{
+                tag: "Delivered",
+                caption: "Completed kitchen remodel · Scottsdale",
+                aspect: "min-h-[320px]",
+                children: (
+                  <PhotoWipe
+                    src="/images/kitchen-built.jpg"
+                    alt="Finished kitchen with waterfall island and custom oak millwork"
+                  />
+                ),
+              }}
+            />
+          </div>
+        </div>
+      </section>
+
       {phases.length > 0 && (
         <ServicesProcess
           phases={phases}
@@ -112,10 +167,48 @@ export default function ServicesPage() {
         />
       )}
 
-      {/* Credentials strip — the one cream interlude in the page rhythm,
-          following the HeritageInterlude treatment: off-white ground, teal
-          drafting grid, accessible gold for small type, gold-display for
-          the italic accent. */}
+      {/* From the Field — the in-progress Troon remodel reel, two-column
+          layout modeled on the framing page's On Site Now section. */}
+      <section
+        className="relative border-t border-off-white/[0.08] py-[clamp(90px,11vh,140px)]"
+        aria-label="Remodel in progress in Troon"
+      >
+        <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div>
+            <span className="section-label !mb-0">From the Field</span>
+            <h2 className="mt-6 max-w-[16ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              A remodel underway in{" "}
+              <em className="font-normal italic text-gold">Troon.</em>
+            </h2>
+            <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
+              Saddlewood remodels homes across Scottsdale&apos;s communities
+              with the same in-house crew that runs our ground-up builds. This
+              reel follows a remodel project currently in progress in Troon.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-start lg:sticky lg:top-[110px] lg:items-center">
+            <div className="night-reel w-[min(320px,80vw)]">
+              <VideoReel
+                src="/videos/saddlewood-reel-troon-remodel.mp4"
+                poster="/videos/saddlewood-reel-troon-remodel-poster.jpg"
+                label="Walkthrough of an in-progress remodel in Troon"
+                aspect="9x16"
+                mode="autoloop"
+                className="rounded-none bg-teal-dark"
+              />
+              <span className="night-reel-chip">Troon · Remodel</span>
+            </div>
+            <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
+              Remodel in progress · Troon
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Credentials strip — the second cream interlude in the page rhythm:
+          off-white ground, teal drafting grid, accessible gold for small
+          type, gold-display for the italic accent. */}
       <section
         className="night-on-cream relative border-t border-gold/[0.35] bg-off-white py-[clamp(80px,10vh,120px)] text-charcoal"
         aria-label="Licensed trades and ROC numbers"

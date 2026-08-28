@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import { Phone, Mail, FileText, HardHat, Loader2 } from "lucide-react";
 
 /**
@@ -156,9 +157,9 @@ export function TradePartnersForm() {
           {/* Form */}
           <div className="lg:col-span-3">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0.12, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={REVEAL_VIEWPORT}
             >
               <span className="section-label !mb-6">Join Our Bid List</span>
               <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-4 leading-tight">
@@ -513,9 +514,9 @@ export function TradePartnersForm() {
           {/* Sidebar Info */}
           <div className="lg:col-span-2">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0.12, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={REVEAL_VIEWPORT}
               transition={{ delay: 0.2 }}
               className="space-y-8"
             >

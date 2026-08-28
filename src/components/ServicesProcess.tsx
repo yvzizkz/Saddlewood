@@ -3,8 +3,8 @@
 /**
  * ServicesProcess — Night Blueprint drawn process timeline.
  *
- * The six construction phases of the 40th Street whole-home build as a
- * typographic ledger: gold Fraunces numerals over dimension-tick strings,
+ * The six construction phases of the completed Paradise Valley whole-home
+ * build as a typographic ledger: gold Fraunces numerals over dimension-tick strings,
  * the phase label, and the single line describing what that phase became
  * in the finished home. Closes with the payoff statement and a link into
  * the full case study. No photography.
@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import { ArrowRight } from "lucide-react";
 import { BlueprintDivider, DimensionTicks } from "@/components/linework";
 
@@ -34,7 +35,7 @@ export interface ServicesProcessProps {
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const revealVariants: Variants = {
-  hidden: { opacity: 0, y: 22 },
+  hidden: { opacity: 0.12, y: 22 },
   visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,
@@ -45,7 +46,7 @@ const revealVariants: Variants = {
 export function ServicesProcess({ phases, closing }: ServicesProcessProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
-  const viewport = { once: true, margin: "-36px" } as const;
+  const viewport = REVEAL_VIEWPORT;
 
   return (
     <section
@@ -125,7 +126,7 @@ export function ServicesProcess({ phases, closing }: ServicesProcessProps) {
             {closing}
           </p>
           <Link
-            href="/portfolio/paradise-valley-40th-street-whole-home-build"
+            href="/portfolio/paradise-valley-whole-home-build"
             className="mt-7 inline-flex items-center gap-2 border-b border-gold/40 pb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:border-gold"
           >
             See the full project

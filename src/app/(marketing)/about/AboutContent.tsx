@@ -4,19 +4,25 @@
  * About — Night Blueprint v2. No photography: the hero carries a wall-section
  * drawing (the craft, drawn rather than photographed), the story and values
  * sit on the dark page ground, credentials read as numbered license plates,
- * and the service area closes on a teal band. All copy preserved from the
- * previous version (punctuation only: no em dashes).
+ * a crew interview reel plays from an active job site, and the service area
+ * closes on a teal band. Copy carried from the previous version plus the
+ * reel section (no em dashes anywhere).
  */
 
-import { motion, type Variants } from "framer-motion";
+import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import Link from "next/link";
 import { Phone } from "lucide-react";
 import { PageHero } from "@/components/PageHero";
 import { ProcoreBadge } from "@/components/ProcoreBadge";
+import { VideoReel } from "@/components/VideoReel";
 import { BlueprintDivider, WallSection } from "@/components/linework";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
+import {
+  revealVariants,
+  revealStaticVariants,
+  REVEAL_STEP,
+  REVEAL_VIEWPORT,
+} from "@/lib/reveal";
 
 const credentials = [
   {
@@ -72,19 +78,9 @@ const goldBtn =
 const lineBtn =
   "inline-flex items-center gap-2 rounded-[2px] border border-off-white/25 px-[26px] py-[14px] text-[12px] font-medium uppercase tracking-[0.08em] text-off-white/80 no-underline transition-colors hover:border-gold hover:text-gold";
 
-const revealVariants: Variants = {
-  hidden: { opacity: 0, y: 22 },
-  visible: (delay: number = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 1, ease: EASE, delay },
-  }),
-};
-
 export default function AboutContent() {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const initial = prefersReducedMotion ? "visible" : "hidden";
-  const viewport = { once: true, margin: "-36px" } as const;
+  const variants = prefersReducedMotion ? revealStaticVariants : revealVariants;
 
   return (
     <>
@@ -106,10 +102,10 @@ export default function AboutContent() {
           <div className="grid gap-[clamp(44px,6vw,100px)] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
             <div>
               <motion.div
-                variants={revealVariants}
-                initial={initial}
+                variants={variants}
+                initial="hidden"
                 whileInView="visible"
-                viewport={viewport}
+                viewport={REVEAL_VIEWPORT}
               >
                 <span className="section-label !mb-0">Heritage</span>
                 <h2 className="mt-5 max-w-[11em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
@@ -118,11 +114,11 @@ export default function AboutContent() {
                 </h2>
               </motion.div>
               <motion.div
-                variants={revealVariants}
-                custom={0.12}
-                initial={initial}
+                variants={variants}
+                custom={REVEAL_STEP}
+                initial="hidden"
                 whileInView="visible"
-                viewport={viewport}
+                viewport={REVEAL_VIEWPORT}
               >
                 <p className="mt-7 max-w-[540px] text-[15.5px] leading-[1.8] text-off-white/70">
                   Saddlewood Contracting was founded with a simple belief:
@@ -153,11 +149,11 @@ export default function AboutContent() {
 
             {/* Values rail — gold hairlines in place of the old project photo */}
             <motion.div
-              variants={revealVariants}
-              custom={0.18}
-              initial={initial}
+              variants={variants}
+              custom={REVEAL_STEP * 2}
+              initial="hidden"
               whileInView="visible"
-              viewport={viewport}
+              viewport={REVEAL_VIEWPORT}
             >
               <span className="section-label !mb-0">Values</span>
               <h3 className="mt-5 font-heading text-[clamp(24px,2.4vw,32px)] font-medium leading-[1.2] tracking-[-0.02em] text-off-white">
@@ -190,10 +186,10 @@ export default function AboutContent() {
       >
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <motion.div
-            variants={revealVariants}
-            initial={initial}
+            variants={variants}
+            initial="hidden"
             whileInView="visible"
-            viewport={viewport}
+            viewport={REVEAL_VIEWPORT}
           >
             <BlueprintDivider className="mb-10 block h-[24px] w-[180px]" />
             <span className="section-label !mb-0">Credentials</span>
@@ -208,11 +204,11 @@ export default function AboutContent() {
               <motion.div
                 key={c.title}
                 className="h-full"
-                variants={revealVariants}
-                custom={i * 0.1}
-                initial={initial}
+                variants={variants}
+                custom={i * REVEAL_STEP}
+                initial="hidden"
                 whileInView="visible"
-                viewport={viewport}
+                viewport={REVEAL_VIEWPORT}
               >
                 <div className="flex h-full flex-col bg-teal-dark p-7 lg:p-9">
                   <div className="mb-5 text-[10.5px] font-medium tracking-[0.25em] text-gold">
@@ -232,17 +228,77 @@ export default function AboutContent() {
           {/* Verified on the Procore Network */}
           <motion.div
             className="mt-[clamp(44px,6vh,64px)] flex flex-col items-center gap-4"
-            variants={revealVariants}
-            custom={0.1}
-            initial={initial}
+            variants={variants}
+            custom={REVEAL_STEP}
+            initial="hidden"
             whileInView="visible"
-            viewport={viewport}
+            viewport={REVEAL_VIEWPORT}
           >
             <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-off-white/65">
               Verified on the Procore Network
             </p>
             <ProcoreBadge width={168} />
           </motion.div>
+        </div>
+      </section>
+
+      {/* From the crew — interview reel filmed on an active job site */}
+      <section
+        className="relative pb-[clamp(90px,11vh,140px)]"
+        aria-label="From the crew"
+      >
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <div className="grid items-center gap-[clamp(44px,6vw,100px)] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <div>
+              <motion.div
+                variants={variants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={REVEAL_VIEWPORT}
+              >
+                <span className="section-label !mb-0">From the Crew</span>
+                <h2 className="mt-6 max-w-[14em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+                  Hear it from the people who{" "}
+                  <em className="font-normal italic text-gold">build</em> it.
+                </h2>
+              </motion.div>
+              <motion.p
+                variants={variants}
+                custom={REVEAL_STEP}
+                initial="hidden"
+                whileInView="visible"
+                viewport={REVEAL_VIEWPORT}
+                className="mt-7 max-w-[540px] text-[15.5px] leading-[1.8] text-off-white/70"
+              >
+                This reel was filmed with our crew on an active job site, not
+                in a studio. Press play to hear them in their own words; the
+                sound is on.
+              </motion.p>
+            </div>
+
+            <motion.div
+              variants={variants}
+              custom={REVEAL_STEP * 2}
+              initial="hidden"
+              whileInView="visible"
+              viewport={REVEAL_VIEWPORT}
+              className="flex lg:justify-center"
+            >
+              <div className="night-reel w-[min(320px,80vw)]">
+                <VideoReel
+                  src="/videos/saddlewood-reel-lets-build-together.mp4"
+                  poster="/videos/saddlewood-reel-lets-build-together-poster.jpg"
+                  label="Let's build together: from the crew on site"
+                  aspect="9x16"
+                  mode="clickToPlay"
+                  className="rounded-none bg-teal-dark"
+                />
+                <span className="night-reel-chip">
+                  Let&apos;s Build Together
+                </span>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 
@@ -261,10 +317,10 @@ export default function AboutContent() {
         />
         <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <motion.div
-            variants={revealVariants}
-            initial={initial}
+            variants={variants}
+            initial="hidden"
             whileInView="visible"
-            viewport={viewport}
+            viewport={REVEAL_VIEWPORT}
           >
             <span className="section-label !mb-0">Service Area</span>
             <h2 className="mt-6 font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">

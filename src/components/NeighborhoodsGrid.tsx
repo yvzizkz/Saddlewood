@@ -2,14 +2,15 @@
 
 /**
  * Full service-area hub, Night Blueprint v2 — the photo cards replaced by
- * an indexed Fraunces ledger over a faded, self-drawing NeighborhoodPlat
- * (same pattern as the homepage NeighborhoodCards, expanded with each
- * neighborhood's real one-line descriptor from src/lib/neighborhoods.ts).
+ * an indexed Fraunces ledger over a faded, self-drawing NeighborhoodPlat,
+ * expanded with each neighborhood's real one-line descriptor from
+ * src/lib/neighborhoods.ts.
  */
 
 import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import { ArrowRight } from "lucide-react";
 import { neighborhoods } from "@/lib/neighborhoods";
 import { NeighborhoodPlat } from "@/components/linework";
@@ -17,7 +18,7 @@ import { NeighborhoodPlat } from "@/components/linework";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const revealVariants: Variants = {
-  hidden: { opacity: 0, y: 22 },
+  hidden: { opacity: 0.12, y: 22 },
   visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,
@@ -28,7 +29,7 @@ const revealVariants: Variants = {
 export function NeighborhoodsGrid() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
-  const viewport = { once: true, margin: "-36px" } as const;
+  const viewport = REVEAL_VIEWPORT;
 
   const hoods = Object.values(neighborhoods);
 

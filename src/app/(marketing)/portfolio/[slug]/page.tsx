@@ -7,7 +7,6 @@ import { getAllCaseStudySlugs, getCaseStudy } from "@/data/case-studies";
 import { CTABanner } from "@/components/CTABanner";
 import { SpecTable } from "@/components/SpecTable";
 import { TimelinePhases } from "@/components/TimelinePhases";
-import { VideoReel } from "@/components/VideoReel";
 import {
   MassingDiagram,
   NeighborhoodPlat,
@@ -44,7 +43,9 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${study.title} | ${study.category} Case Study`,
+    // The display titles are "Community · Phase"; a plain suffix keeps the
+    // composed tab title to a single "·" separator.
+    title: `${study.title} Case Study | Saddlewood Contracting`,
     description: narrativeLede(study.narrative[0] ?? ""),
     alternates: { canonical: `/portfolio/${study.slug}` },
   };
@@ -101,8 +102,16 @@ function heroPlate(key: string): { figure: ReactNode; caption: string } | null {
   }
 }
 
-/** Splits the display title so the last word carries the gold italic accent. */
+/**
+ * Splits the "Community · Phase" display title so the phase carries the gold
+ * italic accent (the separator stays with the community). Titles without the
+ * separator fall back to accenting the last word.
+ */
 function splitTitle(title: string): { head: string; accent: string } {
+  const parts = title.split(" · ");
+  if (parts.length === 2) {
+    return { head: `${parts[0]} ·`, accent: parts[1] };
+  }
   const words = title.split(" ");
   return {
     head: words.slice(0, -1).join(" "),
@@ -127,8 +136,10 @@ export default async function CaseStudyPage({ params }: PageProps) {
       {/* ---- Title block ---- */}
       <header className="pb-[clamp(40px,6vh,72px)] pt-32 sm:pt-36 lg:pt-40">
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          {/* The h1 already carries the community; the eyebrow carries the
+              document type and category instead of repeating it. */}
           <span className="section-label !mb-0 flex-wrap">
-            <span className="whitespace-nowrap">{study.neighborhood}</span>
+            <span className="whitespace-nowrap">Case Study</span>
             <span className="text-off-white/50">· {study.category}</span>
           </span>
           <h1 className="mt-6 max-w-[16ch] font-heading text-[clamp(38px,5.4vw,76px)] font-medium leading-[1.08] tracking-[-0.02em] text-off-white">
@@ -208,36 +219,6 @@ export default async function CaseStudyPage({ params }: PageProps) {
               phases={study.timelinePhases}
               className="mt-9 max-w-[840px]"
             />
-          </div>
-        </section>
-      ) : null}
-
-      {/* ---- On-site reel ---- */}
-      {study.reel ? (
-        <section
-          className="pb-[clamp(72px,10vh,128px)]"
-          aria-label="On-site footage"
-        >
-          <div className="mx-auto flex w-full max-w-[1240px] flex-col items-center px-5 text-center sm:px-8">
-            <span className="inline-flex items-center gap-3.5 text-[11px] font-medium uppercase tracking-[0.25em] text-gold">
-              <span className="h-px w-6 bg-gold" aria-hidden="true" />
-              On Site
-              <span className="h-px w-6 bg-gold" aria-hidden="true" />
-            </span>
-            <div className="night-reel night-reel--dusk mt-9 w-[min(320px,80vw)]">
-              <VideoReel
-                src={study.reel.src}
-                poster={study.reel.poster}
-                label={study.reel.label}
-                aspect="9x16"
-                mode="autoloop"
-                className="rounded-none bg-teal-dark"
-              />
-              <span className="night-reel-chip">On Site</span>
-            </div>
-            <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
-              Filmed on site · {study.neighborhood}
-            </div>
           </div>
         </section>
       ) : null}

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { PageHero } from "@/components/PageHero";
 import { CTABanner } from "@/components/CTABanner";
 import { VideoReel } from "@/components/VideoReel";
-import { SteelBeam, WallSection } from "@/components/linework";
+import { SheetPair } from "@/components/SheetPair";
+import { PhotoWipe } from "@/components/PhotoWipe";
+import { ShearWallSheet, SteelBeam, WallSection } from "@/components/linework";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -23,7 +25,7 @@ export const metadata = {
   },
   openGraph: {
     title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood",
-    description: "A licensed Arizona framing crew that self-performs — slab to trusses, on schedule.",
+    description: "A licensed Arizona framing crew that self-performs: slab to trusses, on schedule.",
   },
 };
 
@@ -34,8 +36,8 @@ const siteNotes = [
   "Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection.",
 ];
 
-// The completed 40th Street wood-framed build, phase by phase. Titles and
-// captions carried over from the previous proof gallery.
+// The completed Paradise Valley wood-framed build, phase by phase. Titles
+// and captions carried over from the previous proof gallery.
 const woodPhases = [
   {
     number: "01",
@@ -158,18 +160,67 @@ export default function FramingPage() {
           <div className="flex flex-col items-start lg:sticky lg:top-[110px] lg:items-center">
             <div className="night-reel night-reel--dusk w-[min(320px,80vw)]">
               <VideoReel
-                src="/videos/breaking-ground-steel-9x16.mp4"
-                poster="/videos/breaking-ground-steel-9x16-poster.jpg"
-                label="On-site footage of Paradise Valley custom home framing progress"
+                src="/videos/saddlewood-reel-99-percent-never-see.mp4"
+                poster="/videos/saddlewood-reel-99-percent-never-see-poster.jpg"
+                label="Steel framing on the active Paradise Valley build: the structure most clients never see"
                 aspect="9x16"
                 mode="autoloop"
                 className="rounded-none bg-teal-dark"
               />
-              <span className="night-reel-chip">On Site</span>
+              <span className="night-reel-chip">
+                <i className="night-live-dot" aria-hidden="true" />
+                On site now
+              </span>
             </div>
             <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
               Active Paradise Valley build · structural phase
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* The Working Set — traced shear wall detail beside the installed
+          steel, the Drawn/Delivered pair pattern on the dark ground. */}
+      <section
+        className="relative py-[clamp(90px,11vh,140px)]"
+        aria-label="Structural drawings and installed framing"
+      >
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <span className="section-label !mb-0">The Working Set</span>
+          <h2 className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+            Engineered, then{" "}
+            <em className="font-normal italic text-gold">self-performed.</em>
+          </h2>
+          <p className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-off-white/70">
+            Steel studs at 16 inches on center, shear panels screwed to
+            schedule, holdowns where the plans call them. The same crew that
+            reads the S-sheets installs them.
+          </p>
+
+          <div className="mt-11">
+            <SheetPair
+              tone="dark"
+              left={{
+                tag: "Drawn",
+                caption: "Traced from the engineer's structural set",
+                children: (
+                  <div className="w-full p-4">
+                    <ShearWallSheet className="block h-auto w-full" />
+                  </div>
+                ),
+              }}
+              right={{
+                tag: "Installed",
+                caption: "Structural phase · Paradise Valley · self-performed",
+                aspect: "min-h-[320px]",
+                children: (
+                  <PhotoWipe
+                    src="/images/steel-built.jpg"
+                    alt="Steel framing installed on the active Paradise Valley build"
+                  />
+                ),
+              }}
+            />
           </div>
         </div>
       </section>
@@ -217,55 +268,35 @@ export default function FramingPage() {
             Wood-Framed Process: Slab to Trusses
           </h2>
           <p className="mt-6 max-w-[720px] text-[15.5px] leading-[1.8] text-off-white/70">
-            A retrospective look at a separate, completed 40th Street whole-home build. This wood-framed project demonstrates our structural execution and self-performed crew timeline from slab to roof trusses.
+            A retrospective look at a separate, completed wood-framed whole-home build in Paradise Valley. The project demonstrates our structural execution and self-performed crew timeline from slab to roof trusses.
           </p>
 
-          <div className="mt-[clamp(44px,6vh,72px)] grid items-start gap-[clamp(40px,6vw,96px)] lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-            {/* Process reel — kept, rewrapped in the night treatment */}
-            <div className="flex flex-col items-start lg:sticky lg:top-[110px]">
-              <div className="night-reel w-[min(320px,80vw)]">
-                <VideoReel
-                  src="/videos/process-timeline-9x16.mp4"
-                  poster="/videos/process-timeline-9x16-poster.jpg"
-                  label="Retrospective timeline of the completed 40th Street custom wood-frame whole-home build from foundation to finish"
-                  aspect="9x16"
-                  mode="clickToPlay"
-                  className="rounded-none bg-teal-dark"
-                />
-                <span className="night-reel-chip">Timeline</span>
-              </div>
-              <div className="mt-4 max-w-[320px] text-[10.5px] uppercase tracking-[0.2em] leading-[1.8] text-off-white/60">
-                Studs-to-finish lifecycle · 40th Street wood build
-              </div>
-            </div>
-
-            {/* Drawn phase ledger replaces the photo grid */}
-            <div>
-              <figure className="mb-0 ml-0 mr-0" aria-hidden="true">
-                <WallSection className="block h-auto w-full max-w-[320px]" />
-                <figcaption className="mt-3.5 text-[10.5px] uppercase tracking-[0.18em] text-off-white/60">
-                  Wall section · Footing to double top plate
-                </figcaption>
-              </figure>
-              <ol className="mt-10 list-none border-t border-off-white/[0.14] p-0" role="list">
-                {woodPhases.map((phase) => (
-                  <li
-                    key={phase.number}
-                    className="grid grid-cols-[56px_1fr] items-baseline gap-x-5 border-b border-off-white/[0.14] py-5 sm:grid-cols-[64px_180px_1fr] sm:gap-x-6"
-                  >
-                    <span className="font-heading text-[26px] font-medium leading-none text-gold sm:text-[30px]">
-                      {phase.number}
-                    </span>
-                    <h3 className="m-0 text-[11.5px] font-medium uppercase tracking-[0.2em] text-off-white">
-                      {phase.title}
-                    </h3>
-                    <p className="col-span-2 m-0 mt-2 text-[13.5px] leading-[1.7] text-off-white/[0.65] sm:col-span-1 sm:mt-0">
-                      {phase.caption}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            </div>
+          {/* Drawn wall section above the phase ledger, single flow */}
+          <div className="mt-[clamp(44px,6vh,72px)] max-w-[880px]">
+            <figure className="mb-0 ml-0 mr-0" aria-hidden="true">
+              <WallSection className="block h-auto w-full max-w-[320px]" />
+              <figcaption className="mt-3.5 text-[10.5px] uppercase tracking-[0.18em] text-off-white/60">
+                Wall section · Footing to double top plate
+              </figcaption>
+            </figure>
+            <ol className="mt-10 list-none border-t border-off-white/[0.14] p-0" role="list">
+              {woodPhases.map((phase) => (
+                <li
+                  key={phase.number}
+                  className="grid grid-cols-[56px_1fr] items-baseline gap-x-5 border-b border-off-white/[0.14] py-5 sm:grid-cols-[64px_180px_1fr] sm:gap-x-6"
+                >
+                  <span className="font-heading text-[26px] font-medium leading-none text-gold sm:text-[30px]">
+                    {phase.number}
+                  </span>
+                  <h3 className="m-0 text-[11.5px] font-medium uppercase tracking-[0.2em] text-off-white">
+                    {phase.title}
+                  </h3>
+                  <p className="col-span-2 m-0 mt-2 text-[13.5px] leading-[1.7] text-off-white/[0.65] sm:col-span-1 sm:mt-0">
+                    {phase.caption}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>

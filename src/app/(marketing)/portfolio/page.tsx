@@ -84,14 +84,12 @@ export default function PortfolioPage() {
                       />
                     </div>
 
-                    {/* Entry: meta, title, narrative excerpt, scope line */}
+                    {/* Entry: meta, title, narrative excerpt, scope line.
+                        The title is "Community · Phase", so the meta line
+                        carries only the category. */}
                     <div className="flex flex-col items-start">
                       <div className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-gold">
-                        {study.neighborhood}
-                        <span className="text-off-white/50">
-                          {" "}
-                          · {study.category}
-                        </span>
+                        {study.category}
                       </div>
                       <h2 className="mt-5 font-heading text-[clamp(28px,3.4vw,44px)] font-medium leading-[1.15] tracking-[-0.02em]">
                         <Link

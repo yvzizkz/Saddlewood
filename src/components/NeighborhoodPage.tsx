@@ -11,6 +11,7 @@
 
 import { motion, type Variants } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import Link from "next/link";
 import { ArrowRight, Phone } from "lucide-react";
 import type { NeighborhoodData } from "@/lib/neighborhoods";
@@ -21,7 +22,7 @@ import { NeighborhoodPlat } from "@/components/linework";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const revealVariants: Variants = {
-  hidden: { opacity: 0, y: 22 },
+  hidden: { opacity: 0.12, y: 22 },
   visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,
@@ -38,7 +39,7 @@ const lineBtn =
 export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
-  const viewport = { once: true, margin: "-36px" } as const;
+  const viewport = REVEAL_VIEWPORT;
 
   const projects = caseStudies
     .filter((cs) => cs.neighborhood === data.name)
@@ -52,7 +53,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
   // only Paradise Valley surfaces it.
   const processSteps =
     data.slug === "paradise-valley"
-      ? getCaseStudy("fortieth-street-breaking-ground")?.timelinePhases?.map(
+      ? getCaseStudy("paradise-valley-structural-phase")?.timelinePhases?.map(
           (p) => ({ label: p.phase }),
         )
       : undefined;

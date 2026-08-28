@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * Colophon-style spec table for the Night Blueprint case-study pages.
- * Matches the CaseStudyShowcase spec rows: gold small-caps labels, cream
- * values, hairline rules between rows. Renders as a definition list and
- * reveals with the shared editorial ease; fully static under
- * prefers-reduced-motion.
+ * Colophon-style spec table for the Night Blueprint case-study pages:
+ * gold small-caps labels, cream values, hairline rules between rows.
+ * Renders as a definition list and reveals with the shared editorial
+ * ease; fully static under prefers-reduced-motion.
  */
 
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -28,10 +28,10 @@ export function SpecTable({ specs, className }: SpecTableProps) {
     <motion.dl
       className={cn("border-t border-off-white/[0.14]", className)}
       initial={
-        prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }
+        prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0.12, y: 22 }
       }
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-36px" }}
+      viewport={REVEAL_VIEWPORT}
       transition={{ duration: 1, ease: EASE }}
     >
       {specs.map((spec) => (

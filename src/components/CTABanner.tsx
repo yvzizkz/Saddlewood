@@ -8,6 +8,7 @@
 
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import Link from "next/link";
 import { Phone } from "lucide-react";
 
@@ -32,9 +33,9 @@ function CTAShell({ children }: { children: React.ReactNode }) {
       />
       <motion.div
         className="relative"
-        initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
+        initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0.12, y: 22 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-36px" }}
+        viewport={REVEAL_VIEWPORT}
         transition={{ duration: 1, ease: EASE }}
       >
         {children}
