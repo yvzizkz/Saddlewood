@@ -2,10 +2,11 @@
 
 /**
  * Neighborhood landing page, Night Blueprint v2 — no photography. The
- * PageHero carries the NeighborhoodPlat linework figure; every SEO body
- * section (description paragraphs, expertise list, project index,
- * process phases, testimonials, localized CTA) renders as type and
- * hairlines on the dark page ground. Copy comes verbatim from
+ * cream PageHero (premium standard for Areas pages) carries the
+ * NeighborhoodPlat figure in drafting ink; every SEO body section
+ * (description paragraphs, expertise list, project index, process
+ * phases, testimonials, localized CTA) renders as type and hairlines
+ * on the dark page ground. Copy comes verbatim from
  * src/lib/neighborhoods.ts and src/data/case-studies.ts.
  */
 
@@ -64,7 +65,14 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
         label={`Service Area · ${data.zip}`}
         title={`Remodeling in ${data.fullName}`}
         description={data.tagline}
-        linework={<NeighborhoodPlat className="block h-auto w-full" opacity={0.5} />}
+        variant="cream"
+        linework={
+          /* linework-ink swaps the plat to drafting ink so it holds up on
+             the cream ground */
+          <div className="linework-ink">
+            <NeighborhoodPlat className="block h-auto w-full" opacity={0.5} />
+          </div>
+        }
       />
 
       {/* About — the SEO body copy, on the dark page ground */}

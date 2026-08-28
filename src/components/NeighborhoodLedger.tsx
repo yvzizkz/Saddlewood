@@ -3,7 +3,8 @@
 /**
  * Service-area ledger — the eight neighborhoods as numbered drafting rows
  * with a gold rule that draws across each row on scroll (handoff demo's
- * "hoods" pattern). Each row links to its neighborhood page.
+ * "hoods" pattern). Each row links to its neighborhood page. Cream
+ * interlude ground per the premium-standard homepage rhythm.
  */
 
 import Link from "next/link";
@@ -38,20 +39,21 @@ export function NeighborhoodLedger() {
 
   return (
     <section
-      className="relative py-[clamp(72px,9vh,112px)]"
+      className="night-on-cream relative bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
       aria-label="Service area"
     >
-      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+      <div className="night-cream-grid" aria-hidden="true" />
+      <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
         <span className="section-label !mb-0">Service Area</span>
         <motion.h2
           variants={variants}
           initial="hidden"
           whileInView="visible"
           viewport={REVEAL_VIEWPORT}
-          className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,4.4vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white"
+          className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,4.4vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-charcoal"
         >
           Proudly serving{" "}
-          <em className="font-normal italic text-gold">Scottsdale.</em>
+          <em className="font-normal italic text-gold-display">Scottsdale.</em>
         </motion.h2>
         <motion.p
           variants={variants}
@@ -59,7 +61,7 @@ export function NeighborhoodLedger() {
           initial="hidden"
           whileInView="visible"
           viewport={REVEAL_VIEWPORT}
-          className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-off-white/70"
+          className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light"
         >
           Hyper-local focus means deeper expertise and stronger relationships
           in the communities where we work.
@@ -67,22 +69,22 @@ export function NeighborhoodLedger() {
 
         <div className="mt-11 grid grid-cols-1 gap-x-16 md:grid-cols-2">
           {hoods.map((hood, i) => (
-            <div key={hood.slug} className="relative border-b border-off-white/[0.14]">
+            <div key={hood.slug} className="relative border-b border-charcoal/[0.14]">
               <Link
                 href={`/neighborhoods/${hood.slug}`}
                 className="group flex items-baseline gap-[18px] py-[22px] no-underline"
               >
-                <span className="font-mono text-[11px] text-gold">
+                <span className="font-mono text-[11px] text-gold-accessible">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <span className="font-heading text-[clamp(21px,2.2vw,26px)] font-medium text-off-white transition-colors group-hover:text-gold">
+                <span className="font-heading text-[clamp(21px,2.2vw,26px)] font-medium text-charcoal transition-colors group-hover:text-gold-accessible">
                   {hood.name}
                 </span>
               </Link>
               {/* Gold rule draws across the row once visible */}
               <motion.span
                 aria-hidden="true"
-                className="absolute bottom-[-1px] left-0 h-px bg-gold"
+                className="absolute bottom-[-1px] left-0 h-px bg-gold-accessible"
                 initial={{ width: prefersReducedMotion ? "100%" : 0 }}
                 whileInView={{ width: "100%" }}
                 viewport={{ once: true, amount: 0.4 }}

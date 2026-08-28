@@ -426,6 +426,18 @@ img {
   --cream: #3a2f1d;
 }
 
+/* Slow Ken Burns for full-bleed still heroes (premium standard). */
+@keyframes kenburns {
+  from { transform: scale(1.02); }
+  to { transform: scale(1.1); }
+}
+.kenburns {
+  animation: kenburns 22s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kenburns { animation: none; transform: scale(1.02); }
+}
+
 /* Corner ticks for the hero reel card (drafting registration marks). */
 .reel-corner {
   position: absolute;

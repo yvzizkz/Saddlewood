@@ -1,10 +1,13 @@
 "use client";
 
 /**
- * Case-study plan fragment — great room opening to pool terrace: double-line
- * exterior walls, dashed sliding-wall track (fades with the figures), kitchen
- * island, wine-wall hatch, rounded pool with water ticks, vertical dimension,
- * and a north arrow. Geometry ported verbatim from the winning preview.
+ * Great room plan fragment — v2, the premium-standard two-ink treatment:
+ * true wall poché (one heavy open path that leaves the sliding-door gap),
+ * furniture at plan weight, paver-grid terrace, pool edge peek, room
+ * labels off the linework, one vertical dimension, and a north arrow.
+ *
+ * On the dark ground the heavy tone reads as cream structure + gold
+ * detail; wrap in `.linework-ink` on cream grounds for warm ink + brass.
  */
 
 import {
@@ -13,6 +16,7 @@ import {
   FigurePath,
   Stroke,
   StrokeCircle,
+  StrokeRect,
 } from "./AnimatedLinework";
 
 export interface PlanFragmentProps {
@@ -21,6 +25,8 @@ export interface PlanFragmentProps {
   delay?: number;
 }
 
+const DETAIL = { tone: "gold", width: 0.9, opacity: 0.95 } as const;
+
 export function PlanFragment({
   className,
   glow = false,
@@ -28,75 +34,89 @@ export function PlanFragment({
 }: PlanFragmentProps) {
   return (
     <AnimatedLinework
-      viewBox="0 0 560 400"
+      viewBox="0 0 560 330"
       className={className}
       glow={glow}
       delay={delay}
-      stagger={0.08}
-      duration={1.6}
-      figureDelay={1.9}
+      duration={2.2}
+      stagger={0.05}
+      figureDelay={2.0}
+      preserveAspectRatio="xMidYMid meet"
     >
-      {/* exterior walls (double line) */}
-      <Stroke d="M60 60 H500" duration={2.2} />
-      <Stroke d="M72 72 H488" width={1} duration={2.2} />
-      <Stroke d="M60 60 V240" duration={2} />
-      <Stroke d="M72 72 V228" width={1} duration={2} />
-      <Stroke d="M500 60 V140" />
-      <Stroke d="M488 72 V140" width={1} />
-      <Stroke d="M60 240 H150" />
-      <Stroke d="M72 228 H150" width={1} />
-      <Stroke d="M330 240 H420 V140 H500" duration={2} />
-      <Stroke d="M330 228 H408 V140" width={1} duration={2} />
-      {/* sliding wall track (dashed, fades with figures) */}
-      <FigurePath d="M150 234 H330" width={1} dash="7 5" />
-      {/* kitchen island + wine wall hatch */}
-      <Stroke d="M356 104 H470 V130 H356 Z" width={1} duration={1.8} />
-      <Stroke d="M492 78 L500 86" width={1} opacity={0.5} duration={1.2} />
-      <Stroke d="M488 92 L500 104" width={1} opacity={0.5} duration={1.2} />
-      <Stroke d="M488 110 L500 122" width={1} opacity={0.5} duration={1.2} />
-      <Stroke d="M488 128 L498 138" width={1} opacity={0.5} duration={1.2} />
-      {/* terrace + pool */}
-      <Stroke d="M118 264 H452" tone="cream" opacity={0.28} duration={2} />
+      {/* Exterior walls: true poché — one heavy open path that leaves the
+          sliding-door opening between x170 and x300 on the terrace wall */}
       <Stroke
-        d="M162 288 H390 A12 12 0 0 1 402 300 V352 A12 12 0 0 1 390 364 H162 A12 12 0 0 1 150 352 V300 A12 12 0 0 1 162 288 Z"
-        duration={2.4}
+        d="M300 220 H360 V150 H470 V60 H90 V220 H170"
+        tone="cream"
+        width={7}
       />
-      <Stroke d="M176 308 H214" tone="cream" opacity={0.5} duration={1.2} />
-      <Stroke d="M176 318 H202" tone="cream" opacity={0.5} duration={1.2} />
-      <Stroke d="M176 328 H222" tone="cream" opacity={0.5} duration={1.2} />
-      {/* vertical dimension */}
-      <Stroke d="M32 60 V240" tone="dim" />
-      <Stroke d="M26 66 L38 54" tone="dim" duration={1.2} />
-      <Stroke d="M26 246 L38 234" tone="dim" duration={1.2} />
-      {/* north arrow */}
-      <StrokeCircle cx={524} cy={330} r={15} width={1} />
-      <Stroke d="M524 348 V312" width={1} duration={1.2} />
-      <Stroke d="M524 312 L518 322" width={1} duration={1.2} />
-      <Stroke d="M524 312 L530 322" width={1} duration={1.2} />
-      {/* labels */}
-      <Figure x={150} y={158} tone="cream">
+      {/* Sliding door jambs and overlapping panels */}
+      <Stroke d="M170 216 H236 M234 224 H300" tone="gold" width={1.2} opacity={0.95} />
+      {/* Interior partition */}
+      <Stroke d="M360 150 V60" tone="gold" width={1} opacity={0.95} />
+
+      {/* Island: heavy with brass cabinetry marks */}
+      <StrokeRect x={360} y={96} width={84} height={26} tone="cream" strokeW={1.6} />
+      <Stroke d="M368 96 V122 M376 96 V122" tone="gold" width={0.6} opacity={0.95} />
+
+      {/* Dining: table + chairs */}
+      <StrokeCircle cx={300} cy={110} r={26} {...DETAIL} />
+      <StrokeCircle cx={300} cy={110} r={7} tone="gold" width={0.7} opacity={0.95} />
+      <Stroke
+        d="M300 78 A32 32 0 0 1 328 96 M328 124 A32 32 0 0 1 300 142 M272 124 A32 32 0 0 1 268 104"
+        tone="gold"
+        width={0.6}
+        opacity={0.95}
+      />
+
+      {/* Sofa group */}
+      <StrokeRect x={120} y={96} width={86} height={22} rx={4} tone="gold" strokeW={0.9} opacity={0.95} />
+      <StrokeRect x={120} y={140} width={40} height={20} rx={4} tone="gold" strokeW={0.9} opacity={0.95} />
+      <StrokeRect x={168} y={140} width={40} height={20} rx={4} tone="gold" strokeW={0.9} opacity={0.95} />
+
+      {/* Terrace: paver grid */}
+      <StrokeRect x={140} y={240} width={220} height={60} tone="gold" strokeW={1} opacity={0.95} />
+      <Stroke
+        d="M195 240 V300 M250 240 V300 M305 240 V300 M140 270 H360"
+        tone="gold"
+        width={0.5}
+        opacity={0.7}
+      />
+      {/* Pool edge peek */}
+      <Stroke
+        d="M380 252 C400 246 430 246 452 252 M380 268 C400 262 430 262 452 268"
+        tone="gold"
+        width={0.8}
+        opacity={0.95}
+      />
+
+      {/* North arrow */}
+      <StrokeCircle cx={500} cy={290} r={14} tone="cream" width={1.2} />
+      <Stroke d="M500 300 V280 M495 286 L500 280 L505 286" tone="cream" width={1.2} />
+
+      {/* Labels + dimension: brass, after the linework */}
+      <Figure x={150} y={84} size={10}>
         GREAT ROOM
       </Figure>
-      <Figure x={360} y={94} tone="cream" delay={0.13}>
+      <Figure x={368} y={88} size={9}>
         KITCHEN
       </Figure>
-      <Figure x={196} y={332} tone="cream" delay={0.26}>
-        POOL TERRACE
-      </Figure>
-      <Figure x={188} y={222} tone="cream" delay={0.39}>
+      <Figure x={212} y={212} size={9}>
         SLIDING DOORS
       </Figure>
-      <Figure
-        x={22}
-        y={156}
-        anchor="middle"
-        transform="rotate(-90 22 156)"
-        delay={0.52}
-      >
-        {"24'-0\""}
+      <Figure x={200} y={290} size={9}>
+        POOL TERRACE
       </Figure>
-      <Figure x={519} y={366} tone="cream" delay={0.65}>
+      <FigurePath d="M76 60 H62 M76 220 H62 M68 60 V220" tone="gold" width={0.7} />
+      <FigurePath d="M64 64 L72 56 M64 224 L72 216" tone="gold" width={0.7} />
+      <Figure x={54} y={144} anchor="end" size={9.5} transform="rotate(-90 54 144)">
+        24&apos;-0&quot;
+      </Figure>
+      <Figure x={497} y={322} size={9}>
         N
+      </Figure>
+      <Figure x={90} y={322} size={10}>
+        PLAN FRAGMENT · GREAT ROOM TO POOL TERRACE
       </Figure>
     </AnimatedLinework>
   );

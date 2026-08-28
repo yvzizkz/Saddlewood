@@ -12,6 +12,7 @@
  */
 
 import { VideoPanel } from "@/components/VideoPanel";
+import { GrainOverlay } from "@/components/GrainOverlay";
 
 interface TransitionBandProps {
   src: string;
@@ -39,6 +40,7 @@ export function TransitionBand({ src, poster, eyebrow, label }: TransitionBandPr
             "linear-gradient(to bottom, rgba(26,47,47,0.82), rgba(26,47,47,0.25) 35%, rgba(26,47,47,0.25) 65%, rgba(26,47,47,0.82)), linear-gradient(rgba(26,47,47,0.15), rgba(26,47,47,0.15))",
         }}
       />
+      <GrainOverlay />
       <span className="absolute bottom-6 left-5 z-[1] inline-flex items-center gap-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-gold sm:left-8">
         <span className="h-px w-8 bg-gold" aria-hidden="true" />
         {eyebrow}

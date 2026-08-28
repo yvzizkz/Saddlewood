@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { PageHero } from "@/components/PageHero";
+import { FullBleedHero } from "@/components/FullBleedHero";
 import { CTABanner } from "@/components/CTABanner";
 import { VideoReel } from "@/components/VideoReel";
 import { SheetPair } from "@/components/SheetPair";
 import { PhotoWipe } from "@/components/PhotoWipe";
-import { ShearWallSheet, SteelBeam, WallSection } from "@/components/linework";
+import { ShearWallSheet, WallSection } from "@/components/linework";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -111,18 +111,22 @@ const differentiators = [
 export default function FramingPage() {
   return (
     <>
-      <PageHero
-        label="Framing Subcontractor"
+      <FullBleedHero
+        media={{
+          kind: "video",
+          src: "/videos/saddlewood-transition-band-b.mp4",
+          poster: "/videos/saddlewood-transition-band-b-poster.jpg",
+        }}
+        label="Interior steel stud walls of the active Paradise Valley build"
+        chip={{ text: "Self-Performed", live: true }}
+        eyebrow="Framing Subcontractor"
         title="A licensed AZ framing crew that self-performs."
         description="From slab to trusses, we deliver structural precision on schedule. The reliable framing partner for Scottsdale's premier builders."
-        linework={
-          <SteelBeam glow className="block h-auto w-full max-w-[440px] lg:ml-auto" />
-        }
       />
 
       {/* On Site Now — active ground-up build */}
       <section
-        className="relative border-b border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
+        className="relative py-[clamp(72px,9vh,112px)]"
         aria-label="Active framing project"
       >
         <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -160,9 +164,9 @@ export default function FramingPage() {
           <div className="flex flex-col items-start lg:sticky lg:top-[110px] lg:items-center">
             <div className="night-reel night-reel--dusk w-[min(320px,80vw)]">
               <VideoReel
-                src="/videos/saddlewood-reel-99-percent-never-see.mp4"
-                poster="/videos/saddlewood-reel-99-percent-never-see-poster.jpg"
-                label="Steel framing on the active Paradise Valley build: the structure most clients never see"
+                src="/videos/saddlewood-steel-framing-full.mp4"
+                poster="/videos/saddlewood-steel-framing-full-poster.jpg"
+                label="The full steel framing reel from the active Paradise Valley build"
                 aspect="9x16"
                 mode="autoloop"
                 className="rounded-none bg-teal-dark"
@@ -180,18 +184,20 @@ export default function FramingPage() {
       </section>
 
       {/* The Working Set — traced shear wall detail beside the installed
-          steel, the Drawn/Delivered pair pattern on the dark ground. */}
+          steel, the Drawn/Delivered pair pattern on the cream interlude:
+          off-white ground, teal drafting grid, charcoal type. */}
       <section
-        className="relative py-[clamp(72px,9vh,112px)]"
+        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
         aria-label="Structural drawings and installed framing"
       >
-        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+        <div className="night-cream-grid" aria-hidden="true" />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <span className="section-label !mb-0">The Working Set</span>
-          <h2 className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+          <h2 className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
             Engineered, then{" "}
-            <em className="font-normal italic text-gold">self-performed.</em>
+            <em className="font-normal italic text-gold-display">self-performed.</em>
           </h2>
-          <p className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-off-white/70">
+          <p className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light">
             Steel studs at 16 inches on center, shear panels screwed to
             schedule, holdowns where the plans call them. The same crew that
             reads the S-sheets installs them.
@@ -199,12 +205,12 @@ export default function FramingPage() {
 
           <div className="mt-11">
             <SheetPair
-              tone="dark"
+              tone="cream"
               left={{
                 tag: "Drawn",
                 caption: "Traced from the engineer's structural set",
                 children: (
-                  <div className="w-full p-4">
+                  <div className="linework-ink w-full p-4">
                     <ShearWallSheet className="block h-auto w-full" />
                   </div>
                 ),

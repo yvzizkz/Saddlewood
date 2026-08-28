@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { PageHero } from "@/components/PageHero";
+import { FullBleedHero } from "@/components/FullBleedHero";
 import { ServicesCategories } from "@/components/ServicesCategories";
 import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
 import { VideoReel } from "@/components/VideoReel";
 import { SheetPair } from "@/components/SheetPair";
 import { VideoPanel } from "@/components/VideoPanel";
-import { KitchenSheet, WallSection } from "@/components/linework";
+import { KitchenSheet } from "@/components/linework";
 import { getCaseStudy } from "@/data/case-studies";
 
 export const metadata = {
@@ -20,7 +20,8 @@ export const metadata = {
  * Services page, Night Blueprint.
  *
  * Structure (top to bottom):
- *   1. PageHero — gold kicker, Fraunces title, wall-section linework
+ *   1. FullBleedHero — premium standard: edge-to-edge wide crop of the
+ *      in-progress Troon kitchen remodel loop under the dark grade
  *   2. ServicesCategories — Kitchen / Bathroom / Whole-Home / Outdoor Living
  *      as hairline linework + type plates
  *   3. Kitchen & Bath sheet pair — cream interlude, traced millwork
@@ -119,13 +120,17 @@ export default function ServicesPage() {
 
   return (
     <>
-      <PageHero
-        label="Services"
+      <FullBleedHero
+        media={{
+          kind: "video",
+          src: "/videos/saddlewood-troon-kitchen-wide.mp4",
+          poster: "/videos/saddlewood-troon-kitchen-wide-poster.jpg",
+        }}
+        label="Kitchen segment of the in-progress Troon remodel walkthrough"
+        chip={{ text: "Troon · Remodel" }}
+        eyebrow="Services"
         title="Built start to finish, in-house."
         description="Four trades. One crew. Every phase of your remodel, from the first demo swing to the final punch list, handled by Saddlewood's own licensed team."
-        linework={
-          <WallSection glow className="block h-auto w-full max-w-[440px] lg:ml-auto" />
-        }
       />
 
       <ServicesCategories categories={categories} />

@@ -22,6 +22,7 @@ export {
   FigurePath,
   Stroke,
   StrokeCircle,
+  StrokeRect,
   LINEWORK_EASE,
 } from "./AnimatedLinework";
 export type {
@@ -32,6 +33,7 @@ export type {
   PreparedLineworkVariants,
   StrokeCircleProps,
   StrokeProps,
+  StrokeRectProps,
   StrokeTone,
 } from "./AnimatedLinework";
 

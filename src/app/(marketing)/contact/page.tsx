@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 import { PageHero } from "@/components/PageHero";
-import { PlanFragment } from "@/components/linework";
+import { GarageElevation } from "@/components/linework";
 
 export const metadata = {
   title: { absolute: "Free Remodeling Consultation in Scottsdale | Contact Saddlewood" },
@@ -17,8 +17,9 @@ export default function ContactPage() {
         label="Get In Touch"
         title="Let's Talk"
         description="Ready to transform your home? Start with a free consultation. We'd love to hear about your vision."
-        linework={
-          <PlanFragment className="ml-auto block h-auto w-full max-w-[520px]" glow />
+        variant="cream"
+        underlay={
+          <GarageElevation className="block h-[clamp(160px,24vh,300px)] w-full" />
         }
       />
 

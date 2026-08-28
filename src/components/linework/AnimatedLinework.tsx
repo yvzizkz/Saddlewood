@@ -273,6 +273,36 @@ export function Stroke({ d, duration, ...styleProps }: StrokeProps) {
   );
 }
 
+export interface StrokeRectProps extends Omit<StrokeStyleProps, "width"> {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rx?: number;
+  /** Stroke width in viewBox units (the rect's own `width` is its size). */
+  strokeW?: number;
+}
+
+/** A draw-on rectangle (plan furniture, sheathing panels, holdowns). */
+export function StrokeRect({ x, y, width, height, rx, strokeW, duration, ...styleProps }: StrokeRectProps) {
+  const ctx = useContext(LineworkContext);
+  const attrs = useStrokeAttrs({ ...styleProps, width: strokeW });
+  if (ctx.reduced) {
+    return <rect x={x} y={y} width={width} height={height} rx={rx} {...attrs} />;
+  }
+  return (
+    <motion.rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      rx={rx}
+      {...attrs}
+      variants={drawVariants(duration ?? ctx.duration)}
+    />
+  );
+}
+
 export interface StrokeCircleProps extends StrokeStyleProps {
   cx: number;
   cy: number;

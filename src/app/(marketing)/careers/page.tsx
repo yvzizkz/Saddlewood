@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Phone } from "lucide-react";
 import { CareersForm } from "@/components/CareersForm";
-import { DimensionTicks } from "@/components/linework";
+import { PageHero } from "@/components/PageHero";
+import { GarageElevation } from "@/components/linework";
 
 export const metadata: Metadata = {
   title: "Careers | Build With Saddlewood in Scottsdale | Saddlewood",
@@ -141,34 +142,17 @@ export default function CareersPage() {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jobPostingJsonLd()) }}
       />
 
-      {/* Header — dark page ground, centered title block */}
-      <section className="relative px-5 pb-16 pt-32 text-center sm:px-8 sm:pt-36">
-        {/* Ambient gold glow */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          aria-hidden="true"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 60% at 50% 90%, rgba(200,165,90,0.08), transparent 70%)",
-          }}
-        />
-        <div className="relative">
-          <span className="section-label !mb-0 justify-center">Careers</span>
-          <h1 className="mx-auto mt-5 font-heading text-4xl font-medium leading-[1.1] tracking-[-0.02em] text-off-white lg:text-6xl">
-            Build with{" "}
-            <em className="font-normal italic text-gold">Saddlewood.</em>
-          </h1>
-          <div aria-hidden="true" className="mt-7 flex justify-center">
-            <DimensionTicks className="block h-[14px] w-[64px]" />
-          </div>
-          <p className="mx-auto mt-6 max-w-[560px] text-[15px] leading-[1.8] text-off-white/[0.62]">
-            We&apos;re a Scottsdale builder: luxury remodels, new construction,
-            and a self-performing framing crew. We&apos;re small enough that
-            your work is visible and growing fast enough that the next role up
-            usually exists.
-          </p>
-        </div>
-      </section>
+      {/* Hero — premium-standard cream treatment with the garage elevation
+          ghosted along the floor */}
+      <PageHero
+        label="Careers"
+        title="Build with Saddlewood."
+        description="We're a Scottsdale builder: luxury remodels, new construction, and a self-performing framing crew. We're small enough that your work is visible and growing fast enough that the next role up usually exists."
+        variant="cream"
+        underlay={
+          <GarageElevation className="block h-[clamp(160px,24vh,300px)] w-full" />
+        }
+      />
 
       <section className="mx-auto max-w-[880px] px-5 py-14 sm:px-8">
         <div className="space-y-10">

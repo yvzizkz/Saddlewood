@@ -1,20 +1,24 @@
 "use client";
 
 /**
- * Perforated shear wall detail, traced from the engineer's structural set
- * for the active Paradise Valley steel build (2026-08-28 handoff). Steel
- * studs at 16" O.C., lintel per plan, holdown, and the sheathing panel
- * with edge/field screws.
+ * Perforated shear wall detail — v2, the premium-standard two-ink
+ * treatment: poché top track, floor, and end double studs; hatched lintel;
+ * real screw dots on the sheathing; earth hatch below the floor line; and
+ * a crew figure setting the panel for life and scale. Traced from the
+ * engineer's structural set for the active Paradise Valley steel build.
  *
- * Monochrome drafting sheet; reads full-gold on the dark ground.
+ * On the dark ground the heavy tone reads as cream structure + gold
+ * detail; wrap in `.linework-ink` on cream grounds for warm ink + brass.
  */
 
 import {
   AnimatedLinework,
   Figure,
+  FigureGroup,
   FigurePath,
   Stroke,
   StrokeCircle,
+  StrokeRect,
 } from "./AnimatedLinework";
 
 export interface ShearWallSheetProps {
@@ -22,12 +26,15 @@ export interface ShearWallSheetProps {
   glow?: boolean;
 }
 
-const THIN = { width: 0.75, opacity: 0.9 } as const;
+const DETAIL = { tone: "gold", width: 0.8, opacity: 0.95 } as const;
+
+const SCREW_ROWS = [100, 132, 164, 226, 258, 290];
+const SCREW_COLS = [316, 348, 380, 412, 444, 476];
 
 export function ShearWallSheet({ className, glow = false }: ShearWallSheetProps) {
   return (
     <AnimatedLinework
-      viewBox="0 0 560 390"
+      viewBox="0 0 560 400"
       className={className}
       glow={glow}
       duration={2.2}
@@ -35,79 +42,91 @@ export function ShearWallSheet({ className, glow = false }: ShearWallSheetProps)
       figureDelay={2.0}
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Top track and floor */}
-      <Stroke d="M40 66 H520 M40 74 H520" tone="cream" width={2} />
-      <Stroke d="M40 318 H520 M40 326 H520" tone="cream" width={2} />
-      {/* Studs, left bay */}
-      <Stroke d="M64 74 V318 M72 74 V318" {...THIN} />
-      <Stroke
-        d="M104 74 V318 M136 74 V318 M168 74 V318 M200 74 V318 M232 74 V318 M264 74 V318"
-        {...THIN}
-      />
-      {/* Lintel over opening */}
-      <Stroke d="M136 140 H264 M136 152 H264" tone="cream" width={2} />
-      <Stroke
-        d="M140 152 L152 140 M156 152 L168 140 M172 152 L184 140 M188 152 L200 140 M204 152 L216 140 M220 152 L232 140 M236 152 L248 140 M252 152 L260 144"
-        {...THIN}
-      />
-      {/* Opening */}
-      <Stroke d="M156 158 H244 V252 H156 Z M156 158 L244 252" {...THIN} />
-      {/* Blocking rows */}
-      <Stroke d="M64 200 H136 M64 206 H136 M64 260 H136 M64 266 H136" {...THIN} />
-      {/* Holdown */}
-      <Stroke d="M76 296 H100 V318 H76 Z" {...THIN} />
-      <StrokeCircle cx={84} cy={307} r={3} {...THIN} />
-      <StrokeCircle cx={93} cy={307} r={3} {...THIN} />
-      {/* Sheathing panel, right */}
-      <Stroke d="M292 74 H500 V318 H292 Z" tone="cream" width={2} />
-      <Stroke d="M292 196 H500" {...THIN} />
-      {/* Field screws — dots fade in with the annotations (a pathLength
-          draw would distort the dot pattern) */}
-      <FigurePath
-        d="M316 100 h.1 M348 100 h.1 M380 100 h.1 M412 100 h.1 M444 100 h.1 M476 100 h.1
-           M316 132 h.1 M348 132 h.1 M380 132 h.1 M412 132 h.1 M444 132 h.1 M476 132 h.1
-           M316 164 h.1 M348 164 h.1 M380 164 h.1 M412 164 h.1 M444 164 h.1 M476 164 h.1
-           M316 228 h.1 M348 228 h.1 M380 228 h.1 M412 228 h.1 M444 228 h.1 M476 228 h.1
-           M316 260 h.1 M348 260 h.1 M380 260 h.1 M412 260 h.1 M444 260 h.1 M476 260 h.1
-           M316 292 h.1 M348 292 h.1 M380 292 h.1 M412 292 h.1 M444 292 h.1 M476 292 h.1"
-        width={2.5}
-        opacity={0.9}
-      />
+      <defs>
+        <pattern
+          id="lintel-hatch"
+          width="7"
+          height="7"
+          patternTransform="rotate(45)"
+          patternUnits="userSpaceOnUse"
+        >
+          <line x1="0" y1="0" x2="0" y2="7" stroke="var(--gold)" strokeWidth="1" opacity="0.6" />
+        </pattern>
+        <pattern id="shear-earth" width="8" height="8" patternUnits="userSpaceOnUse">
+          <path d="M0 8 L8 0" stroke="var(--gold)" strokeWidth="0.7" opacity="0.5" />
+        </pattern>
+      </defs>
 
-      {/* Dims + labels — fade in after linework */}
-      <FigurePath d="M136 58 V40 M264 58 V40 M136 46 H264" {...THIN} />
-      <FigurePath d="M132 50 L140 42 M260 50 L268 42" {...THIN} />
-      <Figure x={200} y={38} anchor="middle" size={9.5}>
+      {/* Poché track, floor, end studs, hatched lintel, earth, screw dots */}
+      <FigureGroup>
+        <rect x="40" y="64" width="480" height="9" fill="var(--cream)" opacity="0.9" />
+        <rect x="40" y="316" width="480" height="9" fill="var(--cream)" opacity="0.9" />
+        <rect x="40" y="327" width="480" height="11" fill="url(#shear-earth)" />
+        <rect x="62" y="73" width="11" height="243" fill="var(--cream)" opacity="0.85" />
+        <rect x="136" y="138" width="128" height="14" fill="url(#lintel-hatch)" />
+        {SCREW_ROWS.flatMap((cy) =>
+          SCREW_COLS.map((cx) => (
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={1.6} fill="var(--gold)" />
+          ))
+        )}
+      </FigureGroup>
+
+      {/* Studs: brass */}
+      <Stroke d="M104 73 V316 M136 73 V316 M168 73 V316 M200 73 V316 M232 73 V316 M264 73 V316" {...DETAIL} />
+      {/* Lintel outline: heavy */}
+      <StrokeRect x={136} y={138} width={128} height={14} tone="cream" strokeW={1.6} />
+      {/* Opening */}
+      <Stroke d="M156 158 H244 V250 H156 Z M156 158 L244 250" {...DETAIL} />
+      {/* Blocking */}
+      <Stroke d="M64 198 H136 M64 204 H136 M64 258 H136 M64 264 H136" tone="gold" width={0.7} opacity={0.95} />
+      {/* Holdown: heavy box, brass anchors */}
+      <StrokeRect x={76} y={294} width={24} height={22} tone="cream" strokeW={1.5} />
+      <StrokeCircle cx={84} cy={305} r={3} tone="gold" width={0.9} opacity={0.95} />
+      <StrokeCircle cx={93} cy={305} r={3} tone="gold" width={0.9} opacity={0.95} />
+      {/* Sheathing: heavy border, brass panel joint */}
+      <StrokeRect x={292} y={73} width={208} height={243} tone="cream" strokeW={1.8} />
+      <Stroke d="M292 194 H500" tone="gold" width={0.7} opacity={0.95} />
+
+      {/* Crew figure setting the panel */}
+      <StrokeCircle cx={533} cy={234} r={6} tone="cream" width={1.3} />
+      <Stroke d="M527 231 A7 7 0 0 1 539 231" tone="cream" width={1.3} />
+      <Stroke
+        d="M533 240 V276 M533 248 L518 254 M533 250 L544 262 M533 276 L525 316 M533 276 L541 316"
+        tone="cream"
+        width={1.3}
+      />
+      <Stroke d="M512 252 L518 254" tone="cream" width={2} />
+
+      {/* Dims + labels: brass, after the linework */}
+      <FigurePath d="M136 56 V38 M264 56 V38 M136 44 H264" tone="gold" width={0.7} />
+      <FigurePath d="M132 48 L140 40 M260 48 L268 40" tone="gold" width={0.7} />
+      <FigurePath
+        d="M264 44 H330 M60 118 H30 M200 144 V120 M100 305 L120 288 M500 88 H524"
+        tone="gold"
+        width={0.7}
+      />
+      <Figure x={200} y={36} anchor="middle" size={10}>
         32&quot; MAX
       </Figure>
-      <FigurePath d="M264 46 H330" {...THIN} />
-      <Figure x={297} y={38} anchor="middle" size={9.5}>
+      <Figure x={297} y={36} anchor="middle" size={10}>
         20&quot; TYP
       </Figure>
-      <FigurePath d="M60 120 H30" {...THIN} />
-      <Figure x={28} y={112} size={9.5}>
+      <Figure x={28} y={110} size={10}>
         STEEL STUDS
       </Figure>
-      <Figure x={28} y={132} size={9.5}>
+      <Figure x={28} y={130} size={10}>
         16&quot; O.C.
       </Figure>
-      <FigurePath d="M200 146 V120" {...THIN} />
-      <Figure x={204} y={116} size={9.5}>
+      <Figure x={204} y={116} size={10}>
         LINTEL PER PLAN
       </Figure>
-      <FigurePath d="M100 307 L120 290" {...THIN} />
-      <Figure x={124} y={288} size={9.5}>
+      <Figure x={124} y={286} size={10}>
         HOLDOWN
       </Figure>
-      <FigurePath d="M500 90 H524" {...THIN} />
-      <Figure x={526} y={93} size={9.5}>
-        EDGE SCREWS · TYP
+      <Figure x={526} y={91} size={9}>
+        EDGE
       </Figure>
-      <FigurePath d="M500 318 H524" {...THIN} />
-      <Figure x={526} y={321} size={9.5}>
-        FLOOR LINE
-      </Figure>
-      <Figure x={36} y={376} size={9.5}>
+      <Figure x={36} y={382} size={10}>
         PERFORATED SHEAR WALL DETAIL · S-SERIES · PARADISE VALLEY
       </Figure>
     </AnimatedLinework>
