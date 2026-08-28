@@ -1,10 +1,10 @@
 import Link from "next/link";
-import Image from "next/image";
 import { PageHero } from "@/components/PageHero";
 import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
 import { getProjectBySlug } from "@/data/projects";
 import { VideoReel } from "@/components/VideoReel";
+import { MassingDiagram, SteelBeam } from "@/components/linework";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -25,7 +25,6 @@ export const metadata = {
   openGraph: {
     title: "Custom Home Builder & New Construction in Scottsdale | Saddlewood",
     description: "Ground-up new construction and whole-home builds in Scottsdale & Paradise Valley. Self-performing structure and finishes in-house.",
-    images: [{ url: "/images/pv-exterior-front-entrance-dusk.jpg", alt: "Custom home build in Paradise Valley by Saddlewood Contracting" }],
   },
 };
 
@@ -36,67 +35,33 @@ const trades = [
   { name: "Plumbing", roc: "ROC #350716" },
 ];
 
+// What each construction phase of the 40th Street build became in the
+// finished home. The narrative stays grounded in the matching project
+// entries in projects.ts.
+const phaseOutcomes = [
+  "The cleared site became the entry: exposed beams, oak floors, and arched mirrors at arrival.",
+  "The slab became the chef's kitchen: natural stone island, coffered ceiling, pendant light.",
+  "Exterior framing carried the great room: sliding doors dissolve into pool and patio beyond.",
+  "Interior framing became the primary suite: oak headboard wall, skylight, framed window view.",
+  "The trusses set the ceiling line over a master bath in bookmatched veined marble.",
+  "Same crew through finish: herringbone marble, fluted glass, hammered silver tub.",
+];
+
+// Field notes from the active Paradise Valley steel-frame build.
+const siteNotes = [
+  "The structural frame erected on the foundation.",
+  "Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection.",
+];
+
 export default function NewConstructionPage() {
   const wholeHome = getProjectBySlug("paradise-valley-40th-street-whole-home-build");
   const processSteps = wholeHome?.processSteps ?? [];
 
-  const pairedFinished = [
-    {
-      finishedSrc: "/images/pv-entry-foyer.jpg",
-      finishedAlt:
-        "Finished entry foyer with exposed beams, oak floors, and arched mirrors",
-      finishedCaption:
-        "The cleared site became the entry — exposed beams, oak floors, and arched mirrors at arrival.",
-    },
-    {
-      finishedSrc: "/images/pv-kitchen-island-wide.jpg",
-      finishedAlt:
-        "Finished chef's kitchen with natural stone island and coffered ceiling",
-      finishedCaption:
-        "The slab became the chef's kitchen — natural stone island, coffered ceiling, pendant light.",
-    },
-    {
-      finishedSrc: "/images/pv-great-room-chandelier-pool.jpg",
-      finishedAlt:
-        "Finished great room with sculptural chandelier opening to pool",
-      finishedCaption:
-        "Exterior framing carried the great room — sliding doors dissolve into pool and patio beyond.",
-    },
-    {
-      finishedSrc: "/images/pv-master-bedroom-wide.jpg",
-      finishedAlt:
-        "Finished primary bedroom with oak headboard wall and oversized skylight",
-      finishedCaption:
-        "Interior framing became the primary suite — oak headboard wall, skylight, framed window view.",
-    },
-    {
-      finishedSrc: "/images/pv-master-bath-veined-marble-wide.jpg",
-      finishedAlt:
-        "Finished master bath with bookmatched veined marble and freestanding tub",
-      finishedCaption:
-        "The trusses set the ceiling line over a master bath in bookmatched veined marble.",
-    },
-    {
-      finishedSrc: "/images/pv-master-bath-silver-tub-wide.jpg",
-      finishedAlt:
-        "Finished master bath with hammered silver tub and bubble chandelier",
-      finishedCaption:
-        "Same crew through finish — herringbone marble, fluted glass, hammered silver tub.",
-    },
-  ];
-
-  const pairs = processSteps.map((step, i) => {
-    const pair = pairedFinished[i] ?? pairedFinished[pairedFinished.length - 1];
-    return {
-      number: String(i + 1).padStart(2, "0"),
-      label: step.label,
-      duringSrc: step.image,
-      duringAlt: `${step.label} — 40th Street whole-home build, Paradise Valley`,
-      finishedSrc: pair.finishedSrc,
-      finishedAlt: pair.finishedAlt,
-      finishedCaption: pair.finishedCaption,
-    };
-  });
+  const phases = processSteps.map((step, i) => ({
+    number: String(i + 1).padStart(2, "0"),
+    label: step.label,
+    outcome: phaseOutcomes[i] ?? phaseOutcomes[phaseOutcomes.length - 1],
+  }));
 
   return (
     <>
@@ -104,22 +69,23 @@ export default function NewConstructionPage() {
         label="New Construction"
         title="We build from the studs up."
         description="From the initial slab to the final roof trusses, we self-perform the entire structure. A true ground-up builder for Scottsdale and Paradise Valley."
-        image="/images/pv-exterior-front-entrance-dusk.jpg"
-        imageAlt="Custom home front entrance at dusk, designed and built by Saddlewood Contracting"
+        linework={
+          <MassingDiagram glow className="block h-auto w-full max-w-[440px] lg:ml-auto" />
+        }
       />
 
       {/* Intro/positioning section */}
-      <section className="bg-cream py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12">
-        <div className="max-w-[1200px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
-          <div className="lg:col-span-6">
-            <div className="section-label">Bespoke Residential Building</div>
-            <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2 mb-6">
+      <section className="relative py-[clamp(90px,11vh,140px)]">
+        <div className="mx-auto grid w-full max-w-[1240px] items-start gap-10 px-5 sm:px-8 lg:grid-cols-2 lg:gap-16">
+          <div>
+            <span className="section-label !mb-0">Ground-Up Residential Building</span>
+            <h2 className="mt-6 max-w-[16ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
               A single, self-performing crew for your custom home.
             </h2>
           </div>
-          <div className="lg:col-span-6 text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base space-y-6">
+          <div className="space-y-6 text-[15.5px] leading-[1.8] text-off-white/70">
             <p>
-              Many builders subcontract the structural phases to outside crews. We self-perform them—the foundation, framing, and trusses are built by our own team, so the skeleton of your home is held to the same standard as its finishes.
+              Many builders subcontract the structural phases to outside crews. We self-perform them: the foundation, framing, and trusses are built by our own team, so the skeleton of your home is held to the same standard as its finishes.
             </p>
             <p>
               By keeping the structure in-house and managing all four critical trades (general, electrical, plumbing, and HVAC) under our own licenses, we eliminate scheduling gaps, reduce miscommunications, and maintain uncompromising quality from the day we break ground.
@@ -128,110 +94,107 @@ export default function NewConstructionPage() {
         </div>
       </section>
 
-      {/* On Site Now — Ground-Up Construction Project */}
-      <section className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-t border-b border-stone-mid/20">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="h-px w-8 bg-gold" />
-            <span className="section-label">On Site Now</span>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-            <div className="lg:col-span-5">
-              <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2 mb-6">
-                Currently breaking ground in Paradise Valley.
-              </h2>
-              <p className="text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base mb-6">
-                We are currently self-performing the structural phase on an active custom estate in Paradise Valley. The structural phase is underway now; our crews take the build from there with custom wood and metal stud framing.
-              </p>
-              <p className="text-charcoal-light/80 font-light leading-relaxed text-sm">
-                <em>Note: This is an active, in-progress steel-frame build. The demolition-to-finish sequence shown below highlights a separate, completed wood-framed home (our 40th Street project) to demonstrate the complete lifecycle of our construction process.</em>
-              </p>
+      {/* On Site Now — active ground-up build */}
+      <section
+        className="relative border-y border-off-white/[0.08] py-[clamp(90px,11vh,140px)]"
+        aria-label="Active new construction project"
+      >
+        <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div>
+            <span className="section-label !mb-0">On Site Now</span>
+            <h2 className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              Currently breaking ground in Paradise Valley.
+            </h2>
+            <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
+              We are currently self-performing the structural phase on an active custom estate in Paradise Valley. The structural phase is underway now; our crews take the build from there with custom wood and metal stud framing.
+            </p>
+            <p className="mt-5 max-w-[560px] text-[13.5px] leading-[1.75] text-off-white/[0.55]">
+              <em>Note: This is an active, in-progress steel-frame build. The demolition-to-finish sequence shown below highlights a separate, completed wood-framed home (our 40th Street project) to demonstrate the complete lifecycle of our construction process.</em>
+            </p>
+
+            {/* Drawn steel detail + field notes replace the site photos */}
+            <figure className="mb-0 ml-0 mr-0 mt-10" aria-hidden="true">
+              <SteelBeam className="block h-auto w-full max-w-[340px]" />
+            </figure>
+            <div className="mt-8">
+              <div className="text-[10.5px] font-medium uppercase tracking-[0.25em] text-gold">
+                Field Notes
+              </div>
+              <ul className="mt-4 grid max-w-[560px] list-none grid-cols-1 gap-y-2.5 p-0">
+                {siteNotes.map((note) => (
+                  <li
+                    key={note}
+                    className="relative pl-5 text-[13.5px] leading-snug text-off-white/80"
+                  >
+                    <span
+                      className="absolute left-0 top-[0.62em] h-px w-2.5 bg-gold"
+                      aria-hidden="true"
+                    />
+                    {note}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-12 gap-6 items-end">
-              <div className="sm:col-span-5 flex flex-col justify-end">
-                <VideoReel
-                  src="/videos/breaking-ground-steel-9x16.mp4"
-                  poster="/videos/breaking-ground-steel-9x16-poster.jpg"
-                  label="On-site footage of framing progress in Paradise Valley"
-                  aspect="9x16"
-                  mode="autoloop"
-                  className="mb-3"
-                />
-                <p className="text-charcoal-light text-xs font-light">On-site footage of the active Paradise Valley steel framing.</p>
-              </div>
-              <div className="sm:col-span-7 flex flex-col gap-6">
-                <div className="group">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
-                    <Image
-                      src="/images/pv-newbuild-steel-frame.jpg"
-                      alt="Structural frame erected on the foundation of a Paradise Valley new build"
-                      fill
-                      sizes="(min-width: 1024px) 35vw, 100vw"
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                  </div>
-                  <p className="text-charcoal-light text-xs font-light">The structural frame erected on the foundation.</p>
-                </div>
-                <div className="group">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-3">
-                    <Image
-                      src="/images/pv-newbuild-steel-joists.jpg"
-                      alt="Stacked galvanized structural-phase steel (set by the project's steel trade) members staged on site"
-                      fill
-                      sizes="(min-width: 1024px) 35vw, 100vw"
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                  </div>
-                  <p className="text-charcoal-light text-xs font-light">Galvanized structural-phase steel (set by the project&apos;s steel trade) staged on site before erection.</p>
-                </div>
-              </div>
+          </div>
+
+          {/* On-site reel — dusk treatment + gold edge-light */}
+          <div className="flex flex-col items-start lg:sticky lg:top-[110px] lg:items-center">
+            <div className="night-reel night-reel--dusk w-[min(320px,80vw)]">
+              <VideoReel
+                src="/videos/breaking-ground-steel-9x16.mp4"
+                poster="/videos/breaking-ground-steel-9x16-poster.jpg"
+                label="On-site footage of framing progress in Paradise Valley"
+                aspect="9x16"
+                mode="autoloop"
+                className="rounded-none bg-teal-dark"
+              />
+              <span className="night-reel-chip">On Site</span>
+            </div>
+            <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
+              Active Paradise Valley steel framing
             </div>
           </div>
         </div>
       </section>
 
       {/* Process section */}
-      {pairs.length > 0 && (
+      {phases.length > 0 && (
         <ServicesProcess
-          pairs={pairs}
-          finalHero={{
-            src: "/images/pv-exterior-aerial-sunset-mountain.jpg",
-            alt: "Aerial sunset view of finished Paradise Valley estate against the mountains",
-            caption:
-              "From cleared dirt to a finished estate — every trade ran through our own crew.",
-          }}
+          phases={phases}
+          closing="From cleared dirt to a finished estate. Every trade ran through our own crew."
         />
       )}
 
-      {/* Trades / ROC credential strip */}
+      {/* Trades / ROC credential strip — the one cream interlude in the
+          page rhythm, following the HeritageInterlude treatment. */}
       <section
-        className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-t border-stone-mid/40"
+        className="night-on-cream relative border-t border-gold/[0.35] bg-off-white py-[clamp(80px,10vh,120px)] text-charcoal"
         aria-label="Licensed trades and ROC numbers"
       >
-        <div className="max-w-[1200px] mx-auto">
-          <div className="max-w-[640px] mb-12 sm:mb-16">
-            <div className="section-label">In-House Trades</div>
-            <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2">
+        <div className="night-cream-grid" aria-hidden="true" />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <div className="max-w-[640px]">
+            <span className="section-label !mb-0">In-House Trades</span>
+            <h2 className="mt-5 font-heading text-[clamp(32px,3.8vw,48px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
               Four ROC licenses.{" "}
-              <em className="italic text-teal font-normal">No outside subs.</em>
+              <em className="font-normal italic text-gold-display">
+                No outside subs.
+              </em>
             </h2>
-            <p className="mt-6 text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base max-w-[520px]">
+            <p className="mt-6 max-w-[520px] text-[15.5px] leading-[1.8] text-charcoal-light">
               We pull our own permits. We employ our own electricians, plumbers,
               and HVAC technicians. When something needs coordinating between
               trades, the conversation happens in our own office.
             </p>
           </div>
 
-          <ul className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-stone-mid/40 border border-stone-mid/40">
+          <ul className="mt-12 grid list-none grid-cols-2 gap-px border border-teal/[0.18] bg-teal/[0.18] p-0 lg:grid-cols-4">
             {trades.map((t) => (
-              <li
-                key={t.name}
-                className="bg-off-white px-6 py-8 sm:px-8 sm:py-10"
-              >
-                <div className="font-heading text-xl sm:text-2xl font-light text-charcoal">
+              <li key={t.name} className="bg-off-white px-6 py-8 sm:px-8 sm:py-10">
+                <div className="font-heading text-xl font-medium text-charcoal sm:text-2xl">
                   {t.name}
                 </div>
-                <div className="mt-2 text-[11px] tracking-[0.2em] uppercase text-gold-accessible font-medium">
+                <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.2em] text-gold-accessible">
                   {t.roc}
                 </div>
               </li>
@@ -241,18 +204,17 @@ export default function NewConstructionPage() {
       </section>
 
       {/* Quiet bottom CTA */}
-      <section className="bg-cream py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12">
-        <div className="max-w-[820px] mx-auto text-center">
-          <p className="font-heading text-2xl sm:text-3xl lg:text-[36px] font-light text-charcoal leading-[1.3] tracking-[-0.01em] mb-8">
+      <section className="relative py-[clamp(88px,11vh,128px)]">
+        <div className="mx-auto w-full max-w-[820px] px-5 text-center sm:px-8">
+          <p className="font-heading text-[clamp(26px,3vw,38px)] font-medium leading-[1.3] tracking-[-0.01em] text-off-white">
             Ready to build your custom home?{" "}
-            <em className="italic text-teal font-normal">Let&apos;s talk.</em>
+            <em className="font-normal italic text-gold">Let&apos;s talk.</em>
           </p>
           <Link
             href="/contact"
-            className="inline-flex items-center gap-2 text-sm text-charcoal hover:text-gold-accessible transition-colors tracking-[0.05em] border-b border-charcoal/30 hover:border-gold-accessible py-2"
+            className="mt-8 inline-flex items-center gap-2 border-b border-gold/40 pb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:border-gold"
           >
-            Book a free consultation{" "}
-            <span aria-hidden="true">&rarr;</span>
+            Book a free consultation <span aria-hidden="true">&rarr;</span>
           </Link>
         </div>
       </section>
