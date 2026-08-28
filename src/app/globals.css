@@ -262,3 +262,166 @@ img {
     animation: none;
   }
 }
+
+/* ============================================
+   NIGHT BLUEPRINT — marketing shell scope
+   Everything below is scoped to .night-surface (the (marketing) route
+   group wrapper) or to new night-* class names, so the (portal) route
+   group and its light layout are untouched. Tokens are additions only.
+   ============================================ */
+
+:root {
+  /* Gold for DISPLAY-size type on cream grounds (small text on cream
+     stays on --gold-accessible #8B6914; full-strength --gold #c8a55a is
+     reserved for dark grounds). */
+  --gold-display: #A17A31;
+}
+
+@theme inline {
+  --color-gold-display: var(--gold-display);
+}
+
+/* Dark ground, cream type — the page-wide light table */
+.night-surface {
+  background: var(--teal-dark);
+  color: var(--off-white);
+}
+
+.night-surface ::selection {
+  background: rgba(200, 165, 90, 0.35);
+  color: var(--off-white);
+}
+
+/* Fixed blueprint grid at very low opacity, vignetted toward the edges.
+   Sections that declare their own background (teal band, cream interlude)
+   paint over it; page-ground sections let it show through. Content must
+   sit in a positioned ancestor (the marketing <main> is relative). */
+.night-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(245, 240, 232, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245, 240, 232, 0.028) 1px, transparent 1px);
+  background-size: 96px 96px;
+  -webkit-mask-image: radial-gradient(ellipse 120% 90% at 50% 30%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 120% 90% at 50% 30%, #000 40%, transparent 100%);
+}
+
+/* Teal drafting grid for cream interlude sections (place inside a
+   position:relative section) */
+.night-cream-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(45, 74, 74, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 74, 74, 0.035) 1px, transparent 1px);
+  background-size: 96px 96px;
+}
+
+/* Section label — full-strength gold reads correctly on the dark ground */
+.night-surface .section-label {
+  color: var(--gold);
+}
+.night-surface .section-label::before {
+  background: var(--gold);
+}
+/* ...and back to accessible gold inside cream interludes */
+.night-surface .night-on-cream .section-label {
+  color: var(--gold-accessible);
+}
+.night-surface .night-on-cream .section-label::before {
+  background: var(--gold-accessible);
+}
+
+/* Hero display type — clamps up to ~116px; !important + scope specificity
+   so it wins over the global ≤640px h1 clamp above. The second min() term
+   keeps the fixed "That Demand More." line (whitespace-nowrap) inside the
+   viewport on narrow phones so the closing period never clips. */
+.night-surface .night-hero-title {
+  font-size: min(clamp(40px, 8.1vw, 116px), 10.7vw - 4px) !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.02em;
+}
+
+/* Reel frame — gold edge-light around the on-site video slot */
+.night-reel {
+  position: relative;
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(200, 165, 90, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(26, 47, 47, 0.8),
+    0 0 54px rgba(200, 165, 90, 0.16),
+    0 30px 70px rgba(0, 0, 0, 0.5);
+  transition:
+    box-shadow 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.night-reel:hover {
+  box-shadow:
+    0 0 0 1px rgba(26, 47, 47, 0.8),
+    0 0 84px rgba(200, 165, 90, 0.3),
+    0 34px 80px rgba(0, 0, 0, 0.55);
+  transform: translateY(-4px);
+}
+/* Scrim so the cream chip/label text always reads over the footage */
+.night-reel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgba(26, 47, 47, 0.75), transparent 38%),
+    linear-gradient(to bottom, rgba(26, 47, 47, 0.35), transparent 22%);
+}
+/* Dusk treatment — deeper scrim + tint so daylight footage sits inside
+   the night palette */
+.night-reel--dusk video,
+.night-reel--dusk img {
+  filter: brightness(0.72) saturate(0.78);
+}
+.night-reel--dusk::after {
+  background:
+    linear-gradient(to top, rgba(26, 47, 47, 0.85), transparent 52%),
+    linear-gradient(to bottom, rgba(26, 47, 47, 0.6), transparent 36%),
+    linear-gradient(rgba(26, 47, 47, 0.28), rgba(26, 47, 47, 0.28));
+}
+.night-reel-chip {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+  pointer-events: none;
+}
+.night-reel-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 10px rgba(200, 165, 90, 0.9);
+}
+.night-reel-label {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  z-index: 2;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(245, 240, 232, 0.85);
+  pointer-events: none;
+}

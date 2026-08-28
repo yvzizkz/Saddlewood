@@ -1,94 +1,116 @@
 "use client";
 
-import { motion } from "framer-motion";
-import Image from "next/image";
+/**
+ * Service-area ledger — the 8 neighborhoods as an indexed Fraunces list
+ * over a faded, self-drawing NeighborhoodPlat. Slugs match
+ * src/lib/neighborhoods.ts and the /neighborhoods/* routes.
+ */
+
 import Link from "next/link";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { NeighborhoodPlat } from "@/components/linework";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 const hoods = [
-  {
-    name: "McCormick Ranch",
-    zip: "85258",
-    tagline: "Timeless elegance in the heart of Scottsdale",
-    image: "/images/kitchen2.jpg",
-    imageAlt: "Modern kitchen interior from a McCormick Ranch home remodel",
-    href: "/neighborhoods/mccormick-ranch",
-  },
-  {
-    name: "Gainey Ranch",
-    zip: "85258",
-    tagline: "Refined living with desert sophistication",
-    image: "/images/fireplace.jpg",
-    imageAlt: "Statement fireplace surround in a Gainey Ranch living room",
-    href: "/neighborhoods/gainey-ranch",
-  },
-  {
-    name: "Pinnacle Peak",
-    zip: "85255",
-    tagline: "Modern luxury at the base of the mountain",
-    image: "/images/dining.jpg",
-    imageAlt: "Indoor-outdoor dining space at a Pinnacle Peak residence",
-    href: "/neighborhoods/pinnacle-peak",
-  },
-  {
-    name: "Paradise Valley",
-    zip: "85253",
-    tagline: "Luxury reimagined in the heart of the desert",
-    image: "/images/pv-aerial-sunset.jpg",
-    imageAlt: "Aerial sunset view of a luxury Paradise Valley home remodel",
-    href: "/neighborhoods/paradise-valley",
-  },
+  { name: "Paradise Valley", slug: "paradise-valley" },
+  { name: "Silverleaf", slug: "silverleaf" },
+  { name: "DC Ranch", slug: "dc-ranch" },
+  { name: "McCormick Ranch", slug: "mccormick-ranch" },
+  { name: "Gainey Ranch", slug: "gainey-ranch" },
+  { name: "Grayhawk", slug: "grayhawk" },
+  { name: "Pinnacle Peak", slug: "pinnacle-peak" },
+  { name: "Arcadia", slug: "arcadia" },
 ];
 
+const revealVariants: Variants = {
+  hidden: { opacity: 0, y: 22 },
+  visible: (delay: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 1, ease: EASE, delay },
+  }),
+};
+
 export function NeighborhoodCards() {
+  const prefersReducedMotion = useReducedMotion();
+  const initial = prefersReducedMotion ? "visible" : "hidden";
+  const viewport = { once: true, margin: "-36px" } as const;
+
   return (
-    <section className="bg-teal-dark" aria-label="Neighborhoods we serve">
-      <div className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-12">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="section-label">Neighborhoods</div>
-          <h2 className="font-heading text-3xl lg:text-[42px] font-medium text-stone leading-[1.15] tracking-[-0.02em]">
-            Where we work
-          </h2>
-        </div>
+    <section
+      className="relative overflow-hidden py-[clamp(110px,14vh,170px)]"
+      aria-label="Neighborhoods we serve"
+    >
+      {/* Faded plat drawing behind the ledger */}
+      <div
+        className="pointer-events-none absolute -top-2.5 right-[-110px] w-[min(560px,52vw)] opacity-30 max-md:opacity-10 [mask-image:linear-gradient(to_bottom,#000_55%,transparent_96%)]"
+        aria-hidden="true"
+      >
+        <NeighborhoodPlat className="block h-auto w-full" />
       </div>
 
-      {/* Edge-to-edge image cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[2px]">
-        {hoods.map((hood, i) => (
-          <motion.div
-            key={hood.name}
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.1 }}
-          >
-            <Link
-              href={hood.href}
-              className="relative block h-[400px] lg:h-[520px] overflow-hidden group no-underline"
+      <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+        <motion.div
+          className="max-w-[600px]"
+          variants={revealVariants}
+          initial={initial}
+          whileInView="visible"
+          viewport={viewport}
+        >
+          <span className="section-label !mb-0">Service Area</span>
+          <h2 className="mt-6 font-heading text-[clamp(36px,4.4vw,60px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
+            Proudly Serving{" "}
+            <em className="font-normal italic text-gold">Scottsdale.</em>
+          </h2>
+          <p className="mt-5 max-w-[460px] text-[14.5px] leading-[1.75] text-off-white/[0.62]">
+            Our hyper-local focus means deeper expertise and stronger
+            relationships in the communities where we&nbsp;work.
+          </p>
+        </motion.div>
+
+        <div className="mt-[clamp(44px,6vh,72px)] grid grid-cols-1 gap-x-[clamp(40px,6vw,96px)] md:grid-cols-2">
+          {hoods.map((hood, i) => (
+            <motion.div
+              key={hood.slug}
+              variants={revealVariants}
+              custom={(i % 2) * 0.12}
+              initial={initial}
+              whileInView="visible"
+              viewport={viewport}
             >
-              <Image
-                src={hood.image}
-                alt={hood.imageAlt}
-                fill
-                sizes="(min-width:1024px) 25vw, (min-width:640px) 50vw, 100vw"
-                className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[rgba(26,47,47,0.85)] via-[rgba(26,47,47,0.2)_60%] to-[rgba(26,47,47,0.35)] group-hover:from-[rgba(26,47,47,0.9)] group-hover:via-[rgba(26,47,47,0.3)_60%] group-hover:to-[rgba(26,47,47,0.15)] transition-all duration-400" />
-              <div className="absolute bottom-0 left-0 right-0 p-8 lg:p-10">
-                <div className="text-[10px] tracking-[0.3em] uppercase text-gold font-medium mb-3">
-                  {hood.zip}
-                </div>
-                <h3 className="font-heading text-2xl lg:text-[28px] text-white font-medium mb-2">
+              <Link
+                href={`/neighborhoods/${hood.slug}`}
+                className="group flex items-baseline gap-5 border-b border-off-white/[0.12] py-5 no-underline transition-all duration-500 hover:border-gold/60 hover:pl-2.5"
+              >
+                <span className="text-[10.5px] font-medium tracking-[0.2em] text-gold tabular-nums">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="font-heading text-[clamp(24px,2.4vw,31px)] font-medium leading-[1.2] tracking-[-0.02em] text-off-white transition-colors duration-500 group-hover:text-gold">
                   {hood.name}
-                </h3>
-                <p className="text-[13px] text-white/65 font-light mb-5">{hood.tagline}</p>
-                <div className="w-10 h-10 border border-white/20 flex items-center justify-center group-hover:border-gold group-hover:bg-gold transition-all duration-300">
-                  <ArrowRight className="w-4 h-4 text-white/60 group-hover:text-teal-dark transition-colors duration-300" aria-hidden="true" />
-                </div>
-              </div>
-            </Link>
-          </motion.div>
-        ))}
+                </span>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          className="mt-10"
+          variants={revealVariants}
+          custom={0.1}
+          initial={initial}
+          whileInView="visible"
+          viewport={viewport}
+        >
+          <Link
+            href="/neighborhoods"
+            className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-off-white/60 no-underline transition-colors hover:text-gold"
+          >
+            All service areas
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </motion.div>
       </div>
     </section>
   );

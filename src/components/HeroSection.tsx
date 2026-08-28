@@ -1,45 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+/**
+ * Night Blueprint hero — no photography. Full-viewport teal-dark ground,
+ * gold kicker with flanking rules, Fraunces display H1 (mask-reveal
+ * stagger), real sub-copy, CTA pair, and the EstateElevation drawing
+ * itself in glowing gold linework along the bottom edge.
+ */
+
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import Link from "next/link";
-import Image from "next/image";
 import { Phone } from "lucide-react";
-
-const heroImages = [
-  {
-    src: "/images/pv-exterior-pool-golden-hour.jpg",
-    alt: "Paradise Valley pool at golden hour with mountain backdrop",
-  },
-  {
-    src: "/images/pv-great-room-chandelier-pool.jpg",
-    alt: "Great room with sculptural chandelier opening to pool and patio",
-  },
-  {
-    src: "/images/pv-exterior-aerial-sunset-mountain.jpg",
-    alt: "Aerial sunset view of Paradise Valley estate against the mountains",
-  },
-  {
-    src: "/images/pv-kitchen-from-wine-wall.jpg",
-    alt: "Chef's kitchen with coffered ceiling, stone wine wall, and island seating",
-  },
-  {
-    src: "/images/pv-exterior-front-sunset.jpg",
-    alt: "Paradise Valley estate front facade at sunset",
-  },
-  {
-    src: "/images/pv-master-bath-silver-tub-wide.jpg",
-    alt: "Master bath with hammered silver freestanding tub and fluted glass shower",
-  },
-  {
-    src: "/images/pv-exterior-pool-lounge-twilight.jpg",
-    alt: "Pool deck with lounge furniture at twilight",
-  },
-  {
-    src: "/images/pv-master-bedroom-wide.jpg",
-    alt: "Primary bedroom with oak headboard wall, oversized skylight, and framed window view",
-  },
-];
+import { EstateElevation } from "@/components/linework";
 
 // ease-out cubic — cinematic settle, fast start, soft landing
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -48,8 +19,8 @@ const containerVariants: Variants = {
   hidden: {},
   visible: {
     transition: {
-      delayChildren: 0.5,
-      staggerChildren: 0.22,
+      delayChildren: 0.4,
+      staggerChildren: 0.2,
     },
   },
 };
@@ -63,7 +34,7 @@ const maskLineVariants: Variants = {
   },
 };
 
-const ctaVariants: Variants = {
+const fadeUpVariants: Variants = {
   hidden: { opacity: 0, y: 14 },
   visible: {
     opacity: 1,
@@ -81,64 +52,55 @@ const accentVariants: Variants = {
 };
 
 export function HeroSection() {
-  const [index, setIndex] = useState(0);
   const prefersReducedMotion = useReducedMotion();
-
-  useEffect(() => {
-    const handle = requestAnimationFrame(() => {
-      setIndex(Math.floor(Math.random() * heroImages.length));
-    });
-    return () => cancelAnimationFrame(handle);
-  }, []);
-
-  const hero = heroImages[index];
   const initial = prefersReducedMotion ? "visible" : "hidden";
 
   return (
     <section
-      className="relative h-[100svh] min-h-[600px] sm:min-h-[700px] flex items-end overflow-hidden"
-      aria-label="Hero"
+      className="relative flex min-h-[100svh] flex-col justify-end overflow-hidden"
+      aria-label="Saddlewood Contracting"
     >
-      <div key={hero.src} className="absolute inset-0 ken-burns-active">
-        <Image
-          src={hero.src}
-          alt={hero.alt}
-          fill
-          className="object-cover"
-          priority
-          sizes="100vw"
-        />
-      </div>
-
-      {/* Gradient — bottom darkens enough for white display type to read */}
+      {/* Ambient gold glow rising behind the elevation */}
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="pointer-events-none absolute inset-0"
         aria-hidden="true"
         style={{
           background:
-            "linear-gradient(to top, rgba(26,47,47,0.92) 0%, rgba(26,47,47,0.5) 35%, rgba(26,47,47,0.15) 60%, rgba(26,47,47,0.25) 100%)",
+            "radial-gradient(ellipse 70% 52% at 50% 66%, rgba(200,165,90,0.10), transparent 68%)",
         }}
       />
 
-      {/* Content — bottom-left, mask-reveal stagger */}
+      {/* Copy — centered, mask-reveal stagger */}
       <motion.div
-        className="relative z-10 px-6 lg:px-12 pb-16 lg:pb-20 max-w-[720px]"
+        className="relative z-[1] mx-auto w-full max-w-[1240px] px-5 pt-32 text-center sm:px-8 sm:pt-36"
         variants={containerVariants}
         initial={initial}
         animate="visible"
       >
-        <h1 className="font-heading text-4xl md:text-5xl lg:text-[64px] font-normal text-white mb-9 leading-[1.1] tracking-[-0.025em]">
+        <motion.span
+          variants={fadeUpVariants}
+          className="inline-flex items-center gap-3.5 text-[11px] font-medium uppercase tracking-[0.25em] text-gold"
+        >
+          <span className="h-px w-6 bg-gold" aria-hidden="true" />
+          Luxury Residential · Scottsdale, Arizona
+          <span className="h-px w-6 bg-gold" aria-hidden="true" />
+        </motion.span>
+
+        <h1 className="night-hero-title mx-auto mt-7 font-heading font-medium text-off-white">
           <span className="block overflow-hidden pb-1">
             <motion.span variants={maskLineVariants} className="block">
               Built for Homes
             </motion.span>
           </span>
           <span className="block overflow-hidden pb-1">
-            <motion.span variants={maskLineVariants} className="block">
+            <motion.span
+              variants={maskLineVariants}
+              className="block whitespace-nowrap"
+            >
               That Demand{" "}
               <motion.em
                 variants={accentVariants}
-                className="italic text-gold font-normal"
+                className="font-normal italic text-gold"
               >
                 More.
               </motion.em>
@@ -146,25 +108,40 @@ export function HeroSection() {
           </span>
         </h1>
 
+        <motion.p
+          variants={fadeUpVariants}
+          className="mx-auto mt-8 max-w-[560px] text-base leading-[1.75] text-off-white/70"
+        >
+          New construction, whole-home remodels, and framing in structural
+          steel and conventional lumber. One point of contact, every trade
+          handled <span className="whitespace-nowrap">in-house</span> from demo
+          to final&nbsp;detail.
+        </motion.p>
+
         <motion.div
-          variants={ctaVariants}
-          className="flex flex-col sm:flex-row items-start sm:items-center gap-4"
+          variants={fadeUpVariants}
+          className="mt-11 flex flex-wrap items-center justify-center gap-4"
         >
           <Link
             href="/contact"
-            className="inline-block px-10 py-4 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase rounded-sm no-underline hover:bg-[#d4a94c] transition-all hover:-translate-y-px"
+            className="inline-block rounded-[2px] bg-gold px-[34px] py-[15px] text-[12px] font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:bg-[#d4a94c] hover:shadow-[0_10px_34px_rgba(200,165,90,0.28)]"
           >
             Book Your Consultation
           </Link>
           <a
             href="tel:4809996100"
-            className="inline-flex items-center gap-2 py-3.5 text-[13px] text-white/70 font-normal tracking-wide no-underline hover:text-gold transition-colors"
+            className="inline-flex items-center gap-2 rounded-[2px] border border-off-white/25 px-[26px] py-[14px] text-[13px] tracking-[0.06em] text-off-white/80 no-underline transition-colors hover:border-gold hover:text-gold"
           >
-            <Phone className="w-4 h-4" />
+            <Phone className="h-3.5 w-3.5" aria-hidden="true" />
             (480) 999-6100
           </a>
         </motion.div>
       </motion.div>
+
+      {/* Estate elevation — draws itself along the bottom edge */}
+      <div className="relative mt-[clamp(24px,4vh,56px)] w-full" aria-hidden="true">
+        <EstateElevation className="block h-[clamp(240px,40vh,540px)] w-full" glow />
+      </div>
     </section>
   );
 }

@@ -83,12 +83,16 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
+    <div className="night-surface min-h-svh">
       <JsonLd />
       <Navbar />
-      <main id="main-content">{children}</main>
+      {/* Fixed blueprint grid — page-ground sections let it show through */}
+      <div className="night-grid" aria-hidden="true" />
+      <main id="main-content" className="relative">
+        {children}
+      </main>
       <Footer />
       <StickyMobileBar />
-    </>
+    </div>
   );
 }
