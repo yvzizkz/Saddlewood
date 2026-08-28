@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { HeroSection } from "@/components/HeroSection";
-import { SameHouseSection } from "@/components/SameHouseSection";
-import { PlanBuildAim } from "@/components/PlanBuildAim";
+import { BuildSequence } from "@/components/BuildSequence";
 import {
   KitchenPairSection,
   FramingPairSection,
@@ -17,18 +16,21 @@ export const metadata: Metadata = {
 };
 
 /**
- * Homepage, Hero V2 composition (2026-08-28): full-bleed video hero (media)
- * → cream working-set elevation → plan/build/aim trio (deep) → canopy
- * transition band (media) → kitchen pair (cream) → framing pair (deep) →
- * neighborhood ledger (cream) → CTA (deep band). Ground rhythm rule: no two
- * adjacent sections share a ground; video counts as its own ground.
+ * Homepage, Hero V3 composition (2026-08-28): full-bleed video hero landing
+ * on the mark (media) → build sequence, layout to rendering (cream) →
+ * canopy transition band (media) → kitchen pair (cream) → framing pair
+ * (deep) → neighborhood ledger (cream) → CTA (deep band). Ground rhythm
+ * rule: no two adjacent sections share a ground; video counts as its own.
+ *
+ * The build sequence replaces the traced working-set section and the
+ * plan/build/aim trio: both argued the same thing, one of them with a
+ * drawing instead of the build.
  */
 export default function Home() {
   return (
     <>
       <HeroSection />
-      <SameHouseSection />
-      <PlanBuildAim />
+      <BuildSequence />
       <TransitionBand
         src="/videos/saddlewood-transition-band.mp4"
         poster="/videos/saddlewood-transition-band-poster.jpg"
