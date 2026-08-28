@@ -14,6 +14,7 @@ import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import Link from "next/link";
 import { Phone } from "lucide-react";
 import { VideoReel } from "@/components/VideoReel";
+import { EstateElevation } from "@/components/linework";
 
 // ease-out cubic — cinematic settle, fast start, soft landing
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -87,6 +88,19 @@ export function HeroSection() {
         }}
       />
 
+      {/* Estate elevation underlay — the signature drawing sketches itself
+          faintly along the hero's floor, behind the copy and reel. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 opacity-[0.2]"
+        aria-hidden="true"
+        style={{
+          maskImage: "linear-gradient(to top, #000 55%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to top, #000 55%, transparent 100%)",
+        }}
+      >
+        <EstateElevation className="block h-[clamp(180px,30vh,380px)] w-full" delay={1.1} />
+      </div>
+
       <div className="relative z-[1] mx-auto grid w-full max-w-[1240px] items-center gap-[clamp(40px,6vw,72px)] px-5 pb-[clamp(64px,9vh,110px)] pt-[clamp(120px,16vh,168px)] sm:px-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         {/* Copy column */}
         <motion.div variants={containerVariants} initial={initial} animate="visible">
@@ -124,10 +138,10 @@ export function HeroSection() {
             variants={fadeUpVariants}
             className="mt-8 max-w-[560px] text-base leading-[1.75] text-off-white/70"
           >
-            New construction, whole-home remodels, and framing in structural
-            steel and conventional lumber. One point of contact, every trade
-            handled <span className="whitespace-nowrap">in-house</span> from demo
-            to final&nbsp;detail.
+            New construction, whole-home remodels, and steel framing alongside
+            conventional lumber. One point of contact, every trade handled{" "}
+            <span className="whitespace-nowrap">in-house</span> from demo to
+            final&nbsp;detail.
           </motion.p>
 
           <motion.div

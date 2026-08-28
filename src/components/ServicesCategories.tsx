@@ -4,26 +4,27 @@
  * ServicesCategories — Night Blueprint plates.
  *
  * Four core scopes (Kitchen / Bathroom / Whole-Home / Outdoor Living) as
- * hairline-framed linework + type plates, in the house plate treatment:
- * gold index numeral, self-drawing diagram from the linework registry,
- * Fraunces title, one scope line, and a quiet link into the relevant
- * work. No photography.
+ * hairline-framed plates: gold index numeral, real media where it exists
+ * (reel frames, renders — renders always captioned as renderings), Fraunces
+ * title, one scope line, and a quiet link into the relevant work. Cards
+ * without truthful media stay typographic (round-2 ruling: no recycled
+ * drawings on these cards).
  */
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion, type Variants } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import { ArrowRight } from "lucide-react";
-import { lineworkRegistry } from "@/components/linework";
 
 interface ServiceCategory {
   /** Service name, e.g. "Kitchen" */
   name: string;
   /** One-line summary of what's in scope. Direct, no buzzwords. */
   scope: string;
-  /** Key into lineworkRegistry, e.g. "plan-fragment" */
-  linework: string;
+  /** Real media for the card. Absent = typographic plate. */
+  media?: { src: string; alt: string; caption?: string };
   /** Where to send visitors who want to see more (portfolio or case study) */
   href: string;
   /** Friendly link label */
@@ -52,7 +53,7 @@ export function ServicesCategories({ categories }: ServicesCategoriesProps) {
 
   return (
     <section
-      className="relative py-[clamp(90px,11vh,140px)]"
+      className="relative py-[clamp(72px,9vh,112px)]"
       aria-label="Core services"
     >
       <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
@@ -74,7 +75,6 @@ export function ServicesCategories({ categories }: ServicesCategoriesProps) {
         {/* Plates */}
         <div className="mt-[clamp(48px,7vh,84px)] grid grid-cols-1 gap-px border border-off-white/[0.12] bg-off-white/[0.12] sm:grid-cols-2">
           {categories.map((cat, i) => {
-            const Motif = lineworkRegistry[cat.linework];
             return (
               <motion.article
                 key={cat.name}
@@ -92,10 +92,23 @@ export function ServicesCategories({ categories }: ServicesCategoriesProps) {
                   <div className="text-[10.5px] font-medium tracking-[0.25em] text-gold">
                     0{i + 1}
                   </div>
-                  {Motif ? (
-                    <div className="mt-6" aria-hidden="true">
-                      <Motif className="block h-[150px] w-full max-w-[320px]" />
-                    </div>
+                  {cat.media ? (
+                    <figure className="m-0 mt-6">
+                      <div className="relative aspect-[16/10] overflow-hidden border border-gold/[0.22]">
+                        <Image
+                          src={cat.media.src}
+                          alt={cat.media.alt}
+                          fill
+                          sizes="(max-width: 640px) 100vw, 50vw"
+                          className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                        />
+                      </div>
+                      {cat.media.caption ? (
+                        <figcaption className="mt-2.5 font-mono text-[10px] uppercase tracking-[0.16em] text-off-white/[0.55]">
+                          {cat.media.caption}
+                        </figcaption>
+                      ) : null}
+                    </figure>
                   ) : null}
                   <h3 className="mt-6 font-heading text-[22px] font-medium leading-[1.25] text-off-white lg:text-[26px]">
                     {cat.name}

@@ -181,7 +181,7 @@ export default function AboutContent() {
 
       {/* Credentials — numbered license plates in the services-grid frame */}
       <section
-        className="relative pb-[clamp(90px,11vh,140px)]"
+        className="relative pb-[clamp(72px,9vh,112px)]"
         aria-label="Credentials"
       >
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
@@ -244,7 +244,7 @@ export default function AboutContent() {
 
       {/* From the crew — interview reel filmed on an active job site */}
       <section
-        className="relative pb-[clamp(90px,11vh,140px)]"
+        className="relative pb-[clamp(72px,9vh,112px)]"
         aria-label="From the crew"
       >
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">

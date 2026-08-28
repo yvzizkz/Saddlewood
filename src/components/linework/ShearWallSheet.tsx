@@ -32,7 +32,7 @@ export function ShearWallSheet({ className, glow = false }: ShearWallSheetProps)
       glow={glow}
       duration={2.2}
       stagger={0.05}
-      figureDelay={2.3}
+      figureDelay={2.0}
       preserveAspectRatio="xMidYMid meet"
     >
       {/* Top track and floor */}

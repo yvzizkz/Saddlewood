@@ -50,7 +50,7 @@ export function PlanBuildAim() {
       tag: "02 · The build",
       heading: "Framing now",
       caption:
-        "Structural steel phase underway, self-performed. The reel above is this site.",
+        "Steel framing underway, self-performed. The reel above is this site.",
       media: (
         <PhotoWipe
           src="/images/steel-built.jpg"
@@ -74,7 +74,7 @@ export function PlanBuildAim() {
 
   return (
     <section
-      className="relative py-[clamp(90px,11vh,140px)]"
+      className="relative py-[clamp(72px,9vh,112px)]"
       aria-label="One build, start to finish"
     >
       <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">

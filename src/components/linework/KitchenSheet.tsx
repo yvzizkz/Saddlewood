@@ -32,7 +32,7 @@ export function KitchenSheet({ className, glow = false }: KitchenSheetProps) {
       glow={glow}
       duration={2.2}
       stagger={0.05}
-      figureDelay={2.3}
+      figureDelay={2.0}
       preserveAspectRatio="xMidYMid meet"
     >
       {/* Ceiling and floor */}

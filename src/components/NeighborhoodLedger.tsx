@@ -38,7 +38,7 @@ export function NeighborhoodLedger() {
 
   return (
     <section
-      className="relative py-[clamp(90px,11vh,140px)]"
+      className="relative py-[clamp(72px,9vh,112px)]"
       aria-label="Service area"
     >
       <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">

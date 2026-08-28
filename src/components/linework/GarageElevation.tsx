@@ -32,7 +32,7 @@ export function GarageElevation({ className, glow = false }: GarageElevationProp
       glow={glow}
       duration={2.2}
       stagger={0.05}
-      figureDelay={2.3}
+      figureDelay={2.0}
       preserveAspectRatio="xMidYMid meet"
     >
       {/* Ground line */}

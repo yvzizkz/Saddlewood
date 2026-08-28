@@ -6,6 +6,7 @@
  */
 
 import Link from "next/link";
+import Image from "next/image";
 import { SurveyHorizon } from "@/components/linework";
 import { ProcoreBadge } from "./ProcoreBadge";
 
@@ -47,12 +48,21 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-10 min-[480px]:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,1fr))] lg:gap-14">
           {/* Wordmark */}
           <div className="min-[480px]:col-span-2 lg:col-span-1">
-            <Link href="/" className="inline-block no-underline leading-none" aria-label="Saddlewood Contracting, home">
-              <span className="block font-heading text-[26px] font-medium text-off-white">
-                Saddlewood
-              </span>
-              <span className="mt-1.5 block text-[9px] font-medium uppercase tracking-[0.34em] text-gold">
-                Contracting · Scottsdale
+            <Link href="/" className="flex items-center gap-4 no-underline leading-none" aria-label="Saddlewood Contracting, home">
+              <Image
+                src="/images/logo.svg"
+                alt=""
+                width={54}
+                height={54}
+                className="h-[54px] w-[54px] shrink-0 object-contain"
+              />
+              <span>
+                <span className="block font-heading text-[26px] font-medium text-off-white">
+                  Saddlewood
+                </span>
+                <span className="mt-1.5 block text-[9px] font-medium uppercase tracking-[0.34em] text-gold">
+                  Contracting · Scottsdale
+                </span>
               </span>
             </Link>
             <p className="mt-5 max-w-[16em] font-heading text-[16px] font-normal italic leading-[1.5] text-off-white/65">

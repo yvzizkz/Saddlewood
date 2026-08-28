@@ -33,6 +33,8 @@ export type {
   StrokeTone,
 } from "./AnimatedLinework";
 
+export { EstateElevation } from "./EstateElevation";
+export type { EstateElevationProps } from "./EstateElevation";
 export { MassingDiagram } from "./MassingDiagram";
 export type { MassingDiagramProps } from "./MassingDiagram";
 export { WallSection } from "./WallSection";

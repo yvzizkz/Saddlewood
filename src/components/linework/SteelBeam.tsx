@@ -50,10 +50,10 @@ export function SteelBeam({ className, glow = false, delay = 0 }: SteelBeamProps
       {/* leader to callout */}
       <Stroke d="M156 94 L192 80 H204" tone="dim" />
       <Figure x={210} y={76} tone="cream" size={8.5}>
-        STRUCTURAL
+        STEEL
       </Figure>
       <Figure x={210} y={90} tone="cream" size={8.5} delay={0.13}>
-        STEEL
+        FRAMING
       </Figure>
     </AnimatedLinework>
   );

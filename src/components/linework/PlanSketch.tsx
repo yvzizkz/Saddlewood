@@ -24,7 +24,7 @@ export function PlanSketch({ className, glow = false }: PlanSketchProps) {
       glow={glow}
       duration={2.2}
       stagger={0.06}
-      figureDelay={2.3}
+      figureDelay={2.0}
       preserveAspectRatio="xMidYMid meet"
     >
       {/* Site line */}

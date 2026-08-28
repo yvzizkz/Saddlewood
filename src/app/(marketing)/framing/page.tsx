@@ -122,7 +122,7 @@ export default function FramingPage() {
 
       {/* On Site Now — active ground-up build */}
       <section
-        className="relative border-b border-off-white/[0.08] py-[clamp(90px,11vh,140px)]"
+        className="relative border-b border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
         aria-label="Active framing project"
       >
         <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -182,7 +182,7 @@ export default function FramingPage() {
       {/* The Working Set — traced shear wall detail beside the installed
           steel, the Drawn/Delivered pair pattern on the dark ground. */}
       <section
-        className="relative py-[clamp(90px,11vh,140px)]"
+        className="relative py-[clamp(72px,9vh,112px)]"
         aria-label="Structural drawings and installed framing"
       >
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
@@ -226,7 +226,7 @@ export default function FramingPage() {
       </section>
 
       {/* What We Frame */}
-      <section className="relative py-[clamp(90px,11vh,140px)]" aria-label="Framing capabilities">
+      <section className="relative py-[clamp(72px,9vh,112px)]" aria-label="Framing capabilities">
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
             <div>
@@ -259,7 +259,7 @@ export default function FramingPage() {
 
       {/* Completed build — drawn wood-framed process ledger */}
       <section
-        className="relative border-y border-off-white/[0.08] py-[clamp(90px,11vh,140px)]"
+        className="relative border-y border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
         aria-label="Completed wood-framed build process"
       >
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
@@ -302,7 +302,7 @@ export default function FramingPage() {
       </section>
 
       {/* Why Builders Hire Us */}
-      <section className="relative py-[clamp(90px,11vh,140px)]" aria-label="Why builders hire Saddlewood">
+      <section className="relative py-[clamp(72px,9vh,112px)]" aria-label="Why builders hire Saddlewood">
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <span className="section-label !mb-0">The Saddlewood Difference</span>
           <h2 className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">

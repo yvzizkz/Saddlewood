@@ -28,7 +28,8 @@ export const revealVariants: Variants = {
   visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.8, ease: REVEAL_EASE, delay },
+    // 0.7s (round-2 timing trim from the 0.8s handoff spec).
+    transition: { duration: 0.7, ease: REVEAL_EASE, delay },
   }),
 };
 

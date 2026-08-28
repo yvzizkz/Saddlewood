@@ -75,7 +75,7 @@ export default function NewConstructionPage() {
       />
 
       {/* Intro/positioning section */}
-      <section className="relative py-[clamp(90px,11vh,140px)]">
+      <section className="relative py-[clamp(72px,9vh,112px)]">
         <div className="mx-auto grid w-full max-w-[1240px] items-start gap-10 px-5 sm:px-8 lg:grid-cols-2 lg:gap-16">
           <div>
             <span className="section-label !mb-0">Ground-Up Residential Building</span>
@@ -96,7 +96,7 @@ export default function NewConstructionPage() {
 
       {/* On Site Now — active ground-up build */}
       <section
-        className="relative border-y border-off-white/[0.08] py-[clamp(90px,11vh,140px)]"
+        className="relative border-y border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
         aria-label="Active new construction project"
       >
         <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">

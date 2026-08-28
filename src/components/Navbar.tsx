@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { track } from "@/lib/analytics";
@@ -243,20 +244,30 @@ export function Navbar() {
         className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-10 transition-all duration-500 ${
           scrolled
             ? "h-[76px] bg-[rgba(26,47,47,0.88)] backdrop-blur-[14px] shadow-[0_1px_0_rgba(200,165,90,0.16)]"
-            : "h-[88px] bg-transparent"
+            : "h-[88px] bg-gradient-to-b from-teal-dark/70 to-transparent"
         }`}
       >
-        {/* Wordmark — cream Fraunces over gold small-caps */}
+        {/* SC roundel + wordmark — cream Fraunces over gold small-caps */}
         <Link
           href="/"
-          className="shrink-0 no-underline leading-none"
+          className="flex shrink-0 items-center gap-3 no-underline leading-none"
           aria-label="Saddlewood Contracting, home"
         >
-          <span className="block font-heading text-[21px] font-medium tracking-[0.02em] text-off-white">
-            Saddlewood
-          </span>
-          <span className="mt-1 block text-[9px] font-medium uppercase tracking-[0.34em] text-gold">
-            Contracting · Scottsdale
+          <Image
+            src="/images/logo.svg"
+            alt=""
+            width={42}
+            height={42}
+            priority
+            className="h-[42px] w-[42px] shrink-0 object-contain"
+          />
+          <span>
+            <span className="block font-heading text-[21px] font-medium tracking-[0.02em] text-off-white">
+              Saddlewood
+            </span>
+            <span className="mt-1 block text-[9px] font-medium uppercase tracking-[0.34em] text-gold">
+              Contracting · Scottsdale
+            </span>
           </span>
         </Link>
 

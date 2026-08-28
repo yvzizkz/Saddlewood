@@ -19,12 +19,14 @@ export function CountUp({ value, className }: CountUpProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
+  // The real value stays rendered through SSR and hydration (no flash of
+  // "0"); the count-up only kicks in at the moment the stat scrolls into
+  // view, animating 0 -> value in one gesture.
   useEffect(() => {
     if (prefersReducedMotion) return;
     const el = ref.current;
     if (!el) return;
 
-    el.textContent = "0";
     let raf = 0;
     const observer = new IntersectionObserver(
       (entries) => {

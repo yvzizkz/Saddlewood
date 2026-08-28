@@ -23,7 +23,7 @@ export function SameHouseSection() {
 
   return (
     <section
-      className="night-on-cream relative bg-off-white py-[clamp(90px,11vh,140px)] text-charcoal"
+      className="night-on-cream relative bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
       aria-label="The working set"
     >
       <div className="night-cream-grid" aria-hidden="true" />

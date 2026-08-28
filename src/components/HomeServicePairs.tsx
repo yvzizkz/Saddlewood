@@ -19,6 +19,7 @@ import {
 } from "@/lib/reveal";
 import { SheetPair } from "@/components/SheetPair";
 import { PhotoWipe } from "@/components/PhotoWipe";
+import { VideoPanel } from "@/components/VideoPanel";
 import { KitchenSheet, ShearWallSheet } from "@/components/linework";
 
 export function KitchenPairSection() {
@@ -27,7 +28,7 @@ export function KitchenPairSection() {
 
   return (
     <section
-      className="night-on-cream relative bg-off-white py-[clamp(90px,11vh,140px)] text-charcoal"
+      className="night-on-cream relative bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
       aria-label="Kitchen and bath"
     >
       <div className="night-cream-grid" aria-hidden="true" />
@@ -69,13 +70,14 @@ export function KitchenPairSection() {
               ),
             }}
             right={{
-              tag: "Delivered",
-              caption: "Completed kitchen remodel · Scottsdale",
+              tag: "Troon · Remodel",
+              caption: "Kitchen remodel underway · filmed on site",
               aspect: "min-h-[320px]",
               children: (
-                <PhotoWipe
-                  src="/images/kitchen-built.jpg"
-                  alt="Finished kitchen with custom oak millwork, stone island, and dome pendant"
+                <VideoPanel
+                  src="/videos/saddlewood-reel-troon-kitchen-9x16.mp4"
+                  poster="/videos/saddlewood-reel-troon-kitchen-9x16-poster.jpg"
+                  label="Kitchen segment of the in-progress Troon remodel walkthrough"
                 />
               ),
             }}
@@ -109,7 +111,7 @@ export function FramingPairSection() {
 
   return (
     <section
-      className="relative py-[clamp(90px,11vh,140px)]"
+      className="relative py-[clamp(72px,9vh,112px)]"
       aria-label="Framing"
     >
       <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
