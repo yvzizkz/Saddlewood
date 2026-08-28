@@ -50,7 +50,7 @@ export function Footer() {
           <div className="min-[480px]:col-span-2 lg:col-span-1">
             <Link href="/" className="flex items-center gap-4 no-underline leading-none" aria-label="Saddlewood Contracting, home">
               <Image
-                src="/images/logo.svg"
+                src="/images/logo-roundel.png"
                 alt=""
                 width={54}
                 height={54}

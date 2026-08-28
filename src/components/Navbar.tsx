@@ -254,7 +254,7 @@ export function Navbar() {
           aria-label="Saddlewood Contracting, home"
         >
           <Image
-            src="/images/logo.svg"
+            src="/images/logo-roundel.png"
             alt=""
             width={42}
             height={42}
