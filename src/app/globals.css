@@ -46,6 +46,7 @@
   --color-gold-accessible: var(--gold-accessible);
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-heading: var(--font-fraunces), "Playfair Display", "Georgia", "Times New Roman", serif;
+  --font-mono: var(--font-plex-mono), "SF Mono", "Menlo", ui-monospace, monospace;
 }
 
 /* ===== BASE STYLES ===== */
@@ -80,10 +81,12 @@ img {
 }
 
 /* ===== SECTION LABEL PATTERN ===== */
+/* Drafting-mono eyebrow, per the 2026-08-28 handoff demo. */
 .section-label {
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--gold-accessible);
   margin-bottom: 16px;
@@ -307,13 +310,14 @@ img {
   background: var(--gold-accessible);
 }
 
-/* Hero display type — clamps up to ~116px; !important + scope specificity
-   so it wins over the global ≤640px h1 clamp above. The second min() term
-   keeps the fixed "That Demand More." line (whitespace-nowrap) inside the
-   viewport on narrow phones so the closing period never clips. */
+/* Hero display type — sized for the split copy/reel hero (handoff demo
+   scale); !important + scope specificity so it wins over the global ≤640px
+   h1 clamp above. The second min() term keeps the fixed "That Demand More."
+   line (whitespace-nowrap) inside the viewport on narrow phones so the
+   closing period never clips. */
 .night-surface .night-hero-title {
-  font-size: min(clamp(40px, 8.1vw, 116px), 10.7vw - 4px) !important;
-  line-height: 1.1 !important;
+  font-size: min(clamp(40px, 5.8vw, 78px), 10.7vw - 4px) !important;
+  line-height: 1.08 !important;
   letter-spacing: -0.02em;
 }
 
@@ -369,20 +373,17 @@ img {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.28em;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--gold);
+  background: rgba(26, 47, 47, 0.78);
+  border: 1px solid rgba(200, 165, 90, 0.35);
+  border-radius: 3px;
+  padding: 7px 12px;
   pointer-events: none;
-}
-.night-reel-chip::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 10px rgba(200, 165, 90, 0.9);
 }
 .night-reel-label {
   position: absolute;
@@ -390,9 +391,47 @@ img {
   right: 16px;
   bottom: 14px;
   z-index: 2;
+  font-family: var(--font-mono);
   font-size: 10.5px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(245, 240, 232, 0.85);
   pointer-events: none;
 }
+
+/* Pulsing live dot for the "On site now" chip. The pulse must stay true:
+   only use this chip over footage of a genuinely active project. */
+.night-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 10px rgba(200, 165, 90, 0.9);
+  animation: night-pulse 1.6s infinite;
+}
+@keyframes night-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .night-live-dot { animation: none; }
+}
+
+/* Ink scope — renders AnimatedLinework sheets in accessible drafting ink
+   when they sit on cream grounds (gold #c8a55a fails contrast on cream). */
+.linework-ink {
+  --gold: var(--gold-accessible);
+  --cream: #44514a;
+}
+
+/* Corner ticks for the hero reel card (drafting registration marks). */
+.reel-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--gold);
+  z-index: 2;
+  pointer-events: none;
+}
+.reel-corner--tl { top: -7px; left: -7px; border-right: 0; border-bottom: 0; }
+.reel-corner--br { bottom: -7px; right: -7px; border-left: 0; border-top: 0; }

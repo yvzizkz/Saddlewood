@@ -33,8 +33,6 @@ export type {
   StrokeTone,
 } from "./AnimatedLinework";
 
-export { EstateElevation } from "./EstateElevation";
-export type { EstateElevationProps } from "./EstateElevation";
 export { MassingDiagram } from "./MassingDiagram";
 export type { MassingDiagramProps } from "./MassingDiagram";
 export { WallSection } from "./WallSection";
@@ -47,6 +45,14 @@ export { NeighborhoodPlat } from "./NeighborhoodPlat";
 export type { NeighborhoodPlatProps } from "./NeighborhoodPlat";
 export { SurveyHorizon } from "./SurveyHorizon";
 export type { SurveyHorizonProps } from "./SurveyHorizon";
+export { GarageElevation } from "./GarageElevation";
+export type { GarageElevationProps } from "./GarageElevation";
+export { KitchenSheet } from "./KitchenSheet";
+export type { KitchenSheetProps } from "./KitchenSheet";
+export { ShearWallSheet } from "./ShearWallSheet";
+export type { ShearWallSheetProps } from "./ShearWallSheet";
+export { PlanSketch } from "./PlanSketch";
+export type { PlanSketchProps } from "./PlanSketch";
 export { DimensionTicks } from "./DimensionTicks";
 export type { DimensionTicksProps } from "./DimensionTicks";
 export { BlueprintDivider } from "./BlueprintDivider";

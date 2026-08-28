@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { PostHogProvider } from "./providers";
 
@@ -7,6 +7,14 @@ const fraunces = Fraunces({
   subsets: ["latin"],
   style: ["normal", "italic"],
   variable: "--font-fraunces",
+  display: "swap",
+});
+
+// Drafting voice — eyebrows, dimension figures, sheet captions, reel chips.
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
   display: "swap",
 });
 
@@ -34,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`scroll-smooth ${fraunces.variable}`}>
+    <html lang="en" className={`scroll-smooth ${fraunces.variable} ${plexMono.variable}`}>
       <body className="font-sans antialiased">
         <PostHogProvider>{children}</PostHogProvider>
       </body>

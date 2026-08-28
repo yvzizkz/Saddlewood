@@ -195,7 +195,8 @@ export function AnimatedLinework({
         variants={containerVariants}
         initial={reduced ? "visible" : "hidden"}
         whileInView="visible"
-        viewport={{ once: true, margin: "-15% 0px" }}
+        // Handoff motion spec: sheets start drawing at 30% visibility.
+        viewport={{ once: true, amount: 0.3 }}
       >
         {glow ? (
           <>
@@ -318,8 +319,9 @@ export interface FigureProps {
 }
 
 const FIGURE_FONT: CSSProperties = {
-  fontFamily: "var(--font-sans, 'Inter', ui-sans-serif, sans-serif)",
-  letterSpacing: "0.12em",
+  // Drafting voice: dimension figures and sheet labels set in mono.
+  fontFamily: "var(--font-mono, 'SF Mono', ui-monospace, monospace)",
+  letterSpacing: "0.08em",
   fontWeight: 500,
 };
 

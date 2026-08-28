@@ -11,6 +11,8 @@ interface VideoReelProps {
   label: string;          // aria-label / context, e.g. "framing on site in Paradise Valley"
   aspect: "9x16" | "16x9" | "1x1";
   mode?: "autoloop" | "clickToPlay";  // default "autoloop"
+  /** Video preload hint. Above-the-fold reels (hero) pass "metadata". */
+  preload?: "none" | "metadata" | "auto";
   className?: string;
 }
 
@@ -26,6 +28,7 @@ export function VideoReel({
   label,
   aspect,
   mode = "autoloop",
+  preload = "none",
   className,
 }: VideoReelProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -100,7 +103,7 @@ export function VideoReel({
         playsInline
         muted={mode === "autoloop" && !prefersReducedMotion}
         loop={mode === "autoloop"}
-        preload="none"
+        preload={preload}
         controls={showControls}
       />
 

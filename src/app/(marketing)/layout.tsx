@@ -3,6 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { JsonLd } from "@/components/JsonLd";
 import { StickyMobileBar } from "@/components/StickyMobileBar";
+import { ScrollProgress } from "@/components/ScrollProgress";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -85,6 +86,7 @@ export default function MarketingLayout({
   return (
     <div className="night-surface min-h-svh">
       <JsonLd />
+      <ScrollProgress />
       <Navbar />
       {/* Fixed blueprint grid — page-ground sections let it show through */}
       <div className="night-grid" aria-hidden="true" />
