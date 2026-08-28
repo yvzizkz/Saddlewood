@@ -17,8 +17,8 @@ import Link from "next/link";
 import { ArrowRight, Phone } from "lucide-react";
 import type { NeighborhoodData } from "@/lib/neighborhoods";
 import { caseStudies, getCaseStudy } from "@/data/case-studies";
-import { PageHero } from "@/components/PageHero";
-import { NeighborhoodPlat, areaScapeRegistry } from "@/components/linework";
+import { FullBleedHero } from "@/components/FullBleedHero";
+import { areaScapeRegistry } from "@/components/linework";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -64,28 +64,32 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
 
   return (
     <>
-      <PageHero
-        label={`Service Area · ${data.zip}`}
+      {/* Full-bleed dusk study of the area's own geography (owner
+          direction, 2026-08-28: realistic hero imagery on Areas pages).
+          These are generated scenic studies, never project photography,
+          and each carries its "Dusk study" caption. */}
+      <FullBleedHero
+        media={{
+          kind: "image",
+          src: `/images/area-${data.slug}-dusk.jpg`,
+          alt: `Dusk study of the ${data.name} landscape`,
+          kenBurns: true,
+        }}
+        label={`Dusk study of the ${data.name} landscape`}
+        eyebrow={`Service Area · ${data.zip}`}
         title={`Remodeling in ${data.fullName}`}
         description={data.tagline}
-        variant="cream"
-        linework={
-          /* linework-ink swaps the plat to drafting ink so it holds up on
-             the cream ground */
-          <div className="linework-ink">
-            <NeighborhoodPlat className="block h-auto w-full" opacity={0.5} />
-          </div>
-        }
+        mediaCaption={`Dusk study · ${data.name}`}
       />
 
       {/* Drawn panorama band — the area's real geography in drafting ink,
-          continuing the hero's cream ground */}
+          the drawn counterpart to the dusk study above */}
       {AreaScape ? (
         <section
           className="night-on-cream bg-off-white"
           aria-label={`Drawn panorama of ${data.name}`}
         >
-          <div className="mx-auto w-full max-w-[1240px] px-5 pb-[clamp(40px,6vh,64px)] sm:px-8">
+          <div className="mx-auto w-full max-w-[1240px] px-5 py-[clamp(40px,6vh,64px)] sm:px-8">
             <div className="linework-ink">
               <AreaScape className="block h-auto w-full" />
             </div>

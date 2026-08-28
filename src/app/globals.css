@@ -426,37 +426,6 @@ img {
   --cream: #3a2f1d;
 }
 
-/* Drawing-to-render sweep: the traced sheet's left edge peels away along
-   a travelling divider, revealing the client-approved rendering beneath,
-   then returns. Layer clip and divider position share one timing so they
-   stay locked. Reduced motion holds a static 45/55 split. */
-@keyframes sheet-wipe-clip {
-  0%, 12% { clip-path: inset(0 0 0 0%); }
-  46%, 62% { clip-path: inset(0 0 0 58%); }
-  96%, 100% { clip-path: inset(0 0 0 0%); }
-}
-@keyframes sheet-wipe-pos {
-  0%, 12% { left: 0%; }
-  46%, 62% { left: 58%; }
-  96%, 100% { left: 0%; }
-}
-.sheet-wipe-layer {
-  animation: sheet-wipe-clip 16s cubic-bezier(0.45, 0, 0.25, 1) 3.2s infinite;
-}
-.sheet-wipe-divider {
-  animation: sheet-wipe-pos 16s cubic-bezier(0.45, 0, 0.25, 1) 3.2s infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .sheet-wipe-layer {
-    animation: none;
-    clip-path: inset(0 0 0 45%);
-  }
-  .sheet-wipe-divider {
-    animation: none;
-    left: 45%;
-  }
-}
-
 /* Slow Ken Burns for full-bleed still heroes (premium standard). */
 @keyframes kenburns {
   from { transform: scale(1.02); }

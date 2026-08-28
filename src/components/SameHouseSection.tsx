@@ -15,7 +15,7 @@ import {
   REVEAL_STEP,
   REVEAL_VIEWPORT,
 } from "@/lib/reveal";
-import { DrawingToRender } from "@/components/DrawingToRender";
+import { VisionTransform } from "@/components/VisionTransform";
 
 export function SameHouseSection() {
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -47,22 +47,14 @@ export function SameHouseSection() {
           viewport={REVEAL_VIEWPORT}
           className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light"
         >
-          The elevation below is traced from the working drawings of the
-          estate framing above. It sketches itself in, then sweeps into the
-          client-approved rendering of the same view.
+          The drawing below is traced line for line from the entry of the
+          estate. Keep scrolling: the build rises out of it, from the ground
+          up.
         </motion.p>
 
-        <motion.div
-          variants={variants}
-          custom={REVEAL_STEP * 2}
-          initial="hidden"
-          whileInView="visible"
-          viewport={REVEAL_VIEWPORT}
-        >
-          <DrawingToRender />
-        </motion.div>
+        <VisionTransform />
         <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.14em] text-gold-accessible">
-          Garage side · traced from the project&apos;s working set · Paradise Valley
+          Entry courtyard · traced from the client-approved rendering · Paradise Valley
         </p>
       </div>
     </section>
