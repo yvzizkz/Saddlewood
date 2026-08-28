@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: "DC Ranch Remodeling | Saddlewood Contracting",
     description: "Elevate your DC Ranch home with Saddlewood Contracting's refined design-build remodels and comprehensive in-house expertise.",
-    images: [{ url: data.heroImage, alt: "DC Ranch luxury remodel by Saddlewood Contracting" }],
   },
 };
 

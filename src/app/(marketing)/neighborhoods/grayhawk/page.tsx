@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Grayhawk Remodeling | Saddlewood Contracting",
     description: "Saddlewood Contracting offers refined design-build remodeling services for luxury homes in Scottsdale's Grayhawk community.",
-    images: [{ url: data.heroImage, alt: "Grayhawk luxury remodel by Saddlewood Contracting" }],
   },
 };
 

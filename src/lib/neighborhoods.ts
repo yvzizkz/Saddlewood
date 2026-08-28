@@ -4,7 +4,6 @@ export interface NeighborhoodData {
   fullName: string;
   zip: string;
   tagline: string;
-  heroImage: string;
   description: string[];
   features: string[];
   testimonials: {
@@ -21,7 +20,6 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "McCormick Ranch",
     zip: "85258",
     tagline: "Revitalizing Classic Ranch and Lakeside Homes in Scottsdale's Premier Master-Planned Community",
-    heroImage: "/images/mcr-kitchen-island-05.jpg",
     description: [
       "McCormick Ranch is celebrated for its greenbelts, mature trees, and scenic lakes. The neighborhood features a mix of classic ranch-style homes and waterfront properties. Homeowners here enjoy a relaxed, active lifestyle centered around outdoor recreation and community paths.",
       "Saddlewood Contracting helps residents modernize these established homes. We specialize in transforming original footprints by removing structural walls to create spacious, open-concept layouts. Our team is skilled at preserving the exterior charm of the neighborhood while completely renewing the interior living spaces.",
@@ -41,7 +39,6 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "Gainey Ranch",
     zip: "85258",
     tagline: "Sophisticated Interior Renovations in a Guard-Gated Golf Community",
-    heroImage: "/images/gr-living-room-02.jpg",
     description: [
       "Gainey Ranch stands as a premier guard-gated enclave in Scottsdale. The community blends resort-style living with manicured fairways and sleek, upscale homes. Properties range from modern townhomes to custom estates, all requiring a high level of design sophistication.",
       "Our team brings meticulous craftsmanship to Gainey Ranch. We work closely with homeowners to update kitchens, master baths, and living spaces with premium materials and clean lines. Our experience working in gated neighborhoods ensures we respect all community access hours and job site regulations.",
@@ -61,7 +58,6 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "Pinnacle Peak Country Club",
     zip: "85255",
     tagline: "Desert Contemporary Modernization Under the Saguaro-Framed Peaks",
-    heroImage: "/images/pp-living-room-01.jpg",
     description: [
       "Pinnacle Peak Country Club and its surrounding estates feature stunning mountain vistas and desert landscapes. The homes here showcase classic Southwest details, desert contemporary architecture, and expansive lots. Capturing the natural light and mountain views is a primary focus for homeowners.",
       "Saddlewood Contracting specializes in updating these North Scottsdale homes to modern standards. We focus on expanding window openings, updating desert contemporary finishes, and creating functional floor plans. We aim to highlight the scenic views while improving comfort.",
@@ -81,7 +77,6 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "Paradise Valley",
     zip: "85253",
     tagline: "Precision Custom Construction and Whole-Home Renovations in Arizona's Premier Enclave",
-    heroImage: "/images/pv-aerial-sunset.jpg",
     description: [
       "Paradise Valley is a quiet enclave nestled between Camelback Mountain and Mummy Mountain. Characterized by spacious acre-plus lots and custom estates, it demands the highest standard of architectural execution. The town maintains strict permitting processes and strict building codes.",
       "Saddlewood Contracting is well-established in Paradise Valley. We have experience with complex projects here, including our comprehensive 40th Street whole-home demo and rebuild, as well as an in-progress steel-framed new home construction. We excel at translating architectural designs into physical structures.",
@@ -101,7 +96,6 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "Silverleaf",
     zip: "85255",
     tagline: "Elevated Luxury Remodeling and Custom Details in the McDowell Canyons",
-    heroImage: "/images/silverleaf-hero.jpg",
     description: [
       "Silverleaf is set against the McDowell Mountains, offering spectacular canyon views and guard-gated privacy. The architecture is a blend of Mediterranean, Spanish Colonial, and modern estates. Every home here is designed to make a statement of enduring quality.",
       "We partner with Silverleaf homeowners to execute high-end design-build renovations. Our focus is on custom details, from hand-carved stone fireplaces to intricate ceiling treatments and custom cabinetry. We understand the level of detail required for these estate homes.",
@@ -121,7 +115,6 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "DC Ranch",
     zip: "85255",
     tagline: "Seamless Indoor-Outdoor Living and Custom Desert-Modern Remodels",
-    heroImage: "/images/dc-ranch-hero.jpg",
     description: [
       "DC Ranch is a master-planned community in the Sonoran Desert foothills. Known for its connected pathways, parks, and rustic desert-modern architecture, it emphasizes family living. The homes are designed to connect with the desert surroundings.",
       "Saddlewood Contracting specializes in updating DC Ranch homes to improve flow and utility. We install large multi-slide doors that connect indoor spaces to outdoor patios. We use natural stone, wood accents, and desert-inspired palettes that match the landscape.",
@@ -141,7 +134,6 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "Grayhawk",
     zip: "85255",
     tagline: "Modern Kitchen and Bath Transformations for Grayhawk Families",
-    heroImage: "/images/grayhawk-hero.jpg",
     description: [
       "Grayhawk is a vibrant golf community in North Scottsdale. It offers a family-friendly atmosphere with desert landscaping and local parks. The residential properties feature clean, contemporary architectural lines and desert-inspired exteriors.",
       "We help Grayhawk residents get more value from their homes through functional remodels. We specialize in transforming standard layouts into custom spaces, focusing on modern kitchens and luxurious master baths. We help maximize the usable space in every room.",
@@ -161,7 +153,6 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     fullName: "Arcadia",
     zip: "85251",
     tagline: "Preserving Historic Charm While Adding Modern Comfort in Leafy Arcadia",
-    heroImage: "/images/arcadia-hero.jpg",
     description: [
       "Arcadia is known for its lush green lawns, citrus trees, and views of Camelback Mountain. The neighborhood features a mix of mid-century ranch homes and custom modern farmhouses. It has a distinct character that stands out from the desert landscape.",
       "Saddlewood Contracting helps homeowners modernize these properties while respecting their original charm. We update plumbing and electrical systems, install high-efficiency HVAC, and create open floor plans. We focus on maintaining the classic neighborhood aesthetic.",

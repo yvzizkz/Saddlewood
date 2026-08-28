@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: "McCormick Ranch Remodeling | Saddlewood Contracting",
     description: `${data.tagline}. Premium remodeling by Scottsdale's most trusted contractor.`,
-    images: [{ url: data.heroImage, alt: "McCormick Ranch kitchen remodel by Saddlewood Contracting" }],
   },
 };
 

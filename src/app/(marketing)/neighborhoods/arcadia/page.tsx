@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Arcadia Remodeling | Saddlewood Contracting",
     description: "Saddlewood Contracting brings trusted, in-house craftsmanship to luxury kitchen, bath, and whole-home remodels for discerning homeowners in Arcadia, Scottsdale.",
-    images: [{ url: data.heroImage, alt: "Arcadia luxury remodel by Saddlewood Contracting" }],
   },
 };
 

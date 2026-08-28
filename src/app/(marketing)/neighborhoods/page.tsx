@@ -21,12 +21,6 @@ export const metadata: Metadata = {
     title: "Areas We Serve | Saddlewood Contracting",
     description:
       "Explore the premier neighborhoods we serve across Scottsdale and Paradise Valley. High-end custom home remodels with dedicated, in-house crews.",
-    images: [
-      {
-        url: "/images/pv-aerial-sunset.jpg",
-        alt: "Saddlewood Contracting luxury home remodeling",
-      },
-    ],
   },
 };
 
