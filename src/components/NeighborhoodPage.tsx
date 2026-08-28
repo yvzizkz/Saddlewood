@@ -58,8 +58,10 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
           (p) => ({ label: p.phase }),
         )
       : undefined;
-  // Drawn hero panorama of the area's real geography (two-ink drafting
-  // standard) — rendered on the same cream ground as the hero above.
+  // Drawn panorama of the area's real geography. It used to sit directly
+  // under the dusk hero, which read as the same view twice (owner note,
+  // 2026-08-28); it now closes the page as the ground line the CTA stands
+  // on, where the drawing does a job the photograph can't.
   const AreaScape = areaScapeRegistry[data.slug];
 
   return (
@@ -82,29 +84,14 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
         mediaCaption={`Dusk study · ${data.name}`}
       />
 
-      {/* Drawn panorama band — the area's real geography in drafting ink,
-          the drawn counterpart to the dusk study above */}
-      {AreaScape ? (
-        <section
-          className="night-on-cream bg-off-white"
-          aria-label={`Drawn panorama of ${data.name}`}
-        >
-          <div className="mx-auto w-full max-w-[1240px] px-5 py-[clamp(40px,6vh,64px)] sm:px-8">
-            <div className="linework-ink">
-              <AreaScape className="block h-auto w-full" />
-            </div>
-            <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-gold-accessible">
-              Drawn panorama · {data.name}
-            </p>
-          </div>
-        </section>
-      ) : null}
-
-      {/* About — the SEO body copy, on the dark page ground */}
+      {/* About — the SEO body copy. Cream working-set ground: it carries the
+          longest read on the page and breaks the dark run between the dusk
+          hero and the ledgers below (owner note: teal is heavy in big blocks). */}
       <section
-        className="relative py-[clamp(80px,10vh,128px)]"
+        className="night-on-cream relative bg-off-white py-[clamp(80px,10vh,128px)] text-charcoal"
         aria-label={`About remodeling in ${data.name}`}
       >
+        <div className="night-cream-grid" aria-hidden="true" />
         <div className="relative mx-auto grid w-full max-w-[1240px] gap-[clamp(44px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <motion.div
             variants={revealVariants}
@@ -113,15 +100,17 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             viewport={viewport}
           >
             <span className="section-label !mb-0">About</span>
-            <h2 className="mt-6 max-w-[14em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+            <h2 className="mt-6 max-w-[14em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
               Why Saddlewood for{" "}
-              <em className="font-normal italic text-gold">{data.name}?</em>
+              <em className="font-normal italic text-gold-display">
+                {data.name}?
+              </em>
             </h2>
             <div className="mt-8 space-y-5">
               {data.description.map((p, i) => (
                 <p
                   key={i}
-                  className="max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70"
+                  className="max-w-[560px] text-[15.5px] leading-[1.8] text-charcoal-light"
                 >
                   {p}
                 </p>
@@ -138,21 +127,21 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             viewport={viewport}
           >
             {/* Expertise ledger — hairline frame instead of a photo card */}
-            <div className="rounded-[2px] border border-off-white/[0.14] p-8 lg:p-10">
-              <h3 className="font-heading text-[24px] font-medium leading-[1.25] tracking-[-0.02em] text-off-white">
+            <div className="rounded-[2px] border border-charcoal/[0.16] p-8 lg:p-10">
+              <h3 className="font-heading text-[24px] font-medium leading-[1.25] tracking-[-0.02em] text-charcoal">
                 Our {data.name} Expertise
               </h3>
               <ul className="mt-7 list-none space-y-0 p-0">
                 {data.features.map((feature) => (
                   <li
                     key={feature}
-                    className="flex items-start gap-4 border-b border-off-white/[0.1] py-4 last:border-b-0"
+                    className="flex items-start gap-4 border-b border-charcoal/[0.12] py-4 last:border-b-0"
                   >
                     <span
-                      className="mt-[3px] h-4 w-px shrink-0 bg-gold"
+                      className="mt-[3px] h-4 w-px shrink-0 bg-gold-accessible"
                       aria-hidden="true"
                     />
-                    <span className="text-[13.5px] leading-[1.7] text-off-white/[0.72]">
+                    <span className="text-[13.5px] leading-[1.7] text-charcoal-light">
                       {feature}
                     </span>
                   </li>
@@ -178,10 +167,18 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                   Schedule your free, no-obligation design consultation today.
                 </p>
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Link href="/contact" className={goldBtn + " text-center"}>
+                  <Link
+                    href="/contact"
+                    // Tighter padding than the page CTAs: this pair shares a
+                    // narrow card column and must not wrap mid-label.
+                    className={goldBtn + " whitespace-nowrap text-center !px-[22px]"}
+                  >
                     Schedule Consultation
                   </Link>
-                  <a href="tel:4809996100" className={lineBtn + " justify-center"}>
+                  <a
+                    href="tel:4809996100"
+                    className={lineBtn + " justify-center whitespace-nowrap !px-[18px]"}
+                  >
                     <Phone className="h-3.5 w-3.5" aria-hidden="true" />
                     (480) 999-6100
                   </a>
@@ -364,9 +361,10 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
         </section>
       )}
 
-      {/* Localized CTA — teal band with gold hairlines */}
+      {/* Localized CTA — teal band with gold hairlines, standing on the
+          drawn horizon of the area itself */}
       <section
-        className="relative overflow-hidden border-y border-gold/[0.22] bg-teal px-5 py-[clamp(88px,11vh,140px)] text-center sm:px-8"
+        className="relative overflow-hidden border-y border-gold/[0.22] bg-teal px-5 pb-[clamp(52px,7vh,88px)] pt-[clamp(88px,11vh,140px)] text-center sm:px-8"
         aria-label="Call to action"
       >
         <div
@@ -403,6 +401,22 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             </a>
           </div>
         </motion.div>
+
+        {/* The area's real geography in drafting ink, rising out of the
+            teal as the page's ground line. Cream/brass tokens straight
+            from :root — no .linework-ink wrapper, that's for cream grounds. */}
+        {AreaScape ? (
+          <div className="relative mx-auto mt-[clamp(48px,7vh,84px)] w-full max-w-[1080px]">
+            {/* On phones the panorama is scaled past the viewport and
+                centre-cropped by the section — at 1:1 the ridge and its
+                elevation callouts shrink to illegible specks. */}
+            <div className="-mx-[25%] w-[150%] opacity-[0.58] sm:mx-0 sm:w-full">
+              {/* The drawing carries its own "Area panorama" annotation —
+                  no caption line under it, that would say it twice. */}
+              <AreaScape className="block h-auto w-full" />
+            </div>
+          </div>
+        ) : null}
       </section>
     </>
   );
