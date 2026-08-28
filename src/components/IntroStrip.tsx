@@ -8,13 +8,15 @@
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { DimensionTicks } from "@/components/linework";
+import { CountUp } from "@/components/CountUp";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+// 8 = the neighborhood pages the site actually serves (see src/lib/neighborhoods.ts).
 const stats = [
-  { number: "4", label: "Active ROC Licenses" },
-  { number: "3", label: "Premier Neighborhoods" },
-  { number: "1", label: "Point of Contact" },
+  { number: 4, label: "Active ROC Licenses" },
+  { number: 8, label: "Premier Neighborhoods" },
+  { number: 1, label: "Point of Contact" },
 ];
 
 export function IntroStrip() {
@@ -36,8 +38,8 @@ export function IntroStrip() {
               viewport={{ once: true, margin: "-36px" }}
               transition={{ duration: 1, ease: EASE, delay: i * 0.12 }}
             >
-              <div className="font-heading text-[clamp(64px,7vw,96px)] font-medium leading-none text-gold">
-                {stat.number}
+              <div className="font-heading text-[clamp(64px,7vw,96px)] font-medium leading-none text-gold tabular-nums">
+                <CountUp value={stat.number} />
               </div>
               <DimensionTicks
                 className="mx-auto mb-3 mt-3.5 block h-3.5 w-16"
