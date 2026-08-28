@@ -85,10 +85,13 @@ export default function AboutContent() {
     <>
       <FullBleedHero
         media={{
+          // Pulled from the 1080p steel-framing master rather than the 720p
+          // interview reel: the old plate was a 2x upscale, which is what
+          // read as grain at hero scale.
           kind: "image",
-          src: "/images/about-crew-poster.jpg",
-          alt: "Two Saddlewood crew leads talking on the active steel-build site",
-          positionClass: "object-[50%_35%]",
+          src: "/images/about-lead-framing.jpg",
+          alt: "A Saddlewood team lead standing in the steel framing of the active Paradise Valley build",
+          positionClass: "object-[50%_44%]",
         }}
         label="Saddlewood crew on the active Paradise Valley build"
         eyebrow="About Saddlewood"
