@@ -160,10 +160,7 @@ export function TradePartnersForm() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
             >
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-px w-8 bg-gold" aria-hidden="true" />
-                <span className="section-label">Join Our Bid List</span>
-              </div>
+              <span className="section-label !mb-6">Join Our Bid List</span>
               <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-4 leading-tight">
                 Get On Our Bid List
               </h2>

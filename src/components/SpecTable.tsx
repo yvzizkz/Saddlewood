@@ -8,7 +8,8 @@
  * prefers-reduced-motion.
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -19,7 +20,7 @@ export interface SpecTableProps {
 }
 
 export function SpecTable({ specs, className }: SpecTableProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   if (specs.length === 0) return null;
 

@@ -5,10 +5,11 @@
  * Each phase gets a Fraunces numeral (01, 02, ...) over a drafted
  * dimension-tick string, the phase name, and its description, separated
  * by hairline rules. The DimensionTicks ornament handles its own
- * reduced-motion state; row reveals respect useReducedMotion here.
+ * reduced-motion state; row reveals respect usePrefersReducedMotion here.
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { DimensionTicks } from "@/components/linework";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,7 @@ export interface TimelinePhasesProps {
 }
 
 export function TimelinePhases({ phases, className }: TimelinePhasesProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   if (phases.length === 0) return null;
 

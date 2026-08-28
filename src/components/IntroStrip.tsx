@@ -5,7 +5,8 @@
  * dimension-tick underlines, on a teal band distinct from the page ground.
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { DimensionTicks } from "@/components/linework";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -17,7 +18,7 @@ const stats = [
 ];
 
 export function IntroStrip() {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
     <section

@@ -84,10 +84,7 @@ export function ContactForm() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
             >
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-px w-8 bg-gold" aria-hidden="true" />
-                <span className="section-label">Contact</span>
-              </div>
+              <span className="section-label !mb-6">Contact</span>
               <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-4 leading-tight">
                 Start Your Project
               </h2>
@@ -332,7 +329,7 @@ export function ContactForm() {
                     <Mail className="w-5 h-5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm text-stone/70">Email</p>
-                      <p className="text-lg break-all sm:break-normal">info@saddlewoodcontracting.com</p>
+                      <p className="text-base sm:text-lg break-words">info@saddlewoodcontracting.com</p>
                     </div>
                   </a>
                   <div className="flex items-start gap-4 font-light">

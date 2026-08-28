@@ -9,7 +9,8 @@
  */
 
 import Link from "next/link";
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { ArrowRight } from "lucide-react";
 import { caseStudies, getCaseStudy } from "@/data/case-studies";
 import { CaseStudyCard } from "@/components/CaseStudyCard";
@@ -30,7 +31,7 @@ const revealVariants: Variants = {
 };
 
 export function CaseStudyShowcase() {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const flagship = getCaseStudy(FLAGSHIP_SLUG);
   const rest = caseStudies.filter((cs) => cs.slug !== FLAGSHIP_SLUG);
 

@@ -7,7 +7,8 @@
  * --gold-display (full-strength #c8a55a is reserved for dark grounds).
  */
 
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -39,7 +40,7 @@ const revealVariants: Variants = {
 };
 
 export function HeritageInterlude() {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
   const viewport = { once: true, margin: "-36px" } as const;
 

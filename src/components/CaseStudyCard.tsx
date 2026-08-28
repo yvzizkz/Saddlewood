@@ -8,7 +8,8 @@
  */
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { ArrowRight } from "lucide-react";
 import type { CaseStudy } from "@/data/case-studies";
 import { lineworkRegistry } from "@/components/linework";
@@ -22,7 +23,7 @@ export interface CaseStudyCardProps {
 }
 
 export function CaseStudyCard({ study, index = 0 }: CaseStudyCardProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const Motif = lineworkRegistry[study.linework];
   const scopeLine = study.scope.slice(0, 2).join(" · ");
 

@@ -8,7 +8,8 @@
  * previous version (punctuation only: no em dashes).
  */
 
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import Link from "next/link";
 import { Phone } from "lucide-react";
 import { PageHero } from "@/components/PageHero";
@@ -81,7 +82,7 @@ const revealVariants: Variants = {
 };
 
 export default function AboutContent() {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
   const viewport = { once: true, margin: "-36px" } as const;
 

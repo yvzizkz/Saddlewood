@@ -9,7 +9,8 @@
  * src/lib/neighborhoods.ts and src/data/case-studies.ts.
  */
 
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import Link from "next/link";
 import { ArrowRight, Phone } from "lucide-react";
 import type { NeighborhoodData } from "@/lib/neighborhoods";
@@ -35,7 +36,7 @@ const lineBtn =
   "inline-flex items-center gap-2 rounded-[2px] border border-off-white/25 px-[26px] py-[14px] text-[12px] font-medium uppercase tracking-[0.08em] text-off-white/80 no-underline transition-colors hover:border-gold hover:text-gold";
 
 export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
   const viewport = { once: true, margin: "-36px" } as const;
 

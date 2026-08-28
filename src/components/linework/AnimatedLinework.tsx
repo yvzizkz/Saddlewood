@@ -15,7 +15,8 @@
  * the preview deliberately layers gold over cream.
  */
 
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import {
   createContext,
   useContext,
@@ -135,7 +136,7 @@ export function AnimatedLinework({
   preserveAspectRatio,
   style,
 }: AnimatedLineworkProps) {
-  const reduced = useReducedMotion() ?? false;
+  const reduced = usePrefersReducedMotion();
   const rawId = useId();
   const glowId = `lw-glow-${rawId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 

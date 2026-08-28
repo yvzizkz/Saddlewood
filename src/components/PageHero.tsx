@@ -7,7 +7,8 @@
  * self-drawing figure. No photography.
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import type { ReactNode } from "react";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -29,7 +30,7 @@ interface PageHeroProps {
 }
 
 export function PageHero({ label, title, description, linework }: PageHeroProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
     <section

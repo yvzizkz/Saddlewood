@@ -11,7 +11,8 @@
  */
 
 import Link from "next/link";
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { ArrowRight } from "lucide-react";
 import { lineworkRegistry } from "@/components/linework";
 
@@ -44,7 +45,7 @@ const revealVariants: Variants = {
 };
 
 export function ServicesCategories({ categories }: ServicesCategoriesProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
   const viewport = { once: true, margin: "-36px" } as const;
 

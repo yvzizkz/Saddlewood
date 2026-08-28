@@ -6,7 +6,8 @@
  * unchanged from the previous version (punctuation only: no em dashes).
  */
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import Link from "next/link";
 import { Phone } from "lucide-react";
 
@@ -15,7 +16,7 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 type CTAVariant = "homeowner" | "builders";
 
 function CTAShell({ children }: { children: React.ReactNode }) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   return (
     <section
       className="relative overflow-hidden border-y border-gold/[0.22] bg-teal px-5 py-[clamp(88px,11vh,140px)] text-center sm:px-8"
