@@ -12,16 +12,23 @@ const getAllSlugs = () =>
 
 const ALLOWED_LINEWORK = ["plan-fragment", "massing", "wall-section", "steel-beam", "plat"];
 
+// The only video files allowed on the site (2026-08-28 content rules): the
+// active steel-build hero loop and the four delivered job reels. All 40th
+// Street finished-project media is retired.
 const REAL_VIDEO_SRCS = [
-  "/videos/breaking-ground-steel-9x16.mp4",
-  "/videos/process-timeline-9x16.mp4",
-  "/videos/stitched-reel-9x16.mp4",
+  "/videos/saddlewood-hero-loop.mp4",
+  "/videos/saddlewood-reel-how-it-started.mp4",
+  "/videos/saddlewood-reel-99-percent-never-see.mp4",
+  "/videos/saddlewood-reel-troon-remodel.mp4",
+  "/videos/saddlewood-reel-lets-build-together.mp4",
 ];
 
 const REAL_VIDEO_POSTERS = [
-  "/videos/breaking-ground-steel-9x16-poster.jpg",
-  "/videos/process-timeline-9x16-poster.jpg",
-  "/videos/stitched-reel-9x16-poster.jpg",
+  "/videos/saddlewood-hero-loop-poster.jpg",
+  "/videos/saddlewood-reel-how-it-started-poster.jpg",
+  "/videos/saddlewood-reel-99-percent-never-see-poster.jpg",
+  "/videos/saddlewood-reel-troon-remodel-poster.jpg",
+  "/videos/saddlewood-reel-lets-build-together-poster.jpg",
 ];
 
 describe("case studies", () => {
@@ -90,6 +97,21 @@ describe("case studies", () => {
       expect(getCaseStudy(study.slug)).toBe(study);
     }
     expect(getCaseStudy("does-not-exist")).toBeUndefined();
+  });
+
+  it("never exposes a street address or the retired project name", () => {
+    // Content rule (2026-08-28): community + phase labels only.
+    const banned = /40th|fortieth|street/i;
+    for (const study of caseStudies) {
+      expect(study.slug).not.toMatch(banned);
+      expect(study.title).not.toMatch(banned);
+      for (const paragraph of study.narrative) {
+        expect(paragraph).not.toMatch(banned);
+      }
+      for (const spec of study.specs) {
+        expect(spec.value).not.toMatch(banned);
+      }
+    }
   });
 
   it("produces one redirect per legacy slug, targeting a real case study", () => {

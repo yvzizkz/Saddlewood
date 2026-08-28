@@ -32,11 +32,13 @@ export interface CaseStudy {
 
 export const caseStudies: CaseStudy[] = [
   // ============================================================
-  // 40TH STREET ESTATE — flagship ground-up build, Paradise Valley
+  // PARADISE VALLEY · WHOLE-HOME BUILD — flagship ground-up build
+  // (Privacy rule: community + phase labels only. No street addresses
+  // or owner names anywhere on the site.)
   // ============================================================
   {
-    slug: "fortieth-street-estate",
-    title: "The 40th Street Estate",
+    slug: "paradise-valley-whole-home-build",
+    title: "Paradise Valley · Whole-Home Build",
     neighborhood: "Paradise Valley",
     category: "New Construction",
     scope: [
@@ -55,22 +57,19 @@ export const caseStudies: CaseStudy[] = [
       "Integrated landscape lighting",
     ],
     specs: [
-      { label: "Location", value: "40th Street Estate, Paradise Valley" },
+      { label: "Location", value: "Paradise Valley" },
       { label: "Category", value: "New Construction" },
       { label: "Trades", value: "General, electrical, plumbing, and HVAC, all in-house" },
     ],
     timelinePhases: [],
     narrative: [
-      "The 40th Street estate sits against Paradise Valley's mountain backdrop, a full transformation from the ground up. Clean horizontal lines and deep eaves meet the desert sky, and from above the geometry of the architecture meets the geometry of the desert as a single composition. The entry sets the tone for the entire home: exposed beams, oversized art, and warm oak floors create an immediate sense of arrival.",
+      "The estate sits against Paradise Valley's mountain backdrop, a full transformation from the ground up. Clean horizontal lines and deep eaves meet the desert sky, and from above the geometry of the architecture meets the geometry of the desert as a single composition. The entry sets the tone for the entire home: exposed beams, oversized art, and warm oak floors create an immediate sense of arrival.",
       "Inside, coffered ceilings and white oak built-ins frame the desert views, with a statement ring chandelier anchoring the great room. Sliding doors open the family room directly to the pool, so interior and exterior read as one room. A climate-controlled wine wall, with stone backing and blackened steel framing, doubles as a design statement at the heart of the home, and from the foyer the eye carries straight through to it in a single layered moment of arrival.",
       "An oversized skylight pulls daylight into the primary suite, where oak paneling and a framed window view do the rest. The walk-in closet was designed as its own room, with galley storage, an integrated vanity, and a lit mirror. Even the laundry room carries the same finish discipline as the kitchen, and a crystal chandelier turns the office bar into a signature room.",
       "Outdoors, landscape lighting and clean lines set up the pool and lounge for evening entertaining as the sky turns over Paradise Valley. A floor-to-ceiling stone fireplace makes the covered patio year-round living space, and the outdoor kitchen sits steps from the dining area, an entire entertaining program built outside. Desert evenings run long here.",
     ],
-    reel: {
-      src: "/videos/stitched-reel-9x16.mp4",
-      poster: "/videos/stitched-reel-9x16-poster.jpg",
-      label: "Inside the 40th Street estate",
-    },
+    // No reel: the finished-interior footage of this build is retired media
+    // (content rule: only the new steel framing images/reels stay on site).
     linework: "massing",
     legacySlugs: [
       "paradise-valley-pool-at-golden-hour",
@@ -111,11 +110,11 @@ export const caseStudies: CaseStudy[] = [
   },
 
   // ============================================================
-  // 40TH STREET KITCHEN & BATHS — interior finish story, same build
+  // PARADISE VALLEY · KITCHEN & BATHS — interior finish story, same build
   // ============================================================
   {
-    slug: "fortieth-street-kitchen-and-baths",
-    title: "40th Street Kitchen and Baths",
+    slug: "paradise-valley-kitchen-and-baths",
+    title: "Paradise Valley · Kitchen & Baths",
     neighborhood: "Paradise Valley",
     category: "Kitchen & Bath",
     scope: [
@@ -134,13 +133,13 @@ export const caseStudies: CaseStudy[] = [
       "Dual vanity",
     ],
     specs: [
-      { label: "Location", value: "40th Street Estate, Paradise Valley" },
+      { label: "Location", value: "Paradise Valley" },
       { label: "Category", value: "Kitchen & Bath" },
       { label: "Trades", value: "In-house across general, electrical, plumbing, and HVAC" },
     ],
     timelinePhases: [],
     narrative: [
-      "The kitchen anchors the open floor plan of the 40th Street estate. A massive natural stone island with waterfall edges seats five beneath pendant lighting and coffered ceilings, and the climate-controlled wine wall meets the island at the entertaining heart of the home. Stone, oak, brass, and pendant light sit in unhurried composition, designed for hosts who love to cook and entertain at the same time.",
+      "The kitchen anchors the open floor plan of the estate. A massive natural stone island with waterfall edges seats five beneath pendant lighting and coffered ceilings, and the climate-controlled wine wall meets the island at the entertaining heart of the home. Stone, oak, brass, and pendant light sit in unhurried composition, designed for hosts who love to cook and entertain at the same time.",
       "Every working detail was considered: integrated double ovens, a curated display niche, flush oak cabinetry with brass hardware, and an apron-front farmhouse sink set into custom cabinetry, a working surface composed with the same care as a finished room. A second kitchen moment uses sage-painted cabinetry and brass hardware for a quieter, more verdant palette.",
       "In the master bath, a hammered silver tub sits beneath a sculptural bubble chandelier, with fluted glass, herringbone marble, and brass fixtures completing the room. A second master bath runs bookmatched veined marble floor to ceiling, so the freestanding tub and custom vanity become a single sculpted composition. The dual-vanity secondary bath and the oval-mirror powder bath were designed with the same finish-level discipline as the master.",
     ],
@@ -163,11 +162,12 @@ export const caseStudies: CaseStudy[] = [
   },
 
   // ============================================================
-  // BREAKING GROUND — the structural / framing story of the build
+  // PARADISE VALLEY · STRUCTURAL PHASE — the structural / framing
+  // story of the completed wood-framed whole-home build
   // ============================================================
   {
-    slug: "fortieth-street-breaking-ground",
-    title: "Breaking Ground at 40th Street",
+    slug: "paradise-valley-structural-phase",
+    title: "Paradise Valley · Structural Phase",
     neighborhood: "Paradise Valley",
     category: "Framing",
     scope: [
@@ -178,7 +178,7 @@ export const caseStudies: CaseStudy[] = [
       "All four trades in-house: general, electrical, plumbing, HVAC",
     ],
     specs: [
-      { label: "Location", value: "40th Street Estate, Paradise Valley" },
+      { label: "Location", value: "Paradise Valley" },
       { label: "Category", value: "Framing" },
       { label: "Structure", value: "New foundation and slab, exterior and interior framing, engineered roof trusses" },
       { label: "Trades", value: "All four trades in-house: general, electrical, plumbing, HVAC" },
@@ -210,14 +210,11 @@ export const caseStudies: CaseStudy[] = [
       },
     ],
     narrative: [
-      "The whole-home transformation of the 40th Street estate started with full demolition and site prep, followed by a new foundation and slab. Exterior and interior framing went up next, capped by engineered roof trusses.",
+      "The whole-home transformation of this Paradise Valley estate started with full demolition and site prep, followed by a new foundation and slab. Exterior and interior framing went up next, capped by engineered roof trusses.",
       "Every phase, from demolition to finished luxury, was executed entirely in-house across all four trades: general, electrical, plumbing, and HVAC. Saddlewood's own licensed tradespeople carried the build from the first cut to the last fixture.",
     ],
-    reel: {
-      src: "/videos/breaking-ground-steel-9x16.mp4",
-      poster: "/videos/breaking-ground-steel-9x16-poster.jpg",
-      label: "Breaking ground",
-    },
+    // No reel: the surviving job-site reels document the separate, active
+    // steel-frame build and live on /new-construction and /framing instead.
     linework: "steel-beam",
     legacySlugs: ["paradise-valley-40th-street-whole-home-build"],
   },
@@ -227,7 +224,7 @@ export const caseStudies: CaseStudy[] = [
   // ============================================================
   {
     slug: "mccormick-ranch-kitchen-and-baths",
-    title: "McCormick Ranch Kitchen and Baths",
+    title: "McCormick Ranch · Kitchen & Baths",
     neighborhood: "McCormick Ranch",
     category: "Kitchen & Bath",
     scope: [
@@ -272,7 +269,7 @@ export const caseStudies: CaseStudy[] = [
   // ============================================================
   {
     slug: "pinnacle-peak-remodel",
-    title: "Pinnacle Peak Remodel",
+    title: "Pinnacle Peak · Remodel",
     neighborhood: "Pinnacle Peak",
     category: "Whole-Home Remodel",
     scope: [
@@ -319,7 +316,7 @@ export const caseStudies: CaseStudy[] = [
   // ============================================================
   {
     slug: "gainey-ranch-refresh",
-    title: "Gainey Ranch Refresh",
+    title: "Gainey Ranch · Refresh",
     neighborhood: "Gainey Ranch",
     category: "Whole-Home Remodel",
     scope: [
