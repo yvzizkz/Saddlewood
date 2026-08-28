@@ -1,5 +1,7 @@
 /**
- * 5% film grain over full-bleed media (premium-standard global rule).
+ * Film grain over full-bleed media (premium-standard global rule). Held at
+ * 3%: at 5% it stacked with the compression noise in the footage and the
+ * owner read the heroes as grainy (2026-08-28).
  * Inline SVG turbulence, blended overlay; purely decorative.
  */
 
@@ -9,7 +11,7 @@ const GRAIN_URI =
 export function GrainOverlay() {
   return (
     <div
-      className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay"
+      className="pointer-events-none absolute inset-0 opacity-[0.03] mix-blend-overlay"
       aria-hidden="true"
       style={{ backgroundImage: GRAIN_URI }}
     />

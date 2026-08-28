@@ -33,6 +33,15 @@ interface VideoPanelProps {
   /** Position utilities for that control. */
   replayClassName?: string;
   preload?: "none" | "metadata" | "auto";
+  /**
+   * Fires as the single pass finishes, so a parent can cross into whatever
+   * the panel settles on. Set restLead to fire this many seconds early and
+   * dissolve over the tail of the footage rather than after it.
+   */
+  onRest?: () => void;
+  restLead?: number;
+  /** Fires when the viewer replays, so the parent can undo its rest state. */
+  onReplay?: () => void;
 }
 
 export function VideoPanel({
@@ -44,6 +53,9 @@ export function VideoPanel({
   replay = false,
   replayClassName = "right-5 top-[106px] sm:right-8",
   preload = "none",
+  onRest,
+  restLead = 0,
+  onReplay,
 }: VideoPanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -78,22 +90,40 @@ export function VideoPanel({
     return () => observer.disconnect();
   }, [prefersReducedMotion]);
 
+  const restedRef = useRef(false);
+  const fireRest = useCallback(() => {
+    if (restedRef.current) return;
+    restedRef.current = true;
+    onRest?.();
+  }, [onRest]);
+
   const handleEnded = useCallback(() => {
+    fireRest();
     if (mode !== "once") return;
     atRestRef.current = true;
     setAtRest(true);
-  }, [mode]);
+  }, [fireRest, mode]);
+
+  // Cross into the resting state over the tail of the pass, not after it.
+  const handleTimeUpdate = useCallback(() => {
+    if (!restLead || restedRef.current) return;
+    const video = videoRef.current;
+    if (!video?.duration) return;
+    if (video.duration - video.currentTime <= restLead) fireRest();
+  }, [fireRest, restLead]);
 
   const handleReplay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     atRestRef.current = false;
+    restedRef.current = false;
     setAtRest(false);
+    onReplay?.();
     video.currentTime = 0;
     video.play().catch(() => {
       /* autoplay interruptions are fine */
     });
-  }, []);
+  }, [onReplay]);
 
   if (prefersReducedMotion) {
     return (
@@ -119,6 +149,7 @@ export function VideoPanel({
         playsInline
         preload={preload}
         onEnded={handleEnded}
+        onTimeUpdate={restLead ? handleTimeUpdate : undefined}
       />
       {replay && atRest ? (
         <button
