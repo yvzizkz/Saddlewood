@@ -53,8 +53,7 @@ const beats: Beat[] = [
     src: "/images/build-03-crew.jpg",
     alt: "Two Saddlewood crew members setting steel from a scaffold",
     heading: "The crew",
-    caption:
-      "Our own licensed tradespeople: general, electrical, plumbing, HVAC.",
+    caption: "Our own tradespeople, on our own payroll.",
   },
 ];
 
@@ -92,9 +91,8 @@ export function BuildSequence() {
         >
           On the active Paradise Valley build, the walls were marked out on
           the concrete before a stud went up, then framed in steel by the same
-          crew. Laid out, framed, wired and plumbed under our own licenses:
-          general, electrical, plumbing, HVAC. One point of contact, from the
-          first cut to the last detail.
+          crew that laid them out. One point of contact, from the first chalk
+          line to the last detail.
         </motion.p>
 
         <ol className="mt-[clamp(36px,5vh,56px)] grid list-none grid-cols-1 gap-x-6 gap-y-10 p-0 sm:grid-cols-3">
@@ -130,41 +128,6 @@ export function BuildSequence() {
             </motion.li>
           ))}
         </ol>
-
-        {/* The payoff, wide: where the same build is headed */}
-        <motion.div
-          variants={variants}
-          custom={REVEAL_STEP}
-          initial="hidden"
-          whileInView="visible"
-          viewport={REVEAL_VIEWPORT}
-          className="mt-[clamp(40px,6vh,72px)]"
-        >
-          <div className="relative aspect-[1600/902] overflow-hidden bg-stone">
-            <Image
-              src="/images/vision-entry.jpg"
-              alt="Client-approved rendering of the finished estate entry"
-              fill
-              sizes="(max-width: 1240px) 100vw, 1240px"
-              className="object-cover"
-            />
-            <span className="absolute bottom-3 right-3 bg-teal-dark/70 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-off-white/80 backdrop-blur-[2px]">
-              Rendering · Estate in progress, Paradise Valley
-            </span>
-          </div>
-          <div className="mt-4 flex items-baseline gap-3">
-            <span className="font-mono text-[11px] tracking-[0.2em] text-gold-accessible tabular-nums">
-              04
-            </span>
-            <h3 className="font-heading text-[19px] font-medium leading-[1.3] tracking-[-0.01em] text-charcoal">
-              Where it lands
-            </h3>
-          </div>
-          <p className="mt-2 max-w-[56ch] text-[13.5px] leading-[1.7] text-charcoal-light">
-            The client-approved rendering of the finished estate. Same house as
-            the frames above, same crew carrying it there.
-          </p>
-        </motion.div>
 
         <motion.div
           variants={variants}
