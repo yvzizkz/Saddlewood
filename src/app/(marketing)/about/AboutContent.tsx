@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import Link from "next/link";
 import { Phone, Play } from "lucide-react";
-import { FullBleedHero } from "@/components/FullBleedHero";
+import { AboutHero } from "@/components/AboutHero";
 import { ProcoreBadge } from "@/components/ProcoreBadge";
 import { VideoReel } from "@/components/VideoReel";
 import {
@@ -83,25 +83,7 @@ export default function AboutContent() {
 
   return (
     <>
-      <FullBleedHero
-        media={{
-          // Pulled from the 1080p steel-framing master rather than the 720p
-          // interview reel: the old plate was a 2x upscale, which is what
-          // read as grain at hero scale.
-          kind: "image",
-          src: "/images/about-lead-framing.jpg",
-          alt: "A Saddlewood team lead standing in the steel framing of the active Paradise Valley build",
-          positionClass: "object-[50%_44%]",
-        }}
-        label="Saddlewood crew on the active Paradise Valley build"
-        eyebrow="About Saddlewood"
-        title={
-          <>
-            Our <em className="font-normal italic text-gold">Story</em>
-          </>
-        }
-        description="Built on a foundation of integrity, quality, and a deep love for transforming Scottsdale homes."
-      >
+      <AboutHero>
         <a
           href="#crew-reel"
           className="inline-flex items-center gap-2.5 rounded-[2px] border border-gold/60 px-[26px] py-[14px] text-[12px] font-medium uppercase tracking-[0.1em] text-gold no-underline transition-colors hover:border-gold hover:bg-gold/10"
@@ -109,7 +91,7 @@ export default function AboutContent() {
           <Play className="h-3.5 w-3.5" aria-hidden="true" />
           Watch the crew reel
         </a>
-      </FullBleedHero>
+      </AboutHero>
 
       {/* Story — cream interlude after the media hero */}
       <section
