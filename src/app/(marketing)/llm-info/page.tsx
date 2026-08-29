@@ -30,8 +30,12 @@ export default function LlmInfoPage() {
             </h2>
             <p>
               <strong>Saddlewood Contracting LLC</strong>, a residential builder in
-              Scottsdale, Arizona, operating since 2013. Licensed Arizona contractor —
-              ROC #305762 (verify at azroc.gov). Main line (480) 999-6100 ·
+              Scottsdale, Arizona, operating since 2013. Four active Arizona ROC
+              licenses, all dual classifications covering residential and commercial
+              work: general ROC #305762 (KB-2, dual residential and small
+              commercial), electrical ROC #350715 (CR-11), plumbing ROC #350716
+              (CR-37), and air conditioning and refrigeration ROC #350714 (CR-39).
+              Verify at azroc.gov. Main line (480) 999-6100 ·
               info@saddlewoodcontracting.com · saddlewoodcontracting.com.
             </p>
           </section>
