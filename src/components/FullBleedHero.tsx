@@ -55,6 +55,12 @@ interface FullBleedHeroProps {
   description?: string;
   /** Mono caption pinned bottom-right (e.g. "Rendering · Estate in progress"). */
   mediaCaption?: string;
+  /**
+   * Decorative layer between the grade and the copy — e.g. the brand roundel
+   * resolving over a dusk plate. Rendered aria-hidden and non-interactive, so
+   * it never competes with the headline for the pointer or the screen reader.
+   */
+  overlay?: ReactNode;
   /** Extra content under the description (CTAs, links). */
   children?: ReactNode;
   /** Height utility, default min-h-[74svh]. */
@@ -69,6 +75,7 @@ export function FullBleedHero({
   title,
   description,
   mediaCaption,
+  overlay,
   children,
   minHeightClass = "min-h-[74svh]",
 }: FullBleedHeroProps) {
@@ -115,6 +122,12 @@ export function FullBleedHero({
         }}
       />
       <GrainOverlay />
+
+      {overlay ? (
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          {overlay}
+        </div>
+      ) : null}
 
       {chip ? (
         <span className="night-reel-chip !left-5 !top-[106px] sm:!left-10">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { TradePartnersForm } from "@/components/TradePartnersForm";
-import { ShearWallSheet, SteelBeam } from "@/components/linework";
+import { BrandPlateHero } from "@/components/BrandPlateHero";
+import { ShearWallSheet } from "@/components/linework";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
@@ -88,40 +89,14 @@ export default function TradePartnersPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
       />
 
-      {/* Hero — the "document" treatment: the deep PageHero layout inlined
-          so thin brass rules can bound the copy block like a bid sheet. */}
-      <section
-        className="relative flex items-end overflow-hidden pb-[clamp(48px,7vh,80px)] pt-32 sm:pt-36 lg:pt-40"
-        role="banner"
-      >
-        {/* Ambient gold glow */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          aria-hidden="true"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 60% at 30% 80%, rgba(200,165,90,0.08), transparent 70%)",
-          }}
-        />
-        <div className="relative mx-auto grid w-full max-w-[1240px] items-end gap-10 px-5 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-16">
-          <div>
-            <div className="mb-7 h-px w-full bg-gold/40" aria-hidden="true" />
-            <span className="section-label !mb-0">Trade Partners</span>
-            <h1 className="mt-5 max-w-[16ch] font-heading text-4xl font-medium leading-[1.08] tracking-[-0.02em] text-off-white sm:text-5xl lg:text-6xl xl:text-[68px]">
-              Work With Us
-            </h1>
-            <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
-              Saddlewood is always looking for reliable subcontractors and
-              vendors. Get on our bid list and we&apos;ll send you plans when
-              the right project comes up.
-            </p>
-            <div className="mt-8 h-px w-full bg-gold/40" aria-hidden="true" />
-          </div>
-          <div className="hidden lg:block" aria-hidden="true">
-            <SteelBeam className="ml-auto block h-auto w-full max-w-[440px]" glow />
-          </div>
-        </div>
-      </section>
+      {/* Hero — the brand plate the homepage animation lands on, so a sub
+          arriving from an emailed bid link sees the same mark. */}
+      <BrandPlateHero
+        eyebrow="Trade Partners"
+        title="Work With Us"
+        description="Saddlewood is always looking for reliable subcontractors and vendors. Get on our bid list and we'll send you plans when the right project comes up."
+        minHeightClass="min-h-[62svh]"
+      />
 
       {/* Intro — cream interlude between the deep hero and the cream form:
           off-white ground, teal drafting grid, charcoal type, the bid-list

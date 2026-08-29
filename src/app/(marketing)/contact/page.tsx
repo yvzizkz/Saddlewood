@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
-import { PageHero } from "@/components/PageHero";
-import { GarageElevation } from "@/components/linework";
+import { BrandPlateHero } from "@/components/BrandPlateHero";
 
 export const metadata = {
   title: { absolute: "Free Remodeling Consultation in Scottsdale | Contact Saddlewood" },
@@ -13,14 +12,11 @@ export const metadata = {
 export default function ContactPage() {
   return (
     <>
-      <PageHero
-        label="Get In Touch"
+      <BrandPlateHero
+        eyebrow="Get In Touch"
         title="Let's Talk"
         description="Ready to transform your home? Start with a free consultation. We'd love to hear about your vision."
-        variant="cream"
-        underlay={
-          <GarageElevation className="block h-[clamp(160px,24vh,300px)] w-full" />
-        }
+        minHeightClass="min-h-[62svh]"
       />
 
       {/* Subcontractor / vendor prompt → bid-list page */}
