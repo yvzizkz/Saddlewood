@@ -101,9 +101,9 @@ export default function ServicesPage() {
       scope:
         "Custom cabinetry, natural-stone islands, integrated appliances, and the lighting and millwork to tie it together.",
       media: {
-        src: "/images/troon-kitchen-frame.jpg",
-        alt: "Kitchen of a remodel in progress: range, hood, and stone island",
-        caption: "From a remodel walkthrough, filmed on site",
+        src: "/images/study-kitchen.jpg",
+        alt: "Generated study of the remodel's kitchen: range, hood, stone backsplash, and island",
+        caption: "Study · drawn from the remodel footage",
       },
       href: "/portfolio",
       hrefLabel: "Kitchen projects",
@@ -113,9 +113,9 @@ export default function ServicesPage() {
       scope:
         "Bookmatched stone, freestanding tubs, frameless glass, heated floors. Plumbed and wired by our own licensed crew.",
       media: {
-        src: "/images/troon-bath-frame.jpg",
-        alt: "Deck-set oval tub against curved glass with pool and mountain views, from a remodel in progress",
-        caption: "From a remodel walkthrough, filmed on site",
+        src: "/images/study-bath.jpg",
+        alt: "Generated study of the remodel's bath: deck-set oval tub against curved glass with pool and mountain views",
+        caption: "Study · drawn from the remodel footage",
       },
       href: "/portfolio",
       hrefLabel: "Bathroom projects",
