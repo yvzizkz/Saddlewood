@@ -5,7 +5,9 @@
  * page map: edge-to-edge media (single-pass video or graded still, optional
  * slow Ken Burns) under the dark grade and 5% grain, mono eyebrow +
  * Fraunces title bottom-left with a text shadow, optional truth chip and
- * media caption. Renders must pass a mediaCaption beginning "Rendering".
+ * media caption. Anything that is not literal job footage says so in its
+ * mediaCaption ("Rendering · ...", "Dusk study · ..."), or passes none at
+ * all where the image is plainly decorative and claims nothing.
  * Reduced motion: video shows its poster, Ken Burns stays still.
  */
 

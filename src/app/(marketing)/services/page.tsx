@@ -88,10 +88,13 @@ export default function ServicesPage() {
     outcome: phaseOutcomes[i] ?? phaseOutcomes[phaseOutcomes.length - 1],
   }));
 
-  // Round-2 ruling: no recycled drawings on these cards. Round-3 ruling:
-  // no renderings here either; they live in the case study. Media only
-  // where a truthful asset from a real job exists; cards without one stay
-  // typographic.
+  // Media policy (owner directive, 2026-08-30): generated and enhanced
+  // imagery is allowed here for embellishment, for illustrating a concept,
+  // and as a stand-in where a client would rather their own project not be
+  // shown. The one line that stays: an image only carries a "filmed on
+  // site" or named-project caption when that is literally what it is.
+  // Anything generated is captioned for what it is, or left uncaptioned as
+  // decoration where no claim is implied.
   const categories = [
     {
       name: "Kitchen",

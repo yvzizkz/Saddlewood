@@ -2,10 +2,17 @@
 
 /**
  * Closing CTA band — teal ground with gold hairlines and a soft radial
- * gold glow, distinct from the teal-dark page ground. Copy and hrefs are
- * unchanged from the previous version (punctuation only: no em dashes).
+ * gold glow, distinct from the teal-dark page ground.
+ *
+ * The homeowner variant carries a generated interior study behind the copy
+ * (owner directive, 2026-08-30: generated imagery is approved for CTA
+ * embellishment, for illustrating a concept, and for standing in where a
+ * client would rather their own project not be shown). It sits at low
+ * opacity under a heavy scrim: it sets mood, and it makes no claim about a
+ * particular job, which is why it carries no "filmed on site" caption.
  */
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { REVEAL_VIEWPORT } from "@/lib/reveal";
@@ -16,13 +23,40 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 
 type CTAVariant = "homeowner" | "builders";
 
-function CTAShell({ children }: { children: React.ReactNode }) {
+function CTAShell({
+  children,
+  backdrop,
+}: {
+  children: React.ReactNode;
+  /** Decorative image behind the copy. Never captioned, never a claim. */
+  backdrop?: string;
+}) {
   const prefersReducedMotion = usePrefersReducedMotion();
   return (
     <section
       className="relative overflow-hidden border-y border-gold/[0.22] bg-teal px-5 py-[clamp(88px,11vh,140px)] text-center sm:px-8"
       aria-label="Call to action"
     >
+      {backdrop ? (
+        <div className="absolute inset-0" aria-hidden="true">
+          <Image
+            src={backdrop}
+            alt=""
+            fill
+            sizes="100vw"
+            className="scale-[1.04] object-cover object-[50%_58%]"
+          />
+          {/* Scrim: hold the teal ground so the headline keeps AA contrast
+              and the image reads as atmosphere rather than as content. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(45,74,74,0.93), rgba(45,74,74,0.86) 45%, rgba(45,74,74,0.94))",
+            }}
+          />
+        </div>
+      ) : null}
       <div
         className="pointer-events-none absolute inset-0"
         aria-hidden="true"
@@ -82,7 +116,7 @@ export function CTABanner({ variant = "homeowner" }: { variant?: CTAVariant } = 
     );
   }
   return (
-    <CTAShell>
+    <CTAShell backdrop="/images/cta-kitchen-study.jpg">
       <h2 className="font-heading text-[clamp(38px,5vw,64px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
         Ready to transform
         <br />

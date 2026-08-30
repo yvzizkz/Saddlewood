@@ -4,11 +4,14 @@
  * ServicesCategories — Night Blueprint plates.
  *
  * Four core scopes (Kitchen / Bathroom / Whole-Home / Outdoor Living) as
- * hairline-framed plates: gold index numeral, real media where it exists
- * (reel frames, renders — renders always captioned as renderings), Fraunces
- * title, one scope line, and a quiet link into the relevant work. Cards
- * without truthful media stay typographic (round-2 ruling: no recycled
- * drawings on these cards).
+ * hairline-framed plates: gold index numeral, media, Fraunces title, one
+ * scope line, and a quiet link into the relevant work.
+ *
+ * Media policy (owner directive, 2026-08-30): footage frames, renderings,
+ * and generated or AI-enhanced studies are all fair game on these cards.
+ * The caption is what has to stay honest — "filmed on site" and named
+ * projects mean exactly that; everything else is captioned for what it is
+ * ("Rendering", "Study") or left uncaptioned where it reads as decoration.
  */
 
 import Link from "next/link";
