@@ -253,17 +253,18 @@ export function HeroSection() {
           </a>
         </motion.div>
 
-        {/* Stats row — lives inside the hero in V2 */}
+        {/* Stats row — lives inside the hero in V2. A fixed 3-column grid on
+            phones: flex-wrap broke 1+2 at 390px and read as jumbled. */}
         <motion.div
           variants={fadeUpVariants}
-          className="mt-11 flex flex-wrap gap-x-[46px] gap-y-6 border-t border-off-white/[0.18] pt-6"
+          className="mt-11 grid grid-cols-3 gap-x-4 border-t border-off-white/[0.18] pt-6 sm:flex sm:flex-wrap sm:gap-x-[46px] sm:gap-y-6"
         >
           {stats.map((stat) => (
             <div key={stat.label}>
               <span className="block font-heading text-[30px] font-medium leading-none text-gold tabular-nums">
                 <CountUp value={stat.number} />
               </span>
-              <span className="mt-1.5 block font-mono text-[10.5px] uppercase tracking-[0.18em] text-off-white/[0.65]">
+              <span className="mt-1.5 block font-mono text-[9px] uppercase tracking-[0.12em] text-off-white/[0.65] sm:text-[10.5px] sm:tracking-[0.18em]">
                 {stat.label}
               </span>
             </div>

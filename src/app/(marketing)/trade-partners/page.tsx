@@ -113,8 +113,7 @@ export default function TradePartnersPage() {
                 Subcontractors &amp; Vendors
               </span>
               <h2 className="mt-5 max-w-[14em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
-                Build With Scottsdale&apos;s In-House{" "}
-                <em className="font-normal italic text-gold-display">Contractor</em>
+                Build With Scottsdale&apos;s In-House Contractor
               </h2>
               <p className="mt-7 max-w-[540px] text-[15.5px] leading-[1.8] text-charcoal-light">
                 Saddlewood Contracting builds ground-up new construction,

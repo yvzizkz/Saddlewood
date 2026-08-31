@@ -205,7 +205,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             >
               <span className="section-label !mb-0">Projects</span>
               <h2 className="mt-6 font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
-                {data.name} <em className="font-normal italic text-gold">Projects</em>
+                {data.name} Projects
               </h2>
             </motion.div>
 
@@ -281,7 +281,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             >
               <span className="section-label !mb-0">Our Process</span>
               <h2 className="mt-6 font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
-                From <em className="font-normal italic text-gold">Ground Up</em>
+                From Ground Up
               </h2>
               <p className="mt-5 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
                 This {data.name} project showcases our full-scope capabilities,
@@ -329,8 +329,7 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             >
               <span className="section-label !mb-0">Stories</span>
               <h2 className="mt-6 font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
-                From {data.name}{" "}
-                <em className="font-normal italic text-gold">Homeowners</em>
+                From {data.name} Homeowners
               </h2>
             </motion.div>
 

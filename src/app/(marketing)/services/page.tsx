@@ -175,8 +175,7 @@ export default function ServicesPage() {
         <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <span className="section-label !mb-0">Services · Kitchen &amp; Bath</span>
           <h2 className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,4.4vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-charcoal">
-            Built to the{" "}
-            <em className="font-normal italic text-gold-display">sixteenth.</em>
+            Built to the sixteenth.
           </h2>
           <p className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light">
             Every kitchen starts as a dimensioned elevation and ends flush to
@@ -230,8 +229,7 @@ export default function ServicesPage() {
           <div>
             <span className="section-label !mb-0">From the Field</span>
             <h2 className="mt-6 max-w-[16ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
-              A remodel{" "}
-              <em className="font-normal italic text-gold">underway.</em>
+              A remodel underway.
             </h2>
             <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
               Saddlewood remodels homes across Scottsdale&apos;s communities
@@ -271,10 +269,7 @@ export default function ServicesPage() {
           <div className="max-w-[640px]">
             <span className="section-label !mb-0">In-House Trades</span>
             <h2 className="mt-5 font-heading text-[clamp(32px,3.8vw,48px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
-              Four ROC licenses.{" "}
-              <em className="font-normal italic text-gold-display">
-                No outside subs.
-              </em>
+              Four ROC licenses, held in-house.
             </h2>
             <p className="mt-6 max-w-[520px] text-[15.5px] leading-[1.8] text-charcoal-light">
               We pull our own permits. We employ our own electricians, plumbers,

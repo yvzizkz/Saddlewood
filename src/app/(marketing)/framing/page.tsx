@@ -194,8 +194,7 @@ export default function FramingPage() {
         <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <span className="section-label !mb-0">The Working Set</span>
           <h2 className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
-            Engineered, then{" "}
-            <em className="font-normal italic text-gold-display">self-performed.</em>
+            Engineered, then self-performed.
           </h2>
           <p className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light">
             Steel studs at 16 inches on center, shear panels screwed to

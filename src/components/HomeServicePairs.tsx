@@ -73,10 +73,7 @@ export function FullScopeSection() {
           viewport={REVEAL_VIEWPORT}
           className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,4.4vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-charcoal"
         >
-          One contractor for{" "}
-          <em className="font-normal italic text-gold-display">
-            the whole scope.
-          </em>
+          One contractor for the whole scope.
         </motion.h2>
         <motion.p
           variants={variants}
@@ -191,8 +188,7 @@ export function FramingPairSection() {
           viewport={REVEAL_VIEWPORT}
           className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,4.4vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white"
         >
-          Engineered, then{" "}
-          <em className="font-normal italic text-gold">self-performed.</em>
+          Engineered, then self-performed.
         </motion.h2>
         <motion.p
           variants={variants}

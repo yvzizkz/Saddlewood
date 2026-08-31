@@ -95,8 +95,7 @@ export default function PortfolioPage() {
           <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
             <span className="section-label !mb-0">The Estate</span>
             <h2 className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,4.2vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
-              One build, told in{" "}
-              <em className="font-normal italic text-gold">three chapters.</em>
+              One build, told in three chapters.
             </h2>
             <p className="mt-6 max-w-[58ch] text-[15.5px] leading-[1.8] text-off-white/70">
               A ground-up estate in Paradise Valley, still on the boards as we
@@ -172,10 +171,7 @@ export default function PortfolioPage() {
         <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <span className="section-label !mb-0">Scottsdale Remodels</span>
           <h2 className="mt-6 max-w-[26ch] text-balance font-heading text-[clamp(32px,4.2vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-charcoal">
-            Three homes,{" "}
-            <em className="font-normal italic text-gold-display">
-              carried in-house.
-            </em>
+            Three homes, carried in-house.
           </h2>
           <p className="mt-6 max-w-[58ch] text-[15.5px] leading-[1.8] text-charcoal-light">
             Kitchen, bath, and whole-home work across McCormick Ranch,

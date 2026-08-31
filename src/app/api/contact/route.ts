@@ -54,6 +54,8 @@ interface ContactBody {
   phone?: string;
   neighborhood?: string;
   projectType?: string;
+  budget?: string;
+  timeline?: string;
   message?: string;
   source?: string;
   tags?: string[];
@@ -77,6 +79,8 @@ function buildHtml(b: ContactBody) {
       { label: "Phone", value: b.phone, href: phoneHref },
       { label: "Neighborhood", value: b.neighborhood },
       { label: "Project type", value: b.projectType },
+      { label: "Budget", value: b.budget },
+      { label: "Target start", value: b.timeline },
     ],
     noteLabel: "Their message",
     noteText: b.message,
@@ -131,6 +135,8 @@ async function forwardToGhlWebhook(body: ContactBody): Promise<boolean> {
         phone: body.phone,
         neighborhood: body.neighborhood,
         projectType: body.projectType,
+        budget: body.budget,
+        timeline: body.timeline,
         message: body.message,
         source: body.source,
         tags: body.tags,

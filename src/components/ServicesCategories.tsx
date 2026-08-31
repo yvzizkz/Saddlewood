@@ -70,8 +70,7 @@ export function ServicesCategories({ categories }: ServicesCategoriesProps) {
         >
           <span className="section-label !mb-0">What We Build</span>
           <h2 className="mt-6 font-heading text-[clamp(34px,4.2vw,56px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
-            Four scopes. One{" "}
-            <em className="font-normal italic text-gold">in-house</em> team.
+            Four scopes. One in-house team.
           </h2>
         </motion.div>
 

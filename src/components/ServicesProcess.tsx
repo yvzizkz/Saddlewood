@@ -64,8 +64,7 @@ export function ServicesProcess({ phases, closing }: ServicesProcessProps) {
         >
           <span className="section-label !mb-0">From Demo to Finish</span>
           <h2 className="mt-6 font-heading text-[clamp(34px,4.2vw,56px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
-            One project. Every trade.{" "}
-            <em className="font-normal italic text-gold">Start to finish.</em>
+            One project. Every trade. Start to finish.
           </h2>
           <p className="mt-5 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
             A Paradise Valley whole-home build, from the day we broke ground to

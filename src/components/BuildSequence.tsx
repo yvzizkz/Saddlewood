@@ -76,10 +76,7 @@ export function BuildSequence() {
           viewport={REVEAL_VIEWPORT}
           className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,4.4vw,54px)] font-medium leading-[1.12] tracking-[-0.02em] text-charcoal"
         >
-          Chalked on the slab. Then{" "}
-          <em className="font-normal italic text-gold-display">
-            built to the line.
-          </em>
+          Chalked on the slab. Then built to the line.
         </motion.h2>
         <motion.p
           variants={variants}

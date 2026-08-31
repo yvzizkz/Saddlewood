@@ -179,10 +179,7 @@ export default function NewConstructionPage() {
           <div className="max-w-[640px]">
             <span className="section-label !mb-0">In-House Trades</span>
             <h2 className="mt-5 font-heading text-[clamp(32px,3.8vw,48px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
-              Four ROC licenses.{" "}
-              <em className="font-normal italic text-gold-display">
-                No outside subs.
-              </em>
+              Four ROC licenses, held in-house.
             </h2>
             <p className="mt-6 max-w-[520px] text-[15.5px] leading-[1.8] text-charcoal-light">
               We pull our own permits. We employ our own electricians, plumbers,

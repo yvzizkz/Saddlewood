@@ -18,7 +18,6 @@ import {
   FigureGroup,
   FigurePath,
   Stroke,
-  StrokeCircle,
 } from "./AnimatedLinework";
 
 export interface GarageElevationProps {
@@ -92,14 +91,6 @@ export function GarageElevation({ className, glow = false, delay = 0 }: GarageEl
       <Stroke d="M312 270 V156 H382 V270 M347 156 V270 M312 213 H382" tone="gold" width={0.8} opacity={0.95} />
       <Stroke d="M398 270 V178 H442 V270 M420 178 V270" tone="gold" width={0.8} opacity={0.95} />
       <Stroke d="M352 108 V100 H392 V108" tone="gold" width={0.8} opacity={0.95} />
-
-      {/* Figure at the entry */}
-      <StrokeCircle cx={430} cy={231} r={4.5} tone="cream" width={1.2} />
-      <Stroke
-        d="M430 235.5 V254 M430 240 L423 248 M430 240 L437 247 M430 254 L424 270 M430 254 L436 270"
-        tone="cream"
-        width={1.2}
-      />
 
       {/* Garage volume */}
       <Stroke d="M470 162 V270 M870 162 V270" {...HEAVY} />

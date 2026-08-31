@@ -87,16 +87,6 @@ export function ShearWallSheet({ className, glow = false }: ShearWallSheetProps)
       <StrokeRect x={292} y={73} width={208} height={243} tone="cream" strokeW={1.8} />
       <Stroke d="M292 194 H500" tone="gold" width={0.7} opacity={0.95} />
 
-      {/* Crew figure setting the panel */}
-      <StrokeCircle cx={533} cy={234} r={6} tone="cream" width={1.3} />
-      <Stroke d="M527 231 A7 7 0 0 1 539 231" tone="cream" width={1.3} />
-      <Stroke
-        d="M533 240 V276 M533 248 L518 254 M533 250 L544 262 M533 276 L525 316 M533 276 L541 316"
-        tone="cream"
-        width={1.3}
-      />
-      <Stroke d="M512 252 L518 254" tone="cream" width={2} />
-
       {/* Dims + labels: brass, after the linework */}
       <FigurePath d="M136 56 V38 M264 56 V38 M136 44 H264" tone="gold" width={0.7} />
       <FigurePath d="M132 48 L140 40 M260 48 L268 40" tone="gold" width={0.7} />

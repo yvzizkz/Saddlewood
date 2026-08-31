@@ -89,14 +89,6 @@ export function KitchenSheet({ className, glow = false }: KitchenSheetProps) {
       <Stroke d="M268 60 V80" tone="gold" width={0.9} opacity={0.95} />
       <StrokeCircle cx={268} cy={92} r={12} tone="cream" width={1.6} />
 
-      {/* Scale figure */}
-      <StrokeCircle cx={410} cy={216} r={7} tone="cream" width={1.3} />
-      <Stroke
-        d="M410 223 V258 M410 232 L396 246 M410 232 L424 244 M410 258 L399 290 M410 258 L421 290"
-        tone="cream"
-        width={1.3}
-      />
-
       {/* Plant sprig */}
       <Stroke
         d="M470 290 C468 272 476 262 472 250 M472 262 C480 258 484 250 483 244 M471 270 C464 266 460 258 461 252"

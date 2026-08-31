@@ -72,10 +72,7 @@ export function LicenseLedger() {
           >
             <span className="section-label !mb-0">Licensed In-House</span>
             <h2 className="mt-5 max-w-[21ch] font-heading text-[clamp(30px,3.6vw,46px)] font-medium leading-[1.14] tracking-[-0.02em] text-off-white">
-              Four licenses.{" "}
-              <em className="font-normal italic text-gold">
-                Residential and commercial.
-              </em>
+              Four licenses. Residential and commercial.
             </h2>
           </motion.div>
           <motion.p

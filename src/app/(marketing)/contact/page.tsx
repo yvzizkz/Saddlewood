@@ -19,11 +19,20 @@ export default function ContactPage() {
         minHeightClass="min-h-[62svh]"
       />
 
-      {/* Subcontractor / vendor prompt → bid-list page */}
+      {/* The form paints its own cream section; night-on-cream restores the
+          accessible-gold section label on the light ground. */}
+      <div className="night-on-cream">
+        <ContactForm />
+      </div>
+
+      {/* Trade / vendor prompt → bid-list page. Below the form on purpose
+          (blind-review finding): a homeowner mid-inquiry never sees a
+          detour before the form, and a sub scanning the page still finds
+          their door on the way out. */}
       <div className="border-y border-gold/[0.22]">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-center gap-x-3 gap-y-1 px-5 py-4 text-center sm:px-8">
           <span className="text-sm text-off-white/70">
-            Are you a subcontractor or vendor?
+            Are you a trade partner or vendor?
           </span>
           <Link
             href="/trade-partners"
@@ -32,12 +41,6 @@ export default function ContactPage() {
             Get on our bid list →
           </Link>
         </div>
-      </div>
-
-      {/* The form paints its own cream section; night-on-cream restores the
-          accessible-gold section label on the light ground. */}
-      <div className="night-on-cream">
-        <ContactForm />
       </div>
     </>
   );

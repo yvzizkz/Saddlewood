@@ -37,7 +37,7 @@ const credentials = [
   {
     title: "Electrical License",
     detail: "ROC #350715",
-    description: "Licensed electricians on every project. No outside subs needed.",
+    description: "Licensed electricians on every project, on our own payroll.",
   },
   {
     title: "Plumbing License",
@@ -110,8 +110,7 @@ export default function AboutContent() {
               >
                 <span className="section-label !mb-0">Heritage</span>
                 <h2 className="mt-5 max-w-[11em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
-                  Where Craftsmanship Meets{" "}
-                  <em className="font-normal italic text-gold-display">Character</em>
+                  Where Craftsmanship Meets Character
                 </h2>
               </motion.div>
               <motion.div
@@ -194,8 +193,7 @@ export default function AboutContent() {
           >
             <span className="section-label !mb-0">Credentials</span>
             <h2 className="mt-6 font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
-              Licensed, Bonded &amp;{" "}
-              <em className="font-normal italic text-gold">Insured</em>
+              Licensed, Bonded &amp; Insured
             </h2>
           </motion.div>
 
@@ -261,8 +259,7 @@ export default function AboutContent() {
               >
                 <span className="section-label !mb-0">From the Crew</span>
                 <h2 className="mt-6 max-w-[14em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
-                  Hear it from the people who{" "}
-                  <em className="font-normal italic text-gold-display">build</em> it.
+                  Hear it from the people who build it.
                 </h2>
               </motion.div>
               <motion.p
@@ -327,8 +324,7 @@ export default function AboutContent() {
           >
             <span className="section-label !mb-0">Service Area</span>
             <h2 className="mt-6 font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
-              Proudly Serving{" "}
-              <em className="font-normal italic text-gold">Scottsdale</em>
+              Proudly Serving Scottsdale
             </h2>
             <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/[0.68]">
               Our hyper-local focus means deeper expertise and stronger
