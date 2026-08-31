@@ -10,12 +10,18 @@ import Image from "next/image";
 import { SurveyHorizon } from "@/components/linework";
 import { ProcoreBadge } from "./ProcoreBadge";
 
+// Each license links to the AZROC contractor search (blind-review quick
+// win: a number a visitor can verify in one click is proof; a bare number
+// is just an assertion). The registry is a Lightning app that ignores
+// query params, so all four link to the search page itself.
 const licenses = [
   { trade: "General", roc: "ROC #305762" },
   { trade: "Electrical", roc: "ROC #350715" },
   { trade: "HVAC", roc: "ROC #350714" },
   { trade: "Plumbing", roc: "ROC #350716" },
 ];
+
+const azrocSearch = "https://azroc.my.site.com/AZRoc/s/contractor-search";
 
 const hoods = [
   { name: "Paradise Valley", slug: "paradise-valley" },
@@ -106,7 +112,16 @@ export function Footer() {
             <ul className="m-0 list-none space-y-2.5 p-0">
               {licenses.map((l) => (
                 <li key={l.roc} className="text-[13px] text-off-white/[0.62]">
-                  {l.trade} · <span className="tabular-nums">{l.roc}</span>
+                  {l.trade} ·{" "}
+                  <a
+                    href={azrocSearch}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tabular-nums text-off-white/[0.62] underline decoration-off-white/25 underline-offset-2 transition-colors hover:text-gold"
+                    title="Verify on the Arizona Registrar of Contractors"
+                  >
+                    {l.roc}
+                  </a>
                 </li>
               ))}
               <li className="pt-1 text-[11px] uppercase tracking-[0.14em] text-off-white/50">

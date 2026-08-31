@@ -36,38 +36,39 @@ const siteNotes = [
   "Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection.",
 ];
 
-// The completed Paradise Valley wood-framed build, phase by phase. Titles
-// and captions carried over from the previous proof gallery.
+// The completed Paradise Valley wood-framed build, phase by phase, in
+// build order. (Blind-review catch: the old carry-over list had
+// "Demolition & Prep" as step 06, after the trusses.)
 const woodPhases = [
   {
     number: "01",
+    title: "Demolition & Prep",
+    caption: "Clean site clearing before structural building begins.",
+  },
+  {
+    number: "02",
     title: "Foundation & Slab",
     caption: "Precision concrete work forming the structural footprint.",
   },
   {
-    number: "02",
+    number: "03",
     title: "Exterior Framing",
     caption: "Heavier structural members and wall plates erected on slab.",
   },
   {
-    number: "03",
+    number: "04",
     title: "Interior Framing",
     caption: "Room configurations and load-bearing partition walls.",
   },
   {
-    number: "04",
+    number: "05",
     title: "Roof Trusses",
     caption: "Complex engineered truss layout securing the roofline.",
   },
   {
-    number: "05",
-    title: "In-House Crew",
-    caption: "Our dedicated framing carpenters on-site.",
-  },
-  {
     number: "06",
-    title: "Demolition & Prep",
-    caption: "Clean site clearing before structural building begins.",
+    title: "Structural Closeout",
+    caption: "Holdowns, straps, and truss hardware verified before inspection.",
   },
 ];
 
