@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
+import { EngagementPlanner } from "@/components/EngagementPlanner";
 import { BrandPlateHero } from "@/components/BrandPlateHero";
 
 export const metadata = {
@@ -19,7 +20,12 @@ export default function ContactPage() {
         minHeightClass="min-h-[62svh]"
       />
 
-      {/* The form paints its own cream section; night-on-cream restores the
+      {/* The planner is the primary door: three answers, a tailored path
+          through the engagement model, and the lead form inline. */}
+      <EngagementPlanner />
+
+      {/* The classic form stays for anyone who'd rather just write to us.
+          It paints its own cream section; night-on-cream restores the
           accessible-gold section label on the light ground. */}
       <div className="night-on-cream">
         <ContactForm />

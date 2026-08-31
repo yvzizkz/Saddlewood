@@ -56,6 +56,16 @@ interface ContactBody {
   projectType?: string;
   budget?: string;
   timeline?: string;
+  /** Engagement-planner fields. `role` distinguishes the lead lane:
+      "homeowner" (default) or "builder" (GC bid request). */
+  role?: string;
+  plansStatus?: string;
+  /** Builder lane: requested scopes, real company name, plan-set link. */
+  scopes?: string[];
+  businessName?: string;
+  plansLink?: string;
+  bidDue?: string;
+  projectLocation?: string;
   message?: string;
   source?: string;
   tags?: string[];
@@ -81,6 +91,12 @@ function buildHtml(b: ContactBody) {
       { label: "Project type", value: b.projectType },
       { label: "Budget", value: b.budget },
       { label: "Target start", value: b.timeline },
+      { label: "Company", value: b.businessName },
+      { label: "Scopes", value: b.scopes?.join(", ") },
+      { label: "Plans", value: b.plansStatus },
+      { label: "Plan set", value: b.plansLink, href: b.plansLink },
+      { label: "Bid due", value: b.bidDue },
+      { label: "Location", value: b.projectLocation },
     ],
     noteLabel: "Their message",
     noteText: b.message,
@@ -103,7 +119,10 @@ async function sendEmail(body: ContactBody): Promise<boolean> {
       from: FROM,
       to: TO,
       replyTo: body.email,
-      subject: `New lead — ${body.name ?? "Unknown"} · ${body.projectType ?? "General"}`,
+      subject:
+        body.role === "builder"
+          ? `Builder bid request — ${body.businessName || body.name || "Unknown"}${body.bidDue ? ` · due ${body.bidDue}` : ""}`
+          : `New lead — ${body.name ?? "Unknown"} · ${body.projectType ?? "General"}`,
       html: buildHtml(body),
     });
     if (error) {
