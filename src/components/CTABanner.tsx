@@ -1,78 +1,158 @@
 "use client";
 
+/**
+ * Closing CTA band — teal ground with gold hairlines and a soft radial
+ * gold glow, distinct from the teal-dark page ground.
+ *
+ * The homeowner variant carries a generated interior study behind the copy
+ * (owner directive, 2026-08-30: generated imagery is approved for CTA
+ * embellishment, for illustrating a concept, and for standing in where a
+ * client would rather their own project not be shown). It sits at low
+ * opacity under a heavy scrim: it sets mood, and it makes no claim about a
+ * particular job, which is why it carries no "filmed on site" caption.
+ */
+
+import Image from "next/image";
 import { motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import Link from "next/link";
 import { Phone } from "lucide-react";
+import { track } from "@/lib/analytics";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 type CTAVariant = "homeowner" | "builders";
+
+function CTAShell({
+  children,
+  backdrop,
+}: {
+  children: React.ReactNode;
+  /** Decorative image behind the copy. Never captioned, never a claim. */
+  backdrop?: string;
+}) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  return (
+    <section
+      className="relative overflow-hidden border-y border-gold/[0.22] bg-teal px-5 py-[clamp(88px,11vh,140px)] text-center sm:px-8"
+      aria-label="Call to action"
+    >
+      {backdrop ? (
+        <div className="absolute inset-0" aria-hidden="true">
+          <Image
+            src={backdrop}
+            alt=""
+            fill
+            sizes="100vw"
+            className="scale-[1.04] object-cover object-[50%_58%]"
+          />
+          {/* Scrim: hold the teal ground so the headline keeps AA contrast
+              and the image reads as atmosphere rather than as content. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(13,21,21,0.92), rgba(13,21,21,0.78) 45%, rgba(13,21,21,0.94))",
+            }}
+          />
+        </div>
+      ) : null}
+      <div
+        className="pointer-events-none absolute inset-0"
+        aria-hidden="true"
+        style={{
+          background:
+            "radial-gradient(ellipse 55% 70% at 50% 50%, rgba(212,175,55,0.15), transparent 70%)",
+        }}
+      />
+      <motion.div
+        className="relative"
+        initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={REVEAL_VIEWPORT}
+        transition={{ duration: 1, ease: EASE }}
+      >
+        {children}
+      </motion.div>
+    </section>
+  );
+}
+
+const goldBtn =
+  "inline-block rounded-[2px] bg-gradient-to-r from-gold to-[#c49a2a] px-[36px] py-[16px] text-[12px] font-semibold uppercase tracking-[0.12em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:from-[#e2bc48] hover:to-[#d4aa3b] hover:shadow-[0_10px_34px_rgba(212,175,55,0.38)]";
+
+const lineBtn =
+  "inline-flex items-center gap-2 rounded-[2px] border border-off-white/25 px-[26px] py-[14px] text-[12px] font-medium uppercase tracking-[0.08em] text-off-white/80 no-underline transition-colors hover:border-gold hover:text-gold";
 
 /** variant="builders": the framing/trade-partners audience is a GC deciding whether
  *  to shortlist a sub — "transform your home" was the wrong close for that page. */
 export function CTABanner({ variant = "homeowner" }: { variant?: CTAVariant } = {}) {
   if (variant === "builders") {
     return (
-      <section className="bg-teal-dark py-12 sm:py-14 lg:py-16 px-4 sm:px-6 lg:px-12 text-center" aria-label="Call to action">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-        >
-          <h2 className="font-heading text-3xl lg:text-5xl text-white font-medium mb-5 leading-[1.15] tracking-[-0.02em]">
-            Have a project<br />
-            to <em className="italic text-gold font-normal">bid?</em>
-          </h2>
-          <p className="text-[15px] text-white/60 max-w-[480px] mx-auto font-light leading-relaxed mb-10">
-            Send us your plans — we&apos;ll review the scope and come back with a real number, fast. Self-performed crew, ROC licensed, built to your schedule.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center">
-            <a
-              href="mailto:info@saddlewoodcontracting.com?subject=Plans%20for%20bid"
-              className="inline-block px-8 py-3.5 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase no-underline hover:bg-[#d4a94c] transition-all hover:-translate-y-px"
-            >
-              Send Us Your Plans
-            </a>
-            <a
-              href="tel:4809996100"
-              className="inline-flex items-center gap-2 px-8 py-3.5 border border-white/20 text-white/70 text-[12px] font-medium tracking-[0.08em] uppercase no-underline hover:border-gold hover:text-gold transition-all"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              (480) 999-6100
-            </a>
-          </div>
-        </motion.div>
-      </section>
-    );
-  }
-  return (
-    <section className="bg-teal-dark py-12 sm:py-14 lg:py-16 px-4 sm:px-6 lg:px-12 text-center" aria-label="Call to action">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-      >
-        <h2 className="font-heading text-3xl lg:text-5xl text-white font-medium mb-5 leading-[1.15] tracking-[-0.02em]">
-          Ready to transform<br />
-          your <em className="italic text-gold font-normal">home?</em>
+      <CTAShell>
+        <h2 className="font-heading text-[clamp(38px,5vw,64px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
+          Have a project
+          <br />
+          to <em className="font-normal italic text-gold">bid?</em>
         </h2>
-        <p className="text-[15px] text-white/60 max-w-[480px] mx-auto font-light leading-relaxed mb-10">
-          Start with a free, no-obligation design consultation. We&apos;ll walk your space, discuss your vision, and provide a detailed estimate.
+        <p className="mx-auto mt-6 max-w-[480px] text-[15px] leading-[1.8] text-off-white/[0.68]">
+          Send us your plans. We&apos;ll review the scope and come back with a
+          real number, fast. Self-performed crew, ROC licensed, built to your
+          schedule.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center">
+        <div className="mt-11 flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/contact"
-            className="inline-block px-8 py-3.5 bg-gold text-teal-dark text-[12px] font-semibold tracking-[0.1em] uppercase no-underline hover:bg-[#d4a94c] transition-all hover:-translate-y-px"
+            onClick={() =>
+              track("cta_click", { cta: "send_plans_builder", location: "cta_banner" })
+            }
+            className={goldBtn}
           >
-            Schedule Consultation
+            Send Us Your Plans
           </Link>
           <a
             href="tel:4809996100"
-            className="inline-flex items-center gap-2 px-8 py-3.5 border border-white/20 text-white/70 text-[12px] font-medium tracking-[0.08em] uppercase no-underline hover:border-gold hover:text-gold transition-all"
+            onClick={() => track("phone_tap", { location: "cta_banner_builder" })}
+            className={lineBtn}
           >
-            <Phone className="w-3.5 h-3.5" />
+            <Phone className="h-3.5 w-3.5" aria-hidden="true" />
             (480) 999-6100
           </a>
         </div>
-      </motion.div>
-    </section>
+      </CTAShell>
+    );
+  }
+  return (
+    <CTAShell backdrop="/images/study-terrace-luxury.jpg">
+      <h2 className="font-heading text-[clamp(38px,5vw,64px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
+        Ready to transform
+        <br />
+        your <em className="font-normal italic text-gold">home?</em>
+      </h2>
+      <p className="mx-auto mt-6 max-w-[480px] text-[15px] leading-[1.8] text-off-white/[0.68]">
+        Start with a free, no-obligation design consultation. We&apos;ll walk
+        your space, discuss your vision, and provide a detailed estimate.
+      </p>
+      <div className="mt-11 flex flex-wrap items-center justify-center gap-4">
+        <Link
+          href="/contact"
+          onClick={() =>
+            track("cta_click", { cta: "schedule_consultation", location: "cta_banner" })
+          }
+          className={goldBtn}
+        >
+          Schedule Consultation
+        </Link>
+        <a
+          href="tel:4809996100"
+          onClick={() => track("phone_tap", { location: "cta_banner_homeowner" })}
+          className={lineBtn}
+        >
+          <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+          (480) 999-6100
+        </a>
+      </div>
+    </CTAShell>
   );
 }

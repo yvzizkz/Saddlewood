@@ -1,10 +1,21 @@
 import type { MetadataRoute } from "next";
+import { getAllCaseStudySlugs } from "@/data/case-studies";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl =
     process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
+  const caseStudyEntries: MetadataRoute.Sitemap = getAllCaseStudySlugs().map(
+    (slug) => ({
+      url: `${baseUrl}/portfolio/${slug}`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    })
+  );
+
   return [
+    ...caseStudyEntries,
     {
       url: baseUrl,
       lastModified: new Date(),

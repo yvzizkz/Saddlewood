@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 const navLinks = [
   { label: "Work", href: "/portfolio" },
@@ -240,31 +241,37 @@ export function Navbar() {
       <nav
         role="navigation"
         aria-label="Main navigation"
-        className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-10 transition-all duration-400 ${
+        className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-10 transition-all duration-500 ${
           scrolled
-            ? "h-[80px] bg-[rgba(26,47,47,0.97)] backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.06)]"
-            : "h-[88px] bg-gradient-to-b from-[rgba(26,47,47,0.85)] via-[rgba(26,47,47,0.5)] to-transparent"
+            ? "h-[76px] bg-[rgba(13,21,21,0.88)] backdrop-blur-[16px] shadow-[0_1px_0_rgba(212,175,55,0.18)]"
+            : "h-[88px] bg-gradient-to-b from-teal-dark/[0.9] via-teal-dark/45 to-transparent"
         }`}
       >
-        {/* Brand with Logo */}
-        <Link href="/" className="flex items-center gap-3 no-underline shrink-0" aria-label="Saddlewood Contracting — home">
-          <div className="relative w-[60px] h-[60px] sm:w-[68px] sm:h-[68px] shrink-0">
-            <Image
-              src="/images/logo.png"
-              alt="Saddlewood Contracting LLC"
-              fill
-              sizes="80px"
-              className="object-contain"
-              priority
-            />
-          </div>
-          <span className="hidden sm:block text-white text-[15px] font-heading tracking-[0.04em] leading-tight uppercase">
-            Saddlewood<br />Contracting
+        {/* SC roundel + wordmark — cream Fraunces over gold small-caps */}
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-3 no-underline leading-none"
+        >
+          <Image
+            src="/images/logo-roundel.png"
+            alt=""
+            width={42}
+            height={42}
+            priority
+            className="h-[42px] w-[42px] shrink-0 object-contain"
+          />
+          <span>
+            <span className="block font-heading text-[21px] font-medium tracking-[0.02em] text-off-white">
+              Saddlewood
+            </span>
+            <span className="mt-1 block text-[9px] font-medium uppercase tracking-[0.34em] text-gold">
+              Contracting · Scottsdale
+            </span>
           </span>
         </Link>
 
         {/* Desktop Nav Links */}
-        <div className="hidden lg:flex items-center gap-5 xl:gap-8">
+        <div className="hidden lg:flex items-center gap-6 xl:gap-8">
           {navLinks.map((link) =>
             link.children ? (
               <div
@@ -277,7 +284,7 @@ export function Navbar() {
                 }}
               >
                 <button
-                  className="flex items-center gap-1.5 text-[15px] xl:text-base font-normal text-white/80 hover:text-white transition-colors tracking-wide bg-transparent border-none cursor-pointer"
+                  className="flex cursor-pointer items-center gap-1.5 border-none bg-transparent text-[11px] font-medium uppercase tracking-[0.18em] text-off-white/[0.66] transition-colors hover:text-gold"
                   aria-expanded={!!menuOpenStates[link.label]}
                   aria-haspopup="true"
                   onKeyDown={(e) => handleDropdownKeyDown(e, link.label)}
@@ -290,7 +297,7 @@ export function Navbar() {
                   }}
                 >
                   {link.label}
-                  <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                  <ChevronDown className="w-3 h-3" aria-hidden="true" />
                 </button>
                 <AnimatePresence>
                   {!!menuOpenStates[link.label] && (
@@ -299,7 +306,7 @@ export function Navbar() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 4 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute top-full left-0 mt-2 min-w-[220px] bg-[rgba(26,47,47,0.95)] backdrop-blur-xl border border-white/[0.06] py-2 rounded-sm"
+                      className="absolute top-full left-0 mt-3 min-w-[220px] rounded-[2px] border border-gold/[0.25] bg-[rgba(13,21,21,0.96)] py-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl"
                       role="menu"
                       aria-label={`${link.label} submenu`}
                     >
@@ -313,8 +320,8 @@ export function Navbar() {
                             }
                             menuItemsRefs.current[link.label][idx] = el;
                           }}
-                          className={`block px-5 py-3 text-[15px] text-white/70 hover:text-gold hover:bg-white/[0.03] transition-colors no-underline ${
-                            idx === (menuActiveIndices[link.label] ?? -1) ? "text-gold bg-white/[0.03]" : ""
+                          className={`block px-5 py-2.5 text-[13px] text-off-white/70 no-underline transition-colors hover:bg-off-white/[0.03] hover:text-gold ${
+                            idx === (menuActiveIndices[link.label] ?? -1) ? "text-gold bg-off-white/[0.03]" : ""
                           }`}
                           role="menuitem"
                           tabIndex={-1}
@@ -336,7 +343,7 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-[15px] xl:text-base font-normal text-white/80 hover:text-white transition-colors tracking-wide no-underline"
+                className="text-[11px] font-medium uppercase tracking-[0.18em] text-off-white/[0.66] no-underline transition-colors hover:text-gold"
               >
                 {link.label}
               </Link>
@@ -344,18 +351,28 @@ export function Navbar() {
           )}
         </div>
 
-        {/* CTA + Mobile Toggle */}
-        <div className="flex items-center gap-4">
+        {/* Phone + CTA + Mobile Toggle */}
+        <div className="flex items-center gap-5">
+          <a
+            href="tel:4809996100"
+            onClick={() => track("phone_tap", { location: "navbar" })}
+            className="hidden xl:inline-block text-[12px] tracking-[0.06em] text-gold no-underline transition-colors hover:text-[#d4a94c]"
+          >
+            (480) 999-6100
+          </a>
           <Link
             href="/contact"
-            className="hidden lg:inline-block text-[13px] font-medium tracking-[0.08em] uppercase text-teal-dark bg-gold px-6 py-3 hover:bg-gold-muted transition-colors no-underline"
+            onClick={() =>
+              track("cta_click", { cta: "book_consultation", location: "navbar" })
+            }
+            className="hidden lg:inline-block rounded-[2px] bg-gradient-to-r from-gold to-[#c49a2a] px-[24px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.12em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:from-[#e2bc48] hover:to-[#d4aa3b] hover:shadow-[0_6px_20px_rgba(212,175,55,0.3)]"
           >
-            Book Consultation
+            Book Your Consultation
           </Link>
           <button
             ref={mobileToggleRef}
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden text-white bg-transparent border-none p-2 cursor-pointer"
+            className="lg:hidden cursor-pointer border-none bg-transparent p-2 text-off-white"
             aria-expanded={mobileOpen}
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
           >
@@ -372,17 +389,17 @@ export function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-[rgba(26,47,47,0.98)] pt-24 px-6 overflow-y-auto"
+            className="fixed inset-0 z-40 overflow-y-auto bg-[rgba(13,21,21,0.98)] px-6 pt-24 backdrop-blur-md"
             role="dialog"
             aria-modal="true"
             aria-label="Mobile navigation menu"
           >
-            <nav className="flex flex-col gap-1" aria-label="Mobile navigation">
+            <nav className="flex flex-col gap-1 pb-28" aria-label="Mobile navigation">
               {navLinks.map((link) =>
                 link.children ? (
                   <div key={link.label}>
-                    <div className="py-4 border-b border-white/[0.06]">
-                      <span className="text-xs tracking-[0.2em] uppercase text-gold/60 font-medium">
+                    <div className="border-b border-off-white/[0.08] py-4">
+                      <span className="text-[10.5px] font-medium uppercase tracking-[0.25em] text-gold">
                         {link.label}
                       </span>
                     </div>
@@ -391,7 +408,7 @@ export function Navbar() {
                         key={child.href}
                         href={child.href}
                         onClick={() => setMobileOpen(false)}
-                        className="block py-3.5 pl-4 text-lg text-white/70 hover:text-gold transition-colors no-underline"
+                        className="block py-3.5 pl-4 text-lg text-off-white/70 no-underline transition-colors hover:text-gold"
                       >
                         {child.label}
                       </Link>
@@ -402,7 +419,7 @@ export function Navbar() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileOpen(false)}
-                    className="block py-4 border-b border-white/[0.06] font-heading text-2xl text-white/80 hover:text-gold transition-colors no-underline"
+                    className="block border-b border-off-white/[0.08] py-4 font-heading text-2xl text-off-white/85 no-underline transition-colors hover:text-gold"
                   >
                     {link.label}
                   </Link>
@@ -410,14 +427,18 @@ export function Navbar() {
               )}
               <Link
                 href="/contact"
-                onClick={() => setMobileOpen(false)}
-                className="mt-8 block text-center text-sm font-medium tracking-[0.08em] uppercase text-teal-dark bg-gold px-6 py-4 no-underline"
+                onClick={() => {
+                  setMobileOpen(false);
+                  track("cta_click", { cta: "book_consultation", location: "mobile_menu" });
+                }}
+                className="mt-8 block rounded-[2px] bg-gradient-to-r from-gold to-[#c49a2a] px-6 py-4 text-center text-sm font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline transition-all hover:from-[#e2bc48] hover:to-[#d4aa3b]"
               >
-                Book Consultation
+                Book Your Consultation
               </Link>
               <a
                 href="tel:4809996100"
-                className="mt-3 block text-center text-base text-white/60 no-underline"
+                onClick={() => track("phone_tap", { location: "mobile_menu" })}
+                className="mt-4 block text-center text-base tracking-[0.06em] text-gold no-underline"
               >
                 (480) 999-6100
               </a>

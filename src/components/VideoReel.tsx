@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,11 @@ interface VideoReelProps {
   poster: string;         // e.g. "/videos/breaking-ground-steel-9x16-poster.jpg"
   label: string;          // aria-label / context, e.g. "framing on site in Paradise Valley"
   aspect: "9x16" | "16x9" | "1x1";
-  mode?: "autoloop" | "clickToPlay";  // default "autoloop"
+  /** "autoplay" runs one muted pass on first view, then rests with controls
+      (owner direction 2026-08-28 — reels play once, they don't churn). */
+  mode?: "autoplay" | "clickToPlay";  // default "autoplay"
+  /** Video preload hint. Above-the-fold reels (hero) pass "metadata". */
+  preload?: "none" | "metadata" | "auto";
   className?: string;
 }
 
@@ -25,15 +29,19 @@ export function VideoReel({
   poster,
   label,
   aspect,
-  mode = "autoloop",
+  mode = "autoplay",
+  preload = "none",
   className,
 }: VideoReelProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [hasClickedPlay, setHasClickedPlay] = useState(false);
+  const [hasEnded, setHasEnded] = useState(false);
+  // Read inside the observer callback, which closes over the first render.
+  const hasEndedRef = useRef(false);
 
   useEffect(() => {
-    if (mode !== "autoloop" || prefersReducedMotion) return;
+    if (mode !== "autoplay" || prefersReducedMotion) return;
 
     const video = videoRef.current;
     if (!video) return;
@@ -42,6 +50,9 @@ export function VideoReel({
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
+            // One pass only: once it has run, the reel rests on its
+            // closing frame and the controls take over.
+            if (hasEndedRef.current) return;
             video.play().catch((err) => {
               // Ignore play interruptions or aborts
               console.warn("Autoplay failed or interrupted:", err);
@@ -75,9 +86,15 @@ export function VideoReel({
     }
   };
 
+  const handleEnded = () => {
+    if (mode !== "autoplay") return;
+    hasEndedRef.current = true;
+    setHasEnded(true);
+  };
+
   // Determine if controls should be visible
   const showControls =
-    (mode === "autoloop" && prefersReducedMotion) ||
+    (mode === "autoplay" && (prefersReducedMotion || hasEnded)) ||
     (mode === "clickToPlay" && hasClickedPlay);
 
   // Determine if we should show the play button overlay
@@ -98,10 +115,11 @@ export function VideoReel({
         aria-label={label}
         className="w-full h-full object-cover"
         playsInline
-        muted={mode === "autoloop" && !prefersReducedMotion}
-        loop={mode === "autoloop"}
-        preload="none"
+        muted={mode === "autoplay" && !prefersReducedMotion}
+        loop={false}
+        preload={preload}
         controls={showControls}
+        onEnded={handleEnded}
       />
 
       {showPlayButton && (

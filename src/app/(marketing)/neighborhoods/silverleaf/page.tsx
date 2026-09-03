@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Silverleaf Remodeling | Saddlewood Contracting",
     description: "Discover how Saddlewood Contracting brings refined craftsmanship and comprehensive in-house expertise to luxury home remodels in Scottsdale's esteemed Silverleaf community.",
-    images: [{ url: data.heroImage, alt: "Silverleaf luxury remodel by Saddlewood Contracting" }],
   },
 };
 

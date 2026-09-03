@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { PageHero } from "@/components/PageHero";
 import { TradePartnersForm } from "@/components/TradePartnersForm";
+import { BrandPlateHero } from "@/components/BrandPlateHero";
+import { ShearWallSheet } from "@/components/linework";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
@@ -30,12 +31,7 @@ export const metadata: Metadata = {
     description:
       "Get on our bid list. We send plans and drawings to trade partners when new construction, framing, and remodel projects go out for bid across Scottsdale & Paradise Valley.",
     type: "website",
-    images: [
-      {
-        url: "/images/logo.png",
-        alt: "Saddlewood Contracting LLC",
-      },
-    ],
+    // No per-page image override — inherits the site OG image.
   },
 };
 
@@ -67,6 +63,24 @@ const webPageSchema = {
   },
 };
 
+const bidListSteps = [
+  {
+    n: "01",
+    t: "Apply below",
+    d: "Share your business, license, trades, and coverage area.",
+  },
+  {
+    n: "02",
+    t: "We review & file you",
+    d: "You're added to our bid list, organized by trade classification.",
+  },
+  {
+    n: "03",
+    t: "We send you plans",
+    d: "When a matching project goes out for bid, drawings land in your inbox.",
+  },
+];
+
 export default function TradePartnersPage() {
   return (
     <>
@@ -75,83 +89,90 @@ export default function TradePartnersPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
       />
 
-      <PageHero
-        label="Trade Partners"
+      {/* Hero — the brand plate the homepage animation lands on, so a sub
+          arriving from an emailed bid link sees the same mark. */}
+      <BrandPlateHero
+        eyebrow="Trade Partners"
         title="Work With Us"
         description="Saddlewood is always looking for reliable subcontractors and vendors. Get on our bid list and we'll send you plans when the right project comes up."
-        image="/images/pv-newbuild-steel-frame.jpg"
-        imageAlt="Saddlewood Contracting steel framing on a Paradise Valley new-construction site"
+        minHeightClass="min-h-[62svh]"
       />
 
-      {/* Intro */}
-      <section className="py-24 bg-off-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+      {/* Intro — cream interlude between the deep hero and the cream form:
+          off-white ground, teal drafting grid, charcoal type, the bid-list
+          plate as an off-white panel on stone hairlines. */}
+      <section
+        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
+        aria-label="Subcontractors and vendors"
+      >
+        <div className="night-cream-grid" aria-hidden="true" />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <div className="grid items-start gap-[clamp(44px,6vw,90px)] lg:grid-cols-2">
             <div>
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-px w-8 bg-gold" aria-hidden="true" />
-                <span className="section-label">Subcontractors &amp; Vendors</span>
-              </div>
-              <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-8 leading-tight">
+              <span className="section-label !mb-0">
+                Subcontractors &amp; Vendors
+              </span>
+              <h2 className="mt-5 max-w-[14em] font-heading text-[clamp(34px,4vw,56px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
                 Build With Scottsdale&apos;s In-House Contractor
               </h2>
-              <div className="space-y-6 text-charcoal-light font-light leading-relaxed">
-                <p>
-                  Saddlewood Contracting builds ground-up new construction, self-performs
-                  framing, and delivers luxury remodels across Scottsdale and Paradise
-                  Valley. As our pipeline grows, we partner with trusted subcontractors and
-                  suppliers who share our standard of craftsmanship.
-                </p>
-                <p>
-                  Add your company to our bid list and, when a project matching your trade
-                  goes out for bid, we&apos;ll email you the plans and architectural
-                  drawings directly — no chasing, no guesswork. Tell us what you
-                  self-perform below.
-                </p>
-              </div>
+              <p className="mt-7 max-w-[540px] text-[15.5px] leading-[1.8] text-charcoal-light">
+                Saddlewood Contracting builds ground-up new construction,
+                self-performs framing, and delivers luxury remodels across
+                Scottsdale and Paradise Valley. As our pipeline grows, we
+                partner with trusted subcontractors and suppliers who share our
+                standard of craftsmanship.
+              </p>
+              <p className="mt-5 max-w-[540px] text-[15.5px] leading-[1.8] text-charcoal-light">
+                Add your company to our bid list and, when a project matching
+                your trade goes out for bid, we&apos;ll email you the plans and
+                architectural drawings directly. No chasing, no guesswork. Tell
+                us what you self-perform below.
+              </p>
             </div>
 
-            <div className="bg-cream border border-charcoal-light p-8 lg:p-10">
-              <h3 className="font-heading text-2xl font-light text-charcoal mb-6">
-                How the bid list works
-              </h3>
-              <ol className="space-y-6 list-none p-0 m-0">
-                {[
-                  {
-                    n: "01",
-                    t: "Apply below",
-                    d: "Share your business, license, trades, and coverage area.",
-                  },
-                  {
-                    n: "02",
-                    t: "We review & file you",
-                    d: "You're added to our bid list, organized by trade classification.",
-                  },
-                  {
-                    n: "03",
-                    t: "We send you plans",
-                    d: "When a matching project goes out for bid, drawings land in your inbox.",
-                  },
-                ].map((step) => (
-                  <li key={step.n} className="flex gap-5">
-                    <span className="font-heading text-gold text-xl font-light shrink-0">
-                      {step.n}
-                    </span>
-                    <div>
-                      <p className="text-charcoal font-light">{step.t}</p>
-                      <p className="text-charcoal-light text-sm font-light leading-relaxed">
-                        {step.d}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
+            <div>
+              <div className="rounded-[2px] border border-stone-mid bg-off-white p-8 lg:p-10">
+                <h3 className="font-heading text-[clamp(22px,2.2vw,26px)] font-medium leading-[1.25] text-charcoal">
+                  How the bid list works
+                </h3>
+                <ol className="m-0 mt-7 list-none space-y-6 p-0">
+                  {bidListSteps.map((step) => (
+                    <li key={step.n} className="flex gap-5">
+                      <span className="shrink-0 font-heading text-[20px] font-medium text-gold-accessible">
+                        {step.n}
+                      </span>
+                      <div>
+                        <p className="text-[15px] font-medium text-charcoal">
+                          {step.t}
+                        </p>
+                        <p className="mt-1 text-[13.5px] leading-[1.7] text-charcoal-light">
+                          {step.d}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {/* Quiet sheet fragment from the structural set */}
+              <figure className="m-0 mt-10 max-w-[360px]" aria-hidden="true">
+                <div className="linework-ink">
+                  <ShearWallSheet className="block h-auto w-full" />
+                </div>
+                <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-charcoal/[0.65]">
+                  Perforated shear wall detail · S-series
+                </figcaption>
+              </figure>
             </div>
           </div>
         </div>
       </section>
 
-      <TradePartnersForm />
+      {/* The form paints its own cream section; night-on-cream restores the
+          accessible-gold section label on the light ground. */}
+      <div className="night-on-cream">
+        <TradePartnersForm />
+      </div>
     </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import { Phone, Mail, MapPin, Clock, Loader2 } from "lucide-react";
 
 export function ContactForm() {
@@ -11,6 +12,8 @@ export function ContactForm() {
     phone: "",
     neighborhood: "",
     projectType: "",
+    budget: "",
+    timeline: "",
     message: "",
     consent: false,
     // Honeypot — must stay empty. A bot that fills this is dropped server-side.
@@ -33,10 +36,12 @@ export function ContactForm() {
       // Custom fields (mapped in GHL workflow)
       neighborhood: formData.neighborhood,
       projectType: formData.projectType,
+      budget: formData.budget,
+      timeline: formData.timeline,
       message: formData.message,
       // Source tracking
       source: "Website Contact Form",
-      tags: ["website-lead", formData.projectType, formData.neighborhood].filter(Boolean),
+      tags: ["website-lead", formData.projectType, formData.neighborhood, formData.budget].filter(Boolean),
       // Honeypot — bots fill this; humans never see it.
       company: formData.company,
     };
@@ -63,6 +68,8 @@ export function ContactForm() {
         phone: "",
         neighborhood: "",
         projectType: "",
+        budget: "",
+        timeline: "",
         message: "",
         consent: false,
         company: "",
@@ -80,14 +87,11 @@ export function ContactForm() {
           {/* Form */}
           <div className="lg:col-span-3">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0.12, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={REVEAL_VIEWPORT}
             >
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-px w-8 bg-gold" aria-hidden="true" />
-                <span className="section-label">Contact</span>
-              </div>
+              <span className="section-label !mb-6">Contact</span>
               <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-light text-charcoal mb-4 leading-tight">
                 Start Your Project
               </h2>
@@ -239,6 +243,54 @@ export function ContactForm() {
                     </select>
                   </div>
 
+                  {/* Qualification row — blind-review finding: a $2M lead and a
+                      faucet swap looked identical. Budget is required; timeline
+                      optional. Ranges start where the company's work starts. */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="contact-budget" className="block text-sm text-charcoal-light font-light mb-3">
+                        Anticipated Investment
+                      </label>
+                      <select
+                        id="contact-budget"
+                        required
+                        value={formData.budget}
+                        onChange={(e) =>
+                          setFormData({ ...formData, budget: e.target.value })
+                        }
+                        className="w-full px-4 py-3 border border-charcoal-light bg-white text-charcoal focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all font-light"
+                      >
+                        <option value="">Select a range</option>
+                        <option value="Under $100k">Under $100k</option>
+                        <option value="$100k - $250k">$100k &ndash; $250k</option>
+                        <option value="$250k - $500k">$250k &ndash; $500k</option>
+                        <option value="$500k - $1M">$500k &ndash; $1M</option>
+                        <option value="$1M+">$1M+</option>
+                        <option value="Not sure yet">Not sure yet</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="contact-timeline" className="block text-sm text-charcoal-light font-light mb-3">
+                        Target Start
+                      </label>
+                      <select
+                        id="contact-timeline"
+                        value={formData.timeline}
+                        onChange={(e) =>
+                          setFormData({ ...formData, timeline: e.target.value })
+                        }
+                        className="w-full px-4 py-3 border border-charcoal-light bg-white text-charcoal focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all font-light"
+                      >
+                        <option value="">Select a timeframe</option>
+                        <option value="As soon as possible">As soon as possible</option>
+                        <option value="1 - 3 months">1 &ndash; 3 months</option>
+                        <option value="3 - 6 months">3 &ndash; 6 months</option>
+                        <option value="6+ months">6+ months</option>
+                        <option value="Just planning">Just planning</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div>
                     <label htmlFor="contact-message" className="block text-sm text-charcoal-light font-light mb-3">
                       Tell Us About Your Project
@@ -251,7 +303,7 @@ export function ContactForm() {
                         setFormData({ ...formData, message: e.target.value })
                       }
                       className="w-full px-4 py-3 border border-charcoal-light bg-white text-charcoal focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all resize-none font-light"
-                      placeholder="Describe your vision, timeline, budget range, or any questions you have..."
+                      placeholder="Describe your vision or any questions you have..."
                     />
                   </div>
 
@@ -304,9 +356,9 @@ export function ContactForm() {
           {/* Sidebar Info */}
           <div className="lg:col-span-2">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0.12, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={REVEAL_VIEWPORT}
               transition={{ delay: 0.2 }}
               className="space-y-8"
             >
@@ -332,7 +384,7 @@ export function ContactForm() {
                     <Mail className="w-5 h-5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm text-stone/70">Email</p>
-                      <p className="text-lg break-all sm:break-normal">info@saddlewoodcontracting.com</p>
+                      <p className="text-base sm:text-lg break-words">info@saddlewoodcontracting.com</p>
                     </div>
                   </a>
                   <div className="flex items-start gap-4 font-light">

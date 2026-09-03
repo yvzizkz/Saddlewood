@@ -3,6 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { JsonLd } from "@/components/JsonLd";
 import { StickyMobileBar } from "@/components/StickyMobileBar";
+import { ScrollProgress } from "@/components/ScrollProgress";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -48,10 +49,10 @@ export const metadata: Metadata = {
     siteName: "Saddlewood Contracting",
     images: [
       {
-        url: "/images/mcr-kitchen-island-01.jpg",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Saddlewood Contracting — Luxury Kitchen Remodel in McCormick Ranch, Scottsdale",
+        alt: "Saddlewood Contracting - Built for Homes That Demand More",
       },
     ],
   },
@@ -60,7 +61,7 @@ export const metadata: Metadata = {
     title: "Saddlewood Contracting | Luxury Remodeling in Scottsdale",
     description:
       "Premium kitchen, bathroom, and whole-home remodeling in Scottsdale's most prestigious neighborhoods.",
-    images: ["/images/mcr-kitchen-island-01.jpg"],
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -83,12 +84,17 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
+    <div className="night-surface min-h-svh">
       <JsonLd />
+      <ScrollProgress />
       <Navbar />
-      <main id="main-content">{children}</main>
+      {/* Fixed blueprint grid — page-ground sections let it show through */}
+      <div className="night-grid" aria-hidden="true" />
+      <main id="main-content" className="relative">
+        {children}
+      </main>
       <Footer />
       <StickyMobileBar />
-    </>
+    </div>
   );
 }

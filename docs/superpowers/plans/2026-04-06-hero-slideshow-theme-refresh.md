@@ -1,3 +1,5 @@
+> SUPERSEDED (2026-08-27): the image pipeline and photo hero were removed in the Night Blueprint photo-free redesign. Kept for history.
+
 # Hero Slideshow + Warm Modern Theme Refresh — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

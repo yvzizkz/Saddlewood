@@ -7,11 +7,12 @@
 :root {
   --background: #f5f0e8;
   --foreground: #2c2926;
-  --teal: #2d4a4a;
-  --teal-90: rgba(45,74,74,0.9);
-  --teal-dark: #1a2f2f;
-  --gold: #c8a55a;
-  --gold-muted: #B8924A;
+  --teal: #182828;
+  --teal-90: rgba(13,21,21,0.92);
+  --teal-dark: #0d1515;
+  --gold: #d4af37;
+  --gold-muted: #bfa043;
+  --gold-champagne: #e5c97d;
   --stone: #e2dbd0;
   --stone-mid: #d9d0c3;
   --charcoal: #2c2926;
@@ -19,7 +20,7 @@
   --off-white: #f5f0e8;
   --cream: #ede6d8;
   --white: #FFFFFF;
-  --gold-accessible: #8B6914;
+  --gold-accessible: #8f6c18;
 }
 
 @layer utilities {
@@ -36,6 +37,7 @@
   --color-teal-90: var(--teal-90);
   --color-gold: var(--gold);
   --color-gold-muted: var(--gold-muted);
+  --color-gold-champagne: var(--gold-champagne);
   --color-stone: var(--stone);
   --color-stone-mid: var(--stone-mid);
   --color-charcoal: var(--charcoal);
@@ -46,6 +48,7 @@
   --color-gold-accessible: var(--gold-accessible);
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-heading: var(--font-fraunces), "Playfair Display", "Georgia", "Times New Roman", serif;
+  --font-mono: var(--font-plex-mono), "SF Mono", "Menlo", ui-monospace, monospace;
 }
 
 /* ===== BASE STYLES ===== */
@@ -80,10 +83,12 @@ img {
 }
 
 /* ===== SECTION LABEL PATTERN ===== */
+/* Drafting-mono eyebrow, per the 2026-08-28 handoff demo. */
 .section-label {
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--gold-accessible);
   margin-bottom: 16px;
@@ -140,32 +145,6 @@ img {
   background: var(--charcoal-light);
 }
 
-/* ===== EDITORIAL TRANSITIONS ===== */
-.editorial-hover img {
-  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.editorial-hover:hover img {
-  transform: scale(1.05);
-}
-
-/* ===== HERO KEN BURNS ===== */
-@keyframes ken-burns-zoom {
-  from { transform: scale(1) translate(0, 0); }
-  to   { transform: scale(1.08) translate(-1.5%, -1%); }
-}
-
-.ken-burns-active {
-  animation: ken-burns-zoom 15s ease-in-out forwards;
-  will-change: transform;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ken-burns-active {
-    animation: none;
-  }
-}
-
 /* ===== RESPONSIVE TYPOGRAPHY ===== */
 @media (max-width: 640px) {
   h1 {
@@ -199,9 +178,6 @@ img {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-  .editorial-hover:hover img {
-    transform: none;
   }
 }
 
@@ -262,3 +238,213 @@ img {
     animation: none;
   }
 }
+
+/* ============================================
+   NIGHT BLUEPRINT — marketing shell scope
+   Everything below is scoped to .night-surface (the (marketing) route
+   group wrapper) or to new night-* class names, so the (portal) route
+   group and its light layout are untouched. Tokens are additions only.
+   ============================================ */
+
+:root {
+  /* Gold for DISPLAY-size type on cream grounds */
+  --gold-display: #a87f22;
+}
+
+@theme inline {
+  --color-gold-display: var(--gold-display);
+}
+
+/* Dark ground, cream type — the ultra-luxury obsidian slate light table */
+.night-surface {
+  background: var(--teal-dark);
+  color: var(--off-white);
+}
+
+.night-surface ::selection {
+  background: rgba(212, 175, 55, 0.38);
+  color: var(--off-white);
+}
+
+/* Fixed blueprint grid at very low opacity, vignetted toward the edges.
+   Sections that declare their own background (teal band, cream interlude)
+   paint over it; page-ground sections let it show through. Content must
+   sit in a positioned ancestor (the marketing <main> is relative). */
+.night-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(245, 240, 232, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245, 240, 232, 0.022) 1px, transparent 1px);
+  background-size: 96px 96px;
+  -webkit-mask-image: radial-gradient(ellipse 120% 90% at 50% 30%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 120% 90% at 50% 30%, #000 40%, transparent 100%);
+}
+
+/* Teal drafting grid for cream interlude sections (place inside a
+   position:relative section) */
+.night-cream-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(24, 40, 40, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(24, 40, 40, 0.035) 1px, transparent 1px);
+  background-size: 96px 96px;
+}
+
+/* Section label — full-strength champagne gold reads crisp on obsidian */
+.night-surface .section-label {
+  color: var(--gold);
+}
+.night-surface .section-label::before {
+  background: var(--gold);
+}
+/* ...and back to accessible gold inside cream interludes */
+.night-surface .night-on-cream .section-label {
+  color: var(--gold-accessible);
+}
+.night-surface .night-on-cream .section-label::before {
+  background: var(--gold-accessible);
+}
+
+/* Hero display type — sized for the split copy/reel hero */
+.night-surface .night-hero-title {
+  font-size: min(clamp(40px, 5.8vw, 78px), 10.7vw - 4px) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.02em;
+}
+
+/* Reel frame — radiant champagne gold edge-light around the on-site video slot */
+.night-reel {
+  position: relative;
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(13, 21, 21, 0.95),
+    0 0 54px rgba(212, 175, 55, 0.18),
+    0 32px 75px rgba(0, 0, 0, 0.7);
+  transition:
+    box-shadow 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.night-reel:hover {
+  box-shadow:
+    0 0 0 1px rgba(13, 21, 21, 0.95),
+    0 0 84px rgba(212, 175, 55, 0.32),
+    0 38px 85px rgba(0, 0, 0, 0.8);
+  transform: translateY(-4px);
+}
+/* Scrim so the cream chip/label text always reads over the footage */
+.night-reel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgba(13, 21, 21, 0.8), transparent 38%),
+    linear-gradient(to bottom, rgba(13, 21, 21, 0.38), transparent 22%);
+}
+/* Dusk treatment — deeper scrim + tint so daylight footage sits inside
+   the night palette */
+.night-reel--dusk video,
+.night-reel--dusk img {
+  filter: brightness(0.74) saturate(0.82);
+}
+.night-reel--dusk::after {
+  background:
+    linear-gradient(to top, rgba(13, 21, 21, 0.88), transparent 52%),
+    linear-gradient(to bottom, rgba(13, 21, 21, 0.62), transparent 36%),
+    linear-gradient(rgba(13, 21, 21, 0.28), rgba(13, 21, 21, 0.28));
+}
+.night-reel-chip {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: rgba(13, 21, 21, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 3px;
+  padding: 7px 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.night-reel-label {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(245, 240, 232, 0.85);
+  pointer-events: none;
+}
+
+/* Pulsing live dot for the "On site now" chip. The pulse must stay true:
+   only use this chip over footage of a genuinely active project. */
+.night-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 10px rgba(200, 165, 90, 0.9);
+  animation: night-pulse 1.6s infinite;
+}
+@keyframes night-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .night-live-dot { animation: none; }
+}
+
+/* Ink scope — renders AnimatedLinework sheets in accessible drafting ink
+   when they sit on cream grounds (gold #c8a55a fails contrast on cream).
+   Drawing-upgrade standard (hero-v2 handoff): two ink weights — heavy dark
+   structure (the "cream" tone maps to warm ink) and brass detail. */
+.linework-ink {
+  --gold: var(--gold-accessible);
+  --cream: #3a2f1d;
+}
+
+/* Slow Ken Burns for full-bleed still heroes (premium standard). */
+@keyframes kenburns {
+  from { transform: scale(1.02); }
+  to { transform: scale(1.1); }
+}
+.kenburns {
+  animation: kenburns 22s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kenburns { animation: none; transform: scale(1.02); }
+}
+
+/* Corner ticks for the hero reel card (drafting registration marks). */
+.reel-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--gold);
+  z-index: 2;
+  pointer-events: none;
+}
+.reel-corner--tl { top: -7px; left: -7px; border-right: 0; border-bottom: 0; }
+.reel-corner--br { bottom: -7px; right: -7px; border-left: 0; border-top: 0; }

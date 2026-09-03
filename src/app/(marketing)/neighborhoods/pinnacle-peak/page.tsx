@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Pinnacle Peak Remodeling | Saddlewood Contracting",
     description: `${data.tagline}. Premium remodeling by Scottsdale's most trusted contractor.`,
-    images: [{ url: data.heroImage, alt: "Pinnacle Peak kitchen remodel by Saddlewood Contracting" }],
   },
 };
 

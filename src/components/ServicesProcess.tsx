@@ -1,191 +1,137 @@
 "use client";
 
-import { motion, useReducedMotion, type Variants } from "framer-motion";
-import Image from "next/image";
-import Link from "next/link";
-
 /**
- * ServicesProcess
+ * ServicesProcess — Night Blueprint drawn process timeline.
  *
- * Centerpiece section of the Services page. Pairs the six construction
- * phases of the 40th Street whole-home build with finished interiors from
- * the same Paradise Valley project. The narrative the visitor reads, even
- * without copy: "we built this house from the ground up — every trade
- * in-house — here is the proof in pictures."
- *
- * Layout: vertical sequence of paired rows. Each row has the construction
- * photo on one side and a complementary finished image on the other,
- * alternating left/right down the page. Phase numerals and small labels
- * sit between the two images. Final row is a single widescreen finished
- * hero — the "and here it is" payoff.
+ * The six construction phases of the completed Paradise Valley whole-home
+ * build as a typographic ledger: gold Fraunces numerals over dimension-tick strings,
+ * the phase label, and the single line describing what that phase became
+ * in the finished home. Closes with the payoff statement and a link into
+ * the full case study. No photography.
  */
 
-interface PairedPhase {
+import Link from "next/link";
+import { motion, type Variants } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { REVEAL_VIEWPORT } from "@/lib/reveal";
+import { ArrowRight } from "lucide-react";
+import { BlueprintDivider, DimensionTicks } from "@/components/linework";
+
+export interface ProcessPhase {
   /** Phase numeral, e.g. "01" */
   number: string;
   /** Phase label drawn from project data */
   label: string;
-  /** Construction-stage image */
-  duringSrc: string;
-  duringAlt: string;
-  /** Finished image that pairs with this phase */
-  finishedSrc: string;
-  finishedAlt: string;
-  /** Finished caption — single descriptive line, no marketing voice */
-  finishedCaption: string;
+  /** What this phase became in the finished home. Single line, no marketing voice. */
+  outcome: string;
 }
 
-interface ServicesProcessProps {
-  pairs: PairedPhase[];
-  /** Final widescreen finished hero — the payoff after the sequence */
-  finalHero: {
-    src: string;
-    alt: string;
-    caption: string;
-  };
+export interface ServicesProcessProps {
+  phases: ProcessPhase[];
+  /** Closing payoff statement after the sequence. */
+  closing: string;
 }
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 24 },
-  visible: {
+const revealVariants: Variants = {
+  hidden: { opacity: 0, y: 22 },
+  visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.9, ease: EASE },
-  },
+    transition: { duration: 1, ease: EASE, delay },
+  }),
 };
 
-export function ServicesProcess({ pairs, finalHero }: ServicesProcessProps) {
-  const prefersReducedMotion = useReducedMotion();
+export function ServicesProcess({ phases, closing }: ServicesProcessProps) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const initial = prefersReducedMotion ? "visible" : "hidden";
+  const viewport = REVEAL_VIEWPORT;
 
   return (
-    <section className="bg-off-white py-24 sm:py-28 lg:py-36" aria-label="From construction to finished home">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12">
-        {/* Section intro — quiet, editorial */}
+    <section
+      className="relative py-[clamp(72px,9vh,112px)]"
+      aria-label="From construction to finished home"
+    >
+      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+        {/* Head */}
         <motion.div
-          variants={fadeUp}
+          className="max-w-[680px]"
+          variants={revealVariants}
           initial={initial}
           whileInView="visible"
-          viewport={{ once: true, amount: 0.4 }}
-          className="max-w-[720px] mb-20 sm:mb-24 lg:mb-32"
+          viewport={viewport}
         >
-          <div className="section-label">From Demo to Finish</div>
-          <h2 className="font-heading text-3xl sm:text-4xl lg:text-[52px] font-light text-charcoal leading-[1.1] tracking-[-0.02em] mt-2">
-            One project. Every trade.{" "}
-            <em className="italic text-teal font-normal">Start to finish.</em>
+          <span className="section-label !mb-0">From Demo to Finish</span>
+          <h2 className="mt-6 font-heading text-[clamp(34px,4.2vw,56px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
+            One project. Every trade. Start to finish.
           </h2>
-          <p className="mt-7 text-[15px] sm:text-base text-charcoal-light font-light leading-relaxed max-w-[560px]">
+          <p className="mt-5 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
             A Paradise Valley whole-home build, from the day we broke ground to
             the day the homeowner moved in. General, electrical, plumbing, and
-            HVAC — all our own crew, all four ROC licenses on the same job site.
+            HVAC: all our own crew, all four ROC licenses on the same job site.
           </p>
+          <div className="mt-9" aria-hidden="true">
+            <BlueprintDivider className="block h-6 w-[180px]" />
+          </div>
         </motion.div>
 
-        {/* Paired phases */}
-        <ol className="space-y-20 sm:space-y-28 lg:space-y-36" role="list">
-          {pairs.map((pair, i) => {
-            const reverse = i % 2 === 1;
-            return (
-              <motion.li
-                key={pair.duringSrc}
-                variants={fadeUp}
-                initial={initial}
-                whileInView="visible"
-                viewport={{ once: true, amount: 0.2 }}
-                className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-10 lg:gap-12 items-center"
-              >
-                {/* During — construction photo */}
-                <figure
-                  className={`lg:col-span-6 ${
-                    reverse ? "lg:order-2" : "lg:order-1"
-                  }`}
-                >
-                  <div className="relative aspect-[4/3] overflow-hidden bg-stone">
-                    <Image
-                      src={pair.duringSrc}
-                      alt={pair.duringAlt}
-                      fill
-                      loading="lazy"
-                      sizes="(min-width: 1024px) 50vw, 100vw"
-                      className="object-cover"
-                    />
-                  </div>
-                  <figcaption className="mt-4 flex items-baseline gap-4">
-                    <span className="font-heading text-2xl sm:text-3xl text-gold-accessible font-light leading-none">
-                      {pair.number}
-                    </span>
-                    <span className="text-[12px] sm:text-[13px] tracking-[0.18em] uppercase text-charcoal font-medium">
-                      {pair.label}
-                    </span>
-                  </figcaption>
-                </figure>
-
-                {/* Finished — pairing room from the same project */}
-                <figure
-                  className={`lg:col-span-6 ${
-                    reverse ? "lg:order-1" : "lg:order-2"
-                  }`}
-                >
-                  <div className="relative aspect-[4/3] overflow-hidden bg-stone">
-                    <Image
-                      src={pair.finishedSrc}
-                      alt={pair.finishedAlt}
-                      fill
-                      loading="lazy"
-                      sizes="(min-width: 1024px) 50vw, 100vw"
-                      className="object-cover"
-                    />
-                  </div>
-                  <figcaption className="mt-4 flex items-baseline gap-4">
-                    <span className="text-[11px] tracking-[0.25em] uppercase text-charcoal-light font-medium">
-                      Finished
-                    </span>
-                    <span className="text-[13px] sm:text-sm text-charcoal-light font-light leading-snug">
-                      {pair.finishedCaption}
-                    </span>
-                  </figcaption>
-                </figure>
-              </motion.li>
-            );
-          })}
+        {/* Phase ledger */}
+        <ol
+          className="mt-[clamp(44px,6vh,72px)] list-none border-t border-off-white/[0.14] p-0"
+          role="list"
+        >
+          {phases.map((phase, i) => (
+            <motion.li
+              key={phase.number}
+              className="grid grid-cols-[72px_1fr] items-start gap-x-6 border-b border-off-white/[0.14] py-8 sm:grid-cols-[96px_1fr] sm:gap-x-10 lg:grid-cols-[96px_minmax(0,0.55fr)_minmax(0,1fr)] lg:py-10"
+              variants={revealVariants}
+              custom={Math.min(i, 3) * 0.08}
+              initial={initial}
+              whileInView="visible"
+              viewport={viewport}
+            >
+              <div>
+                <span className="block font-heading text-[clamp(30px,3.4vw,44px)] font-medium leading-none text-gold">
+                  {phase.number}
+                </span>
+                <div aria-hidden="true">
+                  <DimensionTicks className="mt-3 block h-[10px] w-12 sm:w-14" />
+                </div>
+              </div>
+              <h3 className="m-0 pt-1.5 text-[12px] font-medium uppercase tracking-[0.22em] text-off-white sm:text-[13px]">
+                {phase.label}
+              </h3>
+              <p className="col-span-2 m-0 mt-4 max-w-[560px] text-[14px] leading-[1.75] text-off-white/[0.65] lg:col-span-1 lg:mt-0 lg:pt-1">
+                {phase.outcome}
+              </p>
+            </motion.li>
+          ))}
         </ol>
 
-        {/* Final hero — the payoff */}
-        <motion.figure
-          variants={fadeUp}
+        {/* Payoff */}
+        <motion.div
+          className="mt-[clamp(48px,7vh,80px)] max-w-[720px]"
+          variants={revealVariants}
+          custom={0.1}
           initial={initial}
           whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          className="mt-20 sm:mt-28 lg:mt-36"
+          viewport={viewport}
         >
-          <div className="relative aspect-[16/9] overflow-hidden bg-stone">
-            <Image
-              src={finalHero.src}
-              alt={finalHero.alt}
-              fill
-              loading="lazy"
-              sizes="100vw"
-              className="object-cover"
-            />
+          <div className="text-[10.5px] font-medium uppercase tracking-[0.25em] text-gold">
+            The Result
           </div>
-          <figcaption className="mt-6 sm:mt-8 max-w-[720px]">
-            <span className="text-[11px] tracking-[0.25em] uppercase text-gold-accessible font-medium">
-              The result
-            </span>
-            <p className="mt-3 font-heading text-xl sm:text-2xl lg:text-[28px] font-light text-charcoal leading-[1.4] italic">
-              {finalHero.caption}
-            </p>
-            <Link
-              href="/portfolio/paradise-valley-40th-street-whole-home-build"
-              className="mt-6 inline-flex items-center gap-2 text-sm text-charcoal hover:text-gold-accessible transition-colors tracking-wide"
-            >
-              See the full project{" "}
-              <span aria-hidden="true">&rarr;</span>
-            </Link>
-          </figcaption>
-        </motion.figure>
+          <p className="mt-4 font-heading text-[clamp(22px,2.6vw,30px)] font-medium italic leading-[1.4] text-off-white">
+            {closing}
+          </p>
+          <Link
+            href="/portfolio/paradise-valley-whole-home-build"
+            className="mt-7 inline-flex items-center gap-2 border-b border-gold/40 pb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:border-gold"
+          >
+            See the full project
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </motion.div>
       </div>
     </section>
   );

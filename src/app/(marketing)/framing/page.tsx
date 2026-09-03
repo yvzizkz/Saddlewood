@@ -1,13 +1,15 @@
 import Link from "next/link";
-import Image from "next/image";
-import { PageHero } from "@/components/PageHero";
+import { FullBleedHero } from "@/components/FullBleedHero";
 import { CTABanner } from "@/components/CTABanner";
 import { VideoReel } from "@/components/VideoReel";
+import { SheetPair } from "@/components/SheetPair";
+import { PhotoWipe } from "@/components/PhotoWipe";
+import { ShearWallSheet, WallSection } from "@/components/linework";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
 export const metadata = {
-  title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood",
+  title: "Framing Contractor for Builders & GCs in Scottsdale",
   description:
     "A licensed Arizona framing contractor (ROC #305762) self-performing structural framing, concrete slab to roof trusses, on schedule in Scottsdale and Paradise Valley.",
   keywords: [
@@ -22,124 +24,238 @@ export const metadata = {
     canonical: "/framing",
   },
   openGraph: {
-    title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood",
-    description: "A licensed Arizona framing crew that self-performs — slab to trusses, on schedule.",
-    images: [{ url: "/images/pv-newbuild-steel-aerial.jpg", alt: "Aerial view of framing on a ground-up custom home in Paradise Valley by Saddlewood Contracting" }],
+    title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood Contracting",
+    description: "A licensed Arizona framing crew that self-performs: slab to trusses, on schedule.",
   },
 };
+
+// Field notes from the active Paradise Valley ground-up build.
+const siteNotes = [
+  "Framing taking shape over a new Paradise Valley estate.",
+  "The structural frame set on the foundation; our crews carry the framing from here.",
+  "Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection.",
+];
+
+// The completed Paradise Valley wood-framed build, phase by phase, in
+// build order. (Blind-review catch: the old carry-over list had
+// "Demolition & Prep" as step 06, after the trusses.)
+const woodPhases = [
+  {
+    number: "01",
+    title: "Demolition & Prep",
+    caption: "Clean site clearing before structural building begins.",
+  },
+  {
+    number: "02",
+    title: "Foundation & Slab",
+    caption: "Precision concrete work forming the structural footprint.",
+  },
+  {
+    number: "03",
+    title: "Exterior Framing",
+    caption: "Heavier structural members and wall plates erected on slab.",
+  },
+  {
+    number: "04",
+    title: "Interior Framing",
+    caption: "Room configurations and load-bearing partition walls.",
+  },
+  {
+    number: "05",
+    title: "Roof Trusses",
+    caption: "Complex engineered truss layout securing the roofline.",
+  },
+  {
+    number: "06",
+    title: "Structural Closeout",
+    caption: "Holdowns, straps, and truss hardware verified before inspection.",
+  },
+];
+
+const capabilities = [
+  {
+    title: "Custom Homes",
+    description:
+      "Full-scale wood framing for custom luxury estates, from foundation layout to engineered truss installation.",
+  },
+  {
+    title: "Additions & Extensions",
+    description:
+      "Complex tie-ins for structural additions, ensuring clean transitions and structural load management.",
+  },
+  {
+    title: "Structural Remodels",
+    description:
+      "Wall removals, beam insertions, and roofline reconfigurations matching architectural plans exactly.",
+  },
+];
+
+const differentiators = [
+  {
+    title: "Self-Performed",
+    desc: "We don't sub out our framing. Our own employees swing the hammers, meaning consistent quality and accountability.",
+  },
+  {
+    title: "ROC Licensed",
+    desc: "Fully licensed in Arizona (General ROC #305762) for residential building. We pull permits and coordinate inspections.",
+  },
+  {
+    title: "Single Crew",
+    desc: "The same core crew handles slab, framing, and trusses, eliminating handoff gaps and errors.",
+  },
+  {
+    title: "On Schedule",
+    desc: "We understand that framing is the critical path. We show up when promised and stay until the inspections pass.",
+  },
+];
 
 export default function FramingPage() {
   return (
     <>
-      <PageHero
-        label="Framing Subcontractor"
+      <FullBleedHero
+        media={{
+          kind: "video",
+          src: "/videos/saddlewood-transition-band-b.mp4",
+          poster: "/videos/saddlewood-transition-band-b-poster.jpg",
+        }}
+        label="Interior steel stud walls of the active Paradise Valley build"
+        chip={{ text: "Self-Performed", live: true }}
+        eyebrow="Framing Subcontractor"
         title="A licensed AZ framing crew that self-performs."
         description="From slab to trusses, we deliver structural precision on schedule. The reliable framing partner for Scottsdale's premier builders."
-        image="/images/pv-newbuild-steel-aerial.jpg"
-        imageAlt="Aerial view of framing on a ground-up custom home in Paradise Valley by Saddlewood Contracting"
       />
 
-      {/* On Site Now — Framing Gallery */}
-      <section className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-b border-stone-mid/20">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="h-px w-8 bg-gold" />
-            <span className="section-label">On Site Now</span>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start mb-12">
-            <div className="lg:col-span-6">
-              <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2 mb-6">
-                Ground-up framing — Paradise Valley.
-              </h2>
-            </div>
-            <div className="lg:col-span-6">
-              <p className="text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base">
-                An active ground-up build we are self-performing; the structural phase is underway. This project is in its framing stage and demonstrates our team&apos;s capacity for complex custom home engineering.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-3 flex flex-col justify-end">
-              <VideoReel
-                src="/videos/breaking-ground-steel-9x16.mp4"
-                poster="/videos/breaking-ground-steel-9x16-poster.jpg"
-                label="On-site footage of Paradise Valley custom home framing progress"
-                aspect="9x16"
-                mode="autoloop"
-                className="mb-4"
-              />
-              <p className="text-charcoal-light text-xs font-light">On-site footage of the active Paradise Valley build in its structural phase.</p>
-            </div>
-            <div className="lg:col-span-9 grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {[
-                {
-                  src: "/images/pv-newbuild-steel-aerial.jpg",
-                  alt: "Aerial of structural-phase steel (set by the project's steel trade) roof framing on a Paradise Valley custom home build",
-                  caption: "framing taking shape over a new Paradise Valley estate."
-                },
-                {
-                  src: "/images/pv-newbuild-steel-frame.jpg",
-                  alt: "Structural frame erected on the foundation of a Paradise Valley new build",
-                  caption: "The structural frame set on the foundation; our crews carry the framing from here."
-                },
-                {
-                  src: "/images/pv-newbuild-steel-joists.jpg",
-                  alt: "Stacked galvanized structural-phase steel (set by the project's steel trade) members staged on site",
-                  caption: "Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection."
-                }
-              ].map((img, idx) => (
-                <div key={idx} className="group">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-4">
-                    <Image
-                      src={img.src}
-                      alt={img.alt}
-                      fill
-                      sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 100vw"
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+      {/* On Site Now — active ground-up build */}
+      <section
+        className="relative py-[clamp(72px,9vh,112px)]"
+        aria-label="Active framing project"
+      >
+        <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div>
+            <span className="section-label !mb-0">On Site Now</span>
+            <h2 className="mt-6 max-w-[16ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              Ground-up framing in Paradise Valley.
+            </h2>
+            <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
+              An active ground-up build we are self-performing; the structural phase is underway. This project is in its framing stage and demonstrates our team&apos;s capacity for complex custom home engineering.
+            </p>
+
+            <div className="mt-10">
+              <div className="text-[10.5px] font-medium uppercase tracking-[0.25em] text-gold">
+                Field Notes
+              </div>
+              <ul className="mt-4 grid max-w-[560px] list-none grid-cols-1 gap-y-2.5 p-0">
+                {siteNotes.map((note) => (
+                  <li
+                    key={note}
+                    className="relative pl-5 text-[13.5px] leading-snug text-off-white/80"
+                  >
+                    <span
+                      className="absolute left-0 top-[0.62em] h-px w-2.5 bg-gold"
+                      aria-hidden="true"
                     />
-                  </div>
-                  <p className="text-charcoal-light text-xs sm:text-sm font-light leading-relaxed">{img.caption}</p>
-                </div>
-              ))}
+                    {note}
+                  </li>
+                ))}
+              </ul>
             </div>
+          </div>
+
+          {/* On-site reel — dusk treatment + gold edge-light */}
+          <div className="flex flex-col items-start lg:sticky lg:top-[110px] lg:items-center">
+            <div className="night-reel night-reel--dusk w-[min(320px,80vw)]">
+              <VideoReel
+                src="/videos/saddlewood-steel-framing-full.mp4"
+                poster="/videos/saddlewood-steel-framing-full-poster.jpg"
+                label="The full steel framing reel from the active Paradise Valley build"
+                aspect="9x16"
+                mode="autoplay"
+                className="rounded-none bg-teal-dark"
+              />
+              <span className="night-reel-chip">
+                <i className="night-live-dot" aria-hidden="true" />
+                On site now
+              </span>
+            </div>
+            <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
+              Active Paradise Valley build · structural phase
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* The Working Set — traced shear wall detail beside the installed
+          steel, the Drawn/Delivered pair pattern on the cream interlude:
+          off-white ground, teal drafting grid, charcoal type. */}
+      <section
+        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
+        aria-label="Structural drawings and installed framing"
+      >
+        <div className="night-cream-grid" aria-hidden="true" />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <span className="section-label !mb-0">The Working Set</span>
+          <h2 className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
+            Engineered, then self-performed.
+          </h2>
+          <p className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light">
+            Steel studs at 16 inches on center, shear panels screwed to
+            schedule, holdowns where the plans call them. The same crew that
+            reads the S-sheets installs them.
+          </p>
+
+          <div className="mt-11">
+            <SheetPair
+              tone="cream"
+              left={{
+                tag: "Drawn",
+                caption: "Traced from the engineer's structural set",
+                children: (
+                  <div className="linework-ink w-full p-4">
+                    <ShearWallSheet className="block h-auto w-full" />
+                  </div>
+                ),
+              }}
+              right={{
+                tag: "Installed",
+                caption: "Structural phase · Paradise Valley · self-performed",
+                aspect: "min-h-[320px]",
+                children: (
+                  <PhotoWipe
+                    src="/images/steel-built-luxury.jpg"
+                    alt="Precision steel stud framing installed on an architectural Paradise Valley build"
+                  />
+                ),
+              }}
+            />
           </div>
         </div>
       </section>
 
       {/* What We Frame */}
-      <section className="bg-cream py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="h-px w-8 bg-gold" />
-            <span className="section-label">Capabilities</span>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
-            <div className="lg:col-span-5">
-              <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2 mb-6">
-                Structural framing for custom builds & major additions.
+      <section className="relative py-[clamp(72px,9vh,112px)]" aria-label="Framing capabilities">
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
+            <div>
+              <span className="section-label !mb-0">Capabilities</span>
+              <h2 className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+                Structural framing for custom builds &amp; major additions.
               </h2>
-              <p className="text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base">
+              <p className="mt-6 max-w-[520px] text-[15.5px] leading-[1.8] text-off-white/70">
                 Saddlewood provides dedicated structural framing services for custom home builders, general contractors, and architects who demand on-schedule execution and precise tolerances.
               </p>
             </div>
-            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {[
-                {
-                  title: "Custom Homes",
-                  description: "Full-scale wood framing for custom luxury estates, from foundation layout to engineered truss installation."
-                },
-                {
-                  title: "Additions & Extensions",
-                  description: "Complex tie-ins for structural additions, ensuring seamless transitions and structural load management."
-                },
-                {
-                  title: "Structural Remodels",
-                  description: "Wall removals, beam insertions, and roofline reconfigurations matching architectural plans exactly."
-                }
-              ].map((item, idx) => (
-                <div key={idx} className="bg-off-white p-6 border border-stone-mid/30">
-                  <h3 className="font-heading text-lg font-light text-charcoal mb-3">{item.title}</h3>
-                  <p className="text-charcoal-light text-xs sm:text-sm font-light leading-relaxed">{item.description}</p>
+            <div className="grid grid-cols-1 gap-px border border-off-white/[0.12] bg-off-white/[0.12] sm:grid-cols-3">
+              {capabilities.map((item, idx) => (
+                <div key={item.title} className="flex h-full flex-col bg-teal-dark p-6 lg:p-7">
+                  <div className="text-[10.5px] font-medium tracking-[0.25em] text-gold">
+                    0{idx + 1}
+                  </div>
+                  <h3 className="mt-4 font-heading text-[19px] font-medium leading-[1.3] text-off-white">
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 text-[13px] leading-[1.7] text-off-white/[0.62]">
+                    {item.description}
+                  </p>
                 </div>
               ))}
             </div>
@@ -147,146 +263,125 @@ export default function FramingPage() {
         </div>
       </section>
 
-      {/* Proof Gallery */}
-      <section className="bg-off-white py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12 border-t border-b border-stone-mid/20">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="h-px w-8 bg-gold" />
-            <span className="section-label">Completed Build</span>
-          </div>
-          <div className="mb-12">
-            <h2 className="font-heading text-3xl sm:text-4xl lg:text-[40px] font-light text-charcoal leading-tight">
-              Wood-Framed Process: Slab to Trusses
+      {/* Field Fabrication & Cutter Sparks Reel */}
+      <section
+        className="relative border-t border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
+        aria-label="Field fabrication and steel cutting on site"
+      >
+        <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div>
+            <span className="section-label !mb-0">Field Fabrication</span>
+            <h2 className="mt-6 max-w-[16ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              Cutter sparks, angle grinders, and laser precision.
             </h2>
-            <p className="mt-4 text-charcoal-light font-light leading-relaxed text-[15px] sm:text-base max-w-[720px]">
-              A retrospective look at a separate, completed 40th Street whole-home build. This wood-framed project demonstrates our structural execution and self-performed crew timeline from slab to roof trusses.
+            <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
+              We cut, cope, and fasten our structural steel framing members directly on site. Every stud is laser-plumbed, every shear panel is fastened to engineering schedule, and every holdown is torqued to structural specifications.
             </p>
+            <div className="mt-8 flex flex-wrap items-center gap-6 font-mono text-[11px] uppercase tracking-[0.18em] text-gold">
+              <span className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-gold" />
+                Heavy-Gauge Steel Studs
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-gold" />
+                On-Site Chop &amp; Grinder Fabrication
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-gold" />
+                In-House Saddlewood Crew
+              </span>
+            </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-3 flex flex-col justify-end">
+
+          <div className="flex flex-col items-start lg:sticky lg:top-[110px] lg:items-center">
+            <div className="night-reel w-[min(320px,80vw)]">
               <VideoReel
-                src="/videos/process-timeline-9x16.mp4"
-                poster="/videos/process-timeline-9x16-poster.jpg"
-                label="Retrospective timeline of the completed 40th Street custom wood-frame whole-home build from foundation to finish"
+                src="/videos/saddlewood-sparks-loop.mp4"
+                poster="/videos/saddlewood-sparks-loop-poster.jpg"
+                label="Angle grinder cutter sparks during heavy-gauge steel stud fabrication on site"
                 aspect="9x16"
-                mode="clickToPlay"
-                className="mb-4"
+                mode="autoplay"
+                className="rounded-none bg-teal-dark"
               />
-              <p className="text-charcoal-light text-xs font-light">
-                Process timeline showing the studs-to-finish lifecycle of the completed 40th Street wood build.
-              </p>
+              <span className="night-reel-chip">
+                <i className="night-live-dot" aria-hidden="true" />
+                Field Fabrication · Paradise Valley
+              </span>
             </div>
-            <div className="lg:col-span-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                {
-                  src: "/images/pv-process-01-slab.jpg",
-                  alt: "Concrete foundation and slab preparation showing rebar grid",
-                  title: "01 / Foundation & Slab",
-                  caption: "Precision concrete work forming the structural footprint."
-                },
-                {
-                  src: "/images/pv-process-02-framing-ext.jpg",
-                  alt: "Exterior wood framing of custom home structure against blue sky",
-                  title: "02 / Exterior Framing",
-                  caption: "Heavier structural members and wall plates erected on slab."
-                },
-                {
-                  src: "/images/pv-process-03-framing-int.jpg",
-                  alt: "Interior wood studs framing rooms and hallways",
-                  title: "03 / Interior Framing",
-                  caption: "Room configurations and load-bearing partition walls."
-                },
-                {
-                  src: "/images/pv-process-04-trusses.jpg",
-                  alt: "Engineered roof trusses installed on top of framing",
-                  title: "04 / Roof Trusses",
-                  caption: "Complex engineered truss layout securing the roofline."
-                },
-                {
-                  src: "/images/pv-process-05-crew.jpg",
-                  alt: "Framing crew members working on top of structural framing",
-                  title: "05 / In-House Crew",
-                  caption: "Our dedicated framing carpenters on-site."
-                },
-                {
-                  src: "/images/pv-process-00-demo.jpg",
-                  alt: "Heavy machinery doing demolition and site preparation",
-                  title: "06 / Demolition & Prep",
-                  caption: "Clean site clearing before structural building begins."
-                }
-              ].map((img, idx) => (
-                <div key={idx} className="group">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-stone mb-4">
-                    <Image
-                      src={img.src}
-                      alt={img.alt}
-                      fill
-                      sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 100vw"
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                  </div>
-                  <h3 className="font-heading text-base font-light text-charcoal mb-1">{img.title}</h3>
-                  <p className="text-charcoal-light text-xs font-light">{img.caption}</p>
-                </div>
+            <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
+              Steel cutting &amp; framing · Filmed on site
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Completed build — drawn wood-framed process ledger on the cream
+          interlude: off-white ground, teal drafting grid, charcoal type. */}
+      <section
+        className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
+        aria-label="Completed wood-framed build process"
+      >
+        <div className="night-cream-grid" aria-hidden="true" />
+        <div className="relative mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <span className="section-label !mb-0">Completed Build</span>
+          <h2 className="mt-6 max-w-[20ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-charcoal">
+            Wood-Framed Process: Slab to Trusses
+          </h2>
+          <p className="mt-6 max-w-[720px] text-[15.5px] leading-[1.8] text-charcoal-light">
+            A retrospective look at a separate, completed wood-framed whole-home build in Paradise Valley. The project demonstrates our structural execution and self-performed crew timeline from slab to roof trusses.
+          </p>
+
+          {/* Drawn wall section above the phase ledger, single flow */}
+          <div className="mt-[clamp(44px,6vh,72px)] max-w-[880px]">
+            <figure className="mb-0 ml-0 mr-0" aria-hidden="true">
+              <div className="linework-ink max-w-[320px]">
+                <WallSection className="block h-auto w-full" />
+              </div>
+              <figcaption className="mt-3.5 text-[10.5px] uppercase tracking-[0.18em] text-charcoal/[0.65]">
+                Wall section · Footing to double top plate
+              </figcaption>
+            </figure>
+            <ol className="mt-10 list-none border-t border-charcoal/[0.14] p-0" role="list">
+              {woodPhases.map((phase) => (
+                <li
+                  key={phase.number}
+                  className="grid grid-cols-[56px_1fr] items-baseline gap-x-5 border-b border-charcoal/[0.14] py-5 sm:grid-cols-[64px_180px_1fr] sm:gap-x-6"
+                >
+                  <span className="font-heading text-[26px] font-medium leading-none text-gold-accessible sm:text-[30px]">
+                    {phase.number}
+                  </span>
+                  <h3 className="m-0 text-[11.5px] font-medium uppercase tracking-[0.2em] text-charcoal">
+                    {phase.title}
+                  </h3>
+                  <p className="col-span-2 m-0 mt-2 text-[13.5px] leading-[1.7] text-charcoal-light sm:col-span-1 sm:mt-0">
+                    {phase.caption}
+                  </p>
+                </li>
               ))}
-            </div>
+            </ol>
           </div>
         </div>
       </section>
 
       {/* Why Builders Hire Us */}
-      <section className="bg-cream py-20 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-12">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="h-px w-8 bg-gold" />
-            <span className="section-label">The Saddlewood Difference</span>
-          </div>
-          <h2 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-light text-charcoal leading-[1.15] tracking-[-0.01em] mt-2 mb-12">
+      <section className="relative py-[clamp(72px,9vh,112px)]" aria-label="Why builders hire Saddlewood">
+        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <span className="section-label !mb-0">The Saddlewood Difference</span>
+          <h2 className="mt-6 max-w-[18ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
             Structure built to plan, on schedule.
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              {
-                title: "Self-Performed",
-                desc: "We don't sub out our framing. Our own employees swing the hammers, meaning consistent quality and accountability."
-              },
-              {
-                title: "ROC Licensed",
-                desc: "Fully licensed in Arizona (General ROC #305762) for residential building. We pull permits and coordinate inspections."
-              },
-              {
-                title: "Single Crew",
-                desc: "The same core crew handles slab, framing, and trusses, eliminating handoff gaps and errors."
-              },
-              {
-                title: "On Schedule",
-                desc: "We understand that framing is the critical path. We show up when promised and stay until the inspections pass."
-              }
-            ].map((item, idx) => (
-              <div key={idx} className="border-l border-gold/40 pl-6">
-                <h3 className="font-heading text-xl font-light text-charcoal mb-3">{item.title}</h3>
-                <p className="text-charcoal-light text-sm font-light leading-relaxed">{item.desc}</p>
+          <div className="mt-[clamp(40px,5vh,64px)] grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+            {differentiators.map((item) => (
+              <div key={item.title} className="border-l border-gold/40 pl-6">
+                <h3 className="font-heading text-[20px] font-medium leading-[1.3] text-off-white">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-[13.5px] leading-[1.7] text-off-white/[0.65]">
+                  {item.desc}
+                </p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Builder CTA */}
-      <section className="bg-teal-dark py-20 sm:py-24 px-4 sm:px-6 lg:px-12 text-center text-stone">
-        <div className="max-w-[820px] mx-auto">
-          <h2 className="font-heading text-3xl sm:text-4xl lg:text-[36px] font-light text-stone leading-[1.3] tracking-[-0.01em] mb-4">
-            Need a reliable framing subcontractor for your next project?
-          </h2>
-          <p className="text-stone/75 text-[15px] font-light mb-8 max-w-[540px] mx-auto leading-relaxed">
-            Send us your plans, engineering sheets, and schedule. We&apos;ll provide a detailed structural framing proposal.
-          </p>
-          <Link
-            href="/contact"
-            className="inline-flex items-center gap-2 text-sm text-stone hover:text-gold transition-colors tracking-[0.05em] border-b border-stone/30 hover:border-gold py-2"
-          >
-            Request a framing bid <span aria-hidden="true">&rarr;</span>
-          </Link>
         </div>
       </section>
 

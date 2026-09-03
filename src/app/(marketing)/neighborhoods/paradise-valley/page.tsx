@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Paradise Valley Remodeling | Saddlewood Contracting",
     description: `${data.tagline}. Premium remodeling by Scottsdale's most trusted contractor.`,
-    images: [{ url: data.heroImage, alt: "Paradise Valley luxury remodel by Saddlewood Contracting" }],
   },
 };
 
