@@ -53,7 +53,7 @@ export function BrandPlateHero({
       overlay={
         <div className="absolute right-[8%] top-[30%] w-[38%] max-w-[280px] opacity-[0.32] sm:right-[10%] sm:top-[26%] sm:w-[19%] sm:opacity-[0.92]">
           <motion.div
-            className="[filter:drop-shadow(0_2px_18px_rgba(26,47,47,0.5))]"
+            className="[filter:drop-shadow(0_2px_18px_rgba(13,21,21,0.6))]"
             initial={
               prefersReducedMotion
                 ? { opacity: 1, scale: 1 }

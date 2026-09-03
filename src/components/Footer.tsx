@@ -54,7 +54,7 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-10 min-[480px]:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,1fr))] lg:gap-14">
           {/* Wordmark */}
           <div className="min-[480px]:col-span-2 lg:col-span-1">
-            <Link href="/" className="flex items-center gap-4 no-underline leading-none" aria-label="Saddlewood Contracting, home">
+            <Link href="/" className="flex items-center gap-4 no-underline leading-none">
               <Image
                 src="/images/logo-roundel.png"
                 alt=""

@@ -31,7 +31,7 @@ export function CaseStudyCard({ study, index = 0 }: CaseStudyCardProps) {
   return (
     <motion.article
       className="h-full"
-      initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0.12, y: 22 }}
+      initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={REVEAL_VIEWPORT}
       transition={{ duration: 0.9, ease: EASE, delay: (index % 3) * REVEAL_STEP }}

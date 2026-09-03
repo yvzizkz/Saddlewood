@@ -19,11 +19,12 @@ import type { NeighborhoodData } from "@/lib/neighborhoods";
 import { caseStudies, getCaseStudy } from "@/data/case-studies";
 import { FullBleedHero } from "@/components/FullBleedHero";
 import { areaScapeRegistry } from "@/components/linework";
+import { track } from "@/lib/analytics";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const revealVariants: Variants = {
-  hidden: { opacity: 0.12, y: 22 },
+  hidden: { opacity: 0, y: 22 },
   visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,
@@ -32,7 +33,7 @@ const revealVariants: Variants = {
 };
 
 const goldBtn =
-  "inline-block rounded-[2px] bg-gold px-[34px] py-[15px] text-[12px] font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:bg-[#d4a94c] hover:shadow-[0_10px_34px_rgba(200,165,90,0.28)]";
+  "inline-block rounded-[2px] bg-gradient-to-r from-gold to-[#c49a2a] px-[36px] py-[16px] text-[12px] font-semibold uppercase tracking-[0.12em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:from-[#e2bc48] hover:to-[#d4aa3b] hover:shadow-[0_10px_34px_rgba(212,175,55,0.38)]";
 
 const lineBtn =
   "inline-flex items-center gap-2 rounded-[2px] border border-off-white/25 px-[26px] py-[14px] text-[12px] font-medium uppercase tracking-[0.08em] text-off-white/80 no-underline transition-colors hover:border-gold hover:text-gold";
@@ -169,6 +170,12 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <Link
                     href="/contact"
+                    onClick={() =>
+                      track("cta_click", {
+                        cta: "schedule_consultation",
+                        location: `neighborhood_sidebar_${data.slug}`,
+                      })
+                    }
                     // Tighter padding than the page CTAs: this pair shares a
                     // narrow card column and must not wrap mid-label.
                     className={goldBtn + " whitespace-nowrap text-center !px-[22px]"}
@@ -177,6 +184,11 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
                   </Link>
                   <a
                     href="tel:4809996100"
+                    onClick={() =>
+                      track("phone_tap", {
+                        location: `neighborhood_sidebar_${data.slug}`,
+                      })
+                    }
                     className={lineBtn + " justify-center whitespace-nowrap !px-[18px]"}
                   >
                     <Phone className="h-3.5 w-3.5" aria-hidden="true" />
@@ -391,10 +403,27 @@ export function NeighborhoodPage({ data }: { data: NeighborhoodData }) {
             for your {data.name} property.
           </p>
           <div className="mt-11 flex flex-wrap items-center justify-center gap-4">
-            <Link href="/contact" className={goldBtn}>
+            <Link
+              href="/contact"
+              onClick={() =>
+                track("cta_click", {
+                  cta: "schedule_consultation",
+                  location: `neighborhood_bottom_${data.slug}`,
+                })
+              }
+              className={goldBtn}
+            >
               Schedule Consultation
             </Link>
-            <a href="tel:4809996100" className={lineBtn}>
+            <a
+              href="tel:4809996100"
+              onClick={() =>
+                track("phone_tap", {
+                  location: `neighborhood_bottom_${data.slug}`,
+                })
+              }
+              className={lineBtn}
+            >
               <Phone className="h-3.5 w-3.5" aria-hidden="true" />
               (480) 999-6100
             </a>

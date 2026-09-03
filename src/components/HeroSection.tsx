@@ -23,6 +23,7 @@ import { Phone } from "lucide-react";
 import { VideoPanel } from "@/components/VideoPanel";
 import { CountUp } from "@/components/CountUp";
 import { GrainOverlay } from "@/components/GrainOverlay";
+import { track } from "@/lib/analytics";
 
 // ease-out cubic — cinematic settle, fast start, soft landing
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -53,7 +54,7 @@ const maskLineVariants: Variants = {
 };
 
 const fadeUpVariants: Variants = {
-  hidden: { opacity: 0.12, y: 14 },
+  hidden: { opacity: 0, y: 14 },
   visible: {
     opacity: 1,
     y: 0,
@@ -82,10 +83,10 @@ export function HeroSection() {
     >
       {/* Full-bleed graded footage */}
       <VideoPanel
-        src="/videos/saddlewood-hero-loop-wide.mp4"
+        src="/videos/saddlewood-hero-loop-wide-enhanced.mp4"
         poster="/videos/saddlewood-hero-loop-wide-poster.jpg"
         label="Steel framing underway on the active Paradise Valley build"
-        className="absolute inset-0 h-full w-full scale-[1.02] object-cover"
+        className="absolute inset-0 h-full w-full object-cover"
         // One slow pass on arrival, then the hero rests on the closing
         // plate — the page settles instead of churning behind the copy.
         preload="auto"
@@ -115,6 +116,7 @@ export function HeroSection() {
             alt=""
             fill
             sizes="100vw"
+            priority
             className="object-cover"
           />
         </motion.div>
@@ -125,7 +127,7 @@ export function HeroSection() {
             watermark instead of fighting it. */}
         <div className="absolute left-[62%] top-[46%] w-[46%] opacity-40 sm:left-[74%] sm:top-[41%] sm:w-[22%] sm:opacity-100">
           <motion.div
-            className="[filter:drop-shadow(0_2px_18px_rgba(26,47,47,0.5))]"
+            className="[filter:drop-shadow(0_2px_18px_rgba(13,21,21,0.6))]"
             initial={false}
             animate={
               settled
@@ -149,20 +151,18 @@ export function HeroSection() {
         </div>
       </motion.div>
 
-      {/* Grade: hold the copy zone dark, let the footage breathe up top.
-          Stronger than the demo's curve because our copy block runs taller
-          (sub + CTAs + stats), so legibility must hold to ~55% height. */}
+      {/* Grade: hold the copy zone dark, let the footage breathe up top with no mud */}
       <div
         className="pointer-events-none absolute inset-0"
         aria-hidden="true"
         style={{
           background:
-            "linear-gradient(to top, rgba(26,47,47,0.94) 0%, rgba(26,47,47,0.72) 42%, rgba(26,47,47,0.5) 68%, rgba(26,47,47,0.26) 84%, rgba(26,47,47,0.5) 100%)",
+            "linear-gradient(to top, rgba(13,21,21,0.96) 0%, rgba(13,21,21,0.74) 42%, rgba(13,21,21,0.45) 68%, rgba(13,21,21,0.15) 84%, transparent 100%)",
         }}
       />
 
-      {/* 5% film grain */}
-      <GrainOverlay />
+      {/* Film grain scoped to static resting plate to keep video pristine */}
+      {settled ? <GrainOverlay /> : null}
 
       {/* Live chip — must stay true, so it retires with the footage it
           describes rather than sitting over the closing plate */}
@@ -189,7 +189,7 @@ export function HeroSection() {
 
       {/* Copy — bottom-left over the grade */}
       <motion.div
-        className="relative z-[1] mx-auto w-full max-w-[1240px] px-5 pb-[clamp(44px,7vh,72px)] pt-40 [text-shadow:0_1px_14px_rgba(26,47,47,0.8)] max-lg:pb-28 sm:px-8"
+        className="relative z-[1] mx-auto w-full max-w-[1240px] px-5 pb-[clamp(44px,7vh,72px)] pt-40 [text-shadow:0_1px_14px_rgba(13,21,21,0.9)] max-lg:pb-28 sm:px-8"
         variants={containerVariants}
         initial={initial}
         animate="visible"
@@ -240,12 +240,16 @@ export function HeroSection() {
         >
           <Link
             href="/contact"
-            className="inline-block rounded-[2px] bg-gold px-[34px] py-[15px] text-[12px] font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:bg-[#d4a94c] hover:shadow-[0_10px_34px_rgba(200,165,90,0.28)]"
+            onClick={() =>
+              track("cta_click", { cta: "book_consultation", location: "hero" })
+            }
+            className="inline-block rounded-[2px] bg-gradient-to-r from-gold to-[#c49a2a] px-[36px] py-[16px] text-[12px] font-semibold uppercase tracking-[0.12em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:from-[#e2bc48] hover:to-[#d4aa3b] hover:shadow-[0_10px_34px_rgba(212,175,55,0.38)]"
           >
             Book Your Consultation
           </Link>
           <a
             href="tel:4809996100"
+            onClick={() => track("phone_tap", { location: "hero" })}
             className="inline-flex items-center gap-2 rounded-[2px] border border-off-white/40 bg-teal-dark/40 px-[26px] py-[14px] text-[13px] tracking-[0.06em] text-off-white no-underline backdrop-blur-[4px] transition-colors hover:border-gold hover:text-gold"
           >
             <Phone className="h-3.5 w-3.5" aria-hidden="true" />

@@ -29,7 +29,7 @@ import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-type Audience = "homeowner" | "builder" | "trade";
+type Audience = "homeowner" | "builder" | "trade" | "direct";
 
 const projectTypes = [
   "New construction",
@@ -155,7 +155,7 @@ function PathLedger({ preconLine }: { preconLine: string }) {
   );
 }
 
-export function EngagementPlanner() {
+export function EngagementPlanner({ embedded = false }: { embedded?: boolean } = {}) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [audience, setAudience] = useState<Audience | null>(null);
   const [step, setStep] = useState(0);
@@ -191,6 +191,7 @@ export function EngagementPlanner() {
   const submit = async () => {
     setStatus("submitting");
     const isBuilder = audience === "builder";
+    const isDirect = audience === "direct";
     const payload = {
       firstName: name.split(" ")[0] || name,
       lastName: name.split(" ").slice(1).join(" ") || "",
@@ -198,9 +199,9 @@ export function EngagementPlanner() {
       email,
       phone,
       role: audience ?? "homeowner",
-      projectType: isBuilder ? "Builder bid request" : projectType,
-      plansStatus: isBuilder ? undefined : plans?.value,
-      budget: isBuilder ? undefined : budget,
+      projectType: isBuilder ? "Builder bid request" : isDirect ? "Direct inquiry" : projectType,
+      plansStatus: isBuilder || isDirect ? undefined : plans?.value,
+      budget: isBuilder || isDirect ? undefined : budget,
       scopes: isBuilder ? scopes : undefined,
       businessName: isBuilder ? businessName : undefined,
       plansLink: isBuilder ? plansLink : undefined,
@@ -209,10 +210,10 @@ export function EngagementPlanner() {
       message,
       source: "Engagement Planner",
       tags: [
-        isBuilder ? "builder-bid" : "website-lead",
+        isBuilder ? "builder-bid" : isDirect ? "direct-inquiry" : "website-lead",
         "engagement-planner",
-        isBuilder ? undefined : projectType,
-        isBuilder ? undefined : budget,
+        isBuilder || isDirect ? undefined : projectType,
+        isBuilder || isDirect ? undefined : budget,
       ].filter(Boolean),
       company,
     };
@@ -297,9 +298,9 @@ export function EngagementPlanner() {
         </div>
       </div>
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div>
+        <div className={audience === "direct" ? "sm:col-span-2" : ""}>
           <label htmlFor="planner-phone" className={labelCls}>
-            Phone
+            Phone {audience === "direct" ? <span className="text-off-white/40">(optional)</span> : null}
           </label>
           <input
             id="planner-phone"
@@ -308,22 +309,41 @@ export function EngagementPlanner() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className={inputCls}
+            placeholder="(480) 555-0123"
           />
         </div>
+        {audience !== "direct" ? (
+          <div>
+            <label htmlFor="planner-message" className={labelCls}>
+              Anything else
+            </label>
+            <input
+              id="planner-message"
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className={inputCls}
+              placeholder="Optional notes or timeline"
+            />
+          </div>
+        ) : null}
+      </div>
+      {audience === "direct" ? (
         <div>
-          <label htmlFor="planner-message" className={labelCls}>
-            Anything else
+          <label htmlFor="planner-message-direct" className={labelCls}>
+            How can we help?
           </label>
-          <input
-            id="planner-message"
-            type="text"
+          <textarea
+            id="planner-message-direct"
+            rows={4}
+            required
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className={inputCls}
-            placeholder="Optional"
+            className={`${inputCls} resize-none`}
+            placeholder="Tell us about your project, timeline, or general questions..."
           />
         </div>
-      </div>
+      ) : null}
       <label className="flex cursor-pointer items-start gap-3 text-[12.5px] leading-relaxed text-off-white/60">
         <input
           type="checkbox"
@@ -348,7 +368,13 @@ export function EngagementPlanner() {
       ) : null}
       <button
         type="button"
-        disabled={status === "submitting" || !name || !email || !consent}
+        disabled={
+          status === "submitting" ||
+          !name ||
+          !email ||
+          !consent ||
+          (audience === "direct" && !message.trim())
+        }
         onClick={submit}
         className="inline-flex items-center gap-2 rounded-[2px] bg-gold px-[30px] py-[14px] text-[12px] font-semibold uppercase tracking-[0.1em] text-teal-dark transition-all hover:-translate-y-px hover:bg-[#d4a94c] disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -358,6 +384,8 @@ export function EngagementPlanner() {
           </>
         ) : audience === "builder" ? (
           "Send bid request"
+        ) : audience === "direct" ? (
+          "Send message"
         ) : (
           "Request my consultation"
         )}
@@ -365,65 +393,92 @@ export function EngagementPlanner() {
     </div>
   );
 
-  return (
-    <section
-      className="relative border-b border-gold/[0.22] py-[clamp(64px,8vh,104px)]"
-      aria-label="Find your path"
-    >
-      <div className="mx-auto w-full max-w-[880px] px-5 sm:px-8">
-        <span className="section-label !mb-0">Find Your Path</span>
-        <h2 className="mt-5 max-w-[24ch] font-heading text-[clamp(30px,3.6vw,46px)] font-medium leading-[1.14] tracking-[-0.02em] text-off-white">
-          Three answers. Then we show you exactly how this works.
-        </h2>
+  const content = (
+    <div className={embedded ? "w-full" : "mx-auto w-full max-w-[880px] px-5 sm:px-8"}>
+      <span className="section-label !mb-0">
+        {audience === "direct" ? "Direct Inquiry" : "Find Your Path"}
+      </span>
+      <h2 className="mt-5 max-w-[24ch] font-heading text-[clamp(28px,3.4vw,44px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+        {audience === "direct"
+          ? "Drop us a note. We reply within 24 hours."
+          : "Three answers. Then we show you exactly how this works."}
+      </h2>
 
-        <div className="mt-10 min-h-[320px]">
-          <AnimatePresence mode="wait">
-            {/* ---- Success ---- */}
-            {status === "success" ? (
-              <motion.div key="done" {...stepAnim} role="status" aria-live="polite">
-                <p className="font-heading text-[26px] font-medium text-gold">
-                  Received.
-                </p>
-                <p className="mt-3 max-w-[52ch] text-[15px] leading-[1.8] text-off-white/70">
-                  {audience === "builder"
-                    ? "Your bid request is in front of us. We review the plans and come back with a real number, fast."
-                    : "We'll be in touch within one business day to schedule your consultation."}
-                </p>
-              </motion.div>
-            ) : audience === null ? (
-              /* ---- Step: audience ---- */
-              <motion.div key="aud" {...stepAnim}>
-                <p className={labelCls}>To start: who are we talking to?</p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <Tile
-                    active={false}
-                    onClick={() => {
-                      setAudience("homeowner");
-                      setStep(0);
-                    }}
-                    sub="A home to build or transform"
-                  >
-                    A homeowner
-                  </Tile>
-                  <Tile
-                    active={false}
-                    onClick={() => {
-                      setAudience("builder");
-                      setStep(0);
-                    }}
-                    sub="A GC or builder with a scope to bid"
-                  >
-                    A builder
-                  </Tile>
-                  <Tile
-                    active={false}
-                    onClick={() => setAudience("trade")}
-                    sub="A sub or vendor who wants our plans"
-                  >
-                    A trade partner
-                  </Tile>
-                </div>
-              </motion.div>
+      <div className="mt-10 min-h-[320px]">
+        <AnimatePresence mode="wait">
+          {/* ---- Success ---- */}
+          {status === "success" ? (
+            <motion.div key="done" {...stepAnim} role="status" aria-live="polite">
+              <p className="font-heading text-[26px] font-medium text-gold">
+                Received.
+              </p>
+              <p className="mt-3 max-w-[52ch] text-[15px] leading-[1.8] text-off-white/70">
+                {audience === "builder"
+                  ? "Your bid request is in front of us. We review the plans and come back with a real number, fast."
+                  : audience === "direct"
+                  ? "Your note is in front of our team. We review every message and reply within one business day."
+                  : "We'll be in touch within one business day to schedule your consultation."}
+              </p>
+            </motion.div>
+          ) : audience === null ? (
+            /* ---- Step: audience ---- */
+            <motion.div key="aud" {...stepAnim}>
+              <p className={labelCls}>To start: who are we talking to?</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Tile
+                  active={false}
+                  onClick={() => {
+                    setAudience("homeowner");
+                    setStep(0);
+                  }}
+                  sub="A home to build or transform"
+                >
+                  A homeowner
+                </Tile>
+                <Tile
+                  active={false}
+                  onClick={() => {
+                    setAudience("builder");
+                    setStep(0);
+                  }}
+                  sub="A GC or builder with a scope to bid"
+                >
+                  A builder
+                </Tile>
+                <Tile
+                  active={false}
+                  onClick={() => setAudience("trade")}
+                  sub="A sub or vendor who wants our plans"
+                >
+                  A trade partner
+                </Tile>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-off-white/[0.1] pt-5">
+                <span className="text-[13px] text-off-white/60">
+                  Have a general question or prefer to write directly?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAudience("direct");
+                    setStep(0);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-[0.16em] text-gold transition-colors hover:text-off-white"
+                >
+                  Send a direct note
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            </motion.div>
+          ) : audience === "direct" ? (
+            /* ---- Direct inquiry lane ---- */
+            <motion.div key="direct" {...stepAnim}>
+              <p className={labelCls}>Direct inquiry · Send a message directly to our team</p>
+              <div className="mt-6">
+                {contactFields}
+              </div>
+            </motion.div>
             ) : audience === "trade" ? (
               /* ---- Trade: route out ---- */
               <motion.div key="trade" {...stepAnim}>
@@ -627,7 +682,19 @@ export function EngagementPlanner() {
             Back
           </button>
         ) : null}
-      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return <div className="w-full">{content}</div>;
+  }
+
+  return (
+    <section
+      className="relative border-b border-gold/[0.22] py-[clamp(64px,8vh,104px)]"
+      aria-label="Find your path"
+    >
+      {content}
     </section>
   );
 }

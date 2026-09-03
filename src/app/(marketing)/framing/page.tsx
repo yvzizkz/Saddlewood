@@ -9,7 +9,7 @@ import { ShearWallSheet, WallSection } from "@/components/linework";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
 export const metadata = {
-  title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood",
+  title: "Framing Contractor for Builders & GCs in Scottsdale",
   description:
     "A licensed Arizona framing contractor (ROC #305762) self-performing structural framing, concrete slab to roof trusses, on schedule in Scottsdale and Paradise Valley.",
   keywords: [
@@ -24,7 +24,7 @@ export const metadata = {
     canonical: "/framing",
   },
   openGraph: {
-    title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood",
+    title: "Framing Contractor for Builders & GCs in Scottsdale | Saddlewood Contracting",
     description: "A licensed Arizona framing crew that self-performs: slab to trusses, on schedule.",
   },
 };
@@ -221,8 +221,8 @@ export default function FramingPage() {
                 aspect: "min-h-[320px]",
                 children: (
                   <PhotoWipe
-                    src="/images/steel-built.jpg"
-                    alt="Steel framing installed on the active Paradise Valley build"
+                    src="/images/steel-built-luxury.jpg"
+                    alt="Precision steel stud framing installed on an architectural Paradise Valley build"
                   />
                 ),
               }}
@@ -258,6 +258,58 @@ export default function FramingPage() {
                   </p>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Field Fabrication & Cutter Sparks Reel */}
+      <section
+        className="relative border-t border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
+        aria-label="Field fabrication and steel cutting on site"
+      >
+        <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div>
+            <span className="section-label !mb-0">Field Fabrication</span>
+            <h2 className="mt-6 max-w-[16ch] font-heading text-[clamp(32px,3.8vw,52px)] font-medium leading-[1.15] tracking-[-0.02em] text-off-white">
+              Cutter sparks, angle grinders, and laser precision.
+            </h2>
+            <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
+              We cut, cope, and fasten our structural steel framing members directly on site. Every stud is laser-plumbed, every shear panel is fastened to engineering schedule, and every holdown is torqued to structural specifications.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-6 font-mono text-[11px] uppercase tracking-[0.18em] text-gold">
+              <span className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-gold" />
+                Heavy-Gauge Steel Studs
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-gold" />
+                On-Site Chop &amp; Grinder Fabrication
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-gold" />
+                In-House Saddlewood Crew
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-start lg:sticky lg:top-[110px] lg:items-center">
+            <div className="night-reel w-[min(320px,80vw)]">
+              <VideoReel
+                src="/videos/saddlewood-sparks-loop.mp4"
+                poster="/videos/saddlewood-sparks-loop-poster.jpg"
+                label="Angle grinder cutter sparks during heavy-gauge steel stud fabrication on site"
+                aspect="9x16"
+                mode="autoplay"
+                className="rounded-none bg-teal-dark"
+              />
+              <span className="night-reel-chip">
+                <i className="night-live-dot" aria-hidden="true" />
+                Field Fabrication · Paradise Valley
+              </span>
+            </div>
+            <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
+              Steel cutting &amp; framing · Filmed on site
             </div>
           </div>
         </div>
@@ -329,36 +381,6 @@ export default function FramingPage() {
                 </p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Builder CTA — hairline-framed panel with the soft gold glow */}
-      <section className="relative pb-[clamp(80px,10vh,120px)]" aria-label="Request a framing bid">
-        <div className="mx-auto w-full max-w-[900px] px-5 sm:px-8">
-          <div className="relative overflow-hidden border border-gold/[0.28] px-7 py-14 text-center sm:px-12 sm:py-16">
-            <div
-              className="pointer-events-none absolute inset-0"
-              aria-hidden="true"
-              style={{
-                background:
-                  "radial-gradient(ellipse 60% 70% at 50% 50%, rgba(200,165,90,0.09), transparent 70%)",
-              }}
-            />
-            <div className="relative">
-              <h2 className="mx-auto max-w-[20ch] font-heading text-[clamp(26px,3.2vw,40px)] font-medium leading-[1.25] tracking-[-0.01em] text-off-white">
-                Need a reliable framing subcontractor for your next project?
-              </h2>
-              <p className="mx-auto mt-5 max-w-[540px] text-[15px] leading-[1.8] text-off-white/[0.68]">
-                Send us your plans, engineering sheets, and schedule. We&apos;ll provide a detailed structural framing proposal.
-              </p>
-              <Link
-                href="/contact"
-                className="mt-8 inline-flex items-center gap-2 border-b border-gold/40 pb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:border-gold"
-              >
-                Request a framing bid <span aria-hidden="true">&rarr;</span>
-              </Link>
-            </div>
           </div>
         </div>
       </section>

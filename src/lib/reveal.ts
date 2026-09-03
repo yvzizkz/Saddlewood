@@ -24,7 +24,7 @@ export const REVEAL_VIEWPORT = { once: true, amount: 0.18 } as const;
  * component's `custom` prop for staggering: custom={REVEAL_STEP * 2}.
  */
 export const revealVariants: Variants = {
-  hidden: { opacity: 0.12, y: 26 },
+  hidden: { opacity: 0, y: 26 },
   visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,

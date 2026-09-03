@@ -79,6 +79,18 @@ export const caseStudies: CaseStudy[] = [
     // (content rule: only the new steel framing images/reels stay on site).
     renders: [
       {
+        src: "/images/study-estate-facade-luxury.jpg",
+        alt: "Architectural study of the modern desert estate front elevation at dusk in Paradise Valley",
+      },
+      {
+        src: "/images/study-greatroom-luxury.jpg",
+        alt: "Architectural study of the great room with wine cellar and disappearing glass doors in Paradise Valley",
+      },
+      {
+        src: "/images/study-terrace-luxury.jpg",
+        alt: "Architectural study of the cantilevered covered terrace and reflection pool in Paradise Valley",
+      },
+      {
         src: "/images/render-rear.jpg",
         alt: "Rendering of the rear terrace and pool of the estate in progress in Paradise Valley",
       },
@@ -183,6 +195,16 @@ export const caseStudies: CaseStudy[] = [
       "The kitchen anchors the open floor plan of the estate. A massive natural stone island with waterfall edges seats five beneath pendant lighting and coffered ceilings, and the climate-controlled wine wall meets the island at the entertaining heart of the home. Stone, oak, brass, and pendant light sit in unhurried composition, designed for hosts who love to cook and entertain at the same time.",
       "Every working detail was considered: integrated double ovens, a curated display niche, flush oak cabinetry with brass hardware, and an apron-front farmhouse sink set into custom cabinetry, a working surface composed with the same care as a finished room. A second kitchen moment uses sage-painted cabinetry and brass hardware for a quieter, more verdant palette.",
       "In the master bath, a hammered silver tub sits beneath a sculptural bubble chandelier, with fluted glass, herringbone marble, and brass fixtures completing the room. A second master bath runs bookmatched veined marble floor to ceiling, so the freestanding tub and custom vanity become a single sculpted composition. The dual-vanity secondary bath and the oval-mirror powder bath were designed with the same finish-level discipline as the master.",
+    ],
+    renders: [
+      {
+        src: "/images/study-kitchen-luxury.jpg",
+        alt: "Architectural study of the chef's kitchen with bookmatched waterfall marble island and fluted white oak",
+      },
+      {
+        src: "/images/study-bath-luxury.jpg",
+        alt: "Architectural study of the master spa bath with freestanding soaking tub and illuminated boulder garden",
+      },
     ],
     linework: "plan-fragment",
     legacySlugs: [
@@ -336,6 +358,16 @@ export const caseStudies: CaseStudy[] = [
       "At Pinnacle Peak Country Club, floor-to-ceiling glass opens the great room to the Sonoran desert, and the landscape becomes part of the living room. The great room flows into the dining area with the peak as the backdrop, while a floor-to-ceiling stone surround with concealed LED strip lighting turns the fireplace into the room's architectural anchor. A quieter sitting room pairs a custom stone fireplace with curated built-ins for a timeless feel.",
       "The kitchen was designed for serious entertaining: a professional-grade island with sightlines to Pinnacle Peak from every angle, a custom pantry system, and matching stone countertops carrying into the dining space under cohesive pendant lighting. The dining room opens fully to the covered patio, a design that makes the most of 300-plus days of Arizona sunshine.",
       "In the baths, a custom floating vanity with LED backlighting and a natural stone countertop pairs with a walk-in spa shower featuring a heated bench, rain showerhead, and multiple body sprays. All of it was plumbed and wired by our licensed in-house team.",
+    ],
+    renders: [
+      {
+        src: "/images/study-greatroom-luxury.jpg",
+        alt: "Architectural study of the open great room with statement wine wall and linear stone fireplace",
+      },
+      {
+        src: "/images/study-terrace-luxury.jpg",
+        alt: "Architectural study of the outdoor living terrace, reflection pool, and mountain sunset views",
+      },
     ],
     linework: "plat",
     legacySlugs: [

@@ -33,7 +33,7 @@ const containerVariants: Variants = {
 };
 
 const fadeUpVariants: Variants = {
-  hidden: { opacity: 0.12, y: 16 },
+  hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
 };
 
@@ -72,7 +72,7 @@ export function AboutHero({ children }: AboutHeroProps) {
         aria-hidden="true"
         style={{
           background:
-            "linear-gradient(to top, rgba(26,47,47,0.95) 0%, rgba(26,47,47,0.78) 42%, rgba(26,47,47,0.6) 68%, rgba(26,47,47,0.42) 84%, rgba(26,47,47,0.62) 100%)",
+            "linear-gradient(to top, rgba(13,21,21,0.96) 0%, rgba(13,21,21,0.78) 42%, rgba(13,21,21,0.6) 68%, rgba(13,21,21,0.42) 84%, rgba(13,21,21,0.62) 100%)",
         }}
       />
       <GrainOverlay />
@@ -83,7 +83,21 @@ export function AboutHero({ children }: AboutHeroProps) {
         initial={initial}
         animate="visible"
       >
-        <div className="[text-shadow:0_1px_14px_rgba(26,47,47,0.8)]">
+        <div className="[text-shadow:0_1px_14px_rgba(13,21,21,0.9)]">
+          <motion.div
+            variants={fadeUpVariants}
+            className="mb-7 w-[105px] sm:w-[130px] md:w-[150px] [filter:drop-shadow(0_4px_24px_rgba(13,21,21,0.75))]"
+          >
+            <Image
+              src="/images/logo-roundel-white.png"
+              alt="Saddlewood Contracting"
+              width={300}
+              height={300}
+              className="h-auto w-full object-contain"
+              priority
+            />
+          </motion.div>
+
           <motion.span
             variants={fadeUpVariants}
             className="inline-flex items-center gap-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-gold max-[480px]:gap-2.5 max-[480px]:text-[9.5px] max-[480px]:tracking-[0.16em]"

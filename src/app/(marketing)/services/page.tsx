@@ -5,12 +5,13 @@ import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
 import { VideoReel } from "@/components/VideoReel";
 import { SheetPair } from "@/components/SheetPair";
+import { PhotoWipe } from "@/components/PhotoWipe";
 import { VideoPanel } from "@/components/VideoPanel";
 import { KitchenSheet } from "@/components/linework";
 import { getCaseStudy } from "@/data/case-studies";
 
 export const metadata = {
-  title: "Services | Kitchen, Bathroom, Whole-Home & Outdoor Living in Scottsdale | Saddlewood",
+  title: "Kitchen, Bathroom, Whole-Home & Outdoor Living in Scottsdale",
   description:
     "Saddlewood Contracting handles every trade in-house: general, electrical, plumbing, and HVAC. Four dual-classification ROC licenses covering residential and commercial work, so one crew carries your project from the first demo swing to the final punch list.",
   alternates: { canonical: "/services" },
@@ -101,9 +102,9 @@ export default function ServicesPage() {
       scope:
         "Custom cabinetry, natural-stone islands, integrated appliances, and the lighting and millwork to tie it together.",
       media: {
-        src: "/images/study-kitchen.jpg",
-        alt: "Generated study of the remodel's kitchen: range, hood, stone backsplash, and island",
-        caption: "Study · drawn from the remodel footage",
+        src: "/images/study-kitchen-luxury.jpg",
+        alt: "Architectural study of the custom kitchen: bookmatched waterfall marble island, fluted oak cabinetry, and integrated appliances",
+        caption: "Study · drawn from the design program",
       },
       href: "/portfolio",
       hrefLabel: "Kitchen projects",
@@ -113,9 +114,9 @@ export default function ServicesPage() {
       scope:
         "Bookmatched stone, freestanding tubs, frameless glass, heated floors. Plumbed and wired by our own licensed crew.",
       media: {
-        src: "/images/study-bath.jpg",
-        alt: "Generated study of the remodel's bath: deck-set oval tub against curved glass with pool and mountain views",
-        caption: "Study · drawn from the remodel footage",
+        src: "/images/study-bath-luxury.jpg",
+        alt: "Architectural study of the master bath: freestanding soaking tub, bookmatched marble walls, and fluted glass shower",
+        caption: "Study · drawn from the design program",
       },
       href: "/portfolio",
       hrefLabel: "Bathroom projects",
@@ -137,9 +138,9 @@ export default function ServicesPage() {
       scope:
         "Pools, covered patios, outdoor kitchens, and architectural lighting designed for 300+ days of Sonoran sun.",
       media: {
-        src: "/images/render-firepit.jpg",
-        alt: "Rendering of a firepit terrace on the Paradise Valley estate",
-        caption: "Rendering · Paradise Valley estate",
+        src: "/images/study-terrace-luxury.jpg",
+        alt: "Architectural study of the outdoor living terrace: cantilevered steel overhang, sunken fire lounge, and reflection pool",
+        caption: "Study · outdoor living program",
       },
       href: "/portfolio",
       hrefLabel: "Outdoor projects",
@@ -150,12 +151,13 @@ export default function ServicesPage() {
     <>
       <FullBleedHero
         media={{
-          kind: "video",
-          src: "/videos/saddlewood-troon-kitchen-wide.mp4",
-          poster: "/videos/saddlewood-troon-kitchen-wide-poster.jpg",
+          kind: "image",
+          src: "/images/services-hero-luxury.jpg",
+          alt: "Completed modern luxury design-build estate at twilight with cantilevered terrace and reflecting pool",
+          kenBurns: true,
         }}
-        label="Kitchen segment of a remodel walkthrough filmed on site"
-        chip={{ text: "Remodel · In Progress" }}
+        label="Completed modern luxury estate showcasing all-trade execution in Paradise Valley"
+        mediaCaption="Architectural study · Paradise Valley estate"
         eyebrow="Services"
         title="Built start to finish, in-house."
         description="Four trades. One crew. Every phase of your remodel, from the first demo swing to the final punch list, handled by Saddlewood's own licensed team."
@@ -196,14 +198,13 @@ export default function ServicesPage() {
                 ),
               }}
               right={{
-                tag: "On site",
-                caption: "Kitchen remodel underway · filmed on site",
+                tag: "Delivered",
+                caption: "Bespoke millwork & stone · delivered to the sixteenth",
                 aspect: "min-h-[320px]",
                 children: (
-                  <VideoPanel
-                    src="/videos/saddlewood-reel-troon-kitchen-9x16.mp4"
-                    poster="/videos/saddlewood-reel-troon-kitchen-9x16-poster.jpg"
-                    label="Kitchen segment of a remodel walkthrough filmed on site"
+                  <PhotoWipe
+                    src="/images/study-kitchen-luxury.jpg"
+                    alt="Finished luxury chef's kitchen with fluted white oak millwork and Calacatta waterfall marble island"
                   />
                 ),
               }}
@@ -291,36 +292,19 @@ export default function ServicesPage() {
                   <span className="font-heading text-xl font-medium text-charcoal sm:text-2xl">
                     {t.name}
                   </span>
-                  <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-gold-accessible">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#76580a]">
                     {t.code}
                   </span>
                 </div>
                 <p className="mt-2.5 max-w-[26ch] text-[13px] leading-[1.6] text-charcoal-light">
                   {t.scope}
                 </p>
-                <div className="mt-4 font-mono text-[10.5px] uppercase tracking-[0.2em] text-charcoal/[0.5] tabular-nums">
+                <div className="mt-4 font-mono text-[10.5px] uppercase tracking-[0.2em] text-charcoal-light tabular-nums">
                   {t.roc}
                 </div>
               </li>
             ))}
           </ul>
-        </div>
-      </section>
-
-      {/* Quiet bottom CTA — single text link. Sticky nav carries the
-          primary conversion path; this is just a soft handoff. */}
-      <section className="relative py-[clamp(88px,11vh,128px)]">
-        <div className="mx-auto w-full max-w-[820px] px-5 text-center sm:px-8">
-          <p className="font-heading text-[clamp(26px,3vw,38px)] font-medium leading-[1.3] tracking-[-0.01em] text-off-white">
-            If your project belongs in this company,{" "}
-            <em className="font-normal italic text-gold">let&apos;s talk.</em>
-          </p>
-          <Link
-            href="/contact"
-            className="mt-8 inline-flex items-center gap-2 border-b border-gold/40 pb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:border-gold"
-          >
-            Start a conversation <span aria-hidden="true">&rarr;</span>
-          </Link>
         </div>
       </section>
 

@@ -9,7 +9,7 @@ import { SteelBeam } from "@/components/linework";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
 export const metadata = {
-  title: "Custom Home Builder & New Construction in Scottsdale | Saddlewood Contracting",
+  title: "Custom Home Builder & New Construction in Scottsdale",
   description:
     "Ground-up new construction and whole-home builds in Scottsdale & Paradise Valley. We self-perform framing, trusses, slab, and all four trades in-house.",
   keywords: [

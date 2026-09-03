@@ -44,7 +44,7 @@ export function TransitionBand({ src, poster, eyebrow, label }: TransitionBandPr
         aria-hidden="true"
         style={{
           background:
-            "linear-gradient(to bottom, rgba(26,47,47,0.82), rgba(26,47,47,0.25) 35%, rgba(26,47,47,0.25) 65%, rgba(26,47,47,0.82)), linear-gradient(rgba(26,47,47,0.15), rgba(26,47,47,0.15))",
+            "linear-gradient(to bottom, rgba(13,21,21,0.85), rgba(13,21,21,0.25) 35%, rgba(13,21,21,0.25) 65%, rgba(13,21,21,0.85)), linear-gradient(rgba(13,21,21,0.15), rgba(13,21,21,0.15))",
         }}
       />
       <GrainOverlay />

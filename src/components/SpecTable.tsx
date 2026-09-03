@@ -28,7 +28,7 @@ export function SpecTable({ specs, className }: SpecTableProps) {
     <motion.dl
       className={cn("border-t border-off-white/[0.14]", className)}
       initial={
-        prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0.12, y: 22 }
+        prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }
       }
       whileInView={{ opacity: 1, y: 0 }}
       viewport={REVEAL_VIEWPORT}

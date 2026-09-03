@@ -26,7 +26,7 @@ const containerVariants: Variants = {
 };
 
 const fadeUpVariants: Variants = {
-  hidden: { opacity: 0.12, y: 16 },
+  hidden: { opacity: 0, y: 16 },
   visible: {
     opacity: 1,
     y: 0,
@@ -120,7 +120,7 @@ export function FullBleedHero({
         aria-hidden="true"
         style={{
           background:
-            "linear-gradient(to top, rgba(26,47,47,0.94) 0%, rgba(26,47,47,0.72) 42%, rgba(26,47,47,0.5) 68%, rgba(26,47,47,0.26) 84%, rgba(26,47,47,0.5) 100%)",
+            "linear-gradient(to top, rgba(13,21,21,0.96) 0%, rgba(13,21,21,0.74) 42%, rgba(13,21,21,0.5) 68%, rgba(13,21,21,0.26) 84%, rgba(13,21,21,0.5) 100%)",
         }}
       />
       <GrainOverlay />
@@ -145,7 +145,7 @@ export function FullBleedHero({
       ) : null}
 
       <motion.div
-        className="relative z-[1] mx-auto w-full max-w-[1240px] px-5 pb-[clamp(40px,6vh,64px)] pt-40 [text-shadow:0_1px_14px_rgba(26,47,47,0.8)] sm:px-8"
+        className="relative z-[1] mx-auto w-full max-w-[1240px] px-5 pb-[clamp(40px,6vh,64px)] pt-40 [text-shadow:0_1px_14px_rgba(13,21,21,0.9)] sm:px-8"
         variants={containerVariants}
         initial={initial}
         animate="visible"

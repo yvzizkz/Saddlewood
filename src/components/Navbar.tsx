@@ -243,15 +243,14 @@ export function Navbar() {
         aria-label="Main navigation"
         className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-10 transition-all duration-500 ${
           scrolled
-            ? "h-[76px] bg-[rgba(26,47,47,0.88)] backdrop-blur-[14px] shadow-[0_1px_0_rgba(200,165,90,0.16)]"
-            : "h-[88px] bg-gradient-to-b from-teal-dark/[0.88] via-teal-dark/45 to-transparent"
+            ? "h-[76px] bg-[rgba(13,21,21,0.88)] backdrop-blur-[16px] shadow-[0_1px_0_rgba(212,175,55,0.18)]"
+            : "h-[88px] bg-gradient-to-b from-teal-dark/[0.9] via-teal-dark/45 to-transparent"
         }`}
       >
         {/* SC roundel + wordmark — cream Fraunces over gold small-caps */}
         <Link
           href="/"
           className="flex shrink-0 items-center gap-3 no-underline leading-none"
-          aria-label="Saddlewood Contracting, home"
         >
           <Image
             src="/images/logo-roundel.png"
@@ -307,7 +306,7 @@ export function Navbar() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 4 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute top-full left-0 mt-3 min-w-[220px] rounded-[2px] border border-gold/[0.18] bg-[rgba(26,47,47,0.95)] py-2 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+                      className="absolute top-full left-0 mt-3 min-w-[220px] rounded-[2px] border border-gold/[0.25] bg-[rgba(13,21,21,0.96)] py-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl"
                       role="menu"
                       aria-label={`${link.label} submenu`}
                     >
@@ -366,7 +365,7 @@ export function Navbar() {
             onClick={() =>
               track("cta_click", { cta: "book_consultation", location: "navbar" })
             }
-            className="hidden lg:inline-block rounded-[2px] bg-gold px-[22px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:bg-[#d4a94c]"
+            className="hidden lg:inline-block rounded-[2px] bg-gradient-to-r from-gold to-[#c49a2a] px-[24px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.12em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:from-[#e2bc48] hover:to-[#d4aa3b] hover:shadow-[0_6px_20px_rgba(212,175,55,0.3)]"
           >
             Book Your Consultation
           </Link>
@@ -390,7 +389,7 @@ export function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 overflow-y-auto bg-[rgba(26,47,47,0.98)] px-6 pt-24 backdrop-blur-sm"
+            className="fixed inset-0 z-40 overflow-y-auto bg-[rgba(13,21,21,0.98)] px-6 pt-24 backdrop-blur-md"
             role="dialog"
             aria-modal="true"
             aria-label="Mobile navigation menu"
@@ -428,8 +427,11 @@ export function Navbar() {
               )}
               <Link
                 href="/contact"
-                onClick={() => setMobileOpen(false)}
-                className="mt-8 block rounded-[2px] bg-gold px-6 py-4 text-center text-sm font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline"
+                onClick={() => {
+                  setMobileOpen(false);
+                  track("cta_click", { cta: "book_consultation", location: "mobile_menu" });
+                }}
+                className="mt-8 block rounded-[2px] bg-gradient-to-r from-gold to-[#c49a2a] px-6 py-4 text-center text-sm font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline transition-all hover:from-[#e2bc48] hover:to-[#d4aa3b]"
               >
                 Book Your Consultation
               </Link>

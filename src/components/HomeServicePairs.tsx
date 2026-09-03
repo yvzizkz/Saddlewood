@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
@@ -22,9 +23,7 @@ import {
   REVEAL_STEP,
   REVEAL_VIEWPORT,
 } from "@/lib/reveal";
-import { SheetPair } from "@/components/SheetPair";
 import { VideoPanel } from "@/components/VideoPanel";
-import { ShearWallSheet } from "@/components/linework";
 
 /** Real scope, matched to what the services pages already claim. */
 const scopeLines: { name: string; detail: string }[] = [
@@ -170,6 +169,29 @@ export function FullScopeSection() {
   );
 }
 
+const structuralSpecs = [
+  {
+    num: "01",
+    title: "Cold-Formed Structural Steel",
+    desc: "Heavy-gauge studs aligned at 16 inches on center, deflection tracks, and engineered headers.",
+  },
+  {
+    num: "02",
+    title: "Holdowns & Anchor Bolts",
+    desc: "Cast-in-place Simpson heavy-duty holdowns and epoxy anchor systems bolted to the structural slab.",
+  },
+  {
+    num: "03",
+    title: "Shear Panels & Diaphragms",
+    desc: "Perforated shear wall assemblies and structural blocking fastened to exact engineering schedule.",
+  },
+  {
+    num: "04",
+    title: "Self-Performed In-House",
+    desc: "Installed by Saddlewood's licensed framing crew. The same team that reads the S-sheets is on the tools.",
+  },
+];
+
 export function FramingPairSection() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const variants = prefersReducedMotion ? revealStaticVariants : revealVariants;
@@ -203,49 +225,83 @@ export function FramingPairSection() {
           the S-sheets installs them.
         </motion.p>
 
-        <div className="mt-11">
-          <SheetPair
-            tone="dark"
-            left={{
-              tag: "Drawn",
-              caption: "Traced from the engineer's structural set",
-              children: (
-                <div className="w-full p-4">
-                  <ShearWallSheet className="block h-auto w-full" />
-                </div>
-              ),
-            }}
-            right={{
-              tag: "Installed",
-              caption: "Structural phase · Paradise Valley · self-performed",
-              aspect: "min-h-[320px]",
-              children: (
-                <VideoPanel
-                  src="/videos/saddlewood-scaffold-loop.mp4"
-                  poster="/videos/saddlewood-scaffold-loop-poster.jpg"
-                  label="Slowed pass of scaffold work on the active Paradise Valley build"
-                />
-              ),
-            }}
-          />
-        </div>
-
-        <motion.div
-          variants={variants}
-          custom={REVEAL_STEP}
-          initial="hidden"
-          whileInView="visible"
-          viewport={REVEAL_VIEWPORT}
-          className="mt-10"
-        >
-          <Link
-            href="/framing"
-            className="inline-flex items-center gap-2 border-b border-gold/40 pb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:border-gold"
+        <div className="mt-11 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          {/* Engineering Specifications Card */}
+          <motion.div
+            variants={variants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={REVEAL_VIEWPORT}
+            className="relative flex flex-col justify-between rounded-[2px] border border-gold/[0.22] bg-[rgba(18,29,29,0.7)] p-6 backdrop-blur-xl sm:p-8"
           >
-            Framing for builders
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </Link>
-        </motion.div>
+            <div>
+              <div className="flex items-center justify-between border-b border-off-white/[0.08] pb-4">
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-gold">
+                  Engineered Standard · S-Series
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-off-white/45">
+                  Paradise Valley
+                </span>
+              </div>
+
+              <div className="mt-6 space-y-5">
+                {structuralSpecs.map((spec) => (
+                  <div key={spec.num} className="flex items-start gap-4">
+                    <span className="font-mono text-[11px] font-semibold text-gold">
+                      {spec.num}
+                    </span>
+                    <div>
+                      <div className="font-heading text-[16px] font-medium tracking-[-0.01em] text-off-white">
+                        {spec.title}
+                      </div>
+                      <p className="mt-1 text-[13px] leading-[1.65] text-off-white/70">
+                        {spec.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-off-white/[0.08] pt-5">
+              <Link
+                href="/framing"
+                className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-gold no-underline transition-colors hover:text-off-white"
+              >
+                Framing for builders &amp; architects
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </div>
+          </motion.div>
+
+          {/* Real Field Installation Photo */}
+          <motion.div
+            variants={variants}
+            custom={REVEAL_STEP}
+            initial="hidden"
+            whileInView="visible"
+            viewport={REVEAL_VIEWPORT}
+            className="flex flex-col"
+          >
+            <div className="night-reel relative aspect-[4/3] flex-1 overflow-hidden min-h-[340px]">
+              <Image
+                src="/images/steel-built-luxury.jpg"
+                alt="Precision heavy-gauge steel stud framing installed on an architectural Paradise Valley build"
+                fill
+                sizes="(max-width: 1024px) 100vw, 560px"
+                className="object-cover"
+              />
+              <span className="night-reel-chip">
+                <i className="night-live-dot" aria-hidden="true" />
+                Structural Phase · Paradise Valley
+              </span>
+            </div>
+            <div className="mt-3 flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.16em] text-off-white/50">
+              <span>Laser-aligned steel studs · 16&quot; O.C.</span>
+              <span>Self-Performed</span>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </section>
   );

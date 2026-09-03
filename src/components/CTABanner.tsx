@@ -18,6 +18,7 @@ import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { REVEAL_VIEWPORT } from "@/lib/reveal";
 import Link from "next/link";
 import { Phone } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -52,7 +53,7 @@ function CTAShell({
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(to bottom, rgba(45,74,74,0.93), rgba(45,74,74,0.86) 45%, rgba(45,74,74,0.94))",
+                "linear-gradient(to bottom, rgba(13,21,21,0.92), rgba(13,21,21,0.78) 45%, rgba(13,21,21,0.94))",
             }}
           />
         </div>
@@ -62,12 +63,12 @@ function CTAShell({
         aria-hidden="true"
         style={{
           background:
-            "radial-gradient(ellipse 55% 70% at 50% 50%, rgba(200,165,90,0.10), transparent 70%)",
+            "radial-gradient(ellipse 55% 70% at 50% 50%, rgba(212,175,55,0.15), transparent 70%)",
         }}
       />
       <motion.div
         className="relative"
-        initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0.12, y: 22 }}
+        initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={REVEAL_VIEWPORT}
         transition={{ duration: 1, ease: EASE }}
@@ -79,7 +80,7 @@ function CTAShell({
 }
 
 const goldBtn =
-  "inline-block rounded-[2px] bg-gold px-[34px] py-[15px] text-[12px] font-semibold uppercase tracking-[0.1em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:bg-[#d4a94c] hover:shadow-[0_10px_34px_rgba(200,165,90,0.28)]";
+  "inline-block rounded-[2px] bg-gradient-to-r from-gold to-[#c49a2a] px-[36px] py-[16px] text-[12px] font-semibold uppercase tracking-[0.12em] text-teal-dark no-underline transition-all hover:-translate-y-px hover:from-[#e2bc48] hover:to-[#d4aa3b] hover:shadow-[0_10px_34px_rgba(212,175,55,0.38)]";
 
 const lineBtn =
   "inline-flex items-center gap-2 rounded-[2px] border border-off-white/25 px-[26px] py-[14px] text-[12px] font-medium uppercase tracking-[0.08em] text-off-white/80 no-underline transition-colors hover:border-gold hover:text-gold";
@@ -101,13 +102,20 @@ export function CTABanner({ variant = "homeowner" }: { variant?: CTAVariant } = 
           schedule.
         </p>
         <div className="mt-11 flex flex-wrap items-center justify-center gap-4">
-          <a
-            href="mailto:info@saddlewoodcontracting.com?subject=Plans%20for%20bid"
+          <Link
+            href="/contact"
+            onClick={() =>
+              track("cta_click", { cta: "send_plans_builder", location: "cta_banner" })
+            }
             className={goldBtn}
           >
             Send Us Your Plans
-          </a>
-          <a href="tel:4809996100" className={lineBtn}>
+          </Link>
+          <a
+            href="tel:4809996100"
+            onClick={() => track("phone_tap", { location: "cta_banner_builder" })}
+            className={lineBtn}
+          >
             <Phone className="h-3.5 w-3.5" aria-hidden="true" />
             (480) 999-6100
           </a>
@@ -116,7 +124,7 @@ export function CTABanner({ variant = "homeowner" }: { variant?: CTAVariant } = 
     );
   }
   return (
-    <CTAShell backdrop="/images/cta-kitchen-study.jpg">
+    <CTAShell backdrop="/images/study-terrace-luxury.jpg">
       <h2 className="font-heading text-[clamp(38px,5vw,64px)] font-medium leading-[1.12] tracking-[-0.02em] text-off-white">
         Ready to transform
         <br />
@@ -127,10 +135,20 @@ export function CTABanner({ variant = "homeowner" }: { variant?: CTAVariant } = 
         your space, discuss your vision, and provide a detailed estimate.
       </p>
       <div className="mt-11 flex flex-wrap items-center justify-center gap-4">
-        <Link href="/contact" className={goldBtn}>
+        <Link
+          href="/contact"
+          onClick={() =>
+            track("cta_click", { cta: "schedule_consultation", location: "cta_banner" })
+          }
+          className={goldBtn}
+        >
           Schedule Consultation
         </Link>
-        <a href="tel:4809996100" className={lineBtn}>
+        <a
+          href="tel:4809996100"
+          onClick={() => track("phone_tap", { location: "cta_banner_homeowner" })}
+          className={lineBtn}
+        >
           <Phone className="h-3.5 w-3.5" aria-hidden="true" />
           (480) 999-6100
         </a>

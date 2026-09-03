@@ -46,7 +46,7 @@ export async function generateMetadata({
   return {
     // The display titles are "Community · Phase"; a plain suffix keeps the
     // composed tab title to a single "·" separator.
-    title: `${study.title} Case Study | Saddlewood Contracting`,
+    title: `${study.title} Case Study`,
     description: narrativeLede(study.narrative[0] ?? ""),
     alternates: { canonical: `/portfolio/${study.slug}` },
   };
@@ -166,7 +166,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
               </div>
               <figcaption className="mt-3.5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-[10.5px] uppercase tracking-[0.18em] text-off-white/60">
                 <span>{plate.caption}</span>
-                <span className="text-off-white/40">
+                <span className="text-off-white/60">
                   Saddlewood Contracting · Scottsdale, AZ
                 </span>
               </figcaption>

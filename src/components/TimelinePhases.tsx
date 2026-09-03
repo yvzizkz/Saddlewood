@@ -38,7 +38,7 @@ export function TimelinePhases({ phases, className }: TimelinePhasesProps) {
           key={item.phase}
           className="grid grid-cols-[76px_1fr] gap-x-6 border-b border-off-white/[0.14] py-[clamp(22px,3.4vh,34px)] sm:grid-cols-[120px_1fr] sm:gap-x-10"
           initial={
-            prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0.12, y: 22 }
+            prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }
           }
           whileInView={{ opacity: 1, y: 0 }}
           viewport={REVEAL_VIEWPORT}

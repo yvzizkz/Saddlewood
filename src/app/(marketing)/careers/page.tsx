@@ -5,7 +5,7 @@ import { PageHero } from "@/components/PageHero";
 import { GarageElevation } from "@/components/linework";
 
 export const metadata: Metadata = {
-  title: "Careers | Build With Saddlewood in Scottsdale | Saddlewood",
+  title: "Careers | Build With Saddlewood in Scottsdale",
   description:
     "Saddlewood is hiring in Scottsdale: framing carpenters, an estimating & sales admin, and a part-time bookkeeper. Real projects, steady work, a team that pays attention.",
 };

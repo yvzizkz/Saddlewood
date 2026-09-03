@@ -41,7 +41,7 @@ interface ServicesCategoriesProps {
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const revealVariants: Variants = {
-  hidden: { opacity: 0.12, y: 22 },
+  hidden: { opacity: 0, y: 22 },
   visible: (delay: number = 0) => ({
     opacity: 1,
     y: 0,
