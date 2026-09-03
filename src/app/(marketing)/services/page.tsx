@@ -127,7 +127,7 @@ export default function ServicesPage() {
         "Full transformations from demolition through final reveal. One contract, one crew, every trade under our own four ROC licenses.",
       media: {
         src: "/images/steel-aerial-frame.jpg",
-        alt: "Drone aerial of the steel deck on the active Paradise Valley build",
+        alt: "Drone aerial of the roof deck on the active Paradise Valley build",
         caption: "From the active Paradise Valley build",
       },
       href: "/portfolio/paradise-valley-whole-home-build",
@@ -139,7 +139,7 @@ export default function ServicesPage() {
         "Pools, covered patios, outdoor kitchens, and architectural lighting designed for 300+ days of Sonoran sun.",
       media: {
         src: "/images/study-terrace-luxury.jpg",
-        alt: "Architectural study of the outdoor living terrace: cantilevered steel overhang, sunken fire lounge, and reflection pool",
+        alt: "Architectural study of the outdoor living terrace: cantilevered shade overhang, sunken fire lounge, and reflection pool",
         caption: "Study · outdoor living program",
       },
       href: "/portfolio",

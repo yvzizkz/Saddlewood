@@ -41,7 +41,7 @@ const scopeLines: { name: string; detail: string }[] = [
   },
   {
     name: "Additions & structural",
-    detail: "Steel framing and shear work built to the engineer's set.",
+    detail: "Structural framing and shear work built to the engineer's set.",
   },
   {
     name: "Outdoor living",
@@ -172,8 +172,8 @@ export function FullScopeSection() {
 const structuralSpecs = [
   {
     num: "01",
-    title: "Cold-Formed Structural Steel",
-    desc: "Heavy-gauge studs aligned at 16 inches on center, deflection tracks, and engineered headers.",
+    title: "Custom Wood & Precision Framing",
+    desc: "Wall studs aligned at 16 inches on center, structural headers, and engineered assemblies.",
   },
   {
     num: "02",
@@ -220,7 +220,7 @@ export function FramingPairSection() {
           viewport={REVEAL_VIEWPORT}
           className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-off-white/70"
         >
-          Steel studs at 16 inches on center, shear panels screwed to
+          Framing studs at 16 inches on center, shear panels fastened to
           schedule, holdowns where the plans call them. The crew that reads
           the S-sheets installs them.
         </motion.p>
@@ -286,7 +286,7 @@ export function FramingPairSection() {
             <div className="night-reel relative aspect-[4/3] flex-1 overflow-hidden min-h-[340px]">
               <Image
                 src="/images/steel-built-luxury.jpg"
-                alt="Precision heavy-gauge steel stud framing installed on an architectural Paradise Valley build"
+                alt="Precision framing installed on an architectural Paradise Valley build"
                 fill
                 sizes="(max-width: 1024px) 100vw, 560px"
                 className="object-cover"
@@ -297,7 +297,7 @@ export function FramingPairSection() {
               </span>
             </div>
             <div className="mt-3 flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.16em] text-off-white/50">
-              <span>Laser-aligned steel studs · 16&quot; O.C.</span>
+              <span>Laser-aligned studs · 16&quot; O.C.</span>
               <span>Self-Performed</span>
             </div>
           </motion.div>

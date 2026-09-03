@@ -4,7 +4,7 @@ import { TransitionBand } from "@/components/TransitionBand";
 import { ServicesProcess } from "@/components/ServicesProcess";
 import { CTABanner } from "@/components/CTABanner";
 import { getCaseStudy } from "@/data/case-studies";
-import { SteelBeam } from "@/components/linework";
+import { WallSection } from "@/components/linework";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://saddlewoodcontracting.com";
 
@@ -47,10 +47,10 @@ const phaseOutcomes = [
   "Same crew through finish: herringbone marble, fluted glass, hammered silver tub.",
 ];
 
-// Field notes from the active Paradise Valley steel-frame build.
+// Field notes from the active Paradise Valley custom build.
 const siteNotes = [
   "The structural frame erected on the foundation.",
-  "Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection.",
+  "Engineered structural framing members staged on site before installation.",
 ];
 
 export default function NewConstructionPage() {
@@ -71,7 +71,7 @@ export default function NewConstructionPage() {
           src: "/videos/saddlewood-reel-how-it-started-wide.mp4",
           poster: "/videos/saddlewood-reel-how-it-started-wide-poster.jpg",
         }}
-        label="Steel structure of the active Paradise Valley build, from the how-it-started reel"
+        label="Structure of the active Paradise Valley build, from the how-it-started reel"
         chip={{ text: "On site now · Paradise Valley", live: true }}
         eyebrow="New Construction"
         title="We build from the studs up."
@@ -114,17 +114,17 @@ export default function NewConstructionPage() {
               Currently breaking ground in Paradise Valley.
             </h2>
             <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
-              We are currently self-performing the structural phase on an active custom estate in Paradise Valley. The structural phase is underway now; our crews take the build from there with custom wood and metal stud framing.
+              We are currently self-performing the framing phase on an active custom estate in Paradise Valley. The framing phase is underway now; our crews carry the build through precision custom framing.
             </p>
             <p className="mt-5 max-w-[560px] text-[13.5px] leading-[1.75] text-off-white/[0.55]">
-              <em>Note: This is an active, in-progress steel-frame build. The demolition-to-finish sequence shown below highlights a separate, completed wood-framed home in Paradise Valley to demonstrate the complete lifecycle of our construction process.</em>
+              <em>Note: This is an active, in-progress custom build. The demolition-to-finish sequence shown below highlights a separate, completed home in Paradise Valley to demonstrate the complete lifecycle of our construction process.</em>
             </p>
           </div>
 
-          {/* Drawn steel detail + field notes */}
+          {/* Drawn framing detail + field notes */}
           <div>
             <figure className="mb-0 ml-0 mr-0 mt-0" aria-hidden="true">
-              <SteelBeam className="block h-auto w-full max-w-[340px]" />
+              <WallSection className="block h-auto w-full max-w-[340px]" />
             </figure>
             <div className="mt-8">
               <div className="text-[10.5px] font-medium uppercase tracking-[0.25em] text-gold">
@@ -157,14 +157,14 @@ export default function NewConstructionPage() {
         />
       )}
 
-      {/* Transition band — interior steel studs on the active build, a
+      {/* Transition band — interior framed walls on the active build, a
           media ground between the deep process section and the cream
           trades strip. */}
       <TransitionBand
         src="/videos/saddlewood-transition-band-b.mp4"
         poster="/videos/saddlewood-transition-band-b-poster.jpg"
-        eyebrow="Steel Framing · Filmed On Site"
-        label="Interior steel stud walls of the active Paradise Valley build"
+        eyebrow="Precision Framing · Filmed On Site"
+        label="Interior framed walls of the active Paradise Valley build"
       />
 
       {/* Trades / ROC credential strip — cream interlude: off-white ground,

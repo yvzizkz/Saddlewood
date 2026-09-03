@@ -79,7 +79,7 @@ export const neighborhoods: Record<string, NeighborhoodData> = {
     tagline: "Precision Custom Construction and Whole-Home Renovations in Arizona's Premier Enclave",
     description: [
       "Paradise Valley is a quiet enclave nestled between Camelback Mountain and Mummy Mountain. Characterized by spacious acre-plus lots and custom estates, it demands the highest standard of architectural execution. The town maintains strict permitting processes and strict building codes.",
-      "Saddlewood Contracting is well-established in Paradise Valley. We have experience with complex projects here, including a comprehensive whole-home demo and rebuild, as well as an in-progress steel-framed new home construction. We excel at translating architectural designs into physical structures.",
+      "Saddlewood Contracting is well-established in Paradise Valley. We have experience with complex projects here, including a comprehensive whole-home demo and rebuild, as well as an in-progress custom new home construction. We excel at translating architectural designs into physical structures.",
       "We hold four active Arizona licenses across general contracting, electrical, plumbing, and HVAC. This structure allows us to self-perform key phases of construction. We maintain total quality control on these large-scale projects.",
     ],
     features: [

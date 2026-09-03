@@ -39,7 +39,7 @@ const fadeUpVariants: Variants = {
 
 const PLATE = "/images/about-lead-framing.jpg";
 const PLATE_ALT =
-  "A Saddlewood team lead standing in the steel framing of the active Paradise Valley build";
+  "A Saddlewood team lead standing in the structural framing of the active Paradise Valley build";
 
 interface AboutHeroProps {
   children?: ReactNode;

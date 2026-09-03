@@ -51,7 +51,7 @@ export function PlanBuildAim() {
       tag: "02 · The build",
       heading: "Framing now",
       caption:
-        "Steel framing underway, self-performed. The reel above is this site.",
+        "Precision framing underway, self-performed. The reel above is this site.",
       media: (
         <VideoPanel
           src="/videos/saddlewood-sparks-loop.mp4"

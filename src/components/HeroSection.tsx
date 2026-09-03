@@ -85,7 +85,7 @@ export function HeroSection() {
       <VideoPanel
         src="/videos/saddlewood-hero-loop-wide-enhanced.mp4"
         poster="/videos/saddlewood-hero-loop-wide-poster.jpg"
-        label="Steel framing underway on the active Paradise Valley build"
+        label="Framing underway on the active Paradise Valley build"
         className="absolute inset-0 h-full w-full object-cover"
         // One slow pass on arrival, then the hero rests on the closing
         // plate — the page settles instead of churning behind the copy.
@@ -228,7 +228,7 @@ export function HeroSection() {
           variants={fadeUpVariants}
           className="mt-6 max-w-[52ch] text-[17px] leading-[1.7] text-off-white/[0.78]"
         >
-          New construction, whole-home remodels, and steel framing. One point
+          New construction, whole-home remodels, and structural framing. One point
           of contact, every trade handled{" "}
           <span className="whitespace-nowrap">in-house</span> from demo to
           final&nbsp;detail.

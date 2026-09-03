@@ -71,7 +71,7 @@ export const caseStudies: CaseStudy[] = [
     timelinePhases: [],
     narrative: [
       "The estate sits against Paradise Valley's mountain backdrop, a full transformation from the ground up. Clean horizontal lines and deep eaves meet the desert sky, and from above the geometry of the architecture meets the geometry of the desert as a single composition. The entry sets the tone for the entire home: exposed beams, oversized art, and warm oak floors create an immediate sense of arrival.",
-      "Inside, coffered ceilings and white oak built-ins frame the desert views, with a statement ring chandelier anchoring the great room. Sliding doors open the family room directly to the pool, so interior and exterior read as one room. A climate-controlled wine wall, with stone backing and blackened steel framing, doubles as a design statement at the heart of the home, and from the foyer the eye carries straight through to it, one continuous line from the front door to the far wall.",
+      "Inside, coffered ceilings and white oak built-ins frame the desert views, with a statement ring chandelier anchoring the great room. Sliding doors open the family room directly to the pool, so interior and exterior read as one room. A climate-controlled wine wall, with stone backing and blackened metal trim, doubles as a design statement at the heart of the home, and from the foyer the eye carries straight through to it, one continuous line from the front door to the far wall.",
       "An oversized skylight pulls daylight into the primary suite, where oak paneling and a framed window view do the rest. The walk-in closet was designed as its own room, with galley storage, an integrated vanity, and a lit mirror. Even the laundry room carries the same finish discipline as the kitchen, and a crystal chandelier turns the office bar into a signature room.",
       "Outdoors, landscape lighting and clean lines set up the pool and lounge for evening entertaining as the sky turns over Paradise Valley. A floor-to-ceiling stone fireplace makes the covered patio year-round living space, and the outdoor kitchen sits steps from the dining area, an entire entertaining program built outside. Desert evenings run long here.",
     ],
@@ -278,7 +278,7 @@ export const caseStudies: CaseStudy[] = [
     ],
     // No reel: the surviving job-site reels document the separate, active
     // steel-frame build and live on /new-construction and /framing instead.
-    linework: "steel-beam",
+    linework: "wall-section",
     legacySlugs: ["paradise-valley-40th-street-whole-home-build"],
   },
 

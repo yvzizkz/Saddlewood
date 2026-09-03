@@ -41,13 +41,13 @@ const PV_SLUGS = [
 const estatePlates = [
   {
     src: "/images/build-02-framing.jpg",
-    alt: "Steel stud framing standing on the slab of the Paradise Valley estate",
+    alt: "Stud framing standing on the slab of the Paradise Valley estate",
     caption: "Framing · filmed on site",
   },
   {
     src: "/images/steel-aerial-frame.jpg",
-    alt: "Drone aerial of the steel deck on the Paradise Valley estate",
-    caption: "Steel deck · filmed on site",
+    alt: "Drone aerial of the roof deck framing on the Paradise Valley estate",
+    caption: "Roof deck framing · filmed on site",
   },
   {
     src: "/images/vision-entry.jpg",

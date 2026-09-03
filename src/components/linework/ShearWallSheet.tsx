@@ -102,7 +102,7 @@ export function ShearWallSheet({ className, glow = false }: ShearWallSheetProps)
         20&quot; TYP
       </Figure>
       <Figure x={28} y={110} size={10}>
-        STEEL STUDS
+        WALL STUDS
       </Figure>
       <Figure x={28} y={130} size={10}>
         16&quot; O.C.

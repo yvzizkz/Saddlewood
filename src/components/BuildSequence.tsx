@@ -44,14 +44,14 @@ const beats: Beat[] = [
   {
     tag: "02",
     src: "/images/build-02-framing.jpg",
-    alt: "Steel stud framing standing on the slab, desert visible beyond",
+    alt: "Framing standing on the slab, desert visible beyond",
     heading: "Framing",
-    caption: "The same lines, standing in steel.",
+    caption: "The same lines, framed on the slab.",
   },
   {
     tag: "03",
     src: "/images/build-03-crew.jpg",
-    alt: "Two Saddlewood crew members setting steel from a scaffold",
+    alt: "Two Saddlewood crew members framing from a scaffold",
     heading: "The crew",
     caption: "Our own tradespeople, on our own payroll.",
   },
@@ -87,7 +87,7 @@ export function BuildSequence() {
           className="mt-6 max-w-[56ch] text-[15.5px] leading-[1.8] text-charcoal-light"
         >
           On the active Paradise Valley build, the walls were marked out on
-          the concrete before a stud went up, then framed in steel by the same
+          the concrete before a stud went up, then framed by the same
           crew that laid them out. One point of contact, from the first chalk
           line to the last detail.
         </motion.p>

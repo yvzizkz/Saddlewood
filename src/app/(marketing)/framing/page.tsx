@@ -33,7 +33,7 @@ export const metadata = {
 const siteNotes = [
   "Framing taking shape over a new Paradise Valley estate.",
   "The structural frame set on the foundation; our crews carry the framing from here.",
-  "Galvanized structural-phase steel (set by the project's steel trade) staged on site before erection.",
+  "Engineered structural framing members staged on site before installation.",
 ];
 
 // The completed Paradise Valley wood-framed build, phase by phase, in
@@ -118,7 +118,7 @@ export default function FramingPage() {
           src: "/videos/saddlewood-transition-band-b.mp4",
           poster: "/videos/saddlewood-transition-band-b-poster.jpg",
         }}
-        label="Interior steel stud walls of the active Paradise Valley build"
+        label="Interior framed walls of the active Paradise Valley build"
         chip={{ text: "Self-Performed", live: true }}
         eyebrow="Framing Subcontractor"
         title="A licensed AZ framing crew that self-performs."
@@ -167,7 +167,7 @@ export default function FramingPage() {
               <VideoReel
                 src="/videos/saddlewood-steel-framing-full.mp4"
                 poster="/videos/saddlewood-steel-framing-full-poster.jpg"
-                label="The full steel framing reel from the active Paradise Valley build"
+                label="Framing reel from the active Paradise Valley build"
                 aspect="9x16"
                 mode="autoplay"
                 className="rounded-none bg-teal-dark"
@@ -185,7 +185,7 @@ export default function FramingPage() {
       </section>
 
       {/* The Working Set — traced shear wall detail beside the installed
-          steel, the Drawn/Delivered pair pattern on the cream interlude:
+          framing, the Drawn/Delivered pair pattern on the cream interlude:
           off-white ground, teal drafting grid, charcoal type. */}
       <section
         className="night-on-cream relative border-y border-gold/[0.35] bg-off-white py-[clamp(72px,9vh,112px)] text-charcoal"
@@ -198,7 +198,7 @@ export default function FramingPage() {
             Engineered, then self-performed.
           </h2>
           <p className="mt-6 max-w-[54ch] text-[15.5px] leading-[1.8] text-charcoal-light">
-            Steel studs at 16 inches on center, shear panels screwed to
+            Framing studs at 16 inches on center, shear panels fastened to
             schedule, holdowns where the plans call them. The same crew that
             reads the S-sheets installs them.
           </p>
@@ -222,7 +222,7 @@ export default function FramingPage() {
                 children: (
                   <PhotoWipe
                     src="/images/steel-built-luxury.jpg"
-                    alt="Precision steel stud framing installed on an architectural Paradise Valley build"
+                    alt="Precision stud framing installed on an architectural Paradise Valley build"
                   />
                 ),
               }}
@@ -266,7 +266,7 @@ export default function FramingPage() {
       {/* Field Fabrication & Cutter Sparks Reel */}
       <section
         className="relative border-t border-off-white/[0.08] py-[clamp(72px,9vh,112px)]"
-        aria-label="Field fabrication and steel cutting on site"
+        aria-label="Field fabrication and precision framing on site"
       >
         <div className="mx-auto grid w-full max-w-[1240px] items-start gap-[clamp(40px,6vw,96px)] px-5 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
           <div>
@@ -275,12 +275,12 @@ export default function FramingPage() {
               Cutter sparks, angle grinders, and laser precision.
             </h2>
             <p className="mt-6 max-w-[560px] text-[15.5px] leading-[1.8] text-off-white/70">
-              We cut, cope, and fasten our structural steel framing members directly on site. Every stud is laser-plumbed, every shear panel is fastened to engineering schedule, and every holdown is torqued to structural specifications.
+              We cut, cope, and fasten framing members directly on site. Every stud is laser-plumbed, every shear panel is fastened to engineering schedule, and every holdown is torqued to structural specifications.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-6 font-mono text-[11px] uppercase tracking-[0.18em] text-gold">
               <span className="flex items-center gap-2">
                 <span className="size-1.5 rounded-full bg-gold" />
-                Heavy-Gauge Steel Studs
+                Heavy-Gauge &amp; Custom Studs
               </span>
               <span className="flex items-center gap-2">
                 <span className="size-1.5 rounded-full bg-gold" />
@@ -298,7 +298,7 @@ export default function FramingPage() {
               <VideoReel
                 src="/videos/saddlewood-sparks-loop.mp4"
                 poster="/videos/saddlewood-sparks-loop-poster.jpg"
-                label="Angle grinder cutter sparks during heavy-gauge steel stud fabrication on site"
+                label="Angle grinder cutter sparks during framing fabrication on site"
                 aspect="9x16"
                 mode="autoplay"
                 className="rounded-none bg-teal-dark"
@@ -309,7 +309,7 @@ export default function FramingPage() {
               </span>
             </div>
             <div className="mt-4 text-[10.5px] uppercase tracking-[0.2em] text-off-white/60">
-              Steel cutting &amp; framing · Filmed on site
+              Field fabrication &amp; framing · Filmed on site
             </div>
           </div>
         </div>

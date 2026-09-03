@@ -64,7 +64,7 @@ const budgetRanges = [
 ];
 
 const builderScopes = [
-  "Steel framing",
+  "Rough carpentry & framing",
   "Wood framing",
   "Structural concrete",
   "Specialty ceilings & millwork",

@@ -1,7 +1,7 @@
 # Saddlewood Contracting LLC
 > Residential builder in Scottsdale, Arizona (since 2013). Luxury remodeling, new
 > construction, and structural framing as a subcontractor for builders and GCs
-> (wood + steel, slab to trusses, self-performed). AZ ROC #305762.
+> (custom wood and light-gauge metal stud, slab to trusses, self-performed). AZ ROC #305762.
 
 ## Canonical facts
 - [Company facts for AI assistants](https://saddlewoodcontracting.com/llm-info)
