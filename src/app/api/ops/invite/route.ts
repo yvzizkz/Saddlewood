@@ -29,6 +29,23 @@ const schema = z.object({
       return t > Date.now() && t < Date.now() + 72 * 3600 * 1000;
     }, "scheduledAt must be in the future and within 72 hours")
     .optional(),
+  // Up to three files, base64 content, 4.5 MB of base64 each. Not combinable
+  // with scheduledAt (Resend holds scheduled sends without attachments).
+  attachments: z
+    .array(
+      z.object({
+        filename: z
+          .string()
+          .trim()
+          .min(1)
+          .max(120)
+          .regex(/^[A-Za-z0-9 ._()-]+$/, "filename may only use letters, digits, space, . _ ( ) -"),
+        content: z.string().min(1).max(4_500_000),
+        contentType: z.string().trim().max(100).optional(),
+      }),
+    )
+    .max(3)
+    .optional(),
   message: z
     .object({
       eyebrow: z.string().trim().max(60).optional(),
@@ -39,7 +56,10 @@ const schema = z.object({
       footer: z.string().trim().max(600).optional(),
     })
     .optional(),
-});
+})
+  .refine((v) => !(v.scheduledAt && v.attachments?.length), {
+    message: "attachments cannot be combined with scheduledAt",
+  });
 
 export async function POST(request: NextRequest) {
   const who = await authorizeOps(request);
@@ -78,6 +98,7 @@ export async function POST(request: NextRequest) {
         from: parsed.data.from,
         replyTo: parsed.data.replyTo,
         scheduledAt: parsed.data.scheduledAt,
+        attachments: parsed.data.attachments,
       });
       sent = res.id;
     }
@@ -89,6 +110,7 @@ export async function POST(request: NextRequest) {
       expiresInHours: 24,
       sent,
       scheduledAt: parsed.data.send ? (parsed.data.scheduledAt ?? null) : null,
+      attachments: parsed.data.send ? (parsed.data.attachments?.length ?? 0) : 0,
       by: who.actor,
     });
   } catch (e) {

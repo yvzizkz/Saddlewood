@@ -63,7 +63,11 @@ export type OutboundEmail = {
   replyTo?: string;
   /** ISO 8601 instant. Resend holds the email and sends it then (up to 72 hours out). */
   scheduledAt?: string;
+  /** Files to attach; content is base64. Resend does not combine these with scheduledAt. */
+  attachments?: EmailAttachment[];
 };
+
+export type EmailAttachment = { filename: string; content: string; contentType?: string };
 
 export async function sendEmail(msg: OutboundEmail): Promise<{ id: string | null }> {
   const key = process.env.RESEND_API_KEY;
@@ -81,6 +85,15 @@ export async function sendEmail(msg: OutboundEmail): Promise<{ id: string | null
     text: msg.text,
     ...(msg.replyTo ? { replyTo: msg.replyTo } : {}),
     ...(msg.scheduledAt ? { scheduledAt: msg.scheduledAt } : {}),
+    ...(msg.attachments?.length
+      ? {
+          attachments: msg.attachments.map((a) => ({
+            filename: a.filename,
+            content: a.content,
+            ...(a.contentType ? { contentType: a.contentType } : {}),
+          })),
+        }
+      : {}),
   });
   if (error) throw new Error(`resend: ${error.message}`);
   return { id: data?.id ?? null };

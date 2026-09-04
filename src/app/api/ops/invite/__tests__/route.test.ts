@@ -91,4 +91,42 @@ describe("POST /api/ops/invite", () => {
     expect(res.status).toBe(403);
     expect(genMock).not.toHaveBeenCalled();
   });
+
+  it("passes attachments through to the sender", async () => {
+    const res = await POST(
+      req(
+        {
+          email: "marco@saddlewoodcontracting.com",
+          send: true,
+          from: "Saddlewood Operations <ops@saddlewoodcontracting.com>",
+          attachments: [{ filename: "Packet.pdf", content: "JVBERi0xLjQK", contentType: "application/pdf" }],
+        },
+        { Authorization: `Bearer ${TOKEN}` },
+      ) as never,
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.attachments).toBe(1);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][0].attachments).toEqual([
+      { filename: "Packet.pdf", content: "JVBERi0xLjQK", contentType: "application/pdf" },
+    ]);
+  });
+
+  it("refuses attachments on a scheduled send", async () => {
+    const at = new Date(Date.now() + 3600 * 1000).toISOString();
+    const res = await POST(
+      req(
+        {
+          email: "marco@saddlewoodcontracting.com",
+          send: true,
+          scheduledAt: at,
+          attachments: [{ filename: "Packet.pdf", content: "JVBERi0xLjQK" }],
+        },
+        { Authorization: `Bearer ${TOKEN}` },
+      ) as never,
+    );
+    expect(res.status).toBe(400);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
 });
