@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { countPendingEstimates } from "@/lib/estimates/queries";
 import BottomTabBar from "@/components/layout/BottomTabBar";
 import DesktopSidebar from "@/components/layout/DesktopSidebar";
@@ -18,6 +19,13 @@ export default async function InternalLayout({
 
   if (!user || error) {
     redirect("/login");
+  }
+
+  // The allowlist is the real gate. A session for any other address, however
+  // it was created, is ended here and sent back to the login page.
+  if (!isAllowedEmail(user.email)) {
+    await supabase.auth.signOut();
+    redirect("/login?error=unauthorized");
   }
 
   const pendingCount = await countPendingEstimates();

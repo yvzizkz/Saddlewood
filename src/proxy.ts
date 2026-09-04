@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAllowedEmail } from "@/lib/ops/allowlist";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -34,12 +35,9 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const allowedEmails = (process.env.INTERNAL_ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  const userEmail = user?.email?.toLowerCase() ?? null;
-  const isAllowed = userEmail !== null && allowedEmails.includes(userEmail);
+  // One allowlist for the proxy, the internal layout, the login page, and the
+  // Ops API: src/lib/ops/allowlist.ts. INTERNAL_ALLOWED_EMAILS still overrides.
+  const isAllowed = isAllowedEmail(user?.email);
 
   if (pathname.startsWith("/internal")) {
     if (!user) {

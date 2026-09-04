@@ -4,6 +4,7 @@ import { useState, Suspense, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import { isAllowedEmail } from "@/lib/ops/allowlist";
 
 type FormState =
   | "idle"
@@ -12,10 +13,6 @@ type FormState =
   | "verifying"
   | "error";
 
-const ALLOWED_EMAILS = [
-  "marco@saddlewoodcontracting.com",
-  "info@saddlewoodcontracting.com",
-];
 const OTP_LENGTH = 8;
 
 function LoginForm() {
@@ -33,7 +30,7 @@ function LoginForm() {
     setFormState("sending");
     setErrorMessage("");
 
-    if (!ALLOWED_EMAILS.includes(email.trim().toLowerCase())) {
+    if (!isAllowedEmail(email, "")) {
       setFormState("error");
       setErrorMessage("You are not authorized to access this portal.");
       return;

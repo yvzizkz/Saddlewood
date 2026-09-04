@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, List, BookOpen, Activity, type LucideIcon } from 'lucide-react'
+import { Home, List, BookOpen, Activity, ClipboardList, type LucideIcon } from 'lucide-react'
 
 type Tab = {
   href: string
@@ -24,6 +24,7 @@ export default function BottomTabBar({ pendingCount }: BottomTabBarProps) {
     { href: '/internal?tab=all', label: 'All', icon: List },
     { href: '/internal/bid-log', label: 'Bid Log', icon: BookOpen },
     { href: '/internal/activity', label: 'Activity', icon: Activity },
+    { href: '/internal/ops', label: 'Ops', icon: ClipboardList },
   ]
 
   function isActive(href: string): boolean {

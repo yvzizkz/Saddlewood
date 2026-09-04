@@ -448,3 +448,26 @@ img {
 }
 .reel-corner--tl { top: -7px; left: -7px; border-right: 0; border-bottom: 0; }
 .reel-corner--br { bottom: -7px; right: -7px; border-left: 0; border-top: 0; }
+
+
+/* ===== INTERNAL OPS DOCUMENTS (markdown from the KB repo) ===== */
+.ops-doc { color: var(--charcoal); font-size: 15px; line-height: 1.65; }
+.ops-doc h1 { font-size: 2rem; margin: 0 0 1rem; }
+.ops-doc h2 { font-size: 1.45rem; margin: 2.2rem 0 0.75rem; padding-top: 1.2rem; border-top: 1px solid var(--stone); }
+.ops-doc h3 { font-size: 1.15rem; margin: 1.6rem 0 0.5rem; }
+.ops-doc h4 { font-size: 1rem; margin: 1.2rem 0 0.4rem; }
+.ops-doc p { margin: 0 0 0.9rem; max-width: 70ch; }
+.ops-doc ul, .ops-doc ol { margin: 0 0 1rem; padding-left: 1.4rem; max-width: 70ch; }
+.ops-doc li { margin: 0.25rem 0; }
+.ops-doc li > p { margin: 0; }
+.ops-doc blockquote { margin: 1rem 0; padding: 0.6rem 1rem; border-left: 3px solid var(--gold); background: var(--cream); max-width: 70ch; }
+.ops-doc blockquote p { margin: 0; }
+.ops-doc code { font-family: var(--font-mono); font-size: 0.85em; background: var(--cream); padding: 0.1em 0.35em; border-radius: 3px; }
+.ops-doc pre { background: var(--cream); border: 1px solid var(--stone); padding: 0.8rem 1rem; overflow-x: auto; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; }
+.ops-doc pre code { background: transparent; padding: 0; font-size: inherit; }
+.ops-doc table { display: block; overflow-x: auto; border-collapse: collapse; width: 100%; font-size: 0.875rem; margin: 0.6rem 0 1.2rem; }
+.ops-doc th, .ops-doc td { text-align: left; vertical-align: top; padding: 0.45rem 0.7rem; border: 1px solid var(--stone); }
+.ops-doc th { background: var(--cream); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--charcoal-light); }
+.ops-doc hr { border: 0; border-top: 1px solid var(--stone); margin: 2rem 0; }
+.ops-doc a { color: var(--teal); text-decoration: underline; }
+.ops-doc input[type="checkbox"] { margin-right: 0.4rem; }

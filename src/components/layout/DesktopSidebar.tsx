@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, List, BookOpen, Activity, Settings, type LucideIcon } from 'lucide-react'
+import { Home, List, BookOpen, Activity, Settings, ClipboardList, type LucideIcon } from 'lucide-react'
 
 type NavItem = {
   href: string
@@ -22,6 +22,7 @@ export default function DesktopSidebar({ pendingCount }: DesktopSidebarProps) {
     { href: '/internal?tab=all', label: 'All', icon: List },
     { href: '/internal/bid-log', label: 'Bid Log', icon: BookOpen },
     { href: '/internal/activity', label: 'Activity', icon: Activity },
+    { href: '/internal/ops', label: 'Ops', icon: ClipboardList },
   ]
 
   function isActive(href: string): boolean {
