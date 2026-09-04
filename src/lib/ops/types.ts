@@ -92,3 +92,80 @@ export function slugFromTitle(title: string): string {
     .slice(0, 48);
   return base.length >= 2 ? base : `card-${Date.now().toString(36)}`;
 }
+
+// ---- Goals and the calendar ------------------------------------------------
+
+export const GOAL_KINDS = ["goal", "milestone", "deadline", "recurring"] as const;
+export type GoalKind = (typeof GOAL_KINDS)[number];
+
+export const GOAL_OWNERS = [...OPS_OWNERS, "Team"] as const;
+export type GoalOwner = (typeof GOAL_OWNERS)[number];
+
+export const GOAL_HORIZONS = ["rhythm", "30-days", "deadlines", "quarter", "2027", "exit"] as const;
+export type GoalHorizon = (typeof GOAL_HORIZONS)[number];
+
+export const GOAL_HORIZON_LABELS: Record<GoalHorizon, string> = {
+  rhythm: "The weekly rhythm",
+  "30-days": "First 30 days",
+  deadlines: "Money and compliance deadlines",
+  quarter: "By year end",
+  "2027": "2027",
+  exit: "The exit",
+};
+
+export type OpsGoal = {
+  id: string;
+  title: string;
+  kind: GoalKind;
+  owner: GoalOwner;
+  dueDate: string | null;
+  recurWeekday: number | null;
+  recurMonthday: number | null;
+  horizon: GoalHorizon | null;
+  status: "open" | "done";
+  notes: string;
+  cardId: string | null;
+  docSlug: string | null;
+  doneAt: string | null;
+  updatedBy: string;
+  updatedAt: string;
+};
+
+const goalId = z
+  .string()
+  .trim()
+  .min(2)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9-]*$/, "id must be lowercase letters, digits, and dashes");
+
+export const createGoalSchema = z.object({
+  id: goalId.optional(),
+  title: z.string().trim().min(3).max(200),
+  kind: z.enum(GOAL_KINDS).default("goal"),
+  owner: z.enum(GOAL_OWNERS).default("Team"),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  recurWeekday: z.number().int().min(0).max(6).nullable().optional(),
+  recurMonthday: z.number().int().min(1).max(31).nullable().optional(),
+  horizon: z.enum(GOAL_HORIZONS).nullable().optional(),
+  notes: z.string().trim().max(600).default(""),
+  cardId: z.string().trim().max(64).nullable().optional(),
+  docSlug: z.string().trim().max(64).regex(/^[a-z0-9-]*$/).nullable().optional(),
+});
+export type CreateGoalInput = z.infer<typeof createGoalSchema>;
+
+export const patchGoalSchema = z
+  .object({
+    title: z.string().trim().min(3).max(200).optional(),
+    kind: z.enum(GOAL_KINDS).optional(),
+    owner: z.enum(GOAL_OWNERS).optional(),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    recurWeekday: z.number().int().min(0).max(6).nullable().optional(),
+    recurMonthday: z.number().int().min(1).max(31).nullable().optional(),
+    horizon: z.enum(GOAL_HORIZONS).nullable().optional(),
+    status: z.enum(["open", "done"]).optional(),
+    notes: z.string().trim().max(600).optional(),
+    cardId: z.string().trim().max(64).nullable().optional(),
+    docSlug: z.string().trim().max(64).regex(/^[a-z0-9-]*$/).nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "nothing to change" });
+export type PatchGoalInput = z.infer<typeof patchGoalSchema>;

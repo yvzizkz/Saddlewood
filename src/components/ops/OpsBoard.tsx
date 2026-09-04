@@ -186,12 +186,15 @@ export default function OpsBoard({ initialCards, docTitles }: Props) {
         </p>
       )}
 
-      <div className="grid gap-3 overflow-x-auto pb-2" style={{ gridTemplateColumns: `repeat(${OPS_COLUMNS.length}, minmax(220px, 1fr))` }}>
+      <p className="md:hidden text-[11px] mb-2" style={{ color: 'var(--color-charcoal-light)' }}>
+        Swipe sideways for the other columns.
+      </p>
+      <div className="ops-board-cols">
         {OPS_COLUMNS.map((c) => {
           const list = visible.filter((k) => k.col === c)
           const good = c === 'live' || c === 'measured'
           return (
-            <section key={c} aria-labelledby={`col-${c}`} className="rounded border flex flex-col" style={{ borderColor: 'var(--color-stone)', backgroundColor: 'var(--color-cream)' }}>
+            <section key={c} aria-labelledby={`col-${c}`} className="ops-col rounded border flex flex-col" style={{ borderColor: 'var(--color-stone)', backgroundColor: 'var(--color-cream)' }}>
               <h3
                 id={`col-${c}`}
                 className="flex justify-between px-3 py-2 text-[11px] tracking-[0.12em] uppercase border-b"
@@ -254,7 +257,7 @@ export default function OpsBoard({ initialCards, docTitles }: Props) {
       </div>
 
       {undo && (
-        <div role="status" className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded px-4 py-2.5 text-sm shadow-lg" style={{ backgroundColor: 'var(--color-teal)', color: 'white' }}>
+        <div role="status" className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-3 rounded px-4 py-2.5 text-sm shadow-lg max-w-[92vw]" style={{ backgroundColor: 'var(--color-teal)', color: 'white' }}>
           <span>
             Moved “{undo.card.title}” to {OPS_COLUMN_LABELS[undo.card.col]}.
           </span>
@@ -354,7 +357,7 @@ function CardDrawer({ card, docTitle, onClose, onMove, onUpdated, onError }: Dra
   const labelStyle = { color: 'var(--color-gold-accessible)' }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+    <div className="fixed inset-0 z-[70] flex justify-end" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/30" />
       <aside className="relative h-full w-full md:w-[460px] overflow-y-auto shadow-2xl flex flex-col" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="sticky top-0 flex items-start gap-3 px-5 py-4 border-b" style={{ backgroundColor: 'var(--color-background)', borderColor: 'var(--color-stone)' }}>
@@ -374,7 +377,7 @@ function CardDrawer({ card, docTitle, onClose, onMove, onUpdated, onError }: Dra
           </button>
         </div>
 
-        <div className="px-5 py-4 flex flex-col gap-5 text-sm" style={{ color: 'var(--color-charcoal)' }}>
+        <div className="px-5 py-4 pb-safe flex flex-col gap-5 text-sm" style={{ color: 'var(--color-charcoal)', paddingBottom: 'max(24px, env(safe-area-inset-bottom, 0px))' }}>
           <section>
             <div className="flex items-center justify-between">
               <div className={label} style={labelStyle}>How to act on this</div>

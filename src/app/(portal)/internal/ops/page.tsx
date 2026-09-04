@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import OpsBoard from '@/components/ops/OpsBoard'
+import OpsSubnav from '@/components/ops/OpsSubnav'
 import { OPS_DOCS } from '@/content/ops/docs.generated'
 import { listCards } from '@/lib/ops/queries'
 import type { OpsCard } from '@/lib/ops/types'
@@ -49,6 +50,8 @@ export default async function OpsPage() {
         step into a role. Tap a card to see how to act on it, read the document behind it, leave a response
         that stays on the record, or move it.
       </p>
+
+      <OpsSubnav />
 
       <section aria-labelledby="ops-board-heading" className="mb-12">
         <h2

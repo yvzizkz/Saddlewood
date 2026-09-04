@@ -471,3 +471,36 @@ img {
 .ops-doc hr { border: 0; border-top: 1px solid var(--stone); margin: 2rem 0; }
 .ops-doc a { color: var(--teal); text-decoration: underline; }
 .ops-doc input[type="checkbox"] { margin-right: 0.4rem; }
+
+
+/* ===== OPS BOARD COLUMNS: one column per swipe on phones, a grid on desktop ===== */
+.ops-board-cols {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  margin-left: -16px;
+  margin-right: -16px;
+  padding: 0 16px 8px;
+  scrollbar-width: thin;
+}
+.ops-col { flex: 0 0 min(86vw, 320px); scroll-snap-align: center; }
+@media (min-width: 768px) {
+  .ops-board-cols {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(220px, 1fr));
+    margin: 0;
+    padding: 0 0 8px;
+    scroll-snap-type: none;
+  }
+  .ops-col { flex: initial; }
+}
+.ops-doc { overflow-wrap: anywhere; }
+.ops-doc table { max-width: 100%; }
+@media (max-width: 640px) {
+  .ops-doc { font-size: 14.5px; }
+  .ops-doc h1 { font-size: 1.6rem; }
+  .ops-doc h2 { font-size: 1.25rem; }
+  .ops-doc pre { font-size: 0.78rem; }
+}

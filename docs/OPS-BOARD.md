@@ -113,3 +113,16 @@ hour and its template pointed at localhost. The site now mints the link itself:
 
 Supabase auth config was pointed at production the same day (`site_url`,
 `uri_allow_list`, `mailer_otp_exp` 86400).
+
+## Calendar (added 2026-09-04)
+
+`/internal/ops/calendar` shows `ops_goals` (migration 0007): the weekly rhythm
+(recurring by weekday or month-day; daily rhythm = weekdays), the first-30-days
+milestones, money and compliance deadlines, and goals by horizon (quarter, 2027,
+exit). Upcoming list and a month grid; check-off writes `status` and `done_at`.
+API: `GET/POST /api/ops/goals`, `PATCH/DELETE /api/ops/goals/:id`, same auth as
+the board. CLI: `python3 bot/ops_board.py goals`, `goal add`, `goal done <id>`.
+
+Bid Log and Activity are placeholder pages that say what they will hold and
+where the information lives today; `src/app/(portal)/internal/not-found.tsx`
+covers everything else.
