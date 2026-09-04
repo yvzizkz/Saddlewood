@@ -85,3 +85,24 @@ python3 scripts/sync_ops_docs.py      # in Saddlewood-KB
 
 That regenerates `src/content/ops/docs.generated.ts` here. Commit and push the
 site. The generated file is the only copy the site holds; do not edit it.
+
+## Sign-in links (added 2026-09-04)
+
+Supabase's own mailer is no longer used. Its sender was capped at two emails an
+hour and its template pointed at localhost. The site now mints the link itself:
+
+- `POST /api/auth/send-link` `{email}`: what the login page calls. Allowlisted
+  addresses get a branded email from `PORTAL_FROM_ADDRESS` (default
+  `Saddlewood Portal <portal@saddlewoodcontracting.com>`) with a one-tap button
+  and the eight-digit code. One per minute per address; unknown addresses get
+  the same `ok` with nothing sent.
+- `GET /auth/confirm?token_hash=…&type=magiclink&next=/internal/ops`: where the
+  button lands. Verifies server-side, sets the session, redirects. Works on any
+  device; single use; 24-hour life (`mailer_otp_exp`).
+- `POST /api/ops/invite` `{email, send?, subject?, from?, replyTo?, message?}`:
+  agent-token protected. Returns a fresh link, and with `send: true` emails it
+  inside a written message. `python3 bot/ops_board.py invite <email> [--send]`
+  wraps it.
+
+Supabase auth config was pointed at production the same day (`site_url`,
+`uri_allow_list`, `mailer_otp_exp` 86400).

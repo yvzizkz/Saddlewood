@@ -16,14 +16,18 @@ type FormState =
 const OTP_LENGTH = 8;
 
 function LoginForm() {
-  const [email, setEmail] = useState("");
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState(() => searchParams.get("email") ?? "");
   const [code, setCode] = useState("");
   const [formState, setFormState] = useState<FormState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const searchParams = useSearchParams();
 
   const urlError = searchParams.get("error");
   const urlErrorDetail = searchParams.get("detail");
+  const nextPath = (() => {
+    const n = searchParams.get("next") ?? "";
+    return n.startsWith("/") && !n.startsWith("//") ? n : "/internal/ops";
+  })();
 
   async function handleSendCode() {
     if (formState === "sending") return;
@@ -36,18 +40,21 @@ function LoginForm() {
       return;
     }
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        shouldCreateUser: false,
-      },
-    });
-
-    if (error) {
+    let failed = false;
+    try {
+      const res = await fetch("/api/auth/send-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), next: nextPath }),
+      });
+      const json = await res.json();
+      failed = !res.ok || !json.ok;
+    } catch {
+      failed = true;
+    }
+    if (failed) {
       setFormState("error");
-      setErrorMessage(error.message);
+      setErrorMessage("The sign-in email could not be sent. Try again in a minute.");
       return;
     }
 
@@ -69,7 +76,7 @@ function LoginForm() {
     const { error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: cleanCode,
-      type: "email",
+      type: "magiclink",
     });
 
     if (error) {
@@ -79,7 +86,7 @@ function LoginForm() {
     }
 
     // Full navigation so proxy.ts sees the fresh session cookie.
-    window.location.href = "/internal";
+    window.location.href = nextPath;
   }
 
   function handleBackToEmail() {
@@ -121,8 +128,8 @@ function LoginForm() {
               className="text-sm text-center mb-6"
               style={{ color: "var(--color-charcoal)", opacity: 0.7 }}
             >
-              We sent a {OTP_LENGTH}-digit code to <strong>{email}</strong>. Enter it
-              below, or click the link in the email.
+              We sent an email to <strong>{email}</strong>. Tap the button in it to
+              sign in, or enter the {OTP_LENGTH}-digit code below.
             </p>
 
             <form
@@ -250,7 +257,7 @@ function LoginForm() {
                 className="w-full py-3 rounded-lg text-white font-medium text-base transition-opacity disabled:opacity-60"
                 style={{ backgroundColor: "var(--color-teal)" }}
               >
-                {formState === "sending" ? "Sending…" : "Send Sign-In Code"}
+                {formState === "sending" ? "Sending…" : "Email me a sign-in link"}
               </button>
             </form>
 
@@ -262,6 +269,10 @@ function LoginForm() {
                   ? "You are not authorized to access this portal."
                   : urlError === "exchange_failed"
                   ? `Sign-in failed: ${urlErrorDetail ?? "please try again"}`
+                  : urlError === "link_expired"
+                  ? "That sign-in link was already used or has expired. Enter your email and a fresh one will arrive."
+                  : urlError === "link_invalid"
+                  ? "That link is missing its sign-in token. Enter your email and a fresh one will arrive."
                   : "Sign-in failed. Please try again."}
               </p>
             )}
