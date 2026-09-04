@@ -72,6 +72,20 @@ describe("POST /api/ops/invite", () => {
     expect(msg.html).toContain("Open the operating model");
   });
 
+  it("passes a future scheduledAt through to the sender", async () => {
+    const at = new Date(Date.now() + 3600_000).toISOString();
+    const res = await POST(req({ email: "marco@saddlewoodcontracting.com", send: true, scheduledAt: at }, { Authorization: `Bearer ${TOKEN}` }) as never);
+    expect(res.status).toBe(200);
+    expect(sendMock.mock.calls[0][0].scheduledAt).toBe(at);
+    expect((await res.json()).scheduledAt).toBe(at);
+  });
+
+  it("refuses a scheduledAt in the past", async () => {
+    const res = await POST(req({ email: "marco@saddlewoodcontracting.com", send: true, scheduledAt: "2026-01-01T00:00:00Z" }, { Authorization: `Bearer ${TOKEN}` }) as never);
+    expect(res.status).toBe(400);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
   it("refuses an address off the allowlist", async () => {
     const res = await POST(req({ email: "jon@gimmegolflife.com" }, { Authorization: `Bearer ${TOKEN}` }) as never);
     expect(res.status).toBe(403);

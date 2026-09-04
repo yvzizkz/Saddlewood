@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { buildSignInEmail } from "@/lib/auth/signInEmail";
-import { generateSignInLink, sendEmail } from "@/lib/auth/magicLink";
+import { cancelScheduledEmail, generateSignInLink, sendEmail } from "@/lib/auth/magicLink";
 import { authorizeOps } from "@/lib/ops/auth";
 import { isAllowedEmail, normalizeEmail } from "@/lib/ops/allowlist";
 
@@ -21,6 +21,14 @@ const schema = z.object({
   subject: z.string().trim().min(3).max(160).optional(),
   from: z.string().trim().max(160).optional(),
   replyTo: z.string().trim().email().optional(),
+  scheduledAt: z
+    .string()
+    .datetime({ offset: true })
+    .refine((v) => {
+      const t = Date.parse(v);
+      return t > Date.now() && t < Date.now() + 72 * 3600 * 1000;
+    }, "scheduledAt must be in the future and within 72 hours")
+    .optional(),
   message: z
     .object({
       eyebrow: z.string().trim().max(60).optional(),
@@ -69,6 +77,7 @@ export async function POST(request: NextRequest) {
         text,
         from: parsed.data.from,
         replyTo: parsed.data.replyTo,
+        scheduledAt: parsed.data.scheduledAt,
       });
       sent = res.id;
     }
@@ -79,9 +88,26 @@ export async function POST(request: NextRequest) {
       next: signIn.next,
       expiresInHours: 24,
       sent,
+      scheduledAt: parsed.data.send ? (parsed.data.scheduledAt ?? null) : null,
       by: who.actor,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 });
+  }
+}
+
+// Cancel a scheduled send that has not gone out yet: DELETE ?id=<resend id>.
+export async function DELETE(request: NextRequest) {
+  const who = await authorizeOps(request);
+  if (!who) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const id = (new URL(request.url).searchParams.get("id") || "").trim();
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) {
+    return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  }
+  try {
+    await cancelScheduledEmail(id);
+    return NextResponse.json({ ok: true, cancelled: id, by: who.actor });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 502 });
   }
 }

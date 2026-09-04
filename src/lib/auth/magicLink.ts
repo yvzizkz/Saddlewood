@@ -61,6 +61,8 @@ export type OutboundEmail = {
   text: string;
   from?: string;
   replyTo?: string;
+  /** ISO 8601 instant. Resend holds the email and sends it then (up to 72 hours out). */
+  scheduledAt?: string;
 };
 
 export async function sendEmail(msg: OutboundEmail): Promise<{ id: string | null }> {
@@ -78,7 +80,17 @@ export async function sendEmail(msg: OutboundEmail): Promise<{ id: string | null
     html: msg.html,
     text: msg.text,
     ...(msg.replyTo ? { replyTo: msg.replyTo } : {}),
+    ...(msg.scheduledAt ? { scheduledAt: msg.scheduledAt } : {}),
   });
   if (error) throw new Error(`resend: ${error.message}`);
   return { id: data?.id ?? null };
+}
+
+/** Cancel an email Resend is still holding for a scheduled send. */
+export async function cancelScheduledEmail(id: string): Promise<void> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY is not set");
+  const resend = new Resend(key);
+  const { error } = await resend.emails.cancel(id);
+  if (error) throw new Error(`resend cancel: ${error.message}`);
 }
