@@ -89,10 +89,22 @@ export default async function OpsPage() {
                   <li key={d.slug} style={{ borderColor: 'var(--color-stone)' }}>
                     <Link
                       href={`/internal/ops/docs/${d.slug}`}
-                      className="block px-3 py-2.5 text-sm hover:bg-[var(--color-cream)] transition-colors"
+                      className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm hover:bg-[var(--color-cream)] transition-colors"
                       style={{ color: 'var(--color-charcoal)' }}
                     >
-                      {d.title}
+                      <span>{d.title}</span>
+                      {d.status && (
+                        <span
+                          className="shrink-0 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.08em]"
+                          style={
+                            d.status.toUpperCase().startsWith('APPROVED')
+                              ? { backgroundColor: 'rgba(47,107,74,0.14)', color: '#2f6b4a' }
+                              : { backgroundColor: 'rgba(212,175,55,0.18)', color: '#8f6c18' }
+                          }
+                        >
+                          {d.status.toUpperCase().startsWith('APPROVED') ? 'Approved' : 'Draft'}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 ))}
@@ -101,8 +113,9 @@ export default async function OpsPage() {
           ))}
         </div>
         <p className="mt-6 text-xs" style={{ color: 'var(--color-charcoal-light)' }}>
-          Documents are drafts for Marco&apos;s review unless marked approved. Legal terms in SOP-007 and SOP-008
-          go to an Arizona construction attorney before use.
+          Everything here is a living document. Draft means a proposal, however finished it looks; Approved means
+          Marco has read it and it binds. Legal terms in SOP-007 and SOP-008 go to an Arizona construction
+          attorney before use. How changes happen is §11 of the operating model.
         </p>
       </section>
     </div>
