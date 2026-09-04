@@ -22,6 +22,8 @@ export default async function OpsPage() {
     loadError = (e as Error).message
   }
 
+  const docTitles = Object.fromEntries(OPS_DOCS.map((d) => [d.slug, d.title]))
+
   const groups = GROUP_ORDER.map((g) => ({
     name: g,
     docs: OPS_DOCS.filter((d) => d.group === g),
@@ -44,7 +46,8 @@ export default async function OpsPage() {
       <p className="max-w-2xl text-[15px] leading-relaxed mb-8" style={{ color: 'var(--color-charcoal-light)' }}>
         Every decision either has an owner with a written rule, or it is logged as a Marco decision and
         counted. The documents below are the rules. The board is what still has to exist before anyone can
-        step into a role. Moves save for everyone the moment you make them.
+        step into a role. Tap a card to see how to act on it, read the document behind it, leave a response
+        that stays on the record, or move it.
       </p>
 
       <section aria-labelledby="ops-board-heading" className="mb-12">
@@ -60,7 +63,7 @@ export default async function OpsPage() {
             The board could not load its cards. {loadError}
           </p>
         ) : (
-          <OpsBoard initialCards={cards} />
+          <OpsBoard initialCards={cards} docTitles={docTitles} />
         )}
       </section>
 

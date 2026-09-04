@@ -20,10 +20,21 @@ export type OpsCard = {
   owner: OpsOwner;
   col: OpsColumn;
   note: string;
+  nextStep: string;
+  docSlug: string | null;
+  dueDate: string | null;
   sort: number;
   updatedAt: string;
   updatedBy: string;
   archivedAt: string | null;
+};
+
+export type OpsComment = {
+  id: number;
+  cardId: string;
+  author: string;
+  body: string;
+  at: string;
 };
 
 export type OpsEvent = {
@@ -48,6 +59,9 @@ export const createCardSchema = z.object({
   owner: z.enum(OPS_OWNERS).default("Lando"),
   col: z.enum(OPS_COLUMNS).default("backlog"),
   note: z.string().trim().max(500).default(""),
+  nextStep: z.string().trim().max(600).default(""),
+  docSlug: z.string().trim().max(64).regex(/^[a-z0-9-]*$/).nullable().optional(),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   sort: z.number().int().min(0).max(100000).optional(),
 });
 export type CreateCardInput = z.infer<typeof createCardSchema>;
@@ -58,9 +72,16 @@ export const patchCardSchema = z
     owner: z.enum(OPS_OWNERS).optional(),
     col: z.enum(OPS_COLUMNS).optional(),
     note: z.string().trim().max(500).optional(),
+    nextStep: z.string().trim().max(600).optional(),
+    docSlug: z.string().trim().max(64).regex(/^[a-z0-9-]*$/).nullable().optional(),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
     sort: z.number().int().min(0).max(100000).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "nothing to change" });
+
+export const commentSchema = z.object({
+  body: z.string().trim().min(1).max(2000),
+});
 export type PatchCardInput = z.infer<typeof patchCardSchema>;
 
 export function slugFromTitle(title: string): string {

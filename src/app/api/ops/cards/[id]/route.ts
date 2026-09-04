@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeOps } from "@/lib/ops/auth";
-import { archiveCard, patchCard } from "@/lib/ops/queries";
+import { archiveCard, getCard, listCardEvents, listComments, patchCard } from "@/lib/ops/queries";
 import { patchCardSchema } from "@/lib/ops/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+export async function GET(request: NextRequest, { params }: Ctx) {
+  const who = await authorizeOps(request);
+  if (!who) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const { id } = await params;
+  try {
+    const card = await getCard(id);
+    if (!card) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    const [comments, events] = await Promise.all([listComments(id), listCardEvents(id)]);
+    return NextResponse.json({ ok: true, card, comments, events });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 });
+  }
+}
 
 export async function PATCH(request: NextRequest, { params }: Ctx) {
   const who = await authorizeOps(request);

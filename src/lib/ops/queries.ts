@@ -4,6 +4,7 @@ import {
   OPS_OWNERS,
   type CreateCardInput,
   type OpsCard,
+  type OpsComment,
   type OpsColumn,
   type OpsEvent,
   type OpsOwner,
@@ -21,6 +22,9 @@ type Row = {
   owner: string;
   col: string;
   note: string | null;
+  next_step: string | null;
+  doc_slug: string | null;
+  due_date: string | null;
   sort: number | null;
   updated_at: string;
   updated_by: string | null;
@@ -41,6 +45,9 @@ function toCard(r: Row): OpsCard {
     owner: asOwner(r.owner),
     col: asCol(r.col),
     note: r.note ?? "",
+    nextStep: r.next_step ?? "",
+    docSlug: r.doc_slug ?? null,
+    dueDate: r.due_date ?? null,
     sort: r.sort ?? 0,
     updatedAt: r.updated_at,
     updatedBy: r.updated_by ?? "",
@@ -74,6 +81,9 @@ export async function createCard(input: CreateCardInput, actor: string): Promise
     owner: input.owner,
     col: input.col,
     note: input.note ?? "",
+    next_step: input.nextStep ?? existing?.nextStep ?? "",
+    doc_slug: input.docSlug === undefined ? (existing?.docSlug ?? null) : input.docSlug,
+    due_date: input.dueDate === undefined ? (existing?.dueDate ?? null) : input.dueDate,
     sort: input.sort ?? existing?.sort ?? 1000,
     updated_by: actor,
     archived_at: null,
@@ -99,6 +109,9 @@ export async function patchCard(id: string, input: PatchCardInput, actor: string
   if (input.owner !== undefined) patch.owner = input.owner;
   if (input.col !== undefined) patch.col = input.col;
   if (input.note !== undefined) patch.note = input.note;
+  if (input.nextStep !== undefined) patch.next_step = input.nextStep;
+  if (input.docSlug !== undefined) patch.doc_slug = input.docSlug;
+  if (input.dueDate !== undefined) patch.due_date = input.dueDate;
   if (input.sort !== undefined) patch.sort = input.sort;
   const { data, error } = await db.from("ops_cards").update(patch).eq("id", id).select("*").single();
   if (error) throw new Error(`ops_cards update failed: ${error.message}`);
@@ -147,4 +160,57 @@ export async function listEvents(limit = 50): Promise<OpsEvent[]> {
     actor: e.actor,
     at: e.at,
   }));
+}
+
+type EventRow = { id: number; card_id: string; from_col: string | null; to_col: string | null; actor: string; at: string; kind?: string };
+
+export async function listCardEvents(cardId: string, limit = 30): Promise<OpsEvent[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("ops_card_events")
+    .select("id, card_id, from_col, to_col, actor, at, kind")
+    .eq("card_id", cardId)
+    .order("at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`ops_card_events list failed: ${error.message}`);
+  return (data as EventRow[]).map((e) => ({
+    id: e.id,
+    cardId: e.card_id,
+    fromCol: e.from_col ? asCol(e.from_col) : null,
+    toCol: e.to_col ? asCol(e.to_col) : null,
+    actor: e.actor,
+    at: e.at,
+  }));
+}
+
+type CommentRow = { id: number; card_id: string; author: string; body: string; at: string };
+
+function toComment(c: CommentRow): OpsComment {
+  return { id: c.id, cardId: c.card_id, author: c.author, body: c.body, at: c.at };
+}
+
+export async function listComments(cardId: string, limit = 100): Promise<OpsComment[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("ops_card_comments")
+    .select("id, card_id, author, body, at")
+    .eq("card_id", cardId)
+    .order("at", { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(`ops_card_comments list failed: ${error.message}`);
+  return (data as CommentRow[]).map(toComment);
+}
+
+export async function addComment(cardId: string, body: string, actor: string): Promise<OpsComment | null> {
+  const db = getSupabaseAdmin();
+  const card = await getCard(cardId);
+  if (!card) return null;
+  const { data, error } = await db
+    .from("ops_card_comments")
+    .insert({ card_id: cardId, author: actor, body })
+    .select("id, card_id, author, body, at")
+    .single();
+  if (error) throw new Error(`ops_card_comments insert failed: ${error.message}`);
+  await db.from("ops_cards").update({ updated_by: actor }).eq("id", cardId);
+  return toComment(data as CommentRow);
 }

@@ -59,7 +59,14 @@ Every write records the actor in `ops_card_events`.
 | GET | `/api/ops/cards` | | `?archived=1` includes archived |
 | POST | `/api/ops/cards` | `{id?, title, owner?, col?, note?, sort?}` | upsert by id; id defaults to a slug of the title |
 | PATCH | `/api/ops/cards/:id` | any of `{title, owner, col, note, sort}` | a column change writes a move event |
+| GET | `/api/ops/cards/:id` | | card plus its responses and history |
 | DELETE | `/api/ops/cards/:id` | | archives, never deletes |
+| GET / POST | `/api/ops/cards/:id/comments` | `{body}` | responses; author is the person's email or the agent's name |
+
+Card fields since v2: `nextStep` (how to act on it), `docSlug` (the document it
+lives in, linked from the drawer), `dueDate`. Moves happen from the card
+drawer with an explicit Move button and an eight-second undo; every move is
+still a row in `ops_card_events`. Migration `0006_ops_board_v2.sql`.
 
 Columns: `backlog`, `drafting`, `review` (owner review), `live`, `measured`.
 Owners: `Marco`, `Lando`, `Ilene`, `Eli`.
