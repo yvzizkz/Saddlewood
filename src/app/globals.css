@@ -465,9 +465,24 @@ img {
 .ops-doc code { font-family: var(--font-mono); font-size: 0.85em; background: var(--cream); padding: 0.1em 0.35em; border-radius: 3px; }
 .ops-doc pre { background: var(--cream); border: 1px solid var(--stone); padding: 0.8rem 1rem; overflow-x: auto; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; }
 .ops-doc pre code { background: transparent; padding: 0; font-size: inherit; }
-.ops-doc table { display: block; overflow-x: auto; border-collapse: collapse; width: 100%; font-size: 0.875rem; margin: 0.6rem 0 1.2rem; }
-.ops-doc th, .ops-doc td { text-align: left; vertical-align: top; padding: 0.45rem 0.7rem; border: 1px solid var(--stone); }
-.ops-doc th { background: var(--cream); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--charcoal-light); }
+/* Tables: each one scrolls sideways inside its own wrapper (the page never does).
+   Cells keep whole words, and OpsMarkdown gives each cell a minimum width from how
+   much text it holds, so a column can never collapse to one character per line. */
+.ops-doc .ops-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; margin: 0.6rem 0 1.2rem; scrollbar-width: thin; }
+.ops-doc table { border-collapse: collapse; width: auto; min-width: 100%; margin: 0; font-size: 0.875rem; overflow-wrap: normal; word-break: normal; }
+.ops-doc th, .ops-doc td { text-align: left; vertical-align: top; padding: 0.45rem 0.7rem; border: 1px solid var(--stone); line-height: 1.5; }
+.ops-doc th { background: var(--cream); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--charcoal-light); white-space: nowrap; }
+.ops-doc td.ops-cell-s { min-width: 5.5rem; }
+.ops-doc td.ops-cell-m { min-width: 7.5rem; }
+.ops-doc td.ops-cell-l { min-width: 12rem; }
+.ops-doc td p, .ops-doc th p { margin: 0; max-width: none; }
+.ops-doc td a, .ops-doc td code { overflow-wrap: anywhere; }
+/* Wide screens: a table may run 2rem into each page gutter (the page's px-8), centered, so a
+   five-column table fits without a scrollbar; a table narrower than the text stays aligned with it. */
+@media (min-width: 1024px) {
+  .ops-doc .ops-table-wrap { margin-left: -2rem; margin-right: -2rem; max-width: calc(100% + 4rem); } /* lg */
+  .ops-doc .ops-table-wrap > table { min-width: calc(100% - 4rem); margin-left: auto; margin-right: auto; } /* lg */
+}
 .ops-doc hr { border: 0; border-top: 1px solid var(--stone); margin: 2rem 0; }
 .ops-doc a { color: var(--teal); text-decoration: underline; }
 .ops-doc input[type="checkbox"] { margin-right: 0.4rem; }
@@ -496,8 +511,7 @@ img {
   }
   .ops-col { flex: initial; }
 }
-.ops-doc { overflow-wrap: anywhere; }
-.ops-doc table { max-width: 100%; }
+.ops-doc { overflow-wrap: anywhere; } /* long URLs and paths in prose; tables reset this above */
 @media (max-width: 640px) {
   .ops-doc { font-size: 14.5px; }
   .ops-doc h1 { font-size: 1.6rem; }

@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 
+import { OpsMarkdown } from '@/components/ops/OpsMarkdown'
 import { OPS_DOCS, getOpsDoc } from '@/content/ops/docs.generated'
 import { listCards } from '@/lib/ops/queries'
 
@@ -67,7 +66,7 @@ export default async function OpsDocPage({ params }: Props) {
       </div>
 
       <article className="ops-doc">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{doc.body}</ReactMarkdown>
+        <OpsMarkdown>{doc.body}</OpsMarkdown>
       </article>
 
       <div className="mt-8 rounded border bg-white px-4 py-3 text-sm" style={{ borderColor: 'var(--color-stone)', color: 'var(--color-charcoal)' }}>
