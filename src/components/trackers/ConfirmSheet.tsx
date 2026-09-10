@@ -1,6 +1,7 @@
 'use client'
 
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { SHEET_H2 } from './format'
 
 export type ConfirmRequest = {
   title: string
@@ -17,7 +18,7 @@ export function ConfirmSheet({ request, onClose }: { request: ConfirmRequest | n
       {request ? (
         <div className="px-5 py-4 flex flex-col gap-4">
           <div>
-            <h2 className="text-lg text-[var(--color-charcoal)]" style={{ fontFamily: 'var(--font-fraunces)' }}>
+            <h2 className={SHEET_H2} style={{ fontFamily: 'var(--font-fraunces)' }}>
               {request.title}
             </h2>
             <p className="text-sm mt-1 leading-relaxed" style={{ color: 'var(--color-charcoal-light)' }}>
@@ -28,17 +29,18 @@ export function ConfirmSheet({ request, onClose }: { request: ConfirmRequest | n
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 rounded-xl border-2 border-[var(--color-stone)] text-[var(--color-charcoal)] font-semibold min-h-[44px]"
+              className="flex-1 py-3 rounded-xl border-2 border-[var(--color-stone)] text-[var(--color-charcoal)] font-semibold min-h-[48px]"
             >
               Cancel
             </button>
             <button
               type="button"
+              autoFocus
               onClick={() => {
                 request.onConfirm()
                 onClose()
               }}
-              className="flex-1 py-3 rounded-xl font-semibold min-h-[44px] text-[var(--color-cream)]"
+              className="flex-1 py-3 rounded-xl font-semibold min-h-[48px] text-[var(--color-cream)]"
               style={{ backgroundColor: request.danger ? '#a23b2a' : 'var(--color-teal)' }}
             >
               {request.confirmLabel ?? 'Continue'}

@@ -143,6 +143,34 @@ describe('guards', () => {
     expect(overBilledLines(st).map((l) => l.id)).toEqual(['drywall'])
     expect(unpricedBilledLines(st).map((l) => l.id)).toEqual(['attic'])
   })
+  it('counts draws toward over-billing', () => {
+    const st: TrackerState = { ...s09, lines: s09.lines.map((l) => (l.id === 'drywall' ? { ...l, thisInvoice: 1000, draw: 500 } : l)) }
+    expect(overBilledLines(st).map((l) => l.id)).toEqual(['drywall'])
+    const ok: TrackerState = { ...s09, lines: s09.lines.map((l) => (l.id === 'drywall' ? { ...l, thisInvoice: 1000, draw: 250 } : l)) }
+    expect(overBilledLines(ok)).toEqual([])
+  })
+  it('slugs long names to fit the id limit', () => {
+    const st = normalizeState({ lines: [{ name: 'Exterior siding, trim & fascia replacement on the north and west elevations including the garage return wall' }], invoice: { number: '1' } })
+    expect(st.lines[0].id.length).toBeLessThanOrEqual(64)
+    expect(trackerStateSchema.safeParse({ ...s09, lines: st.lines }).success).toBe(true)
+  })
+})
+
+describe('notes after a short payment', () => {
+  it('does not call a line fully paid', () => {
+    const short: TrackerState = { ...s09, previousInvoice: { ...s09.previousInvoice!, paid: 30000 } }
+    const calcs = short.lines.map(lineCalc)
+    const txt = notesAuto(short, calcs, summary(short, calcs))
+    expect(txt).toContain('KITCHEN: $39,000 of $89,512 complete (43.57%) — billed on Invoice #3526-08 (partially paid — see note 1); no new billing this invoice.')
+    expect(txt).not.toContain('fully paid via')
+  })
+  it('words a credit as a credit, not a negative carry', () => {
+    const over: TrackerState = { ...s09, payments: [...s09.payments, { label: 'Extra', date: '09/10/2026', amount: 100 }] }
+    const calcs = over.lines.map(lineCalc)
+    const txt = notesAuto(over, calcs, summary(over, calcs))
+    expect(txt).toContain('= −$100.00:  less credit of $100.00.')
+    expect(txt).not.toContain('credit carried')
+  })
 })
 
 describe('parseMoney', () => {

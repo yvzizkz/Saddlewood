@@ -28,7 +28,10 @@ type InvoiceRow = {
   sent_to: string | null
   email_id: string | null
   created_at: string
+  generated_at?: string | null
 }
+
+const INVOICE_COLS = 'id, tracker_id, invoice_number, invoice_date, total_due, status, generated_by, sent_to, email_id, created_at, generated_at'
 
 function toRecord(r: Row): TrackerRecord {
   return {
@@ -54,6 +57,7 @@ function toSnapshot(r: InvoiceRow): TrackerInvoiceSnapshot {
     sentTo: r.sent_to,
     emailId: r.email_id,
     createdAt: r.created_at,
+    generatedAt: r.generated_at ?? r.created_at,
   }
 }
 
@@ -121,9 +125,9 @@ export async function listInvoices(trackerId: string): Promise<TrackerInvoiceSna
   const db = getSupabaseAdmin()
   const { data, error } = await db
     .from('progress_tracker_invoices')
-    .select('id, tracker_id, invoice_number, invoice_date, total_due, status, generated_by, sent_to, email_id, created_at')
+    .select(INVOICE_COLS)
     .eq('tracker_id', trackerId)
-    .order('created_at', { ascending: false })
+    .order('generated_at', { ascending: false })
     .limit(200)
   if (error) throw new Error(`progress_tracker_invoices select failed: ${error.message}`)
   return ((data ?? []) as InvoiceRow[]).map(toSnapshot)
@@ -146,6 +150,7 @@ export async function saveInvoiceSnapshot(input: {
   trackerId: string
   state: TrackerState
   actor: string
+  status?: 'issued' | 'superseded'
   sentTo?: string | null
   emailId?: string | null
 }): Promise<TrackerInvoiceSnapshot> {
@@ -158,16 +163,17 @@ export async function saveInvoiceSnapshot(input: {
     invoice_number: state.invoice.number,
     invoice_date: state.invoice.date,
     total_due: cents(s.totalDue),
-    status: 'issued',
+    status: input.status ?? 'issued',
     state,
     generated_by: actor,
     sent_to: input.sentTo ?? null,
     email_id: input.emailId ?? null,
+    generated_at: new Date().toISOString(),
   }
   const { data, error } = await db
     .from('progress_tracker_invoices')
     .upsert(row, { onConflict: 'tracker_id,invoice_number' })
-    .select('id, tracker_id, invoice_number, invoice_date, total_due, status, generated_by, sent_to, email_id, created_at')
+    .select(INVOICE_COLS)
     .single()
   if (error) throw new Error(`progress_tracker_invoices upsert failed: ${error.message}`)
   return toSnapshot(data as InvoiceRow)

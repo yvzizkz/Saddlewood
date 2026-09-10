@@ -125,11 +125,13 @@ export type TrackerInvoiceSnapshot = {
   invoiceNumber: string
   invoiceDate: string
   totalDue: number
+  /** issued = generated (and usually emailed) from the portal; superseded = the numbers were recorded at payment time without a fresh generation. */
   status: 'issued' | 'superseded'
   generatedBy: string
   sentTo: string | null
   emailId: string | null
   createdAt: string
+  generatedAt: string
 }
 
 export type TrackerRecord = {

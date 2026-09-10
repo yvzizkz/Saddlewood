@@ -82,7 +82,10 @@ export function buildWorkbook(state: TrackerState): ExcelJS.Workbook {
     if (o.border) c.border = o.border
     return c
   }
-  const f = (formula: string): ExcelJS.CellFormulaValue => ({ formula, date1904: false })
+  // Every formula also carries its computed result, so previewers that do not
+  // recalculate (iOS Mail, Gmail, Slack) still show the totals.
+  const f = (formula: string, result?: number): ExcelJS.CellFormulaValue => ({ formula, ...(result === undefined ? {} : { result }), date1904: false })
+  wb.calcProperties.fullCalcOnLoad = true
 
   setRowH(1, 42)
   ws.mergeCells('A1:H1')
@@ -128,7 +131,7 @@ export function buildWorkbook(state: TrackerState): ExcelJS.Workbook {
   styleCell('A' + PAY_TOTAL_ROW, { value: '  TOTAL PAID TO DATE', font: font({ bold: true, size: 12, color: P.WHITE }), fill: fill(P.MED_BLUE), align: align('left', 'center') })
   ws.mergeCells(`F${PAY_TOTAL_ROW}:H${PAY_TOTAL_ROW}`)
   styleCell('F' + PAY_TOTAL_ROW, {
-    value: payments.length ? f(payments.map((_, i) => 'F' + (PAY_START + i)).join('+')) : 0,
+    value: payments.length ? f(payments.map((_, i) => 'F' + (PAY_START + i)).join('+'), s.paid) : 0,
     numFmt: CURRENCY,
     font: font({ bold: true, size: 12, color: P.WHITE }),
     fill: fill(P.MED_BLUE),
@@ -193,13 +196,13 @@ export function buildWorkbook(state: TrackerState): ExcelJS.Workbook {
       fill: co > 0 ? fill(P.LIGHT_ORANGE) : co < 0 ? fill(P.XLIGHT_BLUE) : fill(bg),
       font: co > 0 ? font({ size: 10, bold: true, color: P.DARK_NAVY }) : co < 0 ? font({ size: 10, bold: true, color: P.DARK_RED }) : font({ size: 10, color: P.DARK_GRAY }),
     })
-    styleCell('D' + row, { value: f(`B${row}+C${row}`), numFmt: CURRENCY, font: font({ size: 10, bold: true, color: P.DARK_NAVY }), fill: fill(bg), align: align('right', 'center'), border: THIN })
-    const eVal: ExcelJS.CellValue = rtype === 'complete' ? 1 : rtype === 'partial' && c.D > 0 ? f(`${numLit(c.completed)}/D${row}`) : 0
+    styleCell('D' + row, { value: f(`B${row}+C${row}`, c.D), numFmt: CURRENCY, font: font({ size: 10, bold: true, color: P.DARK_NAVY }), fill: fill(bg), align: align('right', 'center'), border: THIN })
+    const eVal: ExcelJS.CellValue = rtype === 'complete' ? 1 : rtype === 'partial' && c.D > 0 ? f(`${numLit(c.completed)}/D${row}`, c.pct) : 0
     const pct = c.pct
     const txt = pct >= 1 ? P.MED_GREEN : pct > 0 ? P.DARK_NAVY : P.DARK_GRAY
     styleCell('E' + row, { value: eVal, numFmt: PCT, font: font({ size: 10, bold: pct >= 1, color: txt }), fill: fill(bg), align: align('center', 'center'), border: THIN })
     styleCell('F' + row, {
-      value: f(c.cp ? `D${row}*E${row}-${numLit(c.cp)}` : `D${row}*E${row}`),
+      value: f(c.cp ? `D${row}*E${row}-${numLit(c.cp)}` : `D${row}*E${row}`, c.F),
       numFmt: CURRENCY,
       font: font({ size: 10, color: P.DARK_NAVY }),
       fill: fill(bg),
@@ -215,7 +218,7 @@ export function buildWorkbook(state: TrackerState): ExcelJS.Workbook {
       fill: g > 0 ? fill(P.LIGHT_RED) : fill(bg),
       font: g > 0 ? font({ size: 10, bold: true, color: P.DARK_RED }) : font({ size: 10, color: P.DARK_GRAY }),
     })
-    styleCell('H' + row, { value: f(`F${row}+G${row}`), numFmt: CURRENCY, font: font({ size: 10, color: P.DARK_NAVY }), fill: fill(bg), align: align('right', 'center'), border: THIN })
+    styleCell('H' + row, { value: f(`F${row}+G${row}`, c.H), numFmt: CURRENCY, font: font({ size: 10, color: P.DARK_NAVY }), fill: fill(bg), align: align('right', 'center'), border: THIN })
   })
 
   setRowH(TOTALS_ROW, 26)
@@ -229,10 +232,18 @@ export function buildWorkbook(state: TrackerState): ExcelJS.Workbook {
     G: `SUM(G${START_ROW}:G${END_DATA})`,
     H: `SUM(H${START_ROW}:H${END_DATA})`,
   }
+  const totalResults: Record<string, number> = {
+    B: calcs.reduce((a, c) => a + c.contract, 0),
+    C: s.sumCo,
+    D: s.contract,
+    F: calcs.reduce((a, c) => a + c.F, 0),
+    G: s.sumG,
+    H: calcs.reduce((a, c) => a + c.H, 0),
+  }
   for (const col of Object.keys(totals)) {
     const dash = totals[col] === '—'
     styleCell(col + TOTALS_ROW, {
-      value: dash ? '—' : f(totals[col]),
+      value: dash ? '—' : f(totals[col], totalResults[col]),
       numFmt: dash ? 'General' : CURRENCY,
       font: font({ bold: true, size: 11, color: P.WHITE }),
       fill: fill(P.DARK_NAVY),
@@ -245,22 +256,24 @@ export function buildWorkbook(state: TrackerState): ExcelJS.Workbook {
   setRowH(SUM_HEADER, 26)
   ws.mergeCells(`A${SUM_HEADER}:H${SUM_HEADER}`)
   styleCell('A' + SUM_HEADER, { value: '  FINANCIAL SUMMARY', font: font({ bold: true, size: 12, color: P.WHITE }), fill: fill(P.DARK_NAVY), align: align('left', 'center') })
-  const srows: [number, string, string, string, boolean, string, string][] = [
-    [SUM_CONTRACT, 'Total Contract Value (All Current Pricing incl. Change Orders)', `SUM(D${START_ROW}:D${END_DATA})`, P.XLIGHT_BLUE, false, P.DARK_NAVY, CURRENCY],
-    [SUM_PERFORMED, 'Total Work Performed to Date  (Value Earned)', `SUMPRODUCT(D${START_ROW}:D${END_DATA},E${START_ROW}:E${END_DATA})`, P.LIGHT_BLUE, false, P.DARK_NAVY, CURRENCY],
-    [SUM_PAID, paidLabel(state), `F${PAY_TOTAL_ROW}`, P.LIGHT_GREEN, true, P.DARK_NAVY, CURRENCY],
-    [SUM_BAL, 'Balance Due on Completed Work  (Performed − Paid)', `ROUND(F${SUM_PERFORMED}-F${SUM_PAID},2)`, P.XLIGHT_BLUE, false, P.DARK_NAVY, CURRENCY],
-    [SUM_DRAW, 'New Advance Draws Requested — Next-Phase Mobilization', `F${SUM_DUE}-F${SUM_BAL}`, P.LIGHT_ORANGE, false, P.DARK_NAVY, CURRENCY],
-    [SUM_DUE, 'TOTAL DUE THIS INVOICE  (#' + inv.number + ')  =  Total to Date − Paid', `ROUND(SUM(H${START_ROW}:H${END_DATA})-F${SUM_PAID},2)`, P.AMBER, true, P.DARK_RED, CURRENCY],
-    [SUM_PCT, 'Overall Project % Complete  (Performed ÷ Contract)', `F${SUM_PERFORMED}/F${SUM_CONTRACT}`, P.LIGHT_GREEN, false, P.DARK_GREEN, PCT],
-    [SUM_REMAINING, 'Total Remaining — Future Work Not Yet Started', `F${SUM_CONTRACT}-F${SUM_PERFORMED}`, P.XLIGHT_BLUE, false, P.DARK_NAVY, CURRENCY],
+  const balance = Math.round(s.balance * 100) / 100
+  const due = Math.round(s.totalDue * 100) / 100
+  const srows: [number, string, string, number, string, boolean, string, string][] = [
+    [SUM_CONTRACT, 'Total Contract Value (All Current Pricing incl. Change Orders)', `SUM(D${START_ROW}:D${END_DATA})`, s.contract, P.XLIGHT_BLUE, false, P.DARK_NAVY, CURRENCY],
+    [SUM_PERFORMED, 'Total Work Performed to Date  (Value Earned)', `SUMPRODUCT(D${START_ROW}:D${END_DATA},E${START_ROW}:E${END_DATA})`, s.performed, P.LIGHT_BLUE, false, P.DARK_NAVY, CURRENCY],
+    [SUM_PAID, paidLabel(state), `F${PAY_TOTAL_ROW}`, s.paid, P.LIGHT_GREEN, true, P.DARK_NAVY, CURRENCY],
+    [SUM_BAL, 'Balance Due on Completed Work  (Performed − Paid)', `ROUND(F${SUM_PERFORMED}-F${SUM_PAID},2)`, balance, P.XLIGHT_BLUE, false, P.DARK_NAVY, CURRENCY],
+    [SUM_DRAW, 'New Advance Draws Requested — Next-Phase Mobilization', `F${SUM_DUE}-F${SUM_BAL}`, due - balance, P.LIGHT_ORANGE, false, P.DARK_NAVY, CURRENCY],
+    [SUM_DUE, 'TOTAL DUE THIS INVOICE  (#' + inv.number + ')  =  Total to Date − Paid', `ROUND(SUM(H${START_ROW}:H${END_DATA})-F${SUM_PAID},2)`, due, P.AMBER, true, P.DARK_RED, CURRENCY],
+    [SUM_PCT, 'Overall Project % Complete  (Performed ÷ Contract)', `F${SUM_PERFORMED}/F${SUM_CONTRACT}`, s.pct, P.LIGHT_GREEN, false, P.DARK_GREEN, PCT],
+    [SUM_REMAINING, 'Total Remaining — Future Work Not Yet Started', `F${SUM_CONTRACT}-F${SUM_PERFORMED}`, s.remaining, P.XLIGHT_BLUE, false, P.DARK_NAVY, CURRENCY],
   ]
-  for (const [r, label, formula, bg, boldV, txt, nf] of srows) {
+  for (const [r, label, formula, result, bg, boldV, txt, nf] of srows) {
     setRowH(r, 26)
     ws.mergeCells(`A${r}:E${r}`)
     styleCell('A' + r, { value: '  ' + label, font: font({ size: 10, bold: boldV, color: txt }), fill: fill(bg), align: align('left', 'center'), border: THIN })
     ws.mergeCells(`F${r}:H${r}`)
-    styleCell('F' + r, { value: f(formula), numFmt: nf, font: font({ bold: true, size: boldV ? 13 : 12, color: txt }), fill: fill(bg), align: align('right', 'center'), border: THIN })
+    styleCell('F' + r, { value: f(formula, result), numFmt: nf, font: font({ bold: true, size: boldV ? 13 : 12, color: txt }), fill: fill(bg), align: align('right', 'center'), border: THIN })
   }
 
   const legendRow = SUM_REMAINING + 2

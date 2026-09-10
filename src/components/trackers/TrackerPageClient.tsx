@@ -9,7 +9,7 @@ import { cents, lineCalc, notesAuto, slug, summary } from '@/lib/trackers/core'
 import type { TrackerInvoiceSnapshot, TrackerLine, TrackerRecord, TrackerState } from '@/lib/trackers/types'
 import { AmountSheet, type AmountField, type AmountRequest } from './AmountSheet'
 import { ConfirmSheet, type ConfirmRequest } from './ConfirmSheet'
-import { api, ApiError, DUE_RED, fmt } from './format'
+import { api, ApiError, DUE_RED, fmt, type ToastTone } from './format'
 import { HistorySection } from './HistorySection'
 import { InvoicePanel, type GenerateResult } from './InvoicePanel'
 import { LineEditorSheet, type LineEditValues } from './LineEditorSheet'
@@ -24,10 +24,21 @@ type Props = { tracker: TrackerRecord; invoices: TrackerInvoiceSnapshot[] }
 
 const SAVE_DEBOUNCE_MS = 900
 
+/** The parts of the state that matter for "is this the same document" (meta and the issued stamp are bookkeeping). */
+function contentKey(s: TrackerState): string {
+  const { meta: _m, invoice, ...rest } = s
+  void _m
+  const { issuedAt: _i, status: _s, ...inv } = invoice
+  void _i
+  void _s
+  return JSON.stringify({ ...rest, invoice: inv })
+}
+
 /**
  * The tracker page. The server hands over the row; from there every edit
  * lands in local state, recomputes the totals, and is saved 0.9 s after the
- * last change with the row's updated_at as a guard against a second tab.
+ * last change. Saves are serialized and carry the row's updated_at, so a
+ * second tab (or the agent token) cannot silently overwrite this one.
  */
 export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props) {
   const trackerId = tracker.id
@@ -38,7 +49,7 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
   const [conflict, setConflict] = useState<TrackerRecord | null>(null)
   const [busy, setBusy] = useState<'generate' | 'roll' | null>(null)
   const [result, setResult] = useState<GenerateResult | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; tone: ToastTone } | null>(null)
   const [amountReq, setAmountReq] = useState<AmountRequest | null>(null)
   const [editReq, setEditReq] = useState<{ line: TrackerLine | null } | null>(null)
   const [paidOpen, setPaidOpen] = useState(false)
@@ -47,85 +58,153 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
   const stateRef = useRef(state)
   const updatedAtRef = useRef(tracker.updatedAt)
   const dirtyRef = useRef(false)
+  const editedDuringFlightRef = useRef(false)
+  const inFlightRef = useRef<Promise<boolean> | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const conflictRef = useRef<TrackerRecord | null>(null)
+  conflictRef.current = conflict
 
   const calcs = useMemo(() => state.lines.map(lineCalc), [state.lines])
   const s = useMemo(() => summary(state, calcs), [state, calcs])
   const auto = useMemo(() => notesAuto(state, calcs, s), [state, calcs, s])
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg)
+  const showToast = useCallback((msg: string, tone: ToastTone = 'info') => {
+    setToast({ msg, tone })
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), 3200)
+    toastTimer.current = setTimeout(() => setToast(null), tone === 'error' ? 8000 : 3200)
   }, [])
 
   const adopt = useCallback((rec: TrackerRecord) => {
     stateRef.current = rec.state
     updatedAtRef.current = rec.updatedAt
     dirtyRef.current = false
+    editedDuringFlightRef.current = false
     setState(rec.state)
     setConflict(null)
+    setSaveStatus('saved')
+    setLastSavedAt(new Date())
   }, [])
 
+  const schedule = useCallback((run: () => void) => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null
+      run()
+    }, SAVE_DEBOUNCE_MS)
+  }, [])
+
+  /** Save now. One request at a time; an edit made while one is out is saved right after. */
   const flush = useCallback(async (): Promise<boolean> => {
     if (timerRef.current) {
       clearTimeout(timerRef.current)
       timerRef.current = null
     }
-    if (!dirtyRef.current) return true
-    dirtyRef.current = false
-    setSaveStatus('saving')
-    try {
-      const json = await api<{ tracker: TrackerRecord }>(`/api/trackers/${trackerId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ state: stateRef.current, baseUpdatedAt: updatedAtRef.current }),
-      })
-      updatedAtRef.current = json.tracker.updatedAt
-      setLastSavedAt(new Date())
-      setSaveStatus('saved')
+    if (inFlightRef.current) await inFlightRef.current
+    if (!dirtyRef.current) {
+      setSaveStatus((st) => (st === 'error' ? 'idle' : st))
       return true
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 409 && e.data.tracker) {
-        setConflict(e.data.tracker as TrackerRecord)
-      } else {
-        dirtyRef.current = true
-      }
-      setSaveStatus('error')
-      return false
     }
-  }, [trackerId])
+    if (conflictRef.current) return false
+    const run = (async () => {
+      dirtyRef.current = false
+      editedDuringFlightRef.current = false
+      setSaveStatus('saving')
+      const snapshot = stateRef.current
+      try {
+        const json = await api<{ tracker: TrackerRecord }>(`/api/trackers/${trackerId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ state: snapshot, baseUpdatedAt: updatedAtRef.current }),
+        })
+        updatedAtRef.current = json.tracker.updatedAt
+        setLastSavedAt(new Date())
+        setSaveStatus('saved')
+        return true
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 409 && e.data.tracker) {
+          const remote = e.data.tracker as TrackerRecord
+          if (contentKey(remote.state) === contentKey(snapshot)) {
+            // Our own earlier save landed first; nothing was lost.
+            updatedAtRef.current = remote.updatedAt
+            setLastSavedAt(new Date())
+            setSaveStatus('saved')
+            return true
+          }
+          dirtyRef.current = true
+          setConflict(remote)
+          setSaveStatus('error')
+          return false
+        }
+        dirtyRef.current = true
+        setSaveStatus('error')
+        if (e instanceof ApiError && e.status === 400) showToast(`Not saved: ${e.message}`, 'error')
+        return false
+      }
+    })()
+    inFlightRef.current = run
+    try {
+      return await run
+    } finally {
+      inFlightRef.current = null
+      if (editedDuringFlightRef.current && dirtyRef.current && !conflictRef.current) schedule(() => void flush())
+    }
+  }, [schedule, showToast, trackerId])
 
   const update = useCallback(
     (fn: (prev: TrackerState) => TrackerState) => {
-      const next = fn(stateRef.current)
+      let next = fn(stateRef.current)
+      if (next === stateRef.current) return
+      // Any change after an invoice was generated makes it a draft again.
+      if (next.invoice.status === 'issued') {
+        const { issuedAt: _dropped, ...inv } = next.invoice
+        void _dropped
+        next = { ...next, invoice: { ...inv, status: 'draft' } }
+      }
       stateRef.current = next
       setState(next)
       dirtyRef.current = true
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => void flush(), SAVE_DEBOUNCE_MS)
+      if (inFlightRef.current) editedDuringFlightRef.current = true
+      schedule(() => void flush())
     },
-    [flush],
+    [flush, schedule],
   )
 
+  // Edits still inside the debounce window are sent when the page is hidden,
+  // closed, or navigated away from (keepalive survives the unload).
   useEffect(() => {
-    const timers = { save: timerRef, toast: toastTimer }
-    return () => {
-      if (timers.save.current) clearTimeout(timers.save.current)
-      if (timers.toast.current) clearTimeout(timers.toast.current)
-    }
-  }, [])
-
-  // Warn before leaving with unsaved edits still in the debounce window.
-  useEffect(() => {
-    function onBeforeUnload(e: BeforeUnloadEvent) {
-      if (dirtyRef.current) {
-        e.preventDefault()
+    const send = () => {
+      if (!dirtyRef.current || conflictRef.current) return
+      try {
+        void fetch(`/api/trackers/${trackerId}`, {
+          method: 'PUT',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: stateRef.current, baseUpdatedAt: updatedAtRef.current }),
+        })
+        dirtyRef.current = false
+      } catch {
+        // nothing more to do on the way out
       }
     }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') send()
+    }
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) e.preventDefault()
+    }
+    window.addEventListener('pagehide', send)
+    document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [])
+    const timers = { save: timerRef, toast: toastTimer }
+    return () => {
+      window.removeEventListener('pagehide', send)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      if (timers.save.current) clearTimeout(timers.save.current)
+      if (timers.toast.current) clearTimeout(timers.toast.current)
+      send()
+    }
+  }, [trackerId])
 
   /* ---------- line edits ---------- */
   const setAmount = useCallback(
@@ -183,15 +262,19 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
     (lineId: string) => {
       const line = stateRef.current.lines.find((l) => l.id === lineId)
       if (!line) return
+      if (stateRef.current.lines.length <= 1) {
+        showToast('The schedule needs at least one line.', 'error')
+        return
+      }
       setConfirm({
         title: `Remove ${line.name}?`,
         body: 'The line and its amounts leave the schedule of values. You can add it back later.',
         confirmLabel: 'Remove',
         danger: true,
-        onConfirm: () => update((prev) => ({ ...prev, lines: prev.lines.filter((l) => l.id !== lineId) })),
+        onConfirm: () => update((prev) => (prev.lines.length > 1 ? { ...prev, lines: prev.lines.filter((l) => l.id !== lineId) } : prev)),
       })
     },
-    [update],
+    [update, showToast],
   )
 
   /* ---------- payments, notes, project ---------- */
@@ -219,8 +302,8 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
   /* ---------- generate & roll-forward ---------- */
   const generate = useCallback(
     async (force = false) => {
-      if (!stateRef.current.invoice.number) {
-        showToast('Give the invoice a number first.')
+      if (!stateRef.current.invoice.number.trim()) {
+        showToast('Give the invoice a number first.', 'error')
         return
       }
       setBusy('generate')
@@ -241,14 +324,17 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
         if (e instanceof ApiError && (e.code === 'over' || e.code === 'zero_due')) {
           setConfirm({
             title: e.code === 'over' ? 'Some lines bill more than their remaining value' : 'Nothing is due on this invoice',
-            body: `${e.message} Generate anyway?`,
-            confirmLabel: 'Generate',
+            body:
+              e.code === 'over'
+                ? `${e.message}. A line is capped at its contract value on the workbook, so the amount above what is left will not reach Total due — add a change order to the line instead, or generate anyway.`
+                : `${e.message} Generate anyway?`,
+            confirmLabel: 'Generate anyway',
             onConfirm: () => void generate(true),
           })
         } else if (e instanceof ApiError && e.status === 409 && e.data.tracker) {
           setConflict(e.data.tracker as TrackerRecord)
         } else {
-          showToast((e as Error).message)
+          showToast((e as Error).message, 'error')
         }
       } finally {
         setBusy(null)
@@ -275,7 +361,7 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
         window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
       } catch (e) {
         if (e instanceof ApiError && e.status === 409 && e.data.tracker) setConflict(e.data.tracker as TrackerRecord)
-        else showToast((e as Error).message)
+        else showToast((e as Error).message, 'error')
       } finally {
         setBusy(null)
       }
@@ -296,7 +382,7 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
             setResult(null)
             showToast(`Restored #${invoiceNumber}`)
           } catch (e) {
-            showToast((e as Error).message)
+            showToast((e as Error).message, 'error')
           }
         },
       })
@@ -304,14 +390,24 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
     [trackerId, update, showToast],
   )
 
-  const onInvoiceField = (key: 'number' | 'date', value: string) => update((prev) => ({ ...prev, invoice: { ...prev.invoice, [key]: value } }))
+  const keepMine = useCallback(() => {
+    if (!conflict) return
+    updatedAtRef.current = conflict.updatedAt
+    dirtyRef.current = true
+    setConflict(null)
+    void flush()
+  }, [conflict, flush])
+
+  const onInvoiceField = (key: 'number' | 'date', value: string) => update((prev) => ({ ...prev, invoice: { ...prev.invoice, [key]: value.slice(0, key === 'number' ? 32 : 24) } }))
   const issued = state.invoice.status === 'issued'
+  const changedSinceIssue = !issued
+  const busyNow = busy !== null
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
       <div className="sticky top-0 z-10 border-b print:hidden" style={{ backgroundColor: 'var(--color-background)', borderColor: 'var(--color-stone)' }}>
         <div className="flex items-center justify-between gap-3 px-4 py-3 min-h-[44px] max-w-6xl mx-auto md:px-8">
-          <Link href="/internal/trackers" className="flex items-center gap-2 text-[var(--color-charcoal)] font-medium min-w-0">
+          <Link href="/internal/trackers" className="flex items-center gap-2 text-[var(--color-charcoal)] font-medium min-w-0 min-h-[44px]">
             <span aria-hidden="true">{'←'}</span>
             <span style={{ fontFamily: 'var(--font-fraunces)' }} className="text-base uppercase tracking-wide truncate">
               {state.project.name}
@@ -321,92 +417,98 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
         </div>
       </div>
 
-      <div className="px-4 pt-5 md:px-8 md:pt-8 max-w-6xl mx-auto pb-[calc(140px+env(safe-area-inset-bottom,0px))] lg:pb-16">
+      <div className="px-4 pt-5 md:px-8 md:pt-8 max-w-6xl mx-auto pb-[calc(150px+env(safe-area-inset-bottom,0px))] 2xl:pb-16">
         {conflict ? (
           <div className="mb-4 rounded-lg border px-4 py-3 text-sm flex flex-wrap items-center gap-3" style={{ borderColor: DUE_RED, color: 'var(--color-charcoal)', backgroundColor: 'rgba(162,59,42,0.08)' }} role="alert">
             <span className="flex-1 min-w-[200px]">
-              This tracker was saved elsewhere{conflict.updatedBy ? ` by ${conflict.updatedBy.split('@')[0]}` : ''} after you opened it. Load that version to keep working; your unsaved edits here are dropped.
+              This tracker was saved elsewhere{conflict.updatedBy ? ` by ${conflict.updatedBy.split('@')[0]}` : ''} after you opened it, and your latest edit differs from it. Load that version, or keep yours and overwrite it.
             </span>
-            <button type="button" onClick={() => adopt(conflict)} className="px-3 py-2 rounded-lg text-[var(--color-cream)] font-semibold" style={{ backgroundColor: 'var(--color-teal)' }}>
+            <button type="button" onClick={() => adopt(conflict)} className="px-3 py-2 rounded-lg text-[var(--color-cream)] font-semibold min-h-[44px]" style={{ backgroundColor: 'var(--color-teal)' }}>
               Load latest
+            </button>
+            <button type="button" onClick={keepMine} className="px-3 py-2 rounded-lg border font-semibold min-h-[44px]" style={{ borderColor: 'var(--color-stone-mid)', color: 'var(--color-charcoal)' }}>
+              Keep mine
             </button>
           </div>
         ) : null}
 
-        <header className="flex flex-wrap items-end justify-between gap-4 mb-5">
-          <div className="min-w-0">
-            <p className="text-[11px] tracking-[0.14em] uppercase mb-1" style={{ color: 'var(--color-gold-accessible)' }}>
-              Progress payment tracker
-            </p>
-            <h1 style={{ fontFamily: 'var(--font-fraunces)' }} className="text-3xl md:text-4xl text-[var(--color-charcoal)]">
-              {state.project.name}
-            </h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--color-charcoal-light)' }}>
-              <b className="font-medium text-[var(--color-charcoal)]">{state.project.owners}</b>
-              {state.project.address ? ` · ${state.project.address}` : ''}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em]" style={{ color: 'var(--color-charcoal-light)' }}>
-              Invoice #
-              <input
-                className="w-[120px] rounded-lg border px-3 py-2 bg-white text-sm tabular-nums text-[var(--color-charcoal)] outline-none focus:border-[var(--color-teal)]"
-                style={{ borderColor: 'var(--color-stone)' }}
-                value={state.invoice.number}
-                onChange={(e) => onInvoiceField('number', e.target.value)}
-                maxLength={32}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em]" style={{ color: 'var(--color-charcoal-light)' }}>
-              Invoice date
-              <input
-                className="w-[130px] rounded-lg border px-3 py-2 bg-white text-sm tabular-nums text-[var(--color-charcoal)] outline-none focus:border-[var(--color-teal)]"
-                style={{ borderColor: 'var(--color-stone)' }}
-                value={state.invoice.date}
-                placeholder="MM/DD/YYYY"
-                onChange={(e) => onInvoiceField('date', e.target.value)}
-                maxLength={24}
-              />
-            </label>
-            <span className="px-2.5 py-1 rounded-full text-[10px] uppercase tracking-[0.08em] self-center mt-4" style={issued ? { backgroundColor: 'rgba(47,107,74,0.14)', color: '#2f6b4a' } : { backgroundColor: 'rgba(212,175,55,0.18)', color: '#8f6c18' }}>
-              {issued ? 'Issued' : 'Draft'}
-            </span>
-          </div>
-        </header>
-
-        <TrackerKpis s={s} calcs={calcs} paymentsCount={state.payments.length} />
-
-        <div className="mt-5 lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6 lg:items-start">
-          <div className="flex flex-col gap-5">
-            <LinesSection lines={state.lines} calcs={calcs} s={s} onAmount={setAmount} onOpenAmount={(line, field) => setAmountReq({ line, field })} onEdit={(line) => setEditReq({ line })} onBillRemaining={billRemaining} />
-            <div className="lg:hidden">
-              <InvoicePanel state={state} calcs={calcs} s={s} lines={state.lines} busy={busy} result={result} trackerId={trackerId} onGenerate={() => void generate(false)} onPaid={() => setPaidOpen(true)} />
+        {/* Everything below is read-only while a workbook is being generated or a payment recorded. */}
+        <fieldset disabled={busyNow} className="contents">
+          <header className="flex flex-wrap items-end justify-between gap-4 mb-5">
+            <div className="min-w-0">
+              <p className="text-[11px] tracking-[0.14em] uppercase mb-1 flex items-center gap-2" style={{ color: 'var(--color-gold-accessible)' }}>
+                Progress payment tracker
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-[0.08em]" style={issued ? { backgroundColor: 'rgba(47,107,74,0.14)', color: '#2f6b4a' } : { backgroundColor: 'rgba(212,175,55,0.22)', color: '#7a5d16' }}>
+                  {issued ? 'ISSUED' : 'DRAFT'}
+                </span>
+              </p>
+              <h1 style={{ fontFamily: 'var(--font-fraunces)' }} className="text-3xl md:text-4xl text-[var(--color-charcoal)]">
+                {state.project.name}
+              </h1>
+              <p className="text-sm mt-1" style={{ color: 'var(--color-charcoal-light)' }}>
+                <b className="font-medium text-[var(--color-charcoal)]">{state.project.owners}</b>
+                {state.project.address ? ` · ${state.project.address}` : ''}
+              </p>
             </div>
-            <PaymentsSection payments={state.payments} onChange={changePayment} onAdd={addPayment} onRemove={removePayment} />
-            <NotesSection
-              mode={state.notes.mode}
-              text={state.notes.text}
-              auto={auto}
-              onMode={(mode) => update((prev) => ({ ...prev, notes: { mode, text: mode === 'custom' && !prev.notes.text.trim() ? auto : prev.notes.text } }))}
-              onText={(text) => update((prev) => ({ ...prev, notes: { ...prev.notes, text } }))}
-            />
-            <HistorySection trackerId={trackerId} invoices={invoices} onRestore={restore} busy={busy !== null} />
-            <ProjectSection
-              trackerId={trackerId}
-              project={state.project}
-              pending={state.pendingChangeOrders}
-              onProject={(patch) => update((prev) => ({ ...prev, project: { ...prev.project, ...patch } }))}
-              onPending={(list) => update((prev) => ({ ...prev, pendingChangeOrders: list }))}
-            />
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em]" style={{ color: 'var(--color-charcoal-light)' }}>
+                Invoice #
+                <input
+                  className="w-[112px] rounded-lg border px-3 py-2.5 bg-white text-base md:text-sm tabular-nums text-[var(--color-charcoal)] outline-none focus:border-[var(--color-teal)] min-h-[44px] md:min-h-[40px]"
+                  style={{ borderColor: 'var(--color-stone)' }}
+                  value={state.invoice.number}
+                  onChange={(e) => onInvoiceField('number', e.target.value)}
+                  maxLength={32}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em]" style={{ color: 'var(--color-charcoal-light)' }}>
+                Invoice date
+                <input
+                  className="w-[124px] rounded-lg border px-3 py-2.5 bg-white text-base md:text-sm tabular-nums text-[var(--color-charcoal)] outline-none focus:border-[var(--color-teal)] min-h-[44px] md:min-h-[40px]"
+                  style={{ borderColor: 'var(--color-stone)' }}
+                  value={state.invoice.date}
+                  placeholder="MM/DD/YYYY"
+                  onChange={(e) => onInvoiceField('date', e.target.value)}
+                  maxLength={24}
+                />
+              </label>
+            </div>
+          </header>
+
+          <TrackerKpis s={s} paymentsCount={state.payments.length} />
+
+          <div className="mt-5 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:gap-6 2xl:items-start">
+            <div className="flex flex-col gap-5">
+              <LinesSection lines={state.lines} calcs={calcs} s={s} onAmount={setAmount} onOpenAmount={(line, field) => setAmountReq({ line, field })} onEdit={(line) => setEditReq({ line })} onBillRemaining={billRemaining} />
+              <div className="2xl:hidden">
+                <InvoicePanel state={state} calcs={calcs} s={s} lines={state.lines} busy={busy} result={result} trackerId={trackerId} showGenerate={false} onGenerate={() => void generate(false)} onPaid={() => setPaidOpen(true)} />
+              </div>
+              <PaymentsSection payments={state.payments} onChange={changePayment} onAdd={addPayment} onRemove={removePayment} />
+              <NotesSection
+                mode={state.notes.mode}
+                text={state.notes.text}
+                auto={auto}
+                onMode={(mode) => update((prev) => ({ ...prev, notes: { mode, text: mode === 'custom' && !prev.notes.text.trim() ? auto : prev.notes.text } }))}
+                onText={(text) => update((prev) => ({ ...prev, notes: { ...prev.notes, text } }))}
+              />
+              <HistorySection trackerId={trackerId} invoices={invoices} onRestore={restore} busy={busyNow} />
+              <ProjectSection
+                trackerId={trackerId}
+                project={state.project}
+                pending={state.pendingChangeOrders}
+                onProject={(patch) => update((prev) => ({ ...prev, project: { ...prev.project, ...patch } }))}
+                onPending={(list) => update((prev) => ({ ...prev, pendingChangeOrders: list }))}
+              />
+            </div>
+            <aside className="hidden 2xl:block sticky top-20">
+              <InvoicePanel state={state} calcs={calcs} s={s} lines={state.lines} busy={busy} result={result} trackerId={trackerId} showGenerate onGenerate={() => void generate(false)} onPaid={() => setPaidOpen(true)} />
+            </aside>
           </div>
-          <aside className="hidden lg:block sticky top-20">
-            <InvoicePanel state={state} calcs={calcs} s={s} lines={state.lines} busy={busy} result={result} trackerId={trackerId} onGenerate={() => void generate(false)} onPaid={() => setPaidOpen(true)} />
-          </aside>
-        </div>
+        </fieldset>
       </div>
 
-      {/* Phone / tablet: total and the one button that matters, above the tab bar */}
-      <div className="lg:hidden fixed inset-x-0 z-30 border-t px-4 py-2.5 flex items-center justify-between gap-3 print:hidden bottom-[calc(56px+env(safe-area-inset-bottom,0px))] md:bottom-0 md:pb-[env(safe-area-inset-bottom,0px)]" style={{ backgroundColor: 'var(--color-background)', borderColor: 'var(--color-stone)' }}>
+      {/* Phone / tablet / laptop: the total and the one button that matters, above the tab bar */}
+      <div className="2xl:hidden fixed inset-x-0 z-30 border-t px-4 py-2.5 flex items-center justify-between gap-3 print:hidden bottom-[calc(57px+env(safe-area-inset-bottom,0px))] md:bottom-0 md:pb-[calc(10px+env(safe-area-inset-bottom,0px))]" style={{ backgroundColor: 'var(--color-background)', borderColor: 'var(--color-stone)' }}>
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-[0.14em]" style={{ color: 'var(--color-charcoal-light)' }}>
             Total due
@@ -415,20 +517,29 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
             {fmt(s.totalDue)}
           </div>
         </div>
-        <button type="button" onClick={() => void generate(false)} disabled={busy !== null} className="px-4 py-3 rounded-xl bg-[var(--color-teal)] text-[var(--color-cream)] font-semibold min-h-[44px] disabled:opacity-60 whitespace-nowrap">
+        <button type="button" onClick={() => void generate(false)} disabled={busyNow} className="px-4 py-3 rounded-xl bg-[var(--color-teal)] text-[var(--color-cream)] font-semibold min-h-[48px] disabled:opacity-60 whitespace-nowrap">
           {busy === 'generate' ? 'Sending…' : 'Save & generate'}
         </button>
       </div>
 
       {toast ? (
-        <div role="status" aria-live="polite" className="fixed left-1/2 -translate-x-1/2 z-40 px-4 py-2.5 rounded-full text-sm shadow-lg max-w-[calc(100vw-32px)] bottom-[calc(132px+env(safe-area-inset-bottom,0px))] lg:bottom-6" style={{ backgroundColor: 'var(--color-teal)', color: 'var(--color-cream)' }}>
-          {toast}
+        <div className="fixed inset-x-4 z-40 flex justify-center pointer-events-none bottom-[calc(140px+env(safe-area-inset-bottom,0px))] md:bottom-24 2xl:bottom-6">
+          <button
+            type="button"
+            role="status"
+            aria-live="polite"
+            onClick={() => setToast(null)}
+            className="pointer-events-auto max-w-full w-fit rounded-2xl px-4 py-2.5 text-sm text-center shadow-lg"
+            style={{ backgroundColor: toast.tone === 'error' ? DUE_RED : 'var(--color-teal)', color: 'var(--color-cream)' }}
+          >
+            {toast.msg}
+          </button>
         </div>
       ) : null}
 
       <AmountSheet request={amountReq} onClose={() => setAmountReq(null)} onApply={setAmount} />
-      <LineEditorSheet request={editReq} onClose={() => setEditReq(null)} onSave={saveLine} onRemove={removeLine} />
-      <PaidSheet open={paidOpen} invoiceNumber={state.invoice.number} totalDue={s.totalDue} billed={s.sumG} busy={busy === 'roll'} onClose={() => setPaidOpen(false)} onSubmit={(input) => void rollForward(input)} />
+      <LineEditorSheet request={editReq} canRemove={state.lines.length > 1} onClose={() => setEditReq(null)} onSave={saveLine} onRemove={removeLine} />
+      <PaidSheet open={paidOpen} invoiceNumber={state.invoice.number} totalDue={s.totalDue} billed={s.sumG} changedSinceIssue={changedSinceIssue} busy={busy === 'roll'} onClose={() => setPaidOpen(false)} onSubmit={(input) => void rollForward(input)} />
       <ConfirmSheet request={confirm} onClose={() => setConfirm(null)} />
     </div>
   )

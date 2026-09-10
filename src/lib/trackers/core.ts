@@ -83,6 +83,11 @@ export function unpriced(c: LineCalc): boolean {
   return c.status === 'tbd' || c.D <= 0
 }
 
+/** Billed (progress + draw) beyond what is left on the line. */
+export function overBilled(c: LineCalc): boolean {
+  return !unpriced(c) && c.cp + c.draw > c.D - c.prior + 0.005
+}
+
 /** Column A text on the workbook. */
 export function displayDesc(line: TrackerLine, c: LineCalc): string {
   const name = line.name
@@ -187,11 +192,13 @@ export function notesAuto(state: TrackerState, calcs: LineCalc[], s: TrackerSumm
     if (c.draw > 0) parts.push(l.name + ' ' + money(c.draw) + ' advance draw')
   })
   const carry = s.totalDue - s.sumG
-  if (Math.abs(carry) > 0.005) parts.push((carry > 0 ? 'prior balance carried ' : 'credit carried ') + money2(carry))
+  if (carry > 0.005) parts.push('prior balance carried ' + money2(carry))
+  else if (carry < -0.005) parts.push('less credit of ' + money2(-carry))
   if (parts.length) add('CURRENT DUE THIS INVOICE (#' + inv + ') = ' + money2(s.totalDue) + ':  ' + parts.join(' + ') + '.')
   else add('CURRENT DUE THIS INVOICE (#' + inv + ') = ' + money2(s.totalDue) + ' — no new billing this period.')
 
   const prevNames = new Set((prev?.items ?? []).map((it) => it.name))
+  const prevShort = !!prev && prev.paid != null && N(prev.paid) < N(prev.total) - 0.005
   lines.forEach((l, i) => {
     const c = calcs[i]
     if (c.status !== 'partial') return
@@ -200,6 +207,7 @@ export function notesAuto(state: TrackerState, calcs: LineCalc[], s: TrackerSumm
     if (c.cp > 0 && c.draw > 0) tail = money(c.cp) + ' billed this invoice for work completed + ' + money(c.draw) + ' advance draw.'
     else if (c.cp > 0) tail = money(c.cp) + ' billed this invoice for work completed.'
     else if (c.draw > 0) tail = money(c.draw) + ' advance draw this invoice.'
+    else if (prev && prevNames.has(l.name) && prev.number && prevShort) tail = 'billed on Invoice #' + prev.number + ' (partially paid — see note 1); no new billing this invoice.'
     else if (prev && prevNames.has(l.name) && prev.number) tail = 'fully paid via Invoice #' + prev.number + '; no new billing this invoice.'
     else tail = 'no new billing this invoice.'
     add(head + tail)
@@ -277,8 +285,10 @@ export function parseMoney(input: string | number | null | undefined): number {
   return Number.isFinite(v) ? cents(neg ? -v : v) : NaN
 }
 
+/** Lowercase id from a name, at most 60 characters so a uniqueness suffix still fits the 64-char limit. */
 export function slug(s: string): string {
-  return (s || 'line').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'line'
+  const base = (s || 'line').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  return (base.slice(0, 60).replace(/-+$/g, '') || 'line')
 }
 
 /** Fill defaults, coerce numbers to cents, and make line ids unique. Never throws. */
@@ -390,9 +400,9 @@ export function rollForward(state: TrackerState, input: RollForwardInput, today:
 
 type PreviousInvoice = NonNullable<TrackerState['previousInvoice']>
 
-/** Lines whose billed amount exceeds what is left on the line. */
+/** Lines whose billed amount (progress + draw) exceeds what is left on the line. */
 export function overBilledLines(state: TrackerState, calcs: LineCalc[] = state.lines.map(lineCalc)): TrackerLine[] {
-  return state.lines.filter((_, i) => !unpriced(calcs[i]) && calcs[i].cp > calcs[i].D - calcs[i].prior + 0.005)
+  return state.lines.filter((_, i) => overBilled(calcs[i]))
 }
 
 /** Lines that carry an amount but cannot be billed (TBD or unpriced). */

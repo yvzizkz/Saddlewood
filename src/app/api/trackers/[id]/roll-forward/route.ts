@@ -7,8 +7,9 @@ import { rollForwardSchema } from '@/lib/trackers/types'
 
 // The owner paid the current invoice: record the payment, fold this invoice's
 // progress and draws into completed work, and open the next invoice number.
-// The pre-roll state is kept under Invoice history if it was never generated,
-// so a mistaken roll-forward can be stepped back.
+// The numbers being rolled are kept under Invoice history: untouched if they
+// were generated from the portal and not edited since (status 'issued'),
+// otherwise written as 'superseded' so History shows what was actually paid.
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,8 +39,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     }
     const before = tracker.state
     const invoices = await listInvoices(id)
-    if (!invoices.some((s) => s.invoiceNumber === before.invoice.number)) {
-      await saveInvoiceSnapshot({ trackerId: id, state: before, actor: who.actor })
+    const existing = invoices.find((s) => s.invoiceNumber === before.invoice.number)
+    if (!existing || before.invoice.status !== 'issued') {
+      await saveInvoiceSnapshot({ trackerId: id, state: before, actor: who.actor, status: 'superseded', sentTo: existing?.sentTo ?? null, emailId: existing?.emailId ?? null })
     }
     const next = rollForward(before, parsed.data, todayStr())
     const saved = await saveTracker(id, next, who.actor, tracker.updatedAt)
