@@ -406,7 +406,7 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
       <div className="sticky top-0 z-10 border-b print:hidden" style={{ backgroundColor: 'var(--color-background)', borderColor: 'var(--color-stone)' }}>
-        <div className="flex items-center justify-between gap-3 px-4 py-3 min-h-[44px] max-w-6xl mx-auto md:px-8">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 min-h-[44px] max-w-7xl mx-auto md:px-8">
           <Link href="/internal/trackers" className="flex items-center gap-2 text-[var(--color-charcoal)] font-medium min-w-0 min-h-[44px]">
             <span aria-hidden="true">{'←'}</span>
             <span style={{ fontFamily: 'var(--font-fraunces)' }} className="text-base uppercase tracking-wide truncate">
@@ -417,7 +417,7 @@ export function TrackerPageClient({ tracker, invoices: initialInvoices }: Props)
         </div>
       </div>
 
-      <div className="px-4 pt-5 md:px-8 md:pt-8 max-w-6xl mx-auto pb-[calc(150px+env(safe-area-inset-bottom,0px))] 2xl:pb-16">
+      <div className="px-4 pt-5 md:px-8 md:pt-8 max-w-7xl mx-auto pb-[calc(150px+env(safe-area-inset-bottom,0px))] 2xl:pb-16">
         {conflict ? (
           <div className="mb-4 rounded-lg border px-4 py-3 text-sm flex flex-wrap items-center gap-3" style={{ borderColor: DUE_RED, color: 'var(--color-charcoal)', backgroundColor: 'rgba(162,59,42,0.08)' }} role="alert">
             <span className="flex-1 min-w-[200px]">
