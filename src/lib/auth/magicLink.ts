@@ -56,6 +56,8 @@ export async function generateSignInLink(email: string, next?: string): Promise<
 
 export type OutboundEmail = {
   to: string;
+  /** Extra recipients, copied in. */
+  cc?: string[];
   subject: string;
   html: string;
   text: string;
@@ -80,6 +82,7 @@ export async function sendEmail(msg: OutboundEmail): Promise<{ id: string | null
   const { data, error } = await resend.emails.send({
     from,
     to: [msg.to],
+    ...(msg.cc?.length ? { cc: msg.cc } : {}),
     subject: msg.subject,
     html: msg.html,
     text: msg.text,

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, List, BookOpen, Activity, ClipboardList, type LucideIcon } from 'lucide-react'
+import { Home, List, BookOpen, Activity, ClipboardList, Receipt, type LucideIcon } from 'lucide-react'
 
 type Tab = {
   href: string
@@ -24,6 +24,7 @@ export default function BottomTabBar({ pendingCount }: BottomTabBarProps) {
     { href: '/internal?tab=all', label: 'All', icon: List },
     { href: '/internal/bid-log', label: 'Bid Log', icon: BookOpen },
     { href: '/internal/activity', label: 'Activity', icon: Activity },
+    { href: '/internal/trackers', label: 'Trackers', icon: Receipt },
     { href: '/internal/ops', label: 'Ops', icon: ClipboardList },
   ]
 
@@ -49,7 +50,7 @@ export default function BottomTabBar({ pendingCount }: BottomTabBarProps) {
             key={tab.label}
             href={tab.href}
             aria-current={active ? 'page' : undefined}
-            className="flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[56px]"
+            className="flex-1 flex flex-col items-center justify-center gap-1 h-14"
             style={{ color: active ? 'var(--color-teal)' : 'var(--color-charcoal)' }}
           >
             <span className="relative">
@@ -66,7 +67,7 @@ export default function BottomTabBar({ pendingCount }: BottomTabBarProps) {
                 </>
               )}
             </span>
-            <span className="text-[11px] font-medium">{tab.label}</span>
+            <span className="text-[11px] font-medium leading-none">{tab.label}</span>
           </Link>
         )
       })}
