@@ -60,6 +60,48 @@ export type ProposalItem = {
   accepted_ip?: string;
   created_at: string;
   created_by: string;
+  updates?: ProposalUpdateItem[];
+};
+
+export type ProposalUpdateAttachment = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  data_url: string;
+};
+
+export type ProposalUpdateCategory =
+  | 'drawing_revision'
+  | 'scope_change'
+  | 'site_photo'
+  | 'clarification'
+  | 'schedule_update';
+
+export type ProposalUpdateItem = {
+  id: string;
+  author_name: string;
+  author_email?: string;
+  author_role?: 'client' | 'contractor' | 'estimator' | 'architect';
+  category: ProposalUpdateCategory;
+  message: string;
+  attachments: ProposalUpdateAttachment[];
+  status: 'pending_review' | 'acknowledged' | 'incorporated';
+  created_at: string;
+};
+
+export type ProposalUpdateInput = {
+  author_name: string;
+  author_email?: string;
+  author_role?: 'client' | 'contractor' | 'estimator' | 'architect';
+  category: ProposalUpdateCategory;
+  message: string;
+  attachments?: {
+    name: string;
+    size: number;
+    type: string;
+    data_url: string;
+  }[];
 };
 
 export type ProposalDashboardState = {

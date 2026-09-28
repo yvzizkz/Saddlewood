@@ -6,6 +6,8 @@ import type {
   ProposalItem,
   DraftProposalInput,
   ProposalStatus,
+  ProposalUpdateItem,
+  ProposalUpdateInput,
 } from './types';
 
 const PROPOSALS_STATE_PATH = '/Users/landos/dev/Saddlewood-KB/bot/proposals_state.json';
@@ -129,6 +131,27 @@ const SEED_PROPOSALS: ProposalItem[] = [
     status: 'sent',
     created_at: '2026-09-24T18:00:00Z',
     created_by: 'Marco & Lando',
+    updates: [
+      {
+        id: 'upd-001',
+        author_name: 'Paul Johnson (Superintendent)',
+        author_email: 'paulj@schiffererbuilt.com',
+        author_role: 'contractor',
+        category: 'drawing_revision',
+        message: 'Uploaded Rev 5 stamped set sheet list. Confirming 10CR furring dimensions along Classroom 111 north wall for Monday walk.',
+        attachments: [
+          {
+            id: 'att-001',
+            name: 'Bellevue_A102_Rev5_Classrooms_NorthWall.pdf',
+            size: 2450000,
+            type: 'application/pdf',
+            data_url: '#',
+          },
+        ],
+        status: 'pending_review',
+        created_at: '2026-09-26T16:30:00Z',
+      },
+    ],
   },
   {
     id: 'prp-002',
@@ -387,5 +410,65 @@ export async function createProposal(input: DraftProposalInput, createdBy = 'Mar
   state.next_number += 1;
   saveProposalsState(state);
 
+  return proposal;
+}
+
+export async function addProposalUpdate(
+  idOrToken: string,
+  input: ProposalUpdateInput
+): Promise<{ proposal: ProposalItem; update: ProposalUpdateItem } | null> {
+  const state = await getProposalsState();
+  const proposal = state.proposals.find(
+    (p) => p.id === idOrToken || p.token === idOrToken
+  );
+  if (!proposal) return null;
+
+  if (!proposal.updates) {
+    proposal.updates = [];
+  }
+
+  const updateId = `upd-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
+  const attachments = (input.attachments || []).map((att, idx) => ({
+    id: `att-${Date.now().toString(36)}-${idx}`,
+    name: att.name,
+    size: att.size,
+    type: att.type,
+    data_url: att.data_url,
+  }));
+
+  const updateItem: ProposalUpdateItem = {
+    id: updateId,
+    author_name: input.author_name || proposal.client_name,
+    author_email: input.author_email || proposal.client_email,
+    author_role: input.author_role || 'client',
+    category: input.category,
+    message: input.message,
+    attachments,
+    status: 'pending_review',
+    created_at: new Date().toISOString(),
+  };
+
+  proposal.updates.unshift(updateItem);
+  saveProposalsState(state);
+
+  return { proposal, update: updateItem };
+}
+
+export async function updateProposalUpdateStatus(
+  proposalIdOrToken: string,
+  updateId: string,
+  status: 'pending_review' | 'acknowledged' | 'incorporated'
+): Promise<ProposalItem | null> {
+  const state = await getProposalsState();
+  const proposal = state.proposals.find(
+    (p) => p.id === proposalIdOrToken || p.token === proposalIdOrToken
+  );
+  if (!proposal || !proposal.updates) return null;
+
+  const target = proposal.updates.find((u) => u.id === updateId);
+  if (!target) return null;
+
+  target.status = status;
+  saveProposalsState(state);
   return proposal;
 }

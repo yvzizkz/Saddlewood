@@ -19,16 +19,38 @@ import {
   ShieldCheck,
   AlertCircle,
   FileCheck2,
+  MessageSquare,
+  Paperclip,
+  Check,
 } from 'lucide-react';
 import type { ProposalItem, ProposalArchetype, DraftProposalInput } from '@/lib/proposals/types';
 
 export default function InternalProposalsPage() {
   const [proposals, setProposals] = useState<ProposalItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'draft' | 'delta'>('pipeline');
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'updates' | 'delta' | 'draft'>('pipeline');
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const handleUpdateStatus = async (
+    proposalId: string,
+    updateId: string,
+    status: 'pending_review' | 'acknowledged' | 'incorporated'
+  ) => {
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/updates`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ update_id: updateId, status }),
+      });
+      if (!res.ok) throw new Error('Failed to update status');
+      showToast(`Update marked as ${status.replace('_', ' ')}`, 'success');
+      fetchProposals();
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
+  };
 
   // Form State for new proposal
   const [formData, setFormData] = useState<DraftProposalInput>({
@@ -239,6 +261,28 @@ export default function InternalProposalsPage() {
             📋 Proposals Pipeline ({proposals.length})
           </button>
           <button
+            onClick={() => setActiveTab('updates')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'updates'
+                ? 'bg-[var(--color-teal)] text-white shadow-2xs'
+                : 'text-[var(--color-charcoal)] hover:bg-[var(--color-stone)]/40'
+            }`}
+          >
+            <MessageSquare className="size-3.5" />
+            <span>Client Notes & Media</span>
+            {proposals.reduce((acc, p) => acc + (p.updates?.length || 0), 0) > 0 && (
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  activeTab === 'updates'
+                    ? 'bg-white text-teal-800'
+                    : 'bg-teal-100 text-teal-800'
+                }`}
+              >
+                {proposals.reduce((acc, p) => acc + (p.updates?.length || 0), 0)}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('delta')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === 'delta'
@@ -349,9 +393,18 @@ export default function InternalProposalsPage() {
                         </div>
                       </div>
 
-                      {/* Line Item Preview */}
-                      <div className="text-xs text-slate-500">
-                        {p.line_items.length} line item(s) · {p.alternates.length} alternate(s) attached
+                      {/* Line Item Preview & Updates */}
+                      <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                        <span>{p.line_items.length} line item(s) · {p.alternates.length} alternate(s) attached</span>
+                        {p.updates && p.updates.length > 0 && (
+                          <button
+                            onClick={() => setActiveTab('updates')}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-[10px] font-bold hover:bg-teal-100 transition-colors cursor-pointer"
+                          >
+                            <MessageSquare className="size-3 text-teal-600" />
+                            <span>{p.updates.length} Client Scope Note(s)</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -484,6 +537,159 @@ export default function InternalProposalsPage() {
               <span>Preview Live Bellevue Client Proposal</span>
               <ExternalLink className="size-3.5" />
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Inbound Client Updates & Media Feed */}
+      {activeTab === 'updates' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-2xl bg-white border border-[var(--color-stone)] shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-stone)] pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-[var(--color-charcoal)] flex items-center gap-2">
+                  <MessageSquare className="size-5 text-[var(--color-teal)]" />
+                  <span>Inbound Scope Clarifications & Plan Markups</span>
+                </h2>
+                <p className="text-xs text-[var(--color-charcoal-light)] mt-1">
+                  Client and superintendent feedback, site photos, and revised drawing sheets submitted through proposal presentation links.
+                </p>
+              </div>
+              <div className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 shrink-0 self-start sm:self-auto">
+                {proposals.reduce((acc, p) => acc + (p.updates?.length || 0), 0)} Total Updates Logged
+              </div>
+            </div>
+
+            {proposals.reduce((acc, p) => acc + (p.updates?.length || 0), 0) === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <CheckCircle2 className="size-8 text-emerald-600 mx-auto mb-2" />
+                <h3 className="font-bold text-sm text-[var(--color-charcoal)]">All Clear — No Pending Scope Updates</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  When a GC or homeowner submits comments, sketches, or photos on their proposal page, they will land here in real time.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                {proposals.flatMap((p) =>
+                  (p.updates || []).map((u) => ({ proposal: p, update: u }))
+                ).map(({ proposal: p, update: u }) => (
+                  <div
+                    key={u.id}
+                    className="p-5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-3"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="font-bold text-sm text-[var(--color-charcoal)]">
+                          {p.project_name}
+                        </span>
+                        <span className="text-xs text-slate-400">·</span>
+                        <span className="text-xs font-medium text-slate-600">
+                          {p.client_company || p.client_name}
+                        </span>
+                        <span
+                          className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                            u.category === 'drawing_revision'
+                              ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                              : u.category === 'site_photo'
+                              ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                              : u.category === 'scope_change'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {u.category.replace('_', ' ')}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400">
+                          {new Date(u.created_at).toLocaleString()}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
+                            u.status === 'incorporated'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : u.status === 'acknowledged'
+                              ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                              : 'bg-amber-100 text-amber-800 border border-amber-200'
+                          }`}
+                        >
+                          {u.status === 'incorporated'
+                            ? '✓ Incorporated'
+                            : u.status === 'acknowledged'
+                            ? 'Acknowledged'
+                            : 'Under Review'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <span>Submitted by: <strong>{u.author_name}</strong> {u.author_email ? `(${u.author_email})` : ''}</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+                      {u.message}
+                    </div>
+
+                    {u.attachments && u.attachments.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="text-[11px] font-bold text-slate-600">Attached Media & Drawings:</div>
+                        <div className="flex flex-wrap gap-2">
+                          {u.attachments.map((att) => (
+                            <a
+                              key={att.id}
+                              href={att.data_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={att.name}
+                              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs text-slate-700 transition-colors"
+                            >
+                              <Paperclip className="size-3.5 text-slate-400" />
+                              <span className="font-semibold">{att.name}</span>
+                              <span className="text-slate-400 text-[10px]">({Math.round(att.size / 1024)} KB)</span>
+                              <ExternalLink className="size-3 text-slate-400" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
+                      <Link
+                        href={`/p/${p.token}`}
+                        target="_blank"
+                        className="text-[var(--color-teal)] hover:underline flex items-center gap-1 font-semibold"
+                      >
+                        <span>Open Client Proposal</span>
+                        <ExternalLink className="size-3" />
+                      </Link>
+
+                      <div className="flex items-center gap-2">
+                        {u.status !== 'acknowledged' && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateStatus(p.id, u.id, 'acknowledged')}
+                            className="px-3 py-1 rounded-lg border border-slate-300 text-slate-700 font-semibold hover:bg-slate-100 transition-colors cursor-pointer"
+                          >
+                            Acknowledge
+                          </button>
+                        )}
+                        {u.status !== 'incorporated' && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateStatus(p.id, u.id, 'incorporated')}
+                            className="px-3 py-1 rounded-lg bg-[var(--color-teal)] text-white font-semibold hover:opacity-95 transition-opacity cursor-pointer flex items-center gap-1"
+                          >
+                            <Check className="size-3.5" />
+                            <span>Mark Incorporated into Bid</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

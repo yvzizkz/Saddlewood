@@ -19,8 +19,13 @@ import {
   FileText,
   DollarSign,
   ChevronDown,
+  UploadCloud,
+  Paperclip,
+  MessageSquare,
+  Send,
+  ExternalLink,
 } from 'lucide-react';
-import type { ProposalItem, ProposalAlternate } from '@/lib/proposals/types';
+import type { ProposalItem, ProposalAlternate, ProposalUpdateCategory } from '@/lib/proposals/types';
 
 interface Props {
   params: Promise<{ token: string }>;
@@ -44,6 +49,15 @@ export default function ClientProposalPage({ params }: Props) {
     setTimeout(() => setToast(null), 4000);
   };
 
+  // Scope Clarification & File Intake State
+  const [updateCategory, setUpdateCategory] = useState<ProposalUpdateCategory>('drawing_revision');
+  const [updateAuthorName, setUpdateAuthorName] = useState('');
+  const [updateAuthorEmail, setUpdateAuthorEmail] = useState('');
+  const [updateMessage, setUpdateMessage] = useState('');
+  const [stagedFiles, setStagedFiles] = useState<{ name: string; size: number; type: string; data_url: string }[]>([]);
+  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
+  const [updateSuccessMsg, setUpdateSuccessMsg] = useState<string | null>(null);
+
   const fetchProposal = async () => {
     try {
       setLoading(true);
@@ -54,10 +68,82 @@ export default function ClientProposalPage({ params }: Props) {
       const json = await res.json();
       setProposal(json.proposal);
       setSignerName(json.proposal.client_name || '');
+      setUpdateAuthorName(json.proposal.client_name || '');
+      setUpdateAuthorEmail(json.proposal.client_email || '');
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (file.size > 15 * 1024 * 1024) {
+        showToast(`File ${file.name} exceeds 15MB limit`, 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        setStagedFiles((prev) => [
+          ...prev,
+          {
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/octet-stream',
+            data_url: dataUrl,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const removeStagedFile = (index: number) => {
+    setStagedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!updateMessage.trim()) return;
+
+    try {
+      setIsSubmittingUpdate(true);
+      const res = await fetch(`/api/proposals/${token}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          author_name: updateAuthorName.trim() || proposal?.client_name || 'Client',
+          author_email: updateAuthorEmail.trim() || proposal?.client_email || undefined,
+          category: updateCategory,
+          message: updateMessage.trim(),
+          attachments: stagedFiles,
+        }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.error || 'Failed to submit update');
+      }
+
+      const json = await res.json();
+      setProposal(json.proposal);
+      setUpdateMessage('');
+      setStagedFiles([]);
+      setUpdateSuccessMsg('✓ Received! Routed to Saddlewood estimating team and logged to project.');
+      setTimeout(() => setUpdateSuccessMsg(null), 6000);
+      showToast('Scope update & attachments routed to Saddlewood estimating', 'success');
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    } finally {
+      setIsSubmittingUpdate(false);
     }
   };
 
@@ -479,6 +565,289 @@ export default function ClientProposalPage({ params }: Props) {
               </p>
             </div>
           )}
+
+          {/* Scope Clarifications, Jobsite Photos & Plan Updates */}
+          <div className="border border-[var(--color-stone)] rounded-2xl p-6 bg-slate-50/60 space-y-5 print:hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="size-4 text-[var(--color-teal)]" />
+                  <h3 className="font-bold text-sm text-[var(--color-charcoal)]">
+                    Scope Clarifications, Site Photos & Plan Updates
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Need changes to wall layouts, questions on specs, or revised plan sheets? Leave notes or attach drawings below. Our estimating team will review and incorporate any approved updates.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 shrink-0 self-start sm:self-auto font-semibold">
+                Direct Intake
+              </span>
+            </div>
+
+            {/* Category selector */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                What type of update is this?
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                {[
+                  { id: 'drawing_revision', label: '📐 Plan Revision / Markup', desc: 'Rev 5 sheets, details' },
+                  { id: 'site_photo', label: '📸 Jobsite Conditions', desc: 'Ceiling, framing, access' },
+                  { id: 'scope_change', label: '📝 Scope Adjustment', desc: 'Add / deduct wall items' },
+                  { id: 'clarification', label: '💬 Question / RFI', desc: 'Finishes, alternates' },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setUpdateCategory(cat.id as ProposalUpdateCategory)}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      updateCategory === cat.id
+                        ? 'bg-white border-[var(--color-teal)] ring-2 ring-[var(--color-teal)]/20 shadow-xs'
+                        : 'bg-white/70 border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    <div className="font-semibold text-[11px]">{cat.label}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{cat.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Note & File Form */}
+            <form onSubmit={handleSubmitUpdate} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Your Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={updateAuthorName}
+                    onChange={(e) => setUpdateAuthorName(e.target.value)}
+                    placeholder="e.g. Dean Schifferer or Paul Johnson"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:border-[var(--color-teal)]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Your Email (for notifications)</label>
+                  <input
+                    type="email"
+                    value={updateAuthorEmail}
+                    onChange={(e) => setUpdateAuthorEmail(e.target.value)}
+                    placeholder="e.g. deans@schiffererbuilt.com"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:border-[var(--color-teal)]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 text-xs mb-1">
+                  Context, Drawing Revisions or Scope Request *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={updateMessage}
+                  onChange={(e) => setUpdateMessage(e.target.value)}
+                  placeholder={
+                    updateCategory === 'drawing_revision'
+                      ? 'Specify sheet numbers, details, or room locations (e.g., "See attached Rev 5 sheet A102 where we adjusted Classroom 111 wall 3 feet east; please price the delta")...'
+                      : updateCategory === 'site_photo'
+                      ? 'Describe site conditions shown in photos (e.g., "Photo of existing mechanical duct interference over sanctuary lobby")...'
+                      : 'Enter questions or requested additions/deductions to the proposal scope...'
+                  }
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:border-[var(--color-teal)] resize-y leading-relaxed"
+                />
+              </div>
+
+              {/* File Uploader Dropzone */}
+              <div>
+                <label className="block font-semibold text-slate-700 text-xs mb-1">
+                  Attach Plan Sheets, Sketches, or Site Photos
+                </label>
+                <div className="relative border-2 border-dashed border-slate-200 hover:border-[var(--color-teal)] rounded-2xl p-4 bg-white text-center cursor-pointer transition-colors group">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf,.dwg"
+                    onChange={handleFileSelect}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                  <div className="flex flex-col items-center justify-center gap-1.5 pointer-events-none">
+                    <div className="size-8 rounded-full bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center transition-colors">
+                      <UploadCloud className="size-4 text-slate-400 group-hover:text-[var(--color-teal)]" />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700 group-hover:text-[var(--color-teal)]">
+                      Click or drag files here to attach
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      PDF Plan Sheets, Site Photos (PNG/JPG), Sketches • Max 15MB each
+                    </span>
+                  </div>
+                </div>
+
+                {/* Staged Files Preview */}
+                {stagedFiles.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    <div className="text-[11px] font-semibold text-slate-600">
+                      Staged Attachments ({stagedFiles.length}):
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {stagedFiles.map((file, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 text-xs shadow-2xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {file.type.startsWith('image/') ? (
+                              <img
+                                src={file.data_url}
+                                alt={file.name}
+                                className="size-8 rounded object-cover border border-slate-200 shrink-0"
+                              />
+                            ) : (
+                              <div className="size-8 rounded bg-red-50 text-red-600 flex items-center justify-center shrink-0 font-bold text-[10px]">
+                                PDF
+                              </div>
+                            )}
+                            <div className="truncate">
+                              <div className="font-medium text-slate-700 truncate">{file.name}</div>
+                              <div className="text-[10px] text-slate-400">
+                                {Math.round(file.size / 1024)} KB
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeStagedFile(idx)}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded-lg cursor-pointer"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Submit button & feedback */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                {updateSuccessMsg ? (
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                    <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                    <span>{updateSuccessMsg}</span>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-slate-400">
+                    Routes directly into Saddlewood's estimating queue and Marco's mobile digest.
+                  </span>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingUpdate || !updateMessage.trim()}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[var(--color-teal)] text-white text-xs font-semibold hover:opacity-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                >
+                  {isSubmittingUpdate ? (
+                    <>
+                      <div className="size-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Submitting Update...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="size-3.5" />
+                      <span>Submit Scope Update & Files</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* Prior Submissions & Updates Feed */}
+            {proposal.updates && proposal.updates.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-slate-200/90 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                    Scope & Plan Revision Activity Log ({proposal.updates.length})
+                  </span>
+                  <span className="text-[10px] text-slate-400">Chronological history</span>
+                </div>
+
+                <div className="space-y-3">
+                  {proposal.updates.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                              item.category === 'drawing_revision'
+                                ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                                : item.category === 'site_photo'
+                                ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                                : item.category === 'scope_change'
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}
+                          >
+                            {item.category.replace('_', ' ')}
+                          </span>
+                          <span className="font-semibold text-slate-800">{item.author_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
+                              item.status === 'incorporated'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : item.status === 'acknowledged'
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            {item.status === 'incorporated'
+                              ? '✓ In Bid'
+                              : item.status === 'acknowledged'
+                              ? 'Acknowledged'
+                              : 'Under Review'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-slate-600 leading-relaxed text-[11px] whitespace-pre-wrap">
+                        {item.message}
+                      </p>
+
+                      {item.attachments && item.attachments.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {item.attachments.map((att) => (
+                            <a
+                              key={att.id}
+                              href={att.data_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={att.name}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[10px] text-slate-700 hover:bg-slate-100 transition-colors"
+                            >
+                              <Paperclip className="size-3 text-slate-400" />
+                              <span className="font-medium truncate max-w-[180px]">{att.name}</span>
+                              <span className="text-slate-400">({Math.round(att.size / 1024)} KB)</span>
+                              <ExternalLink className="size-2.5 text-slate-400" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Commercial Terms & Conditions */}
           <div className="border-t border-[var(--color-stone)]/80 pt-4 text-[11px] text-slate-500 space-y-1">
