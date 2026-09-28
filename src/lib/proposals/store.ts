@@ -306,14 +306,42 @@ export function saveProposalsState(state: ProposalDashboardState) {
   }
 }
 
+export function matchProposal(p: ProposalItem, identifier: string): boolean {
+  if (!identifier) return false;
+  const clean = identifier.toLowerCase().trim();
+
+  // 1. Direct ID, Token, or Proposal Number match
+  if (p.id.toLowerCase() === clean) return true;
+  if (p.token.toLowerCase() === clean) return true;
+  if (p.proposal_number.toLowerCase() === clean) return true;
+
+  // 2. Token base match (e.g. "bellevue-church-schifferer-ac938" -> "bellevue-church-schifferer")
+  const tokenBase = p.token.toLowerCase().replace(/-[a-f0-9]{4,}$/, '');
+  if (tokenBase === clean) return true;
+
+  // 3. Known clean short aliases for SMS / email links
+  const aliases: Record<string, string[]> = {
+    'prp-001': ['bellevue', 'schifferer', 'ac938', 'b1', 'franklin', 'hutton', 'bellevue-church'],
+    'prp-002': ['cardinal', 'jk', 'c1', 'lot267', 'lot-267', 'lot268', 'lot-268', 'paradise'],
+    'prp-003': ['moore', 'buckeye', 'm1', 'whitton', 'frank', 'moore-addition'],
+  };
+
+  if (aliases[p.id]?.includes(clean)) return true;
+
+  // 4. Prefix match (e.g. "/p/bellevue" matches "bellevue-church-schifferer-ac938")
+  if (clean.length >= 3 && p.token.toLowerCase().startsWith(clean)) return true;
+
+  return false;
+}
+
 export async function getProposalByToken(token: string): Promise<ProposalItem | null> {
   const state = await getProposalsState();
-  return state.proposals.find((p) => p.token === token) || null;
+  return state.proposals.find((p) => matchProposal(p, token)) || null;
 }
 
 export async function getProposalById(id: string): Promise<ProposalItem | null> {
   const state = await getProposalsState();
-  return state.proposals.find((p) => p.id === id) || null;
+  return state.proposals.find((p) => matchProposal(p, id)) || null;
 }
 
 export async function updateProposalStatus(
@@ -321,7 +349,7 @@ export async function updateProposalStatus(
   status: ProposalStatus
 ): Promise<ProposalItem | null> {
   const state = await getProposalsState();
-  const proposal = state.proposals.find((p) => p.id === id);
+  const proposal = state.proposals.find((p) => matchProposal(p, id));
   if (!proposal) return null;
 
   proposal.status = status;
@@ -335,7 +363,7 @@ export async function toggleProposalAlternate(
   selected: boolean
 ): Promise<ProposalItem | null> {
   const state = await getProposalsState();
-  const proposal = state.proposals.find((p) => p.token === token);
+  const proposal = state.proposals.find((p) => matchProposal(p, token));
   if (!proposal) return null;
 
   const alt = proposal.alternates.find((a) => a.id === alternateId);
@@ -351,7 +379,7 @@ export async function acceptProposal(
   acceptance: { name: string; signature: string; ip: string }
 ): Promise<ProposalItem | null> {
   const state = await getProposalsState();
-  const proposal = state.proposals.find((p) => p.id === idOrToken || p.token === idOrToken);
+  const proposal = state.proposals.find((p) => matchProposal(p, idOrToken));
   if (!proposal) return null;
 
   proposal.status = 'accepted';
@@ -418,9 +446,7 @@ export async function addProposalUpdate(
   input: ProposalUpdateInput
 ): Promise<{ proposal: ProposalItem; update: ProposalUpdateItem } | null> {
   const state = await getProposalsState();
-  const proposal = state.proposals.find(
-    (p) => p.id === idOrToken || p.token === idOrToken
-  );
+  const proposal = state.proposals.find((p) => matchProposal(p, idOrToken));
   if (!proposal) return null;
 
   if (!proposal.updates) {
@@ -460,9 +486,7 @@ export async function updateProposalUpdateStatus(
   status: 'pending_review' | 'acknowledged' | 'incorporated'
 ): Promise<ProposalItem | null> {
   const state = await getProposalsState();
-  const proposal = state.proposals.find(
-    (p) => p.id === proposalIdOrToken || p.token === proposalIdOrToken
-  );
+  const proposal = state.proposals.find((p) => matchProposal(p, proposalIdOrToken));
   if (!proposal || !proposal.updates) return null;
 
   const target = proposal.updates.find((u) => u.id === updateId);
