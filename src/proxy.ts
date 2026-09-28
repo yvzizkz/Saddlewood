@@ -2,6 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 
+// Master security gate for Saddlewood.
+// Public marketing routes remain accessible to everyone.
+// All internal tools, review batches (/r/*, /review/*), ops, and internal APIs are strictly guarded.
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -33,16 +37,43 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-
-  // One allowlist for the proxy, the internal layout, the login page, and the
-  // Ops API: src/lib/ops/allowlist.ts. INTERNAL_ALLOWED_EMAILS still overrides.
+  const { pathname, search } = request.nextUrl;
   const isAllowed = isAllowedEmail(user?.email);
 
-  if (pathname.startsWith("/internal")) {
+  // 1. Guarded API routes
+  if (
+    pathname.startsWith("/api/review") ||
+    pathname.startsWith("/api/ops") ||
+    pathname.startsWith("/api/estimates") ||
+    pathname.startsWith("/api/trackers") ||
+    pathname.startsWith("/api/expenses")
+  ) {
+    const authHeader = request.headers.get("authorization");
+    if (
+      authHeader &&
+      ((process.env.SUPABASE_SERVICE_ROLE_KEY && authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`) ||
+       (process.env.OPS_AGENT_TOKEN && authHeader === `Bearer ${process.env.OPS_AGENT_TOKEN}`))
+    ) {
+      return supabaseResponse;
+    }
+    if (!user || !isAllowed) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+  }
+
+  // 2. Guarded internal & review pages
+  const isGuardedPage =
+    pathname.startsWith("/internal") ||
+    pathname.startsWith("/r/") ||
+    pathname === "/r" ||
+    pathname.startsWith("/review/") ||
+    pathname === "/review";
+
+  if (isGuardedPage) {
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
+      url.searchParams.set("next", pathname + (search || ""));
       return NextResponse.redirect(url);
     }
 
@@ -55,9 +86,12 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // 3. If already logged in and visiting /login, redirect to next (or /internal)
   if (pathname === "/login" && isAllowed) {
+    const next = request.nextUrl.searchParams.get("next");
     const url = request.nextUrl.clone();
-    url.pathname = "/internal";
+    url.pathname = next && next.startsWith("/") && !next.startsWith("//") ? next : "/internal";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

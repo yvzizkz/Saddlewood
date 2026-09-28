@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, List, BookOpen, Activity, ClipboardList, Receipt, type LucideIcon } from 'lucide-react'
+import { Home, List, BookOpen, Activity, ClipboardList, Receipt, DollarSign, FileText, type LucideIcon } from 'lucide-react'
 
 type Tab = {
   href: string
@@ -21,9 +21,8 @@ export default function BottomTabBar({ pendingCount }: BottomTabBarProps) {
 
   const tabs: Tab[] = [
     { href: '/internal?tab=pending', label: 'Pending', icon: Home, badge: pendingCount },
-    { href: '/internal?tab=all', label: 'All', icon: List },
-    { href: '/internal/bid-log', label: 'Bid Log', icon: BookOpen },
-    { href: '/internal/activity', label: 'Activity', icon: Activity },
+    { href: '/internal/contracts', label: 'Contracts', icon: FileText },
+    { href: '/internal/expenses', label: 'Expenses', icon: DollarSign },
     { href: '/internal/trackers', label: 'Trackers', icon: Receipt },
     { href: '/internal/ops', label: 'Ops', icon: ClipboardList },
   ]

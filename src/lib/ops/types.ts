@@ -14,6 +14,19 @@ export const OPS_COLUMN_LABELS: Record<OpsColumn, string> = {
 export const OPS_OWNERS = ["Marco", "Lando", "Ilene", "Eli"] as const;
 export type OpsOwner = (typeof OPS_OWNERS)[number];
 
+export const OPS_DEPARTMENTS = [
+  'Sales',
+  'Marketing',
+  'Project Management',
+  'Accounting',
+  'Legal',
+  'HR',
+  'Field Operations',
+  'Training',
+  'IT',
+] as const;
+export type OpsDepartment = (typeof OPS_DEPARTMENTS)[number];
+
 export type OpsCard = {
   id: string;
   title: string;
@@ -27,7 +40,34 @@ export type OpsCard = {
   updatedAt: string;
   updatedBy: string;
   archivedAt: string | null;
+  dept?: OpsDepartment | null;
 };
+
+export function inferCardDepartment(card: {
+  title?: string;
+  note?: string;
+  docSlug?: string | null;
+  owner?: string;
+  dept?: string | null;
+}): OpsDepartment {
+  if (card.dept && (OPS_DEPARTMENTS as readonly string[]).includes(card.dept)) {
+    return card.dept as OpsDepartment;
+  }
+  const text = `${card.title || ''} ${card.note || ''} ${card.docSlug || ''}`.toLowerCase();
+  if (/accounting|joist|zelle|invoice|expense|billing|chase|melio|sop-007/.test(text)) return 'Accounting';
+  if (/legal|contract|warranty|waiver|lien|dispute|carve-out|terms/.test(text)) return 'Legal';
+  if (/marketing|brand|case-study|portfolio|social|website|seo/.test(text)) return 'Marketing';
+  if (/sales|bid|estimate|takeoff|pricing|client-followup|sop-001/.test(text)) return 'Sales';
+  if (/training|apprentice|onboarding|skill|curriculum|guide/.test(text)) return 'Training';
+  if (/hr|payroll|hiring|insurance|worker|subcontractor|trade-partner|w9/.test(text)) return 'HR';
+  if (/it|bot|imessage|portal|automation|api|supabase|passkey|hardware/.test(text)) return 'IT';
+  if (/schedule|change-order|buildertrend|tracker|milestone|superintendent|client-delay/.test(text)) return 'Project Management';
+  if (/field|safety|jobsite|crew|framing|drywall|cleanup|inspection|staging|sop-002|sop-003|sop-004/.test(text)) return 'Field Operations';
+
+  if (card.owner === 'Ilene') return 'Accounting';
+  if (card.owner === 'Lando') return 'IT';
+  return 'Field Operations';
+}
 
 export type OpsComment = {
   id: number;

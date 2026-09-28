@@ -10,6 +10,7 @@ import {
   type OpsOwner,
   type PatchCardInput,
   slugFromTitle,
+  inferCardDepartment,
 } from "./types";
 
 // All reads and writes go through the service-role client after the route has
@@ -52,6 +53,7 @@ function toCard(r: Row): OpsCard {
     updatedAt: r.updated_at,
     updatedBy: r.updated_by ?? "",
     archivedAt: r.archived_at,
+    dept: inferCardDepartment({ title: r.title, note: r.note ?? "", docSlug: r.doc_slug, owner: r.owner }),
   };
 }
 

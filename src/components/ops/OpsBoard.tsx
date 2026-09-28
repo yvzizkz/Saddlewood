@@ -8,11 +8,14 @@ import {
   OPS_COLUMNS,
   OPS_COLUMN_LABELS,
   OPS_OWNERS,
+  OPS_DEPARTMENTS,
+  inferCardDepartment,
   type OpsCard,
   type OpsColumn,
   type OpsComment,
   type OpsEvent,
   type OpsOwner,
+  type OpsDepartment,
 } from '@/lib/ops/types'
 
 type Props = { initialCards: OpsCard[]; docTitles: Record<string, string> }
@@ -22,6 +25,18 @@ const OWNER_STYLE: Record<OpsOwner, { bg: string; fg: string }> = {
   Lando: { bg: 'rgba(24,40,40,0.10)', fg: '#182828' },
   Ilene: { bg: 'rgba(191,160,67,0.16)', fg: '#7a5d16' },
   Eli: { bg: 'rgba(47,107,74,0.14)', fg: '#2f6b4a' },
+}
+
+const DEPT_BADGE_STYLE: Record<OpsDepartment, { bg: string; fg: string }> = {
+  Sales: { bg: 'rgba(59, 130, 246, 0.12)', fg: '#1d4ed8' },
+  Marketing: { bg: 'rgba(236, 72, 153, 0.12)', fg: '#be185d' },
+  'Project Management': { bg: 'rgba(16, 185, 129, 0.12)', fg: '#047857' },
+  Accounting: { bg: 'rgba(212, 175, 55, 0.18)', fg: '#8f6c18' },
+  Legal: { bg: 'rgba(139, 92, 246, 0.12)', fg: '#6d28d9' },
+  HR: { bg: 'rgba(249, 115, 22, 0.12)', fg: '#c2410c' },
+  'Field Operations': { bg: 'rgba(24, 40, 40, 0.10)', fg: '#182828' },
+  Training: { bg: 'rgba(20, 184, 166, 0.12)', fg: '#0f766e' },
+  IT: { bg: 'rgba(99, 102, 241, 0.12)', fg: '#4338ca' },
 }
 
 function when(iso: string, withTime = false) {
@@ -49,6 +64,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export default function OpsBoard({ initialCards, docTitles }: Props) {
   const [cards, setCards] = useState<OpsCard[]>(initialCards)
   const [filter, setFilter] = useState<'all' | OpsOwner>('all')
+  const [deptFilter, setDeptFilter] = useState<'all' | OpsDepartment>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [undo, setUndo] = useState<{ card: OpsCard; fromCol: OpsColumn } | null>(null)
@@ -60,7 +76,16 @@ export default function OpsBoard({ initialCards, docTitles }: Props) {
   const [col, setCol] = useState<OpsColumn>('backlog')
   const [adding, setAdding] = useState(false)
 
-  const visible = useMemo(() => cards.filter((c) => filter === 'all' || c.owner === filter), [cards, filter])
+  const visible = useMemo(
+    () =>
+      cards.filter((c) => {
+        const ownerMatch = filter === 'all' || c.owner === filter
+        const dept = c.dept || inferCardDepartment(c)
+        const deptMatch = deptFilter === 'all' || dept === deptFilter
+        return ownerMatch && deptMatch
+      }),
+    [cards, filter, deptFilter],
+  )
   const open = useMemo(() => cards.find((c) => c.id === openId) ?? null, [cards, openId])
 
   const replace = useCallback((card: OpsCard) => setCards((cs) => cs.map((c) => (c.id === card.id ? card : c))), [])
@@ -125,6 +150,56 @@ export default function OpsBoard({ initialCards, docTitles }: Props) {
 
   return (
     <div>
+      {/* 9-Department Navigation & Focus Filter */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] font-semibold tracking-[0.1em] uppercase" style={{ color: 'var(--color-gold-accessible)' }}>
+            Departments ({OPS_DEPARTMENTS.length})
+          </span>
+          {deptFilter !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setDeptFilter('all')}
+              className="text-[11px] text-[var(--color-teal)] hover:underline"
+            >
+              Show all departments
+            </button>
+          )}
+        </div>
+        <div role="group" aria-label="Filter by department" className="flex flex-wrap gap-1.5">
+          {(['all', ...OPS_DEPARTMENTS] as const).map((d) => {
+            const active = deptFilter === d
+            const count = d === 'all' ? cards.length : cards.filter((c) => (c.dept || inferCardDepartment(c)) === d).length
+            return (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setDeptFilter(d)}
+                className="text-xs px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5"
+                style={{
+                  borderColor: active ? 'var(--color-charcoal)' : 'var(--color-stone)',
+                  backgroundColor: active ? 'var(--color-charcoal)' : 'white',
+                  color: active ? 'white' : 'var(--color-charcoal)',
+                }}
+              >
+                <span>{d === 'all' ? 'All Departments' : d}</span>
+                <span
+                  className="text-[10px] px-1.5 py-0.2 rounded-full font-mono"
+                  style={{
+                    backgroundColor: active ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.06)',
+                    color: active ? 'white' : 'var(--color-charcoal-light)',
+                  }}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Owner Filter Bar */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div role="group" aria-label="Filter by owner" className="flex flex-wrap gap-1.5">
           {(['all', ...OPS_OWNERS] as const).map((o) => {
@@ -142,13 +217,13 @@ export default function OpsBoard({ initialCards, docTitles }: Props) {
                   color: active ? 'white' : 'var(--color-charcoal)',
                 }}
               >
-                {o === 'all' ? 'All' : o}
+                {o === 'all' ? 'All Owners' : o}
               </button>
             )
           })}
         </div>
         <span className="ml-auto text-xs" style={{ color: 'var(--color-charcoal-light)' }}>
-          {cards.length} cards · tap a card to read it, respond, or move it
+          {visible.length} of {cards.length} cards · tap card to inspect
         </span>
       </div>
 
@@ -234,6 +309,18 @@ export default function OpsBoard({ initialCards, docTitles }: Props) {
                         <span className="text-[10px] tracking-[0.08em] uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: os.bg, color: os.fg }}>
                           {card.owner}
                         </span>
+                        {(() => {
+                          const d = card.dept || inferCardDepartment(card)
+                          const ds = DEPT_BADGE_STYLE[d] || { bg: 'rgba(0,0,0,0.06)', fg: 'var(--color-charcoal)' }
+                          return (
+                            <span
+                              className="text-[10px] tracking-[0.04em] px-2 py-0.5 rounded-full font-medium"
+                              style={{ backgroundColor: ds.bg, color: ds.fg }}
+                            >
+                              {d}
+                            </span>
+                          )
+                        })()}
                         {card.docSlug && docTitles[card.docSlug] && (
                           <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: 'var(--color-charcoal-light)' }}>
                             <FileText className="size-3" aria-hidden="true" />

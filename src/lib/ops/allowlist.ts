@@ -19,8 +19,45 @@ export const DEFAULT_ALLOWED_EMAILS = [
   "lando@saddlewoodcontracting.com",
 ] as const;
 
+export const DEFAULT_ALLOWED_PHONES: Record<string, string> = {
+  "+16022181191": "lando@saddlewoodcontracting.com",
+  "+14806556565": "marco@saddlewoodcontracting.com",
+  "+16027431766": "ilene8a@gmail.com",
+};
+
 export function normalizeEmail(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
+}
+
+export function normalizePhone(value: string | null | undefined): string {
+  const digits = (value ?? "").replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return digits ? `+${digits}` : "";
+}
+
+export function allowedPhones(envValue?: string | null): Record<string, string> {
+  const raw = envValue ?? process.env.INTERNAL_ALLOWED_PHONES ?? process.env.OPS_ALLOWED_PHONES;
+  if (raw && raw.trim()) {
+    const custom: Record<string, string> = {};
+    for (const pair of raw.split(",")) {
+      const [p, e] = pair.split(":");
+      if (p && e) custom[normalizePhone(p)] = normalizeEmail(e);
+    }
+    return { ...DEFAULT_ALLOWED_PHONES, ...custom };
+  }
+  return { ...DEFAULT_ALLOWED_PHONES };
+}
+
+export function emailForPhone(phone: string | null | undefined, envValue?: string | null): string | null {
+  const norm = normalizePhone(phone);
+  if (!norm) return null;
+  const phones = allowedPhones(envValue);
+  return phones[norm] || null;
+}
+
+export function isAllowedPhone(phone: string | null | undefined, envValue?: string | null): boolean {
+  return emailForPhone(phone, envValue) !== null;
 }
 
 export function allowedEmails(envValue?: string | null): string[] {
@@ -38,3 +75,19 @@ export function isAllowedEmail(email: string | null | undefined, envValue?: stri
   const e = normalizeEmail(email);
   return e.length > 0 && allowedEmails(envValue).includes(e);
 }
+
+export function isAllowedIdentity(identity: string | null | undefined): { allowed: boolean; email?: string; phone?: string } {
+  if (!identity) return { allowed: false };
+  const raw = identity.trim();
+  if (raw.includes("@")) {
+    const e = normalizeEmail(raw);
+    return isAllowedEmail(e) ? { allowed: true, email: e } : { allowed: false };
+  }
+  const p = normalizePhone(raw);
+  const mapped = emailForPhone(p);
+  if (mapped && isAllowedEmail(mapped)) {
+    return { allowed: true, email: mapped, phone: p };
+  }
+  return { allowed: false };
+}
+
