@@ -1,22 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { getLeadsStateMock, updateLeadStatusMock } = vi.hoisted(() => ({
+const { getLeadsStateMock, updateLeadStatusMock, recordInboundLeadMock } = vi.hoisted(() => ({
   getLeadsStateMock: vi.fn(),
   updateLeadStatusMock: vi.fn(),
+  recordInboundLeadMock: vi.fn(),
 }));
 
 vi.mock('@/lib/leads/store', () => ({
   getLeadsState: getLeadsStateMock,
   updateLeadStatus: updateLeadStatusMock,
+  recordInboundLead: recordInboundLeadMock,
 }));
 
-import { GET, PATCH } from '../route';
+import { GET, PATCH, POST } from '../route';
 
 describe('Leads API Routes', () => {
   beforeEach(() => {
     getLeadsStateMock.mockReset();
     updateLeadStatusMock.mockReset();
+    recordInboundLeadMock.mockReset();
 
     getLeadsStateMock.mockResolvedValue({
       generated: '2026-09-27T08:36:17.414900+00:00',
@@ -73,6 +76,49 @@ describe('Leads API Routes', () => {
     expect(getLeadsStateMock).toHaveBeenCalledWith(true);
   });
 
+  it('POST /api/leads successfully receives webhook and records lead', async () => {
+    recordInboundLeadMock.mockResolvedValue({
+      phone: '4805550199',
+      display: '(480) 555-0199',
+      name: 'Dave Wilson',
+      tags: ['commercial-bid', 'ghl-webhook'],
+      dial_url: 'tel:+14805550199',
+      sms_url: 'sms:+14805550199',
+    });
+
+    const req = new NextRequest('http://localhost:3000/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: '4805550199',
+        name: 'Dave Wilson',
+        email: 'dave@wilsonbuilders.com',
+        summary: 'Caller wants framing takeoff for 4,000 SF medical office.',
+        tags: ['commercial-bid'],
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.lead.phone).toBe('4805550199');
+    expect(recordInboundLeadMock).toHaveBeenCalled();
+  });
+
+  it('POST /api/leads validates missing phone', async () => {
+    const req = new NextRequest('http://localhost:3000/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'No Phone Person' }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+  });
+
   it('PATCH /api/leads successfully updates lead status', async () => {
     const req = new NextRequest('http://localhost:3000/api/leads', {
       method: 'PATCH',
@@ -102,3 +148,4 @@ describe('Leads API Routes', () => {
     expect(body.ok).toBe(false);
   });
 });
+

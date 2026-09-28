@@ -8,6 +8,8 @@ export type LeadItem = {
   phone: string;
   display: string;
   named: boolean;
+  name?: string;
+  email?: string;
   unread: number;
   last: string;
   last_ts: string | null;
