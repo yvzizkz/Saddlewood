@@ -22,15 +22,28 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const contentType = request.headers.get('content-type') || '';
+    let body: any = {};
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await request.formData();
+      body = Object.fromEntries(formData.entries());
+    } else {
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+    }
 
-    // Support GHL format, Voice AI format (Vapi/Retell), or custom webhook payload
+    // Direct bypass: Support Vapi, Twilio, Retell, and custom webhooks
+    const vapiCall = body.message?.call || body.call;
     const phone =
       body.phone ||
+      body.From ||
+      body.from ||
       body.contact?.phone ||
-      body.customer?.number ||
-      body.call?.customer?.number ||
-      body.from;
+      vapiCall?.customer?.number ||
+      body.customer?.number;
 
     if (!phone) {
       return NextResponse.json(
@@ -42,24 +55,28 @@ export async function POST(request: Request) {
     const name =
       body.name ||
       (body.first_name ? `${body.first_name} ${body.last_name || ''}`.trim() : null) ||
+      vapiCall?.customer?.name ||
       body.contact?.name ||
-      body.customer?.name ||
-      body.call?.customer?.name;
+      body.customer?.name;
 
-    const email = body.email || body.contact?.email;
+    const email = body.email || body.contact?.email || vapiCall?.customer?.email;
     const summary =
       body.summary ||
-      body.call?.summary ||
+      body.Body || // Twilio SMS text
+      body.message?.transcript ||
+      body.message?.summary ||
       body.analysis?.structuredData?.summary ||
+      vapiCall?.summary ||
       body.transcript ||
-      body.message ||
       body.notes;
 
     const tags = Array.isArray(body.tags)
       ? body.tags
       : body.tag
       ? [body.tag]
-      : ['ghl-webhook', 'voice-ai-lead'];
+      : body.From
+      ? ['twilio-sms', 'direct-lead']
+      : ['voice-ai-lead', 'vapi'];
 
     const lead = await recordInboundLead({
       phone: String(phone),
