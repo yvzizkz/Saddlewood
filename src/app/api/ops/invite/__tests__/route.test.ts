@@ -130,3 +130,46 @@ describe("POST /api/ops/invite", () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 });
+
+// A sign-in link is the person's session. The agent token gets it back; a
+// signed-in person never does, and only an owner may send one to someone else.
+describe("POST /api/ops/invite from a signed-in person", () => {
+  const people = {
+    "lando@saddlewoodcontracting.com": { name: "Lando", role: "owner" },
+    "ilene8a@gmail.com": { name: "Ilene Ochoa", role: "requester" },
+  };
+
+  async function as(email: string, body: unknown) {
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/server", () => ({
+      createClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: "u", email } }, error: null }) } }),
+    }));
+    vi.doMock("@/lib/bot/queries", () => ({ readState: async () => ({ sections: { people } }) }));
+    const { POST: post } = await import("../route");
+    return post(req(body) as never);
+  }
+
+  it("emails the link to its owner and never returns it", async () => {
+    const res = await as("lando@saddlewoodcontracting.com", { email: "marco@saddlewoodcontracting.com" });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.link).toBeUndefined();
+    expect(JSON.stringify(json)).not.toContain("token_hash");
+    expect(json.sent).toBe("re_9");
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][0].to).toBe("marco@saddlewoodcontracting.com");
+  });
+
+  it("does not let a non-owner get a link sent for someone else", async () => {
+    const res = await as("ilene8a@gmail.com", { email: "marco@saddlewoodcontracting.com", send: true });
+    expect(res.status).toBe(403);
+    expect(genMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("lets anyone send themselves a link, still without returning it", async () => {
+    const res = await as("ilene8a@gmail.com", { email: "ilene8a@gmail.com" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).link).toBeUndefined();
+  });
+});

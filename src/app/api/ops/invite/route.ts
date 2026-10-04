@@ -3,13 +3,21 @@ import { z } from "zod";
 
 import { buildSignInEmail } from "@/lib/auth/signInEmail";
 import { cancelScheduledEmail, generateSignInLink, sendEmail } from "@/lib/auth/magicLink";
+import { whoIs } from "@/lib/bot/home";
+import { readState } from "@/lib/bot/queries";
 import { authorizeOps } from "@/lib/ops/auth";
 import { isAllowedEmail, normalizeEmail } from "@/lib/ops/allowlist";
 
 // Mint a one-tap sign-in link for an allowlisted person, and optionally send
 // it inside a written email. This is how a session or the bot puts the
-// portal in front of Marco without him ever typing a code. Protected the
-// same way as the board: portal session or OPS_AGENT_TOKEN.
+// portal in front of Marco without him ever typing a code.
+//
+// A sign-in link IS that person's session, so who gets to see it matters:
+//   - the agent token (the bot, a Claude session) gets the link back, to
+//     print or to put in an email it is writing;
+//   - a signed-in person never does. They can only have it emailed to the
+//     address it belongs to, and only an owner may do that for someone else.
+//     Otherwise any portal user could mint a link for marco@ and open it.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,10 +89,18 @@ export async function POST(request: NextRequest) {
   if (!isAllowedEmail(email)) {
     return NextResponse.json({ ok: false, error: "not on the allowlist" }, { status: 403 });
   }
+  const person = who.via === "session";
   try {
+    if (person && email !== who.actor) {
+      const { sections } = await readState();
+      if (whoIs(who.actor, sections.people).role !== "owner") {
+        return NextResponse.json({ ok: false, error: "only an owner can send someone else a sign-in link" }, { status: 403 });
+      }
+    }
+    const send = person ? true : parsed.data.send;
     const signIn = await generateSignInLink(email, parsed.data.next);
     let sent: string | null = null;
-    if (parsed.data.send) {
+    if (send) {
       const { html, text } = buildSignInEmail({
         link: signIn.link,
         code: signIn.code,
@@ -105,12 +121,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       email,
-      link: signIn.link,
+      ...(person ? {} : { link: signIn.link }),
       next: signIn.next,
       expiresInHours: 24,
       sent,
-      scheduledAt: parsed.data.send ? (parsed.data.scheduledAt ?? null) : null,
-      attachments: parsed.data.send ? (parsed.data.attachments?.length ?? 0) : 0,
+      scheduledAt: send ? (parsed.data.scheduledAt ?? null) : null,
+      attachments: send ? (parsed.data.attachments?.length ?? 0) : 0,
       by: who.actor,
     });
   } catch (e) {

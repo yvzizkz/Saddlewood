@@ -27,7 +27,8 @@ function LoginForm() {
   const urlErrorDetail = searchParams.get("detail");
   const nextPath = (() => {
     const n = searchParams.get("next") ?? "";
-    return n.startsWith("/") && !n.startsWith("//") ? n : "/internal/ops";
+    // A path on this site only. Browsers read "\" as "/", so "/\evil.com" is out too.
+    return n.startsWith("/") && !n.startsWith("//") && !n.includes("\\") ? n : "/internal/ops";
   })();
 
   // "Face ID" sign-in was removed on 2026-10-03: it never verified anything

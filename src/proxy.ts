@@ -95,7 +95,7 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/login" && isAllowed) {
     const next = request.nextUrl.searchParams.get("next");
     const url = request.nextUrl.clone();
-    url.pathname = next && next.startsWith("/") && !next.startsWith("//") ? next : "/internal";
+    url.pathname = next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/internal";
     url.search = "";
     return NextResponse.redirect(url);
   }

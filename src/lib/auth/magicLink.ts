@@ -26,7 +26,8 @@ export type SignInLink = { email: string; link: string; code: string; next: stri
 export function safeNext(next: string | null | undefined): string {
   const n = (next ?? "").trim();
   // Only same-site paths; never an absolute URL someone could smuggle in.
-  if (!n.startsWith("/") || n.startsWith("//")) return DEFAULT_NEXT;
+  // Browsers read a backslash as a slash, so "/\evil.com" is "//evil.com".
+  if (!n.startsWith("/") || n.startsWith("//") || n.includes("\\")) return DEFAULT_NEXT;
   return n.slice(0, 200);
 }
 
