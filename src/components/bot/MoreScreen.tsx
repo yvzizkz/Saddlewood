@@ -339,7 +339,8 @@ export default function MoreScreen() {
   async function signOut() {
     setLeaving(true)
     try {
-      await createClient().auth.signOut()
+      // This phone only. The default would sign the person out everywhere.
+      await createClient().auth.signOut({ scope: 'local' })
     } finally {
       window.location.href = '/login?next=/app'
     }

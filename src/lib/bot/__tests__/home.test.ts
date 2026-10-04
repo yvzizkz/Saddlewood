@@ -61,7 +61,12 @@ describe("who sees what", () => {
     expect(h.sections.tasks).toHaveLength(2);
     expect(h.sections.ledger).toHaveLength(1);
     expect(h.sections.health.problems.claude).toBeTruthy();
-    expect(h.team.map((t) => t.name)).toEqual(["Lando", "Marco", "Ilene Ochoa", "Eli"]);
+    expect(h.team).toEqual([
+      { name: "Eli", email: ELI },
+      { name: "Ilene Ochoa", email: "ilene8a@gmail.com" },
+      { name: "Lando", email: LANDO }, // his own address, not the shared info@ mailbox
+      { name: "Marco", email: MARCO },
+    ]);
     expect(h.inFlight.map((m) => m.who)).toEqual(["Eli", "Marco"]);
     expect(h.actions[0].who).toBe("Marco");
     expect("people" in h.sections).toBe(false);

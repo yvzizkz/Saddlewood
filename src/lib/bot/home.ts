@@ -66,11 +66,17 @@ export function buildHome(input: {
   };
 
   if (me.role === "owner") {
-    // One seat per person: info@ and lando@ are both Lando.
-    const seen = new Set<string>();
-    const team = Object.entries(people)
-      .filter(([, p]) => (seen.has(p.name) ? false : (seen.add(p.name), true)))
-      .map(([email, p]) => ({ email, name: p.name }));
+    // One seat per person: info@ and lando@ are both Lando. Where a person
+    // has two addresses, use the one that carries their name (lando@), not the
+    // shared mailbox, so a to-do or a sign-in link goes to them.
+    const byName = new Map<string, string[]>();
+    for (const [email, p] of Object.entries(people)) byName.set(p.name, [...(byName.get(p.name) ?? []), email]);
+    const team = [...byName.entries()]
+      .map(([name, emails]) => {
+        const first = name.split(/\s+/)[0].toLowerCase();
+        return { name, email: emails.find((e) => e.split("@")[0] === first) ?? emails.sort()[0] };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
     const names = Object.fromEntries(Object.entries(people).map(([email, p]) => [email, p.name]));
     const health = { ...rest.health, problems: { ...rest.health.problems } };
     // The request lane checks in between runs, and one run can take half an
