@@ -18,12 +18,25 @@ import { crewSyncSchema } from "@/lib/crew/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * The site can be live before supabase/migrations/0011_crew.sql is applied.
+ * Tell the Mac that in so many words (503), so it waits quietly instead of
+ * logging a database error every few minutes.
+ */
+function failure(e: unknown) {
+  const message = (e as Error).message ?? "";
+  if (/does not exist|schema cache|could not find the table/i.test(message)) {
+    return NextResponse.json({ ok: false, error: "crew tables are missing (migration 0011 is not applied)" }, { status: 503 });
+  }
+  return NextResponse.json({ ok: false, error: message }, { status: 500 });
+}
+
 export async function GET(request: NextRequest) {
   if (!(await requireBridge(request))) return unauthorized();
   try {
     return NextResponse.json(await crewFeed(), { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 });
+    return failure(e);
   }
 }
 
@@ -55,6 +68,6 @@ export async function POST(request: NextRequest) {
     const applied = await applyCrewSync(parsed.data);
     return NextResponse.json({ ok: true, applied: { ...applied, dropped } });
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 });
+    return failure(e);
   }
 }

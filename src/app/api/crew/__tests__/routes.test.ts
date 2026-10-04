@@ -301,6 +301,13 @@ describe("the Mac's door", () => {
     expect(spies.crewFeed).toHaveBeenCalledTimes(1);
   });
 
+  it("tells the Mac to wait, not that the database broke, while the crew tables are not there yet", async () => {
+    spies.crewFeed.mockRejectedValue(new Error("crew_people list failed: Could not find the table 'public.crew_people' in the schema cache"));
+    const res = await getFeed(req("/api/bot/crew", "GET", undefined, bearer));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toContain("migration 0011");
+  });
+
   it("takes a report, drops what is malformed, and says how many it dropped", async () => {
     const res = await postFeed(
       req(
