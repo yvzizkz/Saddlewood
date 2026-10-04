@@ -935,13 +935,18 @@ export async function crewSummary(): Promise<CrewSummary> {
   const db = getSupabaseAdmin();
   const head = { count: "exact" as const, head: true };
   const [people, onClock, fixes, review, blocked] = await Promise.all([
-    db.from("crew_people").select("email", head).eq("active", true),
+    // Not a HEAD request, on purpose. A HEAD against a table that does not
+    // exist comes back with no body, which reads as "no error, no count": the
+    // summary would say "0 people" and the Crew tab would show before the
+    // crew tables are there (migration 0011). A GET says what is wrong.
+    db.from("crew_people").select("email", { count: "exact" }).eq("active", true).limit(1),
     db.from("crew_shifts").select("id", head).eq("status", "ok").is("ended_at", null),
     db.from("crew_entries").select("id", head).eq("kind", "timefix").eq("status", "new"),
     db.from("crew_shifts").select("id", head).eq("status", "ok").neq("review", ""),
     db.from("crew_tasks").select("id", head).eq("status", "blocked"),
   ]);
   for (const r of [people, onClock, fixes, review, blocked]) if (r.error) fail("crew summary", r.error.message);
+  if (people.count === null) fail("crew summary", "no count came back for crew_people");
   return {
     people: people.count ?? 0,
     onClock: onClock.count ?? 0,
