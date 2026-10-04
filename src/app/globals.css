@@ -520,6 +520,19 @@ img {
 }
 
 
+/* ===== PORTAL SIGN-IN ===== */
+/* The sign-in page (rewritten 2026-09-27) styles itself with five tokens that
+   were never defined, so its buttons were white text on nothing: there, and
+   working, but invisible. Everyone's first step into the portal and the app
+   is that page. The tokens, from the palette above: */
+:root {
+  --color-primary: var(--teal);
+  --color-muted: var(--charcoal-light);
+  --color-border: var(--stone-mid);
+  --color-error-bg: rgba(154, 42, 31, 0.1);
+  --color-error-text: #7f1d1d;
+}
+
 /* ===== THE APP (/app) ===== */
 /* The site-wide phone rule above pins every h1 to 2.25rem with !important.
    The app's screen titles sit in a 390px column next to a status pill, so
