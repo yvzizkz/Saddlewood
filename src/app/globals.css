@@ -518,3 +518,42 @@ img {
   .ops-doc h2 { font-size: 1.25rem; }
   .ops-doc pre { font-size: 0.78rem; }
 }
+
+
+/* ===== THE APP (/app) ===== */
+/* The site-wide phone rule above pins every h1 to 2.25rem with !important.
+   The app's screen titles sit in a 390px column next to a status pill, so
+   they get their own size here (same specificity trick, one class deeper). */
+.bot-app h1 {
+  font-size: 1.75rem !important;
+  line-height: 1.15 !important;
+}
+/* Momentum scrolling inside the conversation, and no rubber-band on the shell. */
+.bot-app { overscroll-behavior-y: contain; }
+.bot-thread { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+/* Bot replies: the same constrained markdown the bot writes for email. */
+.bot-reply { font-size: 15px; line-height: 1.55; color: var(--charcoal); overflow-wrap: anywhere; }
+.bot-reply > :first-child { margin-top: 0; }
+.bot-reply > :last-child { margin-bottom: 0; }
+.bot-reply p { margin: 0 0 0.6rem; }
+.bot-reply ul, .bot-reply ol { margin: 0 0 0.7rem; padding-left: 1.2rem; }
+.bot-reply ul { list-style: disc; }
+.bot-reply ol { list-style: decimal; }
+.bot-reply li { margin: 0.2rem 0; }
+.bot-reply strong { font-weight: 600; }
+.bot-reply a { color: var(--teal); text-decoration: underline; }
+.bot-reply code { font-family: var(--font-mono); font-size: 0.85em; background: var(--cream); padding: 0.1em 0.3em; border-radius: 3px; }
+.bot-reply .bot-reply-heading {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-accessible);
+  margin: 0.9rem 0 0.35rem;
+}
+@keyframes bot-toast-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.bot-toast { animation: bot-toast-in 180ms ease-out both; }

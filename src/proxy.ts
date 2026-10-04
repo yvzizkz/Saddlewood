@@ -46,7 +46,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/ops") ||
     pathname.startsWith("/api/estimates") ||
     pathname.startsWith("/api/trackers") ||
-    pathname.startsWith("/api/expenses")
+    pathname.startsWith("/api/expenses") ||
+    pathname.startsWith("/api/bot/")
   ) {
     const authHeader = request.headers.get("authorization");
     if (
@@ -62,7 +63,11 @@ export async function proxy(request: NextRequest) {
   }
 
   // 2. Guarded internal & review pages
+  // The app lives at /app. Match the folder exactly: "/app-sw.js" and the
+  // manifest are public files that merely start with the same letters.
   const isGuardedPage =
+    pathname === "/app" ||
+    pathname.startsWith("/app/") ||
     pathname.startsWith("/internal") ||
     pathname.startsWith("/r/") ||
     pathname === "/r" ||

@@ -15,6 +15,11 @@ interface BottomSheetProps {
   maxHeightDvh?: number
   /** Aria label for the dialog. Falls back to `title` if set. */
   ariaLabel?: string
+  /**
+   * Keep the sheet to a phone-width column, centered, on wide screens. The
+   * default spans the window, which suits the trackers' wide editors.
+   */
+  narrow?: boolean
 }
 
 // Returns the document.body lazily so this module can be imported on the
@@ -39,6 +44,7 @@ export function BottomSheet({
   children,
   maxHeightDvh = 50,
   ariaLabel,
+  narrow = false,
 }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null)
   const dragStartY = useRef<number | null>(null)
@@ -108,7 +114,7 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel ?? title ?? 'Editor'}
-        className="bottom-sheet-enter fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-[var(--color-cream)] shadow-2xl pb-[env(safe-area-inset-bottom)] flex flex-col"
+        className={`bottom-sheet-enter fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-[var(--color-cream)] shadow-2xl pb-[env(safe-area-inset-bottom)] flex flex-col${narrow ? ' mx-auto max-w-xl' : ''}`}
         style={{
           maxHeight: `${maxHeightDvh}dvh`,
           transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,

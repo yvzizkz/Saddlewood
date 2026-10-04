@@ -1,0 +1,21 @@
+{
+  "name": "Saddlewood",
+  "short_name": "Saddlewood",
+  "description": "Saddlewood Contracting staff app: ask SaddleWoodBot, approve what it drafts, hand it duties.",
+  "id": "/app",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f0e8",
+  "theme_color": "#f5f0e8",
+  "icons": [
+    { "src": "/icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Ask the bot", "url": "/app/ask" },
+    { "name": "Duties", "url": "/app/duties" }
+  ]
+}
