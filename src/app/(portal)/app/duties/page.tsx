@@ -1,5 +1,9 @@
-import DutiesScreen from "@/components/bot/DutiesScreen";
+import { redirect } from "next/navigation";
 
-export default function BotAppDuties() {
+import DutiesScreen from "@/components/bot/DutiesScreen";
+import { getViewer } from "@/lib/crew/auth";
+
+export default async function BotAppDuties() {
+  if ((await getViewer()).kind !== "staff") redirect("/app");
   return <DutiesScreen />;
 }

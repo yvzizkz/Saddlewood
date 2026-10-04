@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { hasCrewRole } from "@/lib/crew/role";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { safeNext } from "@/lib/auth/magicLink";
 
@@ -47,10 +48,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=link_expired`);
   }
 
-  if (!isAllowedEmail(data.user.email)) {
+  const staff = isAllowedEmail(data.user.email);
+  if (!staff && !hasCrewRole(data.user)) {
     await supabase.auth.signOut();
     return NextResponse.redirect(`${origin}/login?error=unauthorized`);
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // Crew have the app and nothing else, whatever the link asked for.
+  const dest = staff || next === "/app" || next.startsWith("/app/") ? next : "/app";
+  return NextResponse.redirect(`${origin}${dest}`);
 }

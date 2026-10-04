@@ -1,10 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { hasCrewRole } from "@/lib/crew/role";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 
 // Master security gate for Saddlewood.
 // Public marketing routes remain accessible to everyone.
 // All internal tools, review batches (/r/*, /review/*), ops, and internal APIs are strictly guarded.
+//
+// Two kinds of signed-in person:
+//   staff  an address on the portal allowlist: the whole portal and the app
+//   crew   a field worker or employee an owner gave a seat (src/lib/crew/role.ts):
+//          the app at /app and its own API at /api/crew, and nothing else
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -39,6 +45,16 @@ export async function proxy(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
   const isAllowed = isAllowedEmail(user?.email);
+  const isCrew = !isAllowed && hasCrewRole(user);
+
+  // 0. The crew's API (and the owners' side of it, /api/crew/admin). People
+  // only: there is no token caller here. Each route decides which people.
+  if (pathname.startsWith("/api/crew/")) {
+    if (!user || !(isAllowed || isCrew)) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    return supabaseResponse;
+  }
 
   // 1. Guarded API routes
   if (
@@ -65,9 +81,9 @@ export async function proxy(request: NextRequest) {
   // 2. Guarded internal & review pages
   // The app lives at /app. Match the folder exactly: "/app-sw.js" and the
   // manifest are public files that merely start with the same letters.
+  const isAppPage = pathname === "/app" || pathname.startsWith("/app/");
   const isGuardedPage =
-    pathname === "/app" ||
-    pathname.startsWith("/app/") ||
+    isAppPage ||
     pathname.startsWith("/internal") ||
     pathname.startsWith("/r/") ||
     pathname === "/r" ||
@@ -82,7 +98,15 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    if (!isAllowed) {
+    if (isCrew) {
+      // Crew belong in the app. Anything else on the portal sends them back to it.
+      if (!isAppPage) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/app";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    } else if (!isAllowed) {
       await supabase.auth.signOut();
       const url = request.nextUrl.clone();
       url.pathname = "/login";
@@ -92,10 +116,25 @@ export async function proxy(request: NextRequest) {
   }
 
   // 3. If already logged in and visiting /login, redirect to next (or /internal)
+  if (pathname === "/login" && isCrew) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/app";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
   if (pathname === "/login" && isAllowed) {
     const next = request.nextUrl.searchParams.get("next");
     const url = request.nextUrl.clone();
     url.pathname = next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/internal";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // 4. The old one-tap punch link (/crew/punch?t=...) took no sign-in at all.
+  // Time is clocked in the app now.
+  if (pathname === "/crew/punch") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/app";
     url.search = "";
     return NextResponse.redirect(url);
   }

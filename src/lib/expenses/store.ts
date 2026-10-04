@@ -414,6 +414,13 @@ export async function addExpense(
   actor: string
 ): Promise<ExpenseItem> {
   const state = await getAccountingState();
+  // A receipt sent from the app names the app entry it came from. The bot
+  // sends it again when it does not hear back; that must not add a second row.
+  const appEntry = (expense as { appEntry?: unknown }).appEntry;
+  if (typeof appEntry === 'number') {
+    const prior = state.expenses.find((e) => (e as { appEntry?: unknown }).appEntry === appEntry);
+    if (prior) return prior;
+  }
   const maxN = state.expenses.reduce((m, e) => Math.max(m, e.n || 0), 0);
   const n = maxN + 1;
   const prefix = expense.source === 'receipt' ? 'r' : 'z';

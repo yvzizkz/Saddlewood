@@ -6,12 +6,18 @@ Store listing), and it sits on the portal's existing sign-in and allowlist.
 
 The link to send someone: `https://saddlewoodcontracting.com/app`
 
+The same link opens a different app for field workers and employees an owner
+gave a crew seat: their own day (the clock, receipts, progress, the end-of-day
+check-in, their schedule and tasks), with the bot in the background. That side
+is described in `docs/CREW-APP.md`. This page is the owners' side.
+
 ## What is in it
 
 | Tab | What it is for |
 |---|---|
 | Home | Oversight. Drafts waiting on your OK (read, approve and send, send later, cancel), payments and bid invites to clear, what the bot is working on, what it is waiting on from other people, recent activity, bot health. |
 | Ask | Delegation. A conversation with the bot, with photos and files. Same agent, rules and memory as a text or an email to it. Short commands (`drafts`, `approve 4`, `payments`) are answered in seconds. |
+| Crew | Owners only. The field crew: who is on the clock, what came in from the field, the schedule, hours, and who has a seat. See `docs/CREW-APP.md`. |
 | Duties | Standing to-dos (`bot/tasks.json`), recurring duties the bot carries out on a schedule, and the built-in jobs with their last-run state. |
 | More | Install help, notifications, invite a teammate, the rest of the portal, the automatic-sending kill switch. |
 
@@ -71,12 +77,12 @@ Things that are true on purpose:
 - **The app stays out of analytics.** Its screens carry `ph-no-capture`, so
   PostHog records neither what is on them nor the text of what is tapped.
 
-One limit to know before adding an employee: `requester` restricts the BOT.
-The portal itself still has one gate, the allowlist, so anyone on it can open
-every `/internal` page (estimates, contracts, expenses, trackers). The app
-hides those links from a requester, and nothing more. Giving an employee the
-app without the rest of the portal needs a role check on `/internal` and its
-APIs, which does not exist yet.
+One limit of the `requester` seat: it restricts the BOT. The portal itself
+still has one gate for it, the allowlist, so a requester can open every
+`/internal` page (estimates, contracts, expenses, trackers). **For an employee
+or a field worker, use a crew seat instead** (Crew tab, Team, "Add a person").
+Crew are never on the allowlist: they get the app and nothing else on the
+site, and they do not talk to the bot at all (`docs/CREW-APP.md`).
 
 ## Putting it live
 

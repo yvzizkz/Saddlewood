@@ -227,6 +227,21 @@ export default function HomeScreen() {
 
       <HealthAlert home={home} />
 
+      {home.crew && home.crew.people > 0 ? (
+        <Link
+          href="/app/crew"
+          className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-[var(--color-stone)] bg-white px-4 py-3 active:bg-[var(--color-cream)]"
+        >
+          <span className="flex min-w-0 items-center gap-2 text-[15px] text-[var(--color-charcoal)]">
+            <Dot tone={home.crew.onClock ? 'ok' : 'quiet'} />
+            <span className="truncate">
+              Crew: {home.crew.onClock ? `${home.crew.onClock} on the clock` : 'nobody on the clock'}
+            </span>
+          </span>
+          {home.crew.needs ? <Chip tone="warn">{home.crew.needs} need you</Chip> : <span className="text-[13px] text-[var(--color-teal)] underline">Open</span>}
+        </Link>
+      ) : null}
+
       <SectionTitle count={needs}>Needs your OK</SectionTitle>
       {needs === 0 ? (
         <Empty>Nothing is waiting on you. When the bot drafts something that needs a yes, it lands here.</Empty>

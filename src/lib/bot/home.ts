@@ -40,6 +40,7 @@ export function buildHome(input: {
   inFlight: (BotInFlight & { thread: string; lane?: string | null; claimedAt?: string | null })[];
   actions: BotAction[];
   push: BotHome["push"];
+  crew?: BotHome["crew"];
   now?: Date;
 }): BotHome {
   const now = input.now ?? new Date();
@@ -87,7 +88,7 @@ export function buildHome(input: {
       health.problems.requests =
         "Requests sent from the app are not being picked up. Taps still work. Fix: on the Mac, check that the launchd job com.saddlewood.bot-app-agent is loaded.";
     }
-    return { ...base, sections: { ...rest, health }, team, names, inFlight, actions };
+    return { ...base, sections: { ...rest, health }, team, names, inFlight, actions, crew: input.crew ?? null };
   }
 
   // Everyone else starts from an empty picture and is given only what is
@@ -108,5 +109,6 @@ export function buildHome(input: {
     names: me.name ? { [input.email]: me.name } : {},
     inFlight: inFlight.filter((m) => m.mine),
     actions: actions.filter((a) => a.actor === input.email),
+    crew: null,
   };
 }

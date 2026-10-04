@@ -182,7 +182,7 @@ const activitySchema = z.object({
 export type BotActivity = z.infer<typeof activitySchema>;
 
 /** Keep every element that parses; drop the ones that do not. */
-function listOf<T>(schema: z.ZodType<T>) {
+export function listOf<T>(schema: z.ZodType<T>) {
   return z
     .array(z.unknown())
     .catch([])
@@ -419,7 +419,7 @@ export type BotAction = {
 
 // Text the Mac sends is stored, not judged: trim it to what a row may hold
 // and drop NUL bytes (Postgres text cannot store them) instead of refusing it.
-const stored = (max: number) => z.string().transform((v) => v.replace(/\u0000/g, "").slice(0, max));
+export const stored = (max: number) => z.string().transform((v) => v.replace(/\u0000/g, "").slice(0, max));
 
 const syncActionSchema = z.object({
   id: z.number().int(),
@@ -515,6 +515,8 @@ export type BotHome = {
   inFlight: BotInFlight[];
   actions: (BotAction & { who: string })[];
   push: { available: boolean; publicKey: string | null };
+  /** The field crew at a glance. Owners only; null when there is nothing to show or it could not be read. */
+  crew: { people: number; onClock: number; needs: number } | null;
 };
 
 // ---- small shared helpers --------------------------------------------------

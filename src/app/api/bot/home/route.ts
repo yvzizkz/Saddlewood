@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requirePerson, unauthorized } from "@/lib/bot/auth";
-import { buildHome } from "@/lib/bot/home";
+import { buildHome, whoIs } from "@/lib/bot/home";
 import { pushConfig } from "@/lib/bot/push";
 import { failStale, hasStale, listInFlight, listRecentActions, readState } from "@/lib/bot/queries";
+import { crewSummary } from "@/lib/crew/queries";
 
 // Everything the app's Home, Duties and More screens show, in one read: what
 // the Mac last reported the bot is holding, who is asking it for what right
@@ -26,6 +27,8 @@ export async function GET(request: NextRequest) {
       [state, inFlight, actions] = await Promise.all([readState(), listInFlight(), listRecentActions()]);
     }
     const config = pushConfig();
+    // The crew at a glance, for an owner. Never worth failing Home over.
+    const crew = whoIs(email, state.sections.people).role === "owner" ? await crewSummary().catch(() => null) : null;
     const home = buildHome({
       email,
       sections: state.sections,
@@ -33,6 +36,7 @@ export async function GET(request: NextRequest) {
       inFlight,
       actions,
       push: { available: !!config, publicKey: config?.publicKey ?? null },
+      crew,
     });
     return NextResponse.json(home, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

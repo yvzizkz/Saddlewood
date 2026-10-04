@@ -4,20 +4,22 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, ListChecks, Menu, MessageSquare, type LucideIcon } from 'lucide-react'
+import { HardHat, Home, ListChecks, Menu, MessageSquare, type LucideIcon } from 'lucide-react'
 
 import { BotProvider, useBot } from './BotProvider'
 import { Dot } from './ui'
 import { healthLine, needsYouCount } from '@/lib/bot/view'
 
 // The frame every app screen sits in: a slim header that says whether the bot
-// is alive, and four thumb tabs. On a desktop it is the same column, centered.
+// is alive, and the thumb tabs. On a desktop it is the same column, centered.
 
-type Tab = { href: string; label: string; icon: LucideIcon }
+type Tab = { href: string; label: string; icon: LucideIcon; ownersOnly?: boolean }
 
 const TABS: Tab[] = [
   { href: '/app', label: 'Home', icon: Home },
   { href: '/app/ask', label: 'Ask', icon: MessageSquare },
+  // The field crew: who is on the clock, what came in, the schedule, hours.
+  { href: '/app/crew', label: 'Crew', icon: HardHat, ownersOnly: true },
   { href: '/app/duties', label: 'Duties', icon: ListChecks },
   { href: '/app/more', label: 'More', icon: Menu },
 ]
@@ -65,10 +67,12 @@ function TabBar() {
       className="fixed bottom-0 inset-x-0 z-30 border-t border-[var(--color-stone)] bg-[var(--color-background)] pb-safe"
     >
       <div className="mx-auto flex max-w-xl">
-        {TABS.map((tab) => {
+        {/* The Crew tab shows once the crew side exists for this owner (home.crew is null until its tables do). */}
+        {TABS.filter((tab) => !tab.ownersOnly || (home?.me.role === 'owner' && !!home.crew)).map((tab) => {
           const Icon = tab.icon
           const active = tab.href === '/app' ? pathname === '/app' : pathname.startsWith(tab.href)
-          const showBadge = tab.href === '/app' && badge > 0
+          const count = tab.href === '/app' ? badge : tab.href === '/app/crew' ? (home?.crew?.needs ?? 0) : 0
+          const showBadge = count > 0
           return (
             <Link
               key={tab.href}
@@ -86,9 +90,9 @@ function TabBar() {
                       aria-hidden="true"
                       className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 text-[10px] font-bold bg-[var(--color-gold-accessible)] text-white rounded-full flex items-center justify-center"
                     >
-                      {badge}
+                      {count}
                     </span>
-                    <span className="sr-only">{badge} waiting on you</span>
+                    <span className="sr-only">{count} waiting on you</span>
                   </>
                 ) : null}
               </span>

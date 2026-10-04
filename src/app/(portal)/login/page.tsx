@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import { isAllowedIdentity } from "@/lib/ops/allowlist";
 
 type FormState =
   | "idle"
@@ -31,6 +30,41 @@ function LoginForm() {
     return n.startsWith("/") && !n.startsWith("//") && !n.includes("\\") ? n : "/internal/ops";
   })();
 
+  // Arriving from the app (the link crew are sent): plain words, in English
+  // and Spanish, because this is the first screen a field worker sees.
+  const appFlow = nextPath === "/app" || nextPath.startsWith("/app/");
+  const copy = appFlow
+    ? {
+        title: "Saddlewood",
+        lead: "Sign in with your email. · Entra con tu correo.",
+        label: "Email · Correo",
+        placeholder: "you@example.com",
+        send: "Send my code · Mándame el código",
+        sending: "Sending… · Enviando…",
+        haveCode: "I already have a code · Ya tengo un código",
+        codeTitle: "Enter your code",
+        codeLead: "We emailed you a code. · Te mandamos un código por correo.",
+        signIn: "Sign in · Entrar",
+        verifying: "Checking… · Revisando…",
+        back: "← Back · Atrás",
+        resend: "Send again · Mandar otra vez",
+      }
+    : {
+        title: "Internal Portal & Approvals",
+        lead: "Sign in with your authorized phone number or company email.",
+        label: "Phone number or Email",
+        placeholder: "(602) 218-1191 or name@saddlewoodcontracting.com",
+        send: "Send code via iMessage / Email",
+        sending: "Sending code...",
+        haveCode: "I already have a code",
+        codeTitle: "Enter Verification Code",
+        codeLead: "",
+        signIn: "Sign in",
+        verifying: "Verifying...",
+        back: "← Back",
+        resend: "Resend code",
+      };
+
   // "Face ID" sign-in was removed on 2026-10-03: it never verified anything
   // (see /api/auth/passkey). Forget the flag older builds left on this device.
   useEffect(() => {
@@ -46,17 +80,14 @@ function LoginForm() {
     setFormState("sending");
     setErrorMessage("");
 
-    const check = isAllowedIdentity(identifier);
-    if (!check.allowed || !check.email) {
-      setFormState("error");
-      setErrorMessage("This phone number or email is not authorized to access Saddlewood.");
+    const typed = identifier.trim();
+    if (!typed) {
+      setFormState("idle");
       return;
     }
 
-    setResolvedEmail(check.email);
-
     let failed = false;
-    let resJson: { ok: boolean; phone?: string; smsSent?: boolean } | null = null;
+    let resJson: { ok: boolean; email?: string; phone?: string; smsSent?: boolean } | null = null;
     try {
       const res = await fetch("/api/auth/send-link", {
         method: "POST",
@@ -75,10 +106,17 @@ function LoginForm() {
       return;
     }
 
-    const channelDesc = resJson?.phone
-      ? `Sent via text message to ${resJson.phone} and ${check.email}`
-      : `Sent to ${check.email}`;
-    setSentChannel(channelDesc);
+    // The server says the same thing for every address (it does not reveal
+    // who has access), so this is worded as "if".
+    const email = resJson?.email ?? (typed.includes("@") ? typed.toLowerCase() : "");
+    setResolvedEmail(email);
+    setSentChannel(
+      resJson?.phone
+        ? `Sent by text to ${resJson.phone} and to the email on file.`
+        : appFlow
+          ? `If ${typed} has a seat, the code is in that inbox now. · Si ${typed} tiene acceso, el código ya está en ese correo.`
+          : `If ${typed} has access, the code is in that inbox now.`,
+    );
 
     setCode("");
     setFormState("code-entry");
@@ -112,6 +150,22 @@ function LoginForm() {
     window.location.href = nextPath;
   }
 
+  // An owner can read a crew member their code in person ("Get a code" in
+  // the app's Crew tab). No email is sent on this path.
+  function handleHaveCode() {
+    const typed = identifier.trim();
+    if (!typed.includes("@")) {
+      setFormState("error");
+      setErrorMessage(appFlow ? "Type your email first. · Escribe tu correo primero." : "Type your email first.");
+      return;
+    }
+    setResolvedEmail(typed.toLowerCase());
+    setSentChannel(appFlow ? "Type the code you were given. · Escribe el código que te dieron." : "Type the code you were given.");
+    setCode("");
+    setErrorMessage("");
+    setFormState("code-entry");
+  }
+
   function handleBack() {
     setFormState("idle");
     setCode("");
@@ -142,13 +196,13 @@ function LoginForm() {
               className="text-2xl text-center mb-2 font-serif"
               style={{ color: "var(--color-primary)" }}
             >
-              Enter Verification Code
+              {copy.codeTitle}
             </h1>
             <p
               className="text-xs text-center mb-6"
               style={{ color: "var(--color-muted)" }}
             >
-              {sentChannel || `Sent code to ${identifier}`}
+              {sentChannel || copy.codeLead || `Sent code to ${identifier}`}
             </p>
 
             <form
@@ -208,7 +262,7 @@ function LoginForm() {
                   color: "white",
                 }}
               >
-                {formState === "verifying" ? "Verifying..." : "Sign in"}
+                {formState === "verifying" ? copy.verifying : copy.signIn}
               </button>
 
               <div className="flex items-center justify-between pt-2">
@@ -218,7 +272,7 @@ function LoginForm() {
                   className="text-xs hover:underline cursor-pointer"
                   style={{ color: "var(--color-muted)" }}
                 >
-                  ← Back
+                  {copy.back}
                 </button>
                 <button
                   type="button"
@@ -226,7 +280,7 @@ function LoginForm() {
                   className="text-xs hover:underline cursor-pointer"
                   style={{ color: "var(--color-muted)" }}
                 >
-                  Resend code
+                  {copy.resend}
                 </button>
               </div>
             </form>
@@ -237,13 +291,13 @@ function LoginForm() {
               className="text-2xl text-center mb-2 font-serif"
               style={{ color: "var(--color-primary)" }}
             >
-              Internal Portal & Approvals
+              {copy.title}
             </h1>
             <p
               className="text-xs text-center mb-6"
               style={{ color: "var(--color-muted)" }}
             >
-              Sign in with your authorized phone number or company email.
+              {copy.lead}
             </p>
 
             <form
@@ -259,17 +313,22 @@ function LoginForm() {
                   className="block text-xs font-mono mb-1.5"
                   style={{ color: "var(--color-foreground)" }}
                 >
-                  Phone number or Email
+                  {copy.label}
                 </label>
                 <input
                   id="identifier"
+                  // Plain text, with the email keyboard: an owner can still type the
+                  // phone number they sign in with, which type="email" would refuse.
                   type="text"
-                  autoComplete="username tel email"
+                  inputMode={appFlow ? "email" : undefined}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete={appFlow ? "email" : "username tel email"}
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="(602) 218-1191 or name@saddlewoodcontracting.com"
+                  placeholder={copy.placeholder}
                   disabled={formState === "sending"}
-                  className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none transition-colors"
+                  className={`w-full px-3 rounded-lg border focus:outline-none transition-colors ${appFlow ? "py-3 text-base" : "py-2 text-sm"}`}
                   style={{
                     backgroundColor: "white",
                     borderColor: "var(--color-border)",
@@ -279,7 +338,7 @@ function LoginForm() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className={appFlow ? "hidden" : "flex items-center gap-2"}>
                 <input
                   id="stayLoggedIn"
                   type="checkbox"
@@ -303,21 +362,34 @@ function LoginForm() {
                 >
                   {errorMessage ||
                     (urlError === "unauthorized"
-                      ? "You are not on the authorized staff allowlist."
-                      : "Sign-in link was invalid or expired. Enter your phone or email again.")}
+                      ? appFlow
+                        ? "That address does not have a seat. Ask the office. · Ese correo no tiene acceso. Pregunta en la oficina."
+                        : "You are not on the authorized staff allowlist."
+                      : appFlow
+                        ? "That link was used or has expired. Enter your email for a new code. · Ese enlace ya se usó o venció. Escribe tu correo para un código nuevo."
+                        : "Sign-in link was invalid or expired. Enter your phone or email again.")}
                 </div>
               )}
 
               <button
                 type="submit"
                 disabled={formState === "sending"}
-                className="w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
+                className={`w-full px-4 rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 ${appFlow ? "py-3.5" : "py-2.5"}`}
                 style={{
                   backgroundColor: "var(--color-primary)",
                   color: "white",
                 }}
               >
-                {formState === "sending" ? "Sending code..." : "Send code via iMessage / Email"}
+                {formState === "sending" ? copy.sending : copy.send}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleHaveCode}
+                className={`block w-full text-center hover:underline cursor-pointer ${appFlow ? "min-h-11 text-sm" : "pt-1 text-xs"}`}
+                style={{ color: "var(--color-muted)" }}
+              >
+                {copy.haveCode}
               </button>
             </form>
           </>

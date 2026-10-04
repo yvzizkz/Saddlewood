@@ -30,6 +30,8 @@ export type SignInEmailInput = {
   afterButton?: string[];
   /** Footer note. */
   footer?: string;
+  /** The line above the code. Default "Or enter this code at <site>/login". */
+  codeLabel?: string;
 };
 
 export function buildSignInEmail(input: SignInEmailInput): { html: string; text: string } {
@@ -45,6 +47,8 @@ export function buildSignInEmail(input: SignInEmailInput): { html: string; text:
   const footer =
     input.footer ??
     "You are receiving this because your address is on the Saddlewood portal allowlist. If you did not ask for it, ignore it; nothing happens without the tap.";
+
+  const codeLabel = input.codeLabel ?? `Or enter this code at ${SITE_URL.replace(/^https?:\/\//, "")}/login`;
 
   const codeDigits = escapeHtml(input.code || "").split("").join("&#8202;");
 
@@ -73,7 +77,7 @@ ${paragraphs
 <tr><td align="center" style="padding:28px 40px 8px;"><a href="${escapeHtml(input.link)}" style="display:inline-block;background:${TEAL};color:#ffffff;font-family:${FONT};font-size:15px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:2px;">${escapeHtml(buttonLabel)}</a></td></tr>
 ${
   input.code
-    ? `<tr><td align="center" style="padding:20px 40px 0;font-family:${FONT};font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:${MUTE};">Or enter this code at ${escapeHtml(SITE_URL.replace(/^https?:\/\//, ""))}/login</td></tr>
+    ? `<tr><td align="center" style="padding:20px 40px 0;font-family:${FONT};font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:${MUTE};">${escapeHtml(codeLabel)}</td></tr>
 <tr><td align="center" style="padding:8px 40px 0;font-family:${FONT};font-size:30px;font-weight:600;letter-spacing:.3em;color:${INK};">${codeDigits}</td></tr>`
     : ""
 }
@@ -94,7 +98,7 @@ ${afterButton
     ...paragraphs,
     "",
     `${buttonLabel}: ${input.link}`,
-    ...(input.code ? ["", `Or enter this code at ${SITE_URL}/login: ${input.code}`] : []),
+    ...(input.code ? ["", `${codeLabel}: ${input.code}`] : []),
     "",
     ...afterButton,
     "",

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { hasCrewRole } from "@/lib/crew/role";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { countPendingEstimates } from "@/lib/estimates/queries";
 import BottomTabBar from "@/components/layout/BottomTabBar";
@@ -24,6 +25,9 @@ export default async function InternalLayout({
   // The allowlist is the real gate. A session for any other address, however
   // it was created, is ended here and sent back to the login page.
   if (!isAllowedEmail(user.email)) {
+    // Crew have the app and nothing else. (src/proxy.ts already turns them
+    // around; this is the same answer if it ever does not.)
+    if (hasCrewRole(user)) redirect("/app");
     await supabase.auth.signOut();
     redirect("/login?error=unauthorized");
   }

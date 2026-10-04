@@ -26,7 +26,7 @@ const PORTAL: { href: string; label: string; note: string }[] = [
 
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
 
-function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
+export function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
   const pad = '='.repeat((4 - (base64url.length % 4)) % 4)
   const raw = atob((base64url + pad).replace(/-/g, '+').replace(/_/g, '/'))
   const out = new Uint8Array(new ArrayBuffer(raw.length))
@@ -59,7 +59,7 @@ function isIos(): boolean {
 
 const never = () => () => {}
 
-function useInstall() {
+export function useInstall() {
   // On the server (and the first paint) assume it is already installed, so
   // the install card never flashes at someone who has the app.
   const standalone = useSyncExternalStore(watchStandalone, isStandalone, () => true)

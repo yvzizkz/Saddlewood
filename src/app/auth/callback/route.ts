@@ -2,10 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { safeNext } from "@/lib/auth/magicLink";
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/internal";
+  // A path on this site only: `${origin}${next}` with next = "@evil.example" is another site.
+  const next = safeNext(searchParams.get("next") ?? "/internal");
 
   const supabaseError = searchParams.get("error");
   const supabaseErrorCode = searchParams.get("error_code");
