@@ -11,7 +11,6 @@ type FormState =
   | "sending"
   | "code-entry"
   | "verifying"
-  | "enrolling-faceid"
   | "error";
 
 function LoginForm() {
@@ -23,8 +22,6 @@ function LoginForm() {
   const [formState, setFormState] = useState<FormState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
-  const [hasPasskey, setHasPasskey] = useState(false);
-  const [passkeyEmail, setPasskeyEmail] = useState("");
 
   const urlError = searchParams.get("error");
   const urlErrorDetail = searchParams.get("detail");
@@ -33,65 +30,15 @@ function LoginForm() {
     return n.startsWith("/") && !n.startsWith("//") ? n : "/internal/ops";
   })();
 
-  // Check on mount if FaceID / Passkey is enrolled on this browser
+  // "Face ID" sign-in was removed on 2026-10-03: it never verified anything
+  // (see /api/auth/passkey). Forget the flag older builds left on this device.
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("saddlewood_passkey_user");
-      if (stored && window.PublicKeyCredential) {
-        setHasPasskey(true);
-        setPasskeyEmail(stored);
-      }
+      localStorage.removeItem("saddlewood_passkey_user");
     } catch {
       // localStorage may fail in private mode
     }
   }, []);
-
-  async function handleFaceIdLogin() {
-    if (!passkeyEmail) return;
-    setFormState("verifying");
-    setErrorMessage("");
-
-    try {
-      // Challenge the device's biometric sensor (FaceID / TouchID)
-      const credential = (await navigator.credentials.get({
-        publicKey: {
-          challenge: new Uint8Array(32),
-          timeout: 60000,
-          userVerification: "preferred",
-        },
-      })) as PublicKeyCredential | null;
-
-      if (!credential) {
-        setFormState("idle");
-        return;
-      }
-
-      // Verify server-side to set the session cookie
-      const res = await fetch("/api/auth/passkey", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "login",
-          email: passkeyEmail,
-          credentialId: credential.id,
-          next: nextPath,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setFormState("idle");
-        setErrorMessage("FaceID verification failed. Please sign in with your phone or email.");
-        return;
-      }
-
-      window.location.href = json.redirect || nextPath;
-    } catch (err) {
-      console.warn("Passkey error:", err);
-      setFormState("idle");
-      setErrorMessage("FaceID was cancelled or unavailable.");
-    }
-  }
 
   async function handleSendCode() {
     if (formState === "sending") return;
@@ -161,42 +108,6 @@ function LoginForm() {
       return;
     }
 
-    // Remember FaceID prompt eligibility
-    if (typeof window !== "undefined" && window.PublicKeyCredential && !hasPasskey) {
-      setFormState("enrolling-faceid");
-      return;
-    }
-
-    window.location.href = nextPath;
-  }
-
-  async function enrollFaceId() {
-    try {
-      const targetEmail = resolvedEmail || identifier.trim();
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge: new Uint8Array(32),
-          rp: { name: "Saddlewood Contracting", id: window.location.hostname },
-          user: {
-            id: new TextEncoder().encode(targetEmail),
-            name: targetEmail,
-            displayName: targetEmail.split("@")[0],
-          },
-          pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-          authenticatorSelection: {
-            authenticatorAttachment: "platform", // FaceID / TouchID
-            userVerification: "required",
-          },
-          timeout: 60000,
-        },
-      });
-
-      if (credential) {
-        localStorage.setItem("saddlewood_passkey_user", targetEmail);
-      }
-    } catch (e) {
-      console.warn("FaceID enrollment skipped:", e);
-    }
     window.location.href = nextPath;
   }
 
@@ -207,7 +118,6 @@ function LoginForm() {
   }
 
   const isCodeStep = formState === "code-entry" || formState === "verifying";
-  const isEnrollingStep = formState === "enrolling-faceid";
 
   return (
     <div
@@ -225,46 +135,7 @@ function LoginForm() {
           />
         </div>
 
-        {hasPasskey && formState === "idle" && (
-          <div className="mb-6 p-4 rounded-xl border border-[#b45309]/30 bg-[#fdfbf7] text-center shadow-sm">
-            <p className="text-xs text-[#78350f] mb-3 font-medium">FaceID / TouchID Enrolled</p>
-            <button
-              type="button"
-              onClick={handleFaceIdLogin}
-              className="w-full py-3 px-4 rounded-lg bg-[#b45309] hover:bg-[#92400e] text-white font-medium text-sm flex items-center justify-center gap-2 transition"
-            >
-              <span>👤</span> Sign in with FaceID ({passkeyEmail.split("@")[0]})
-            </button>
-            <div className="mt-3 text-xs text-[#9a3412]">
-              Or sign in with code below
-            </div>
-          </div>
-        )}
-
-        {isEnrollingStep ? (
-          <div className="text-center">
-            <h1 className="text-xl font-bold mb-2 text-[#0f172a]">Enable FaceID / TouchID?</h1>
-            <p className="text-sm text-[#475569] mb-6">
-              Skip typing verification codes next time you open Saddlewood on this device.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={enrollFaceId}
-                className="w-full py-3 px-4 rounded-lg bg-[#b45309] text-white font-medium text-sm hover:bg-[#92400e] transition"
-              >
-                Enable FaceID on this device
-              </button>
-              <button
-                type="button"
-                onClick={() => (window.location.href = nextPath)}
-                className="w-full py-2 px-4 rounded-lg text-xs text-[#64748b] hover:text-[#0f172a] transition"
-              >
-                Not now, take me to portal
-              </button>
-            </div>
-          </div>
-        ) : isCodeStep ? (
+        {isCodeStep ? (
           <>
             <h1
               className="text-2xl text-center mb-2 font-serif"
