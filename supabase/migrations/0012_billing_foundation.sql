@@ -267,6 +267,12 @@ revoke all on table
   public.clients, public.client_contacts, public.documents, public.document_events
 from anon, authenticated;
 
+-- The hosted project grants everything on a new table to service_role by
+-- default, so take that away first and give back only what is used.
+revoke all on table
+  public.clients, public.client_contacts, public.documents, public.document_events
+from service_role;
+
 grant select, insert, update, delete on table
   public.clients, public.client_contacts, public.documents
 to service_role;
