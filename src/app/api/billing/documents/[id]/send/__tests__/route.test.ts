@@ -23,6 +23,7 @@ import { POST } from "../route";
 
 const ID = "11111111-2222-3333-4444-555555555555";
 const TOKEN = "a".repeat(32);
+const LINK = `https://saddlewoodcontracting.com/d/${"a".repeat(32)}`;
 const DOC = { id: ID, kind: "statement", number: "AFT-100526", status: "issued", token: TOKEN, clientId: "c1" };
 const GOOD = { to: ["ap@client.com"], cc: ["marco@saddlewoodcontracting.com"], subject: "Open invoices", body: "Hi,\n\nThe statement is here:\n{link}\n\nThank you" };
 
@@ -68,32 +69,129 @@ describe("POST /api/billing/documents/[id]/send", () => {
       expect(json.sent).toBe(false);
       expect(json.preview.from).toContain("accounting@saddlewoodcontracting.com");
       expect(json.preview.to).toEqual(["ap@client.com"]);
-      expect(json.preview.body).toContain(`https://saddlewoodcontracting.com/d/${TOKEN}`);
+      expect(json.preview.body).toContain(LINK);
+      expect(json.preview.internalCopy.to).toEqual(["marco@saddlewoodcontracting.com"]);
     }
     expect(sendMock).not.toHaveBeenCalled();
     expect(recordEvent).not.toHaveBeenCalled();
   });
 
   it("sends from accounting@ and writes the sent line with the mail id", async () => {
-    const res = await call({ ...GOOD, confirm: true });
+    const res = await call({ ...GOOD, cc: [], confirm: true });
     const json = await res.json();
-    expect(json).toMatchObject({ ok: true, sent: true, emailId: "em_1", recorded: true });
+    expect(json).toMatchObject({ ok: true, sent: true, emailId: "em_1", recorded: true, copySent: null });
+    expect(sendMock).toHaveBeenCalledTimes(1);
     const mail = sendMock.mock.calls[0][0];
     expect(mail.from).toBe("Saddlewood Contracting Accounting <accounting@saddlewoodcontracting.com>");
     expect(mail.replyTo).toBe("accounting@saddlewoodcontracting.com");
     expect(mail.to).toEqual(["ap@client.com"]);
-    expect(mail.cc).toEqual(["marco@saddlewoodcontracting.com"]);
-    expect(mail.text).toContain(`/d/${TOKEN}`);
+    expect(mail.cc).toBeUndefined();
+    expect(mail.text).toContain(`View statement: ${LINK}`);
     expect(mail.text).not.toContain("{link}");
-    expect(mail.html).toContain(`<a href="https://saddlewoodcontracting.com/d/${TOKEN}">`);
+    expect(mail.html).toContain(`<a href="${LINK}" style=`);
+    expect(mail.html).toContain(">View statement</a>");
+    expect(mail.html).not.toContain(`>${LINK}<`);
     expect(recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({ documentId: ID, kind: "sent", emailId: "em_1", actor: "lando@saddlewoodcontracting.com", dedupe: "sent:em_1" }),
     );
   });
 
+  it("gives our own people a separate copy whose link is not counted as a viewing", async () => {
+    sendMock.mockResolvedValueOnce({ data: { id: "em_1" }, error: null }).mockResolvedValueOnce({ data: { id: "em_2" }, error: null });
+    const res = await call({ ...GOOD, confirm: true });
+    expect(await res.json()).toMatchObject({ sent: true, emailId: "em_1", copySent: true });
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    const [client, ours] = sendMock.mock.calls.map((c) => c[0]);
+    expect(client.to).toEqual(["ap@client.com"]);
+    expect(client.cc).toBeUndefined();
+    expect(client.text).toContain(LINK);
+    expect(client.text).not.toContain("copy=1");
+    expect(ours.to).toEqual(["marco@saddlewoodcontracting.com"]);
+    expect(ours.text).toContain(`${LINK}?copy=1`);
+    expect(ours.text).toContain("This went to ap@client.com.");
+    expect(recordEvent).toHaveBeenCalledTimes(1);
+    expect(recordEvent.mock.calls[0][0].detail).toMatchObject({ to: ["ap@client.com"], internalCopy: ["marco@saddlewoodcontracting.com"] });
+  });
+
+  it("still answers sent when only the internal copy fails", async () => {
+    sendMock.mockResolvedValueOnce({ data: { id: "em_1" }, error: null }).mockRejectedValueOnce(new Error("down"));
+    const res = await call({ ...GOOD, confirm: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ sent: true, recorded: true, copySent: false });
+  });
+
+  it("uses the uncounted link when a document goes only to our own people", async () => {
+    await call({ ...GOOD, to: ["marco@saddlewoodcontracting.com"], cc: [], confirm: true });
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock.mock.calls[0][0].text).toContain(`${LINK}?copy=1`);
+  });
+
   it("adds the link when the body left it out", async () => {
-    await call({ ...GOOD, body: "Please see the statement.", confirm: true });
-    expect(sendMock.mock.calls[0][0].text).toBe(`Please see the statement.\n\nhttps://saddlewoodcontracting.com/d/${TOKEN}`);
+    await call({ ...GOOD, cc: [], body: "Please see the statement.", confirm: true });
+    expect(sendMock.mock.calls[0][0].text).toBe(`Please see the statement.\n\nView statement: ${LINK}`);
+  });
+
+  it("turns approved extra links into buttons and spells them out in the text copy", async () => {
+    const joist = "https://client.joistapp.com/invoices/2353052f82941ffa2cf7381f?source=email";
+    await call({ ...GOOD, cc: [], links: [{ label: "Invoice 5203-12", url: joist }], confirm: true });
+    const mail = sendMock.mock.calls[0][0];
+    expect(mail.text).toContain(`Invoice 5203-12: ${joist}`);
+    expect(mail.html).toContain(`<a href="${joist}" style=`);
+    expect(mail.html).toContain(">Invoice 5203-12</a>");
+    expect(recordEvent.mock.calls[0][0].detail.links).toEqual(["Invoice 5203-12"]);
+  });
+
+  it("refuses a link to a site that is not approved, or one that is not plain https", async () => {
+    for (const url of [
+      "https://evil.example.com/pay",
+      "https://joistapp.com.evil.example/x",
+      "http://client.joistapp.com/invoices/1",
+      "https://user:pw@client.joistapp.com/x",
+      "javascript:alert(1)",
+      "not a url",
+    ]) {
+      const res = await call({ ...GOOD, links: [{ label: "Invoice", url }], confirm: true });
+      expect(res.status).toBe(400);
+    }
+    expect((await call({ ...GOOD, links: [{ label: "", url: "https://client.joistapp.com/x" }], confirm: true })).status).toBe(400);
+    expect((await call({ ...GOOD, links: "https://client.joistapp.com/x", confirm: true })).status).toBe(400);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("attaches files and names them in the proof record", async () => {
+    const pdf = Buffer.from("%PDF-1.4 waiver").toString("base64");
+    const res = await call({ ...GOOD, cc: [], attachments: [{ filename: "Waiver Jury 8009-10.pdf", content: pdf }], confirm: true });
+    expect((await res.json()).preview.attachments).toEqual([{ filename: "Waiver Jury 8009-10.pdf", bytes: 15 }]);
+    const mail = sendMock.mock.calls[0][0];
+    expect(mail.attachments).toHaveLength(1);
+    expect(mail.attachments[0].filename).toBe("Waiver Jury 8009-10.pdf");
+    expect(mail.attachments[0].contentType).toBe("application/pdf");
+    expect(Buffer.isBuffer(mail.attachments[0].content)).toBe(true);
+    expect(recordEvent.mock.calls[0][0].detail.attachments).toEqual(["Waiver Jury 8009-10.pdf"]);
+  });
+
+  it("refuses attachments that are the wrong kind, unreadable, repeated or too large", async () => {
+    const ok = Buffer.from("x").toString("base64");
+    const big = Buffer.alloc(3 * 1024 * 1024 + 1, 1).toString("base64");
+    for (const attachments of [
+      [{ filename: "run.exe", content: ok }],
+      [{ filename: "page.html", content: ok }],
+      [{ filename: "noext", content: ok }],
+      [{ filename: "a.pdf", content: "***" }],
+      [{ filename: "a.pdf", content: "" }],
+      [{ filename: "a.pdf", content: ok }, { filename: "A.PDF", content: ok }],
+      [{ filename: "a.pdf", content: big }],
+      "a.pdf",
+    ]) {
+      expect((await call({ ...GOOD, attachments, confirm: true })).status).toBe(400);
+    }
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps folders out of an attachment's name", async () => {
+    const ok = Buffer.from("x").toString("base64");
+    await call({ ...GOOD, cc: [], attachments: [{ filename: "../../etc/waiver.pdf", content: ok }], confirm: true });
+    expect(sendMock.mock.calls[0][0].attachments[0].filename).not.toMatch(/[\\/]/);
   });
 
   it("refuses an outside address that is not a contact of this client", async () => {
@@ -132,7 +230,7 @@ describe("POST /api/billing/documents/[id]/send", () => {
   });
 
   it("escapes the body in the HTML copy", async () => {
-    await call({ ...GOOD, body: "<script>alert(1)</script> {link}", confirm: true });
+    await call({ ...GOOD, cc: [], body: "<script>alert(1)</script> {link}", confirm: true });
     const html = sendMock.mock.calls[0][0].html as string;
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");

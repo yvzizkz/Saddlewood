@@ -83,8 +83,17 @@ async function recordView(doc: BillingDocument): Promise<void> {
   }
 }
 
-export default async function DocumentPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function DocumentPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ copy?: string | string[] }>;
+}) {
   const { token } = await params;
+  // Our own people's copy of a billing message links here with ?copy=1, and
+  // that opening is not counted: a "viewed" line has to mean the client.
+  const ownCopy = (await searchParams).copy === "1";
   const doc = await getDocumentByToken(token);
 
   if (!doc || doc.status === "draft") {
@@ -100,7 +109,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ token
     );
   }
 
-  await recordView(doc);
+  if (!ownCopy) await recordView(doc);
 
   const s = doc.snapshot;
   const lines = s.lines ?? [];

@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { deliver } from "@/lib/billing/deliver";
-import { getDocument } from "@/lib/billing/documents";
 import { authorizeOps } from "@/lib/ops/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Mail an issued document to its client, from accounting@. Staff only.
-// The rules (preview unless confirmed, who may receive it, the copy our own
-// people get) live in src/lib/billing/deliver.ts.
+// A note from accounting@ with no document behind it: to our own people only,
+// since there is no client whose contacts could vouch for an outside address.
+// Staff only; preview unless confirmed (src/lib/billing/deliver.ts).
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest) {
   const who = await authorizeOps(request);
   if (!who) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-
-  const { id } = await params;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
 
   let input: Record<string, unknown>;
   try {
@@ -28,12 +24,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   try {
-    const doc = await getDocument(id);
-    if (!doc) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-    const result = await deliver(who.actor, doc, input);
+    const result = await deliver(who.actor, null, input);
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
-    console.error("billing send:", err);
+    console.error("billing mail:", err);
     return NextResponse.json({ ok: false, error: "could not send" }, { status: 500 });
   }
 }
