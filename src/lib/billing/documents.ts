@@ -258,3 +258,11 @@ export async function documentForEmail(emailId: string): Promise<string | null> 
   if (error) fail("find document for email", error.message);
   return data ? (data as { document_id: string }).document_id : null;
 }
+
+/** The addresses on file for a client: the only outside addresses its documents may be mailed to. */
+export async function clientContactEmails(clientId: string): Promise<string[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("client_contacts").select("email").eq("client_id", clientId).eq("active", true);
+  if (error) fail("list client contacts", error.message);
+  return (data ?? []).map((r) => (r as { email: string }).email.trim().toLowerCase()).filter(Boolean);
+}
