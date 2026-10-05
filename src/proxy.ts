@@ -62,6 +62,7 @@ export async function proxy(request: NextRequest) {
   // signing link, a phone provider's webhook), so those routes check the
   // caller themselves: src/lib/proposals/access.ts, src/lib/contracts/link.ts
   // and the top of src/app/api/leads/route.ts.
+  // Likewise /api/billing/mail-events: the mail service signs its reports.
   if (
     pathname.startsWith("/api/review") ||
     pathname.startsWith("/api/ops") ||
