@@ -94,7 +94,15 @@ export function summarizeProof(events: DocumentEvent[]): ProofSummary {
   const delivered = sorted.filter((e) => e.kind === "delivered");
   const bounced = sorted.filter((e) => e.kind === "bounced");
   const portal = sorted.filter((e) => e.kind === "portal_submitted");
-  const opened = sorted.filter((e) => e.kind === "viewed" || e.kind === "downloaded");
+  // A viewing that turned out to be our own people (a staff copy opened
+  // before the uncounted links existed) cannot be deleted; a later note names
+  // it in detail.excludeViews and it stops counting.
+  const excluded = new Set<number>();
+  for (const e of sorted) {
+    if (e.kind !== "note" || !Array.isArray(e.detail.excludeViews)) continue;
+    for (const id of e.detail.excludeViews) if (typeof id === "number") excluded.add(id);
+  }
+  const opened = sorted.filter((e) => (e.kind === "viewed" || e.kind === "downloaded") && !excluded.has(e.id));
   const human = opened.filter((e) => !e.automatic);
 
   const sentTo = new Set<string>();

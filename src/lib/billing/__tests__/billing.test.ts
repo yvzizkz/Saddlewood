@@ -192,3 +192,21 @@ describe("delivery reports from the mail service", () => {
     expect(readMailReport(null)).toBeNull();
   });
 });
+
+describe("staff viewings named by a note", () => {
+  it("stop counting", () => {
+    const ev = (id: number, kind: DocumentEvent["kind"], at: string, detail: Record<string, unknown> = {}): DocumentEvent => ({
+      id, documentId: "d", kind, at, actor: "", automatic: false, emailId: null, detail,
+    });
+    const events = [
+      ev(1, "sent", "2026-10-05T21:15:00Z", { to: ["ap@client.com"] }),
+      ev(2, "viewed", "2026-10-05T22:07:00Z", { ua: IPHONE }),
+      ev(3, "viewed", "2026-10-05T22:08:00Z", { ua: IPHONE }),
+      ev(4, "note", "2026-10-05T22:40:00Z", { text: "those were Marco and Lando", excludeViews: [2, 3] }),
+    ];
+    const s = summarizeProof(events);
+    expect(s.views).toHaveLength(0);
+    expect(s.state).toBe("sent");
+    expect(summarizeProof(events.slice(0, 3)).views).toHaveLength(2);
+  });
+});
