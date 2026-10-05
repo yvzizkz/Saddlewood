@@ -63,9 +63,8 @@ end;
 $$;
 
 drop trigger if exists trg_payment_allocations_within on public.payment_allocations;
-create constraint trigger trg_payment_allocations_within
+create trigger trg_payment_allocations_within
   after insert or update on public.payment_allocations
-  deferrable initially deferred
   for each row execute function public.payment_allocations_within_payment();
 
 -- The only change a payment may see: being voided, once, with a reason.
