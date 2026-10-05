@@ -88,6 +88,16 @@ describe('Contracts API Routes', () => {
     expect(data.summary.draftCount).toBe(1);
   });
 
+  it('gives staff the signing token with each contract', async () => {
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key-0123456789');
+    const req = new NextRequest('http://localhost/api/contracts', {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    const res = await GET(req);
+    const data = await res.json();
+    expect(data.contracts[0].sign_token).toMatch(/^[0-9a-f]{32}$/);
+  });
+
   it('rejects POST without authentication with 401', async () => {
     const req = new NextRequest('http://localhost/api/contracts', {
       method: 'POST',

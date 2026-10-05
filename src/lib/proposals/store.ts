@@ -334,6 +334,21 @@ export function matchProposal(p: ProposalItem, identifier: string): boolean {
   return false;
 }
 
+// The link a client holds is /p/<token>, and this is the token, whole and
+// exact. It is the only thing that opens a proposal for someone who is not
+// signed in (src/lib/proposals/access.ts). matchProposal above also takes
+// prp-001, PRP-2026-001, "moore" and the first letters of a token: handy for
+// staff and the bot, and far too easy to guess to leave open to the public.
+export function matchShareToken(p: ProposalItem, token: string): boolean {
+  if (!token) return false;
+  return p.token.toLowerCase() === token.toLowerCase().trim();
+}
+
+export async function getProposalByShareToken(token: string): Promise<ProposalItem | null> {
+  const state = await getProposalsState();
+  return state.proposals.find((p) => matchShareToken(p, token)) || null;
+}
+
 export async function getProposalByToken(token: string): Promise<ProposalItem | null> {
   const state = await getProposalsState();
   return state.proposals.find((p) => matchProposal(p, token)) || null;
@@ -396,7 +411,8 @@ export async function createProposal(input: DraftProposalInput, createdBy = 'Mar
   const state = await getProposalsState();
   const n = state.next_number;
   const id = `prp-${String(n).padStart(3, '0')}`;
-  const token = `${input.project_name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${crypto.randomBytes(4).toString('hex')}`;
+  // The random ending is what keeps a client's link from being guessed.
+  const token = `${input.project_name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${crypto.randomBytes(8).toString('hex')}`;
   const proposal_number = `PRP-${new Date().getFullYear()}-${String(n).padStart(3, '0')}`;
 
   const validUntil = new Date();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchProposal } from '../store';
+import { matchProposal, matchShareToken } from '../store';
 import type { ProposalItem } from '../types';
 
 describe('Proposal Slug & Short URL Matching', () => {
@@ -93,5 +93,28 @@ describe('Proposal Slug & Short URL Matching', () => {
   it('rejects unmatched strings', () => {
     expect(matchProposal(bellevue, 'unrelated')).toBe(false);
     expect(matchProposal(bellevue, '')).toBe(false);
+  });
+});
+
+describe('The share token a client holds', () => {
+  const p = {
+    id: 'prp-004',
+    token: 'bellevue-church-schifferer-0a1b2c3d4e5f6a7b',
+    proposal_number: 'PRP-2026-004',
+  } as ProposalItem;
+
+  it('matches the whole token, whatever the letter case', () => {
+    expect(matchShareToken(p, 'bellevue-church-schifferer-0a1b2c3d4e5f6a7b')).toBe(true);
+    expect(matchShareToken(p, ' Bellevue-Church-Schifferer-0A1B2C3D4E5F6A7B ')).toBe(true);
+  });
+
+  it('matches nothing shorter or easier to guess', () => {
+    // Every one of these opens the proposal for staff through matchProposal.
+    const shortForms = ['prp-004', 'PRP-2026-004', 'bellevue-church-schifferer', 'bellevue', 'bel'];
+    for (const guess of shortForms) {
+      expect(matchProposal(p, guess)).toBe(true);
+      expect(matchShareToken(p, guess)).toBe(false);
+    }
+    expect(matchShareToken(p, '')).toBe(false);
   });
 });

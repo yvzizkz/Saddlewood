@@ -183,7 +183,7 @@ export default function ClientProposalPage({ params }: Props) {
 
     try {
       setIsSubmitting(true);
-      const res = await fetch(`/api/proposals/${proposal.id}/accept`, {
+      const res = await fetch(`/api/proposals/${token}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

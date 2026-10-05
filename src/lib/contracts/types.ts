@@ -35,6 +35,9 @@ export interface ContractItem {
   protections?: ContractProtections;
   signed_at?: string;
   signed_by?: string;
+  // The token in the client's signing link (/sign/<token>). The API adds it
+  // for staff; it is never stored: see src/lib/contracts/link.ts.
+  sign_token?: string;
 }
 
 export interface ContractDashboardState {

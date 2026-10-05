@@ -57,6 +57,11 @@ export async function proxy(request: NextRequest) {
   }
 
   // 1. Guarded API routes
+  // Not in this list, on purpose: /api/proposals, /api/contracts, /api/leads.
+  // Part of each is for someone who cannot sign in (a client's proposal or
+  // signing link, a phone provider's webhook), so those routes check the
+  // caller themselves: src/lib/proposals/access.ts, src/lib/contracts/link.ts
+  // and the top of src/app/api/leads/route.ts.
   if (
     pathname.startsWith("/api/review") ||
     pathname.startsWith("/api/ops") ||

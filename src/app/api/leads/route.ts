@@ -1,10 +1,45 @@
-import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
+import { escapeHtml } from '@/lib/emailTemplate';
 import { getLeadsState, updateLeadStatus, recordInboundLead } from '@/lib/leads/store';
+import { authorizeOps } from '@/lib/ops/auth';
 import { Resend } from 'resend';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+// Who may call this.
+//
+// GET and PATCH are the staff's lead list (/internal/leads): a signed-in
+// address on the allowlist, or the bot with its agent token.
+//
+// POST is the door for a phone or voice provider (Twilio, Vapi, Retell, a
+// GoHighLevel workflow). A provider cannot sign in, so it carries a key in
+// its webhook URL instead:
+//
+//   https://saddlewoodcontracting.com/api/leads?key=<LEADS_WEBHOOK_KEY>
+//
+// While LEADS_WEBHOOK_KEY is not set the door is shut to everyone but staff,
+// because an open one lets anyone on the internet send "new lead" email to
+// the owners. To switch it on: set LEADS_WEBHOOK_KEY (16 characters or more)
+// in the site's environment, redeploy, and give the provider the URL above.
+
+const unauthorized = () =>
+  NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+
+function webhookKeyMatches(request: NextRequest): boolean {
+  const secret = process.env.LEADS_WEBHOOK_KEY;
+  if (!secret || secret.length < 16) return false;
+  const given =
+    request.nextUrl.searchParams.get('key') || request.headers.get('x-webhook-key') || '';
+  const a = Buffer.from(given, 'utf8');
+  const b = Buffer.from(secret, 'utf8');
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+export async function GET(request: NextRequest) {
+  if (!(await authorizeOps(request))) return unauthorized();
+
   try {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('refresh') === 'true';
@@ -20,7 +55,9 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  if (!webhookKeyMatches(request) && !(await authorizeOps(request))) return unauthorized();
+
   try {
     const contentType = request.headers.get('content-type') || '';
     let body: any = {};
@@ -87,14 +124,16 @@ export async function POST(request: Request) {
       tags,
     });
 
-    // Send instant email notification via Resend
+    // Send instant email notification via Resend. Whatever the caller or
+    // texter wrote is escaped: it lands in the owners' inboxes.
     if (process.env.RESEND_API_KEY) {
       try {
         const resend = new Resend(process.env.RESEND_API_KEY);
+        const tagList = lead.tags.map(String).join(', ');
         await resend.emails.send({
           from: 'Saddlewood Leads <info@saddlewoodcontracting.com>',
           to: ['info@saddlewoodcontracting.com', 'marco@saddlewoodcontracting.com'],
-          subject: `🚨 [New Inbound Lead] ${lead.name || lead.display} (${lead.tags.join(', ')})`,
+          subject: `🚨 [New Inbound Lead] ${lead.name || lead.display} (${tagList})`,
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
               <div style="border-bottom: 2px solid #0f766e; padding-bottom: 12px; margin-bottom: 16px;">
@@ -103,23 +142,23 @@ export async function POST(request: Request) {
               </div>
 
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-                <p style="margin: 0 0 8px 0; font-size: 15px;"><strong>Caller / Contact:</strong> ${lead.name || 'Anonymous Caller'}</p>
-                <p style="margin: 0 0 8px 0; font-size: 15px;"><strong>Phone:</strong> <a href="${lead.dial_url}" style="color: #0f766e; font-weight: bold;">${lead.display}</a></p>
-                ${lead.email ? `<p style="margin: 0 0 8px 0; font-size: 14px;"><strong>Email:</strong> ${lead.email}</p>` : ''}
-                <p style="margin: 0; font-size: 13px; color: #64748b;"><strong>Tags:</strong> ${lead.tags.join(', ')}</p>
+                <p style="margin: 0 0 8px 0; font-size: 15px;"><strong>Caller / Contact:</strong> ${escapeHtml(lead.name) || 'Anonymous Caller'}</p>
+                <p style="margin: 0 0 8px 0; font-size: 15px;"><strong>Phone:</strong> <a href="${escapeHtml(lead.dial_url)}" style="color: #0f766e; font-weight: bold;">${escapeHtml(lead.display)}</a></p>
+                ${lead.email ? `<p style="margin: 0 0 8px 0; font-size: 14px;"><strong>Email:</strong> ${escapeHtml(lead.email)}</p>` : ''}
+                <p style="margin: 0; font-size: 13px; color: #64748b;"><strong>Tags:</strong> ${escapeHtml(tagList)}</p>
               </div>
 
               ${summary ? `
               <div style="padding: 14px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; margin-bottom: 16px;">
                 <p style="margin: 0 0 4px 0; font-size: 12px; text-transform: uppercase; font-weight: bold; color: #92400e;">Call Summary / Transcript:</p>
-                <p style="margin: 0; font-size: 14px; color: #78350f; white-space: pre-wrap; line-height: 1.5;">${summary}</p>
+                <p style="margin: 0; font-size: 14px; color: #78350f; white-space: pre-wrap; line-height: 1.5;">${escapeHtml(String(summary))}</p>
               </div>` : ''}
 
               <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; gap: 12px;">
-                <a href="${lead.dial_url}" style="background: #0f766e; color: #ffffff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block;">
+                <a href="${escapeHtml(lead.dial_url)}" style="background: #0f766e; color: #ffffff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block;">
                   📞 1-Tap Call Back
                 </a>
-                <a href="${lead.sms_url}" style="background: #1e293b; color: #ffffff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-left: 8px;">
+                <a href="${escapeHtml(lead.sms_url)}" style="background: #1e293b; color: #ffffff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-left: 8px;">
                   💬 1-Tap Text Reply
                 </a>
                 <a href="https://saddlewoodcontracting.com/internal/leads" style="background: #f1f5f9; color: #334155; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-left: 8px;">
@@ -144,7 +183,9 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
+  if (!(await authorizeOps(request))) return unauthorized();
+
   try {
     const body = await request.json();
     const { phone, status } = body;

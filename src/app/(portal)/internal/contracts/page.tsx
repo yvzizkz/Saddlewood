@@ -444,7 +444,7 @@ export default function ContractsPortalPage() {
                           View
                         </button>
                         <a
-                          href={`/sign/${c.id}`}
+                          href={`/sign/${c.sign_token ?? c.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-1.5 rounded bg-[var(--color-teal)] hover:opacity-90 text-xs font-semibold text-white flex items-center gap-1 transition-all"
@@ -709,7 +709,12 @@ export default function ContractsPortalPage() {
                 </button>
                 <button
                   onClick={() => {
-                    const url = `${window.location.origin}/sign/${viewingContract.id}`;
+                    // The client's link carries a token; an id link only opens for staff.
+                    if (!viewingContract.sign_token) {
+                      alert('Could not make a signing link for this contract. Reload the page and try again.');
+                      return;
+                    }
+                    const url = `${window.location.origin}/sign/${viewingContract.sign_token}`;
                     navigator.clipboard.writeText(url);
                     alert(`Copied 1-Tap Client Sign Link to clipboard:\n${url}`);
                   }}

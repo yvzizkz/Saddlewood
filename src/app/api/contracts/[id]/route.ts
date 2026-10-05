@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeOps } from '@/lib/ops/auth';
+import { withSignToken } from '@/lib/contracts/link';
 import { getContractsState, updateContract } from '@/lib/contracts/store';
 
 export const runtime = 'nodejs';
@@ -24,7 +25,7 @@ export async function GET(
     return NextResponse.json({ ok: false, error: 'contract not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ ok: true, contract });
+  return NextResponse.json({ ok: true, contract: withSignToken(contract) });
 }
 
 export async function PATCH(
@@ -44,12 +45,15 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 });
   }
 
+  // The signing token is worked out, never stored: do not let it be saved.
+  if (body && typeof body === 'object') delete body.sign_token;
+
   try {
     const updated = await updateContract(id, body, who.actor);
     if (!updated) {
       return NextResponse.json({ ok: false, error: 'contract not found' }, { status: 404 });
     }
-    return NextResponse.json({ ok: true, contract: updated });
+    return NextResponse.json({ ok: true, contract: withSignToken(updated) });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: (err as Error).message },

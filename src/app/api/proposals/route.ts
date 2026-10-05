@@ -1,9 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { authorizeOps } from '@/lib/ops/auth';
 import { getProposalsState, createProposal } from '@/lib/proposals/store';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+// The whole list, and writing a new proposal, are staff work: a signed-in
+// address on the allowlist, or the bot with its agent token. A client only
+// ever reaches one proposal, through /api/proposals/<their token>.
+
+const unauthorized = () =>
+  NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+
+export async function GET(request: NextRequest) {
+  if (!(await authorizeOps(request))) return unauthorized();
+
   try {
     const state = await getProposalsState();
     return NextResponse.json(state);
@@ -13,9 +23,11 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
+  if (!(await authorizeOps(request))) return unauthorized();
+
   try {
-    const body = await req.json();
+    const body = await request.json();
     if (!body.client_name || !body.project_name || body.base_amount === undefined) {
       return NextResponse.json({ error: 'Missing required proposal fields' }, { status: 400 });
     }

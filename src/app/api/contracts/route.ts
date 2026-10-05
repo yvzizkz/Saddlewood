@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeOps } from '@/lib/ops/auth';
+import { withSignToken } from '@/lib/contracts/link';
 import { draftContract, getContractsState, saveContractsState } from '@/lib/contracts/store';
 import type { DraftContractInput } from '@/lib/contracts/types';
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      contracts: state.contracts,
+      contracts: state.contracts.map(withSignToken),
       next_number: state.next_number,
       lastUpdated: state.lastUpdated,
       summary,
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     const contract = await draftContract(payload, who.actor);
-    return NextResponse.json({ ok: true, contract }, { status: 201 });
+    return NextResponse.json({ ok: true, contract: withSignToken(contract) }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: (err as Error).message },

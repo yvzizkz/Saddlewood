@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getProposalByToken } from '@/lib/proposals/store';
+import { getProposalByShareToken } from '@/lib/proposals/store';
 
 interface SharePageProps {
   params: Promise<{ token: string }>;
@@ -7,7 +7,7 @@ interface SharePageProps {
 
 export default async function SharePage({ params }: SharePageProps) {
   const { token } = await params;
-  const proposal = await getProposalByToken(token);
+  const proposal = await getProposalByShareToken(token);
 
   if (proposal) {
     redirect(`/p/${token}`);

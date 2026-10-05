@@ -1,8 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { findBySignToken } from '@/lib/contracts/link';
 import { getContractsState, updateContract } from '@/lib/contracts/store';
+import type { ContractItem } from '@/lib/contracts/types';
+import { authorizeOps } from '@/lib/ops/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+// The one contracts route a client reaches without signing in. What opens it
+// is the token in the link we sent them (src/lib/contracts/link.ts). Staff,
+// signed in, may also open a contract here by its id or number to check how
+// it looks; nobody else may, because cnt-001 and "1" are anyone's guess.
+async function findForSigning(request: NextRequest, id: string): Promise<ContractItem | null> {
+  const state = await getContractsState();
+  const byToken = findBySignToken(state.contracts, id);
+  if (byToken) return byToken;
+  if (await authorizeOps(request)) {
+    return (
+      state.contracts.find(
+        (c) => c.id === id || c.contract_number === id || String(c.n) === id
+      ) ?? null
+    );
+  }
+  return null;
+}
 
 export async function GET(
   request: NextRequest,
@@ -10,10 +31,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const state = await getContractsState();
-    const contract = state.contracts.find(
-      (c) => c.id === id || c.contract_number === id || String(c.n) === id
-    );
+    const contract = await findForSigning(request, id);
 
     if (!contract) {
       return NextResponse.json({ ok: false, error: 'Contract not found' }, { status: 404 });
@@ -66,10 +84,7 @@ export async function POST(
       return NextResponse.json({ ok: false, error: 'Must acknowledge terms of agreement' }, { status: 400 });
     }
 
-    const state = await getContractsState();
-    const contract = state.contracts.find(
-      (c) => c.id === id || c.contract_number === id || String(c.n) === id
-    );
+    const contract = await findForSigning(request, id);
 
     if (!contract) {
       return NextResponse.json({ ok: false, error: 'Contract not found' }, { status: 404 });
