@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-
-import { getDocumentByToken, listEvents, recordEvent } from "@/lib/billing/documents";
-import { looksAutomatic } from "@/lib/billing/proof";
-import type { BillingDocument, DocumentKind } from "@/lib/billing/types";
-import { isAllowedEmail } from "@/lib/ops/allowlist";
-import { createClient } from "@/lib/supabase/server";
+import { getDocumentByToken } from "@/lib/billing/documents";
+import { listExhibits, type Exhibit } from "@/lib/billing/exhibits";
+import { recordOpening } from "@/lib/billing/opening";
+import type { DocumentKind } from "@/lib/billing/types";
 
 // The client's copy of a document we issued: /d/<token>.
 //
@@ -41,48 +38,6 @@ function day(iso: string | null | undefined): string {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Phoenix" });
 }
 
-async function isStaff(): Promise<boolean> {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    return isAllowedEmail(user?.email);
-  } catch {
-    return false;
-  }
-}
-
-async function recordView(doc: BillingDocument): Promise<void> {
-  try {
-    if (await isStaff()) return;
-    const h = await headers();
-    const now = new Date();
-    const events = await listEvents(doc.id);
-    const last = events.filter((e) => e.kind === "sent" || e.kind === "delivered").at(-1);
-    const ua = h.get("user-agent");
-    await recordEvent({
-      documentId: doc.id,
-      kind: "viewed",
-      at: now,
-      actor: "client link",
-      automatic: looksAutomatic({
-        userAgent: ua,
-        purpose: h.get("sec-purpose") ?? h.get("purpose") ?? (h.get("next-router-prefetch") ? "prefetch" : null),
-        at: now,
-        lastSentOrDeliveredAt: last ? new Date(last.at) : null,
-      }),
-      detail: {
-        ua: (ua ?? "").slice(0, 300),
-        ip: (h.get("x-forwarded-for") ?? "").split(",")[0].trim().slice(0, 64),
-      },
-    });
-  } catch (err) {
-    // The client still gets their document; we lose one line, and say so in the logs.
-    console.error("document view not recorded:", err);
-  }
-}
-
 export default async function DocumentPage({
   params,
   searchParams,
@@ -109,10 +64,22 @@ export default async function DocumentPage({
     );
   }
 
-  if (!ownCopy) await recordView(doc);
+  if (!ownCopy) await recordOpening(doc, "viewed");
 
   const s = doc.snapshot;
   const lines = s.lines ?? [];
+
+  // The original invoice and the waiver for each line, when we have put them
+  // here. A failure to load them must not keep the client from the document.
+  let exhibits: Exhibit[] = [];
+  try {
+    exhibits = await listExhibits(doc.id);
+  } catch (err) {
+    console.error("exhibits not loaded:", err);
+  }
+  const href = (e: Exhibit) => `/d/${doc.token}/x/${e.id}${ownCopy ? "?copy=1" : ""}`;
+  const forLine = (i: number) => exhibits.filter((e) => e.lineIndex === i);
+  const general = exhibits.filter((e) => e.lineIndex === null || e.lineIndex >= lines.length);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 print:bg-white print:py-0">
@@ -176,6 +143,15 @@ export default async function DocumentPage({
                     </span>
                   )}
                   {line.note && <span className="block text-xs text-slate-500">{line.note}</span>}
+                  {forLine(i).length > 0 && (
+                    <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs print:hidden">
+                      {forLine(i).map((e) => (
+                        <a key={e.id} href={href(e)} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">
+                          {e.label}
+                        </a>
+                      ))}
+                    </span>
+                  )}
                 </td>
                 <td className="py-3 text-right tabular-nums text-slate-900">{money(line.amountCents)}</td>
               </tr>
@@ -194,6 +170,21 @@ export default async function DocumentPage({
             )}
           </tfoot>
         </table>
+
+        {general.length > 0 && (
+          <section className="mt-8 border-t border-slate-200 pt-4 print:hidden">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Previously sent</p>
+            <ul className="mt-1 space-y-1 text-sm">
+              {general.map((e) => (
+                <li key={e.id}>
+                  <a href={href(e)} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">
+                    {e.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {s.terms && (
           <section className="mt-8 border-t border-slate-200 pt-4">
