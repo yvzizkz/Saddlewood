@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { HardHat, Home, ListChecks, Menu, MessageSquare, type LucideIcon } from 'lucide-react'
+import { HardHat, Home, ListChecks, Menu, MessageSquare, Wallet, type LucideIcon } from 'lucide-react'
 
 import { BotProvider, useBot } from './BotProvider'
 import { Dot } from './ui'
@@ -13,13 +13,15 @@ import { healthLine, needsYouCount } from '@/lib/bot/view'
 // The frame every app screen sits in: a slim header that says whether the bot
 // is alive, and the thumb tabs. On a desktop it is the same column, centered.
 
-type Tab = { href: string; label: string; icon: LucideIcon; ownersOnly?: boolean }
+type Tab = { href: string; label: string; icon: LucideIcon; ownersOnly?: boolean; staffOnly?: boolean }
 
 const TABS: Tab[] = [
   { href: '/app', label: 'Home', icon: Home },
   { href: '/app/ask', label: 'Ask', icon: MessageSquare },
   // The field crew: who is on the clock, what came in, the schedule, hours.
   { href: '/app/crew', label: 'Crew', icon: HardHat, ownersOnly: true },
+  // Who owes what, the proof record, payments in.
+  { href: '/app/money', label: 'Money', icon: Wallet, staffOnly: true },
   { href: '/app/duties', label: 'Duties', icon: ListChecks },
   { href: '/app/more', label: 'More', icon: Menu },
 ]
@@ -68,7 +70,7 @@ function TabBar() {
     >
       <div className="mx-auto flex max-w-xl">
         {/* The Crew tab shows once the crew side exists for this owner (home.crew is null until its tables do). */}
-        {TABS.filter((tab) => !tab.ownersOnly || (home?.me.role === 'owner' && !!home.crew)).map((tab) => {
+        {TABS.filter((tab) => (!tab.ownersOnly || (home?.me.role === 'owner' && !!home.crew)) && (!tab.staffOnly || home?.me.role === 'owner')).map((tab) => {
           const Icon = tab.icon
           const active = tab.href === '/app' ? pathname === '/app' : pathname.startsWith(tab.href)
           const count = tab.href === '/app' ? badge : tab.href === '/app/crew' ? (home?.crew?.needs ?? 0) : 0
