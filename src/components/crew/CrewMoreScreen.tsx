@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, BellOff, Download, LogOut } from 'lucide-react'
 
+import { PasskeyCard } from '@/components/auth/PasskeyCard'
 import { keyBytes, useInstall } from '@/components/bot/MoreScreen'
 import { Button, Card, Empty, ScreenTitle, SectionTitle, Segmented } from '@/components/bot/ui'
 import { createClient } from '@/lib/supabase/client'
@@ -168,6 +169,7 @@ export default function CrewMoreScreen() {
 
       <InstallCard />
       <NotificationsCard />
+      <PasskeyCard lang={lang} />
 
       <SectionTitle>{t.signedInAs}</SectionTitle>
       {home ? (

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import { passkeyOnThisDevice, passkeySupported, signInWithPasskey } from "@/lib/auth/passkeyClient";
 
 type FormState =
   | "idle"
@@ -64,6 +65,14 @@ function LoginForm() {
   }, []);
   const [errorMessage, setErrorMessage] = useState("");
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
+  // "none" until the device has been asked; "lead" when a passkey was enrolled
+  // on this device, so the Face ID button comes first.
+  const [passkey, setPasskey] = useState<"none" | "offer" | "lead" | "busy">("none");
+  useEffect(() => {
+    if (!passkeySupported()) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPasskey(passkeyOnThisDevice() ? "lead" : "offer");
+  }, []);
 
   const urlError = searchParams.get("error");
   const urlErrorDetail = searchParams.get("detail");
@@ -221,6 +230,30 @@ function LoginForm() {
     setFormState("code-entry");
   }
 
+  async function handlePasskey() {
+    if (passkey === "busy") return;
+    const was = passkey;
+    setPasskey("busy");
+    setErrorMessage("");
+    try {
+      const dest = await signInWithPasskey(nextPath);
+      saveStep(null);
+      window.location.href = dest;
+    } catch (e) {
+      const msg = (e as Error).message || "";
+      // Closing the Face ID sheet is not an error worth a red box.
+      const cancelled = /NotAllowedError|cancel|abort|timed out/i.test(`${(e as Error).name} ${msg}`);
+      setPasskey(was);
+      if (!cancelled) {
+        setErrorMessage(
+          appFlow
+            ? `Face ID sign-in did not work (${msg}). Use your email instead. · No funcionó. Usa tu correo.`
+            : `Passkey sign-in did not work (${msg}). Use your email or phone instead.`,
+        );
+      }
+    }
+  }
+
   function handleBack() {
     saveStep(null);
     setFormState("idle");
@@ -356,6 +389,27 @@ function LoginForm() {
               {copy.lead}
             </p>
 
+            {passkey === "lead" || (passkey === "busy" && passkeyOnThisDevice()) ? (
+              <div className="mb-6">
+                <button
+                  type="button"
+                  onClick={handlePasskey}
+                  disabled={passkey === "busy"}
+                  className="w-full py-3.5 px-4 rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
+                  style={{ backgroundColor: "var(--color-primary)", color: "white" }}
+                >
+                  {passkey === "busy"
+                    ? copy.verifying
+                    : appFlow
+                      ? "Sign in with Face ID · Entrar con Face ID"
+                      : "Sign in with Face ID / passkey"}
+                </button>
+                <p className="text-xs text-center mt-3" style={{ color: "var(--color-muted)" }}>
+                  {appFlow ? "or with your email · o con tu correo" : "or with your email or phone"}
+                </p>
+              </div>
+            ) : null}
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -447,6 +501,22 @@ function LoginForm() {
               >
                 {copy.haveCode}
               </button>
+
+              {passkey === "offer" || (passkey === "busy" && !passkeyOnThisDevice()) ? (
+                <button
+                  type="button"
+                  onClick={handlePasskey}
+                  disabled={passkey === "busy"}
+                  className={`block w-full text-center hover:underline cursor-pointer disabled:opacity-50 ${appFlow ? "min-h-11 text-sm" : "pt-1 text-xs"}`}
+                  style={{ color: "var(--color-muted)" }}
+                >
+                  {passkey === "busy"
+                    ? copy.verifying
+                    : appFlow
+                      ? "I set up Face ID on this phone · Ya tengo Face ID"
+                      : "Sign in with a passkey"}
+                </button>
+              ) : null}
             </form>
           </>
         )}

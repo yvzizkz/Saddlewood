@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { Bell, BellOff, ChevronRight, Download, LogOut, Send, Share2, ShieldCheck } from 'lucide-react'
 
+import { PasskeyCard } from '@/components/auth/PasskeyCard'
 import { createClient } from '@/lib/supabase/client'
 import { botApi, useBot } from './BotProvider'
 import { Button, Card, Chip, Empty, INPUT, ScreenTitle, SectionTitle } from './ui'
@@ -332,7 +333,7 @@ function InviteCard() {
 }
 
 export default function MoreScreen() {
-  const { home, error, act, busy } = useBot()
+  const { home, error, act, busy, toast } = useBot()
   const [armed, setArmed] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
@@ -373,6 +374,7 @@ export default function MoreScreen() {
 
       <InstallCard />
       <NotificationsCard />
+      <PasskeyCard toast={toast} />
       <InviteCard />
 
       {owner ? (
