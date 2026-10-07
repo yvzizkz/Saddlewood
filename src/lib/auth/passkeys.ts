@@ -87,8 +87,11 @@ export function newChallenge(kind: Challenge["kind"], userId?: string): Challeng
   };
 }
 
-export function challengeBytes(c: Challenge): Uint8Array {
-  return new Uint8Array(Buffer.from(c.challenge, "base64url"));
+export function challengeBytes(c: Challenge): Uint8Array<ArrayBuffer> {
+  const raw = Buffer.from(c.challenge, "base64url");
+  const out = new Uint8Array(new ArrayBuffer(raw.length));
+  out.set(raw);
+  return out;
 }
 
 export const challengeCookie = {
