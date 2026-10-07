@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getDocumentByToken } from "@/lib/billing/documents";
 import { listExhibits, type Exhibit } from "@/lib/billing/exhibits";
 import { recordOpening } from "@/lib/billing/opening";
+import { paymentsForDocument, type Allocation } from "@/lib/billing/payments";
 import type { DocumentKind } from "@/lib/billing/types";
 
 // The client's copy of a document we issued: /d/<token>.
@@ -81,6 +82,22 @@ export default async function DocumentPage({
   const forLine = (i: number) => exhibits.filter((e) => e.lineIndex === i);
   const general = exhibits.filter((e) => e.lineIndex === null || e.lineIndex >= lines.length);
 
+  // Money received against this document. The issued total stays as issued;
+  // what has come in since is shown beside it, so the same link always reads
+  // current without a new document or a new email. Only the date and amount
+  // reach the client, never our reference, note or evidence.
+  let received: (Allocation & { receivedOn: string })[] = [];
+  try {
+    received = (await paymentsForDocument(doc.id))
+      .filter((p) => !p.voidedAt)
+      .flatMap((p) => p.allocations.filter((a) => a.documentId === doc.id).map((a) => ({ ...a, receivedOn: p.receivedOn })));
+  } catch (err) {
+    console.error("payments not loaded:", err);
+  }
+  const paidOnLine = (i: number) => received.filter((a) => a.lineIndex === i);
+  const paidCents = received.reduce((n, a) => n + a.amountCents, 0);
+  const lastDay = (rows: { receivedOn: string }[]) => rows.map((r) => r.receivedOn).sort().at(-1);
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 print:bg-white print:py-0">
       <article className="mx-auto max-w-3xl bg-white border border-slate-200 rounded-xl p-6 sm:p-10 print:border-0 print:p-0">
@@ -133,35 +150,61 @@ export default async function DocumentPage({
             </tr>
           </thead>
           <tbody>
-            {lines.map((line, i) => (
-              <tr key={i} className="border-b border-slate-100 align-top">
-                <td className="py-3 pr-4 text-slate-900">
-                  <span className="whitespace-pre-line">{line.description}</span>
-                  {line.quantity !== undefined && (
-                    <span className="block text-xs text-slate-500">
-                      {line.quantity} {line.unit ?? ""}
-                    </span>
-                  )}
-                  {line.note && <span className="block text-xs text-slate-500">{line.note}</span>}
-                  {forLine(i).length > 0 && (
-                    <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs print:hidden">
-                      {forLine(i).map((e) => (
-                        <a key={e.id} href={href(e)} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">
-                          {e.label}
-                        </a>
-                      ))}
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 text-right tabular-nums text-slate-900">{money(line.amountCents)}</td>
-              </tr>
-            ))}
+            {lines.map((line, i) => {
+              const paid = paidOnLine(i);
+              const linePaid = paid.reduce((n, a) => n + a.amountCents, 0);
+              const inFull = linePaid > 0 && linePaid >= line.amountCents;
+              return (
+                <tr key={i} className="border-b border-slate-100 align-top">
+                  <td className="py-3 pr-4 text-slate-900">
+                    <span className="whitespace-pre-line">{line.description}</span>
+                    {line.quantity !== undefined && (
+                      <span className="block text-xs text-slate-500">
+                        {line.quantity} {line.unit ?? ""}
+                      </span>
+                    )}
+                    {line.note && <span className="block text-xs text-slate-500">{line.note}</span>}
+                    {forLine(i).length > 0 && (
+                      <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs print:hidden">
+                        {forLine(i).map((e) => (
+                          <a key={e.id} href={href(e)} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">
+                            {e.label}
+                          </a>
+                        ))}
+                      </span>
+                    )}
+                    {linePaid > 0 && (
+                      <span className="mt-1 block text-xs font-semibold text-emerald-700">
+                        {inFull ? "Paid" : `${money(linePaid)} paid`} {day(lastDay(paid))}
+                      </span>
+                    )}
+                  </td>
+                  <td className={`py-3 text-right tabular-nums ${inFull ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                    {money(line.amountCents)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr>
               <td className="pt-4 pr-4 text-right font-semibold text-slate-900">Total</td>
               <td className="pt-4 text-right text-lg font-semibold tabular-nums text-slate-900">{money(doc.totalCents)}</td>
             </tr>
+            {paidCents > 0 && (
+              <>
+                <tr>
+                  <td className="pt-1 pr-4 text-right text-emerald-700">Paid</td>
+                  <td className="pt-1 text-right tabular-nums text-emerald-700">−{money(paidCents)}</td>
+                </tr>
+                <tr>
+                  <td className="pt-2 pr-4 text-right font-semibold text-slate-900">Balance due</td>
+                  <td className="pt-2 text-right text-lg font-semibold tabular-nums text-slate-900">
+                    {money(Math.max(doc.totalCents - paidCents, 0))}
+                  </td>
+                </tr>
+              </>
+            )}
             {doc.dueDate && (
               <tr>
                 <td className="pt-1 pr-4 text-right text-slate-600">Due</td>
