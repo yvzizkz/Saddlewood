@@ -12,6 +12,36 @@ type FormState =
   | "verifying"
   | "error";
 
+// A home-screen app on iOS reloads when the person switches to Mail for the
+// code and comes back, which threw away the code step and showed "enter your
+// email" again. The step is kept on the device for a while so the reload
+// lands back on the code screen.
+const STEP_KEY = "saddlewood_login_step";
+const STEP_MINUTES = 30;
+
+type SavedStep = { identifier: string; email: string; channel: string; at: number };
+
+function readStep(): SavedStep | null {
+  try {
+    const raw = localStorage.getItem(STEP_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as SavedStep;
+    if (!s?.email || Date.now() - s.at > STEP_MINUTES * 60_000) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function saveStep(s: Omit<SavedStep, "at"> | null) {
+  try {
+    if (s) localStorage.setItem(STEP_KEY, JSON.stringify({ ...s, at: Date.now() }));
+    else localStorage.removeItem(STEP_KEY);
+  } catch {
+    // localStorage may fail in private mode
+  }
+}
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const [identifier, setIdentifier] = useState(() => searchParams.get("email") ?? searchParams.get("phone") ?? "");
@@ -19,6 +49,19 @@ function LoginForm() {
   const [sentChannel, setSentChannel] = useState("");
   const [code, setCode] = useState("");
   const [formState, setFormState] = useState<FormState>("idle");
+
+  // Back from a reload mid sign-in: straight to the code screen. The server
+  // renders the email step (it cannot see the device), so this has to be an
+  // effect; same pattern as NumericBottomSheet.
+  useEffect(() => {
+    const saved = readStep();
+    if (!saved) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIdentifier((v) => v || saved.identifier);
+    setResolvedEmail(saved.email);
+    setSentChannel(saved.channel);
+    setFormState("code-entry");
+  }, []);
   const [errorMessage, setErrorMessage] = useState("");
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
 
@@ -109,14 +152,14 @@ function LoginForm() {
     // The server says the same thing for every address (it does not reveal
     // who has access), so this is worded as "if".
     const email = resJson?.email ?? (typed.includes("@") ? typed.toLowerCase() : "");
+    const channel = resJson?.phone
+      ? `Sent by text to ${resJson.phone} and to the email on file.`
+      : appFlow
+        ? `If ${typed} has a seat, the code is in that inbox now. Use the newest email. · Si ${typed} tiene acceso, el código ya está en ese correo. Usa el correo más reciente.`
+        : `If ${typed} has access, the code is in that inbox now. Use the newest email.`;
     setResolvedEmail(email);
-    setSentChannel(
-      resJson?.phone
-        ? `Sent by text to ${resJson.phone} and to the email on file.`
-        : appFlow
-          ? `If ${typed} has a seat, the code is in that inbox now. · Si ${typed} tiene acceso, el código ya está en ese correo.`
-          : `If ${typed} has access, the code is in that inbox now.`,
-    );
+    setSentChannel(channel);
+    saveStep({ identifier: typed, email, channel });
 
     setCode("");
     setFormState("code-entry");
@@ -143,10 +186,20 @@ function LoginForm() {
 
     if (error) {
       setFormState("code-entry");
-      setErrorMessage(error.message || "Invalid or expired code.");
+      // Supabase says "Token has expired or is invalid" for every miss. The
+      // usual cause is an older email: each new code replaces the last one.
+      const replaced = /expired|invalid/i.test(error.message || "");
+      setErrorMessage(
+        replaced
+          ? appFlow
+            ? "That code is not the newest one, or it expired. Check the latest email, or tap Send again. · Ese código no es el más reciente o venció. Revisa el correo más nuevo o toca Mandar otra vez."
+            : "That code is not the newest one, or it expired. Check the latest email, or tap Resend code."
+          : error.message || "Invalid or expired code.",
+      );
       return;
     }
 
+    saveStep(null);
     window.location.href = nextPath;
   }
 
@@ -159,14 +212,17 @@ function LoginForm() {
       setErrorMessage(appFlow ? "Type your email first. · Escribe tu correo primero." : "Type your email first.");
       return;
     }
+    const channel = appFlow ? "Type the code you were given. · Escribe el código que te dieron." : "Type the code you were given.";
     setResolvedEmail(typed.toLowerCase());
-    setSentChannel(appFlow ? "Type the code you were given. · Escribe el código que te dieron." : "Type the code you were given.");
+    setSentChannel(channel);
+    saveStep({ identifier: typed, email: typed.toLowerCase(), channel });
     setCode("");
     setErrorMessage("");
     setFormState("code-entry");
   }
 
   function handleBack() {
+    saveStep(null);
     setFormState("idle");
     setCode("");
     setErrorMessage("");
