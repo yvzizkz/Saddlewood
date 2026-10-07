@@ -20,6 +20,29 @@ export function passkeyOnThisDevice(): boolean {
   }
 }
 
+// "Not now" on the offer after sign-in. Asked again after a month, the way a
+// bank app would, not on every sign-in.
+const DECLINED_KEY = "saddlewood_passkey_declined";
+const ASK_AGAIN_DAYS = 30;
+
+export function shouldOfferPasskey(): boolean {
+  if (!passkeySupported() || passkeyOnThisDevice()) return false;
+  try {
+    const at = Number(localStorage.getItem(DECLINED_KEY) || 0);
+    return !at || Date.now() - at > ASK_AGAIN_DAYS * 86_400_000;
+  } catch {
+    return true;
+  }
+}
+
+export function declinePasskeyOffer() {
+  try {
+    localStorage.setItem(DECLINED_KEY, String(Date.now()));
+  } catch {
+    // private mode
+  }
+}
+
 function remember(on: boolean) {
   try {
     if (on) localStorage.setItem(PASSKEY_FLAG, "1");

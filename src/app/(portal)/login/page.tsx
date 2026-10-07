@@ -4,14 +4,25 @@ import { useState, useEffect, Suspense, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import { passkeyOnThisDevice, passkeySupported, signInWithPasskey } from "@/lib/auth/passkeyClient";
+import {
+  declinePasskeyOffer,
+  deviceLabel,
+  enrollPasskey,
+  passkeyOnThisDevice,
+  passkeySupported,
+  shouldOfferPasskey,
+  signInWithPasskey,
+} from "@/lib/auth/passkeyClient";
 
 type FormState =
   | "idle"
   | "sending"
   | "code-entry"
   | "verifying"
-  | "error";
+  | "error"
+  // Signed in; offering Face ID for next time before going on.
+  | "enroll"
+  | "enrolling";
 
 // A home-screen app on iOS reloads when the person switches to Mail for the
 // code and comes back, which threw away the code step and showed "enter your
@@ -209,6 +220,38 @@ function LoginForm() {
     }
 
     saveStep(null);
+    // Signed in. Like a bank app: offer Face ID for next time, once, before
+    // going on. The session is on the device already, so enrolling here
+    // works without another round trip through email.
+    if (shouldOfferPasskey()) {
+      setFormState("enroll");
+      return;
+    }
+    window.location.href = nextPath;
+  }
+
+  async function handleEnroll() {
+    if (formState === "enrolling") return;
+    setFormState("enrolling");
+    setErrorMessage("");
+    try {
+      await enrollPasskey(deviceLabel());
+      window.location.href = nextPath;
+    } catch (e) {
+      const err = e as Error;
+      setFormState("enroll");
+      if (!/NotAllowedError|cancel|abort/i.test(`${err.name} ${err.message}`)) {
+        setErrorMessage(
+          appFlow
+            ? `Face ID did not turn on (${err.message}). You can try again from More. · No se activó Face ID. Puedes intentarlo desde Más.`
+            : `Face ID did not turn on (${err.message}). You can try again from the app's More screen.`,
+        );
+      }
+    }
+  }
+
+  function handleNotNow() {
+    declinePasskeyOffer();
     window.location.href = nextPath;
   }
 
@@ -262,6 +305,7 @@ function LoginForm() {
   }
 
   const isCodeStep = formState === "code-entry" || formState === "verifying";
+  const isEnrollStep = formState === "enroll" || formState === "enrolling";
 
   return (
     <div
@@ -279,7 +323,62 @@ function LoginForm() {
           />
         </div>
 
-        {isCodeStep ? (
+        {isEnrollStep ? (
+          <>
+            <h1
+              className="text-2xl text-center mb-2 font-serif"
+              style={{ color: "var(--color-primary)" }}
+            >
+              {appFlow ? "You're in" : "Signed in"}
+            </h1>
+            <p
+              className="text-sm text-center mb-6 leading-relaxed"
+              style={{ color: "var(--color-muted)" }}
+            >
+              {appFlow
+                ? "Next time, sign in with Face ID instead of waiting for a code. · La próxima vez, entra con Face ID en vez de esperar un código."
+                : "Next time, sign in with Face ID or your fingerprint instead of waiting for a code."}
+            </p>
+
+            {errorMessage && (
+              <div
+                role="alert"
+                className="p-3 rounded-lg text-xs mb-4"
+                style={{
+                  backgroundColor: "var(--color-error-bg)",
+                  color: "var(--color-error-text)",
+                }}
+              >
+                {errorMessage}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleEnroll}
+              disabled={formState === "enrolling"}
+              className="w-full py-3.5 px-4 rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
+              style={{ backgroundColor: "var(--color-primary)", color: "white" }}
+            >
+              {formState === "enrolling"
+                ? appFlow
+                  ? "Setting up… · Configurando…"
+                  : "Setting up…"
+                : appFlow
+                  ? "Turn on Face ID · Activar Face ID"
+                  : "Turn on Face ID / fingerprint"}
+            </button>
+            <button
+              type="button"
+              onClick={handleNotNow}
+              disabled={formState === "enrolling"}
+              className="block w-full text-center mt-3 min-h-11 text-sm hover:underline cursor-pointer disabled:opacity-50"
+              style={{ color: "var(--color-muted)" }}
+            >
+              {appFlow ? "Not now · Ahora no" : "Not now"}
+            </button>
+          </>
+        ) : isCodeStep ? (
           <>
             <h1
               className="text-2xl text-center mb-2 font-serif"
