@@ -4,6 +4,7 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 
 import { safeNext } from "@/lib/auth/magicLink";
 import {
+  challengeBytes,
   challengeCookie,
   mayUseApp,
   mintSession,
@@ -39,7 +40,7 @@ export async function POST() {
   const challenge = newChallenge("login");
   const options = await generateAuthenticationOptions({
     rpID: RP_ID,
-    challenge: challenge.challenge,
+    challenge: challengeBytes(challenge),
     userVerification: "required",
     // No allow-list: the phone offers whichever Saddlewood passkey it holds.
     allowCredentials: [],

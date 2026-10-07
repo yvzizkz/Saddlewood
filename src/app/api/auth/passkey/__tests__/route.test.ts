@@ -53,6 +53,9 @@ describe("passkey sign-in", () => {
     const cookie = res.headers.get("set-cookie") ?? "";
     expect(cookie).toContain(`${CHALLENGE_COOKIE}=`);
     expect(cookie.toLowerCase()).toContain("httponly");
+    // The challenge the browser signs must be the one the cookie expects.
+    const raw = decodeURIComponent(cookie.split(`${CHALLENGE_COOKIE}=`)[1].split(";")[0]);
+    expect(readChallenge(raw, "login")?.challenge).toBe(json.options.challenge);
     expect(adminMock).not.toHaveBeenCalled();
   });
 

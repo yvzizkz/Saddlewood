@@ -74,6 +74,10 @@ export function readChallenge(raw: string | undefined, kind: Challenge["kind"], 
   return c;
 }
 
+// SimpleWebAuthn takes the challenge as raw bytes and base64url-encodes it
+// for the browser; what comes back (and what we must expect) is that
+// encoded form. So the challenge kept here is the encoded string, and the
+// options are built from its bytes (see challengeBytes).
 export function newChallenge(kind: Challenge["kind"], userId?: string): Challenge {
   return {
     kind,
@@ -81,6 +85,10 @@ export function newChallenge(kind: Challenge["kind"], userId?: string): Challeng
     ...(userId ? { userId } : {}),
     exp: Date.now() + CHALLENGE_MINUTES * 60_000,
   };
+}
+
+export function challengeBytes(c: Challenge): Uint8Array {
+  return new Uint8Array(Buffer.from(c.challenge, "base64url"));
 }
 
 export const challengeCookie = {

@@ -3,6 +3,7 @@ import { generateRegistrationOptions, verifyRegistrationResponse } from "@simple
 import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 
 import {
+  challengeBytes,
   challengeCookie,
   deletePasskey,
   mayUseApp,
@@ -64,7 +65,7 @@ export async function POST() {
     userID: new TextEncoder().encode(user.id),
     userName: user.email,
     userDisplayName: user.email,
-    challenge: challenge.challenge,
+    challenge: challengeBytes(challenge),
     attestationType: "none",
     excludeCredentials: existing.map((r) => ({ id: r.credential_id, transports: r.transports })),
     authenticatorSelection: {
