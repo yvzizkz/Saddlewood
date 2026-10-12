@@ -6,7 +6,7 @@ export function PrintButton() {
     <button
       type="button"
       onClick={() => window.print()}
-      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
+      className="rounded-md bg-teal px-3 py-1.5 text-sm font-medium text-off-white hover:bg-teal-dark"
     >
       Print or save as PDF
     </button>

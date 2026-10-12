@@ -85,8 +85,10 @@ export default async function DocumentPage({
   const forLine = (i: number) => exhibits.filter((e) => e.lineIndex === i);
   const general = exhibits.filter((e) => e.lineIndex === null || e.lineIndex >= lines.length);
 
+  const linkClass = "font-medium text-teal underline decoration-gold/60 underline-offset-4 hover:decoration-gold";
+
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 print:bg-white print:py-0">
+    <main className="min-h-screen bg-off-white px-4 py-8 sm:py-12 print:bg-white print:py-0">
       {/* What a client's accounting team needs to file it: a printout or PDF of
           this page, and the documents that go with it. Not printed. */}
       <div className="mx-auto mb-4 flex max-w-3xl flex-wrap items-center gap-2 print:hidden">
@@ -95,130 +97,156 @@ export default async function DocumentPage({
           <a
             key={e.id}
             href={saveHref(e)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            className="rounded-md border border-stone-mid bg-white px-3 py-1.5 text-sm font-medium text-teal hover:border-gold-muted"
           >
             Download {e.label.replace(/\s*\(PDF\)\s*$/i, "")}
           </a>
         ))}
       </div>
-      <article className="mx-auto max-w-3xl bg-white border border-slate-200 rounded-xl p-6 sm:p-10 print:border-0 print:p-0">
-        {doc.status === "void" && (
-          <p className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
-            This {KIND_LABEL[doc.kind].toLowerCase()} was voided and is no longer in effect.
-          </p>
-        )}
 
-        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
-          <div>
-            <p className="text-lg font-semibold text-slate-900">Saddlewood Contracting LLC</p>
-            <p className="text-sm text-slate-600">accounting@saddlewoodcontracting.com</p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-semibold text-slate-900">{KIND_LABEL[doc.kind]}</p>
-            <p className="text-sm text-slate-700">
-              No. {doc.number}
-              {doc.revision > 1 ? ` (revision ${doc.revision})` : ""}
+      <article className="mx-auto max-w-3xl overflow-hidden rounded-xl border border-stone bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
+        <div className="h-1 bg-gold print:hidden" />
+        <div className="p-6 sm:p-10 print:p-0">
+          {doc.status === "void" && (
+            <p className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+              This {KIND_LABEL[doc.kind].toLowerCase()} was voided and is no longer in effect.
             </p>
-            <p className="text-sm text-slate-600">{day(s.date ?? doc.issuedAt)}</p>
-          </div>
-        </header>
-
-        <section className="grid gap-6 py-6 sm:grid-cols-2">
-          {s.billTo && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">To</p>
-              <p className="text-sm font-medium text-slate-900">{s.billTo.name}</p>
-              {s.billTo.attention && <p className="text-sm text-slate-700">Attn: {s.billTo.attention}</p>}
-              {s.billTo.address && <p className="text-sm text-slate-700 whitespace-pre-line">{s.billTo.address}</p>}
-            </div>
           )}
-          {s.job && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Job</p>
-              <p className="text-sm font-medium text-slate-900">{s.job.name}</p>
-              {s.job.address && <p className="text-sm text-slate-700 whitespace-pre-line">{s.job.address}</p>}
+
+          <header className="flex flex-wrap items-start justify-between gap-6 border-b border-stone pb-6">
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/logo-roundel.png" alt="" width={48} height={48} className="h-12 w-12 rounded-full" />
+              <div>
+                <p className="font-heading text-lg text-teal">Saddlewood Contracting</p>
+                <p className="text-xs text-charcoal-light">ROC 305762 · accounting@saddlewoodcontracting.com</p>
+              </div>
             </div>
-          )}
-        </section>
+            <div className="text-right">
+              <p className="font-heading text-2xl text-teal">{KIND_LABEL[doc.kind]}</p>
+              {/* The number only: a revision is our own record-keeping, not the client's concern. */}
+              <p className="text-sm text-charcoal">No. {doc.number}</p>
+              <p className="text-sm text-charcoal-light">{day(s.date ?? doc.issuedAt)}</p>
+            </div>
+          </header>
 
-        {doc.title && <h1 className="pb-4 text-base font-semibold text-slate-900">{doc.title}</h1>}
-
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-300 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="py-2 pr-4 font-semibold">Description</th>
-              <th className="py-2 text-right font-semibold">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((line, i) => (
-              <tr key={i} className="border-b border-slate-100 align-top">
-                <td className="py-3 pr-4 text-slate-900">
-                  <span className="whitespace-pre-line">{line.description}</span>
-                  {line.quantity !== undefined && (
-                    <span className="block text-xs text-slate-500">
-                      {line.quantity} {line.unit ?? ""}
-                    </span>
-                  )}
-                  {line.note && <span className="block text-xs text-slate-500">{line.note}</span>}
-                  {forLine(i).length > 0 && (
-                    <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs print:hidden">
-                      {forLine(i).map((e) => (
-                        <a key={e.id} href={href(e)} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">
-                          {e.label}
-                        </a>
-                      ))}
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 text-right tabular-nums text-slate-900">{money(line.amountCents)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td className="pt-4 pr-4 text-right font-semibold text-slate-900">Total</td>
-              <td className="pt-4 text-right text-lg font-semibold tabular-nums text-slate-900">{money(doc.totalCents)}</td>
-            </tr>
-            {doc.dueDate && (
-              <tr>
-                <td className="pt-1 pr-4 text-right text-slate-600">Due</td>
-                <td className="pt-1 text-right text-slate-900">{day(doc.dueDate)}</td>
-              </tr>
+          <section className="grid gap-6 py-6 sm:grid-cols-2">
+            {s.billTo && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-accessible">To</p>
+                <p className="mt-1 text-sm font-medium text-charcoal">{s.billTo.name}</p>
+                {s.billTo.attention && <p className="text-sm text-charcoal-light">Attn: {s.billTo.attention}</p>}
+                {s.billTo.address && <p className="text-sm text-charcoal-light whitespace-pre-line">{s.billTo.address}</p>}
+              </div>
             )}
-          </tfoot>
-        </table>
+            {s.job && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-accessible">Job</p>
+                <p className="mt-1 text-sm font-medium text-charcoal">{s.job.name}</p>
+                {s.job.address && <p className="text-sm text-charcoal-light whitespace-pre-line">{s.job.address}</p>}
+              </div>
+            )}
+          </section>
 
-        {general.length > 0 && (
-          <section className="mt-8 border-t border-slate-200 pt-4 print:hidden">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {doc.kind === "statement" ? "Previously sent" : "Documents"}
-            </p>
-            <ul className="mt-1 space-y-1 text-sm">
-              {general.map((e) => (
-                <li key={e.id}>
-                  <a href={href(e)} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">
-                    {e.label}
-                  </a>
-                  {e.kind === "file" && (
-                    <a href={saveHref(e)} className="ml-3 text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900">
-                      Download
-                    </a>
-                  )}
-                </li>
+          {doc.title && <h1 className="pb-4 font-heading text-lg text-teal">{doc.title}</h1>}
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-stone-mid text-left text-[11px] uppercase tracking-[0.14em] text-charcoal-light">
+                <th className="py-2 pr-4 font-semibold">Description</th>
+                <th className="py-2 text-right font-semibold">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line, i) => (
+                <tr key={i} className="border-b border-stone/70 align-top">
+                  <td className="py-4 pr-4 text-charcoal">
+                    <span className="font-medium whitespace-pre-line">{line.description}</span>
+                    {line.quantity !== undefined && (
+                      <span className="block text-xs text-charcoal-light">
+                        {line.quantity} {line.unit ?? ""}
+                      </span>
+                    )}
+                    {line.note && <span className="mt-1 block text-xs leading-relaxed text-charcoal-light whitespace-pre-line">{line.note}</span>}
+                    {line.parts && line.parts.length > 0 && (
+                      <ul className="mt-2 space-y-1.5 border-l-2 border-stone pl-3">
+                        {line.parts.map((p, j) => (
+                          <li key={j} className="flex items-baseline justify-between gap-4 text-xs">
+                            <span className="text-charcoal-light">{p.description}</span>
+                            {p.amountCents === 0 ? (
+                              <span className="shrink-0 rounded-full bg-cream px-2 py-0.5 text-[11px] font-medium text-gold-accessible">
+                                {p.label ?? "No charge"}
+                              </span>
+                            ) : (
+                              <span className="shrink-0 tabular-nums text-charcoal">{money(p.amountCents)}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {forLine(i).length > 0 && (
+                      <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs print:hidden">
+                        {forLine(i).map((e) => (
+                          <a key={e.id} href={href(e)} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                            {e.label}
+                          </a>
+                        ))}
+                      </span>
+                    )}
+                  </td>
+                  <td className={`py-4 text-right font-medium tabular-nums ${line.amountCents < 0 ? "text-gold-accessible" : "text-charcoal"}`}>
+                    {money(line.amountCents)}
+                  </td>
+                </tr>
               ))}
-            </ul>
-          </section>
-        )}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="pt-5 pr-4 text-right text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal-light">Total</td>
+                <td className="pt-5 text-right font-heading text-2xl tabular-nums text-teal">{money(doc.totalCents)}</td>
+              </tr>
+              {doc.dueDate && (
+                <tr>
+                  <td className="pt-1 pr-4 text-right text-charcoal-light">Due</td>
+                  <td className="pt-1 text-right text-charcoal">{day(doc.dueDate)}</td>
+                </tr>
+              )}
+            </tfoot>
+          </table>
 
-        {s.terms && (
-          <section className="mt-8 border-t border-slate-200 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms</p>
-            <p className="mt-1 text-sm text-slate-700 whitespace-pre-line">{s.terms}</p>
-          </section>
-        )}
-        {s.note && <p className="mt-4 text-sm text-slate-700 whitespace-pre-line">{s.note}</p>}
+          {general.length > 0 && (
+            <section className="mt-10 border-t border-stone pt-5 print:hidden">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-accessible">
+                {doc.kind === "statement" ? "Previously sent" : "Documents"}
+              </p>
+              <ul className="mt-2 divide-y divide-stone/70 text-sm">
+                {general.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between gap-4 py-2">
+                    <a href={href(e)} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                      {e.label}
+                    </a>
+                    {e.kind === "file" && (
+                      <a href={saveHref(e)} className="shrink-0 text-xs text-charcoal-light underline underline-offset-4 hover:text-teal">
+                        Download
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {(s.note || s.terms) && (
+            <section className="mt-8 space-y-2 border-t border-stone pt-5 text-sm text-charcoal-light">
+              {s.note && <p className="whitespace-pre-line text-charcoal">{s.note}</p>}
+              {s.terms && <p className="whitespace-pre-line">{s.terms}</p>}
+            </section>
+          )}
+        </div>
       </article>
+      <p className="mx-auto mt-6 max-w-3xl text-center text-[11px] tracking-wide text-charcoal-light print:hidden">
+        Saddlewood Contracting LLC · 480-999-6100
+      </p>
     </main>
   );
 }

@@ -46,6 +46,8 @@ export type DocumentLine = {
   quantity?: number;
   unit?: string;
   note?: string;
+  /** The pieces that make up this line's amount, each shown with its own price; 0 shows as "No charge". */
+  parts?: { description: string; amountCents: number; label?: string }[];
 };
 
 // What the client sees. Frozen when the document is issued.

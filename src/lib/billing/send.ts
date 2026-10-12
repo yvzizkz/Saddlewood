@@ -172,9 +172,10 @@ export type MessageParts = {
   links?: MailLink[];
 };
 
+// Brand teal and off-white (src/app/globals.css), small and quiet.
 const BUTTON =
-  "display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:600;" +
-  "font-size:14px;line-height:20px;padding:10px 18px;border-radius:6px";
+  "display:inline-block;background:#182828;color:#f5f0e8;text-decoration:none;font-weight:600;" +
+  "font-size:13px;line-height:18px;padding:9px 16px;border-radius:4px;margin:0 8px 8px 0;letter-spacing:0.01em";
 
 function button(link: MailLink): string {
   return `<a href="${escapeHtml(link.url)}" style="${BUTTON}">${escapeHtml(link.label)}</a>`;
@@ -212,7 +213,8 @@ export function buildMessage(parts: MessageParts): BillingMessage | { error: str
     const only = p.trim();
     if (only === "{link}" && doc) return `<p style="margin:4px 0 16px">${button({ label: doc.label, url: doc.link })}</p>`;
     if (only === "{links}") {
-      return links.map((l) => `<p style="margin:4px 0 12px">${button(l)}</p>`).join("");
+      // One row that wraps, not a stack of single buttons.
+      return `<p style="margin:4px 0 12px">${links.map(button).join("")}</p>`;
     }
     let h = escapeHtml(p).replace(/\n/g, "<br>");
     if (doc) h = h.split("{link}").join(`<a href="${escapeHtml(doc.link)}">${escapeHtml(doc.label)}</a>`);
@@ -220,7 +222,7 @@ export function buildMessage(parts: MessageParts): BillingMessage | { error: str
     return `<p style="margin:0 0 12px">${h}</p>`;
   };
   const html =
-    '<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#111;max-width:640px">' +
+    '<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#2c2926;max-width:640px">' +
     // A marker alone on its line becomes a button, wherever the line sits.
     b
       .replace(/^[ \t]*(\{links?\})[ \t]*$/gm, "\n\n$1\n\n")
