@@ -3,6 +3,7 @@ import { getDocumentByToken } from "@/lib/billing/documents";
 import { listExhibits, type Exhibit } from "@/lib/billing/exhibits";
 import { recordOpening } from "@/lib/billing/opening";
 import type { DocumentKind } from "@/lib/billing/types";
+import { PrintButton } from "./PrintButton";
 
 // The client's copy of a document we issued: /d/<token>.
 //
@@ -78,11 +79,28 @@ export default async function DocumentPage({
     console.error("exhibits not loaded:", err);
   }
   const href = (e: Exhibit) => `/d/${doc.token}/x/${e.id}${ownCopy ? "?copy=1" : ""}`;
+  // The same file, saved instead of opened in the browser.
+  const saveHref = (e: Exhibit) => `/d/${doc.token}/x/${e.id}?dl=1${ownCopy ? "&copy=1" : ""}`;
+  const files = exhibits.filter((e) => e.kind === "file");
   const forLine = (i: number) => exhibits.filter((e) => e.lineIndex === i);
   const general = exhibits.filter((e) => e.lineIndex === null || e.lineIndex >= lines.length);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 print:bg-white print:py-0">
+      {/* What a client's accounting team needs to file it: a printout or PDF of
+          this page, and the documents that go with it. Not printed. */}
+      <div className="mx-auto mb-4 flex max-w-3xl flex-wrap items-center gap-2 print:hidden">
+        <PrintButton />
+        {files.map((e) => (
+          <a
+            key={e.id}
+            href={saveHref(e)}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Download {e.label.replace(/\s*\(PDF\)\s*$/i, "")}
+          </a>
+        ))}
+      </div>
       <article className="mx-auto max-w-3xl bg-white border border-slate-200 rounded-xl p-6 sm:p-10 print:border-0 print:p-0">
         {doc.status === "void" && (
           <p className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
@@ -173,13 +191,20 @@ export default async function DocumentPage({
 
         {general.length > 0 && (
           <section className="mt-8 border-t border-slate-200 pt-4 print:hidden">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Previously sent</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {doc.kind === "statement" ? "Previously sent" : "Documents"}
+            </p>
             <ul className="mt-1 space-y-1 text-sm">
               {general.map((e) => (
                 <li key={e.id}>
                   <a href={href(e)} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">
                     {e.label}
                   </a>
+                  {e.kind === "file" && (
+                    <a href={saveHref(e)} className="ml-3 text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900">
+                      Download
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

@@ -1,10 +1,12 @@
 import { headers } from "next/headers";
+import { after } from "next/server";
 
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { createClient } from "@/lib/supabase/server";
 import { listEvents, recordEvent } from "./documents";
 import { looksAutomatic } from "./proof";
 import type { BillingDocument } from "./types";
+import { sendViewAlert } from "./viewAlert";
 
 // Writes "the client opened this" to the proof record: the document's page
 // itself ("viewed"), or one of the things shown with it ("downloaded").
@@ -35,17 +37,24 @@ export async function recordOpening(
     const events = await listEvents(doc.id);
     const last = events.filter((e) => e.kind === "sent" || e.kind === "delivered").at(-1);
     const ua = h.get("user-agent");
+    const automatic = looksAutomatic({
+      userAgent: ua,
+      purpose: h.get("sec-purpose") ?? h.get("purpose") ?? (h.get("next-router-prefetch") ? "prefetch" : null),
+      at: now,
+      lastSentOrDeliveredAt: last ? new Date(last.at) : null,
+    });
+    // A person opening it tells Marco, like Joist's "viewed" notice; sent after
+    // the response so the client never waits on it.
+    if (!automatic) {
+      const what = typeof extra.exhibit === "string" ? extra.exhibit : undefined;
+      after(() => sendViewAlert({ doc, kind, what, at: now, userAgent: ua, earlier: events }));
+    }
     await recordEvent({
       documentId: doc.id,
       kind,
       at: now,
       actor: "client link",
-      automatic: looksAutomatic({
-        userAgent: ua,
-        purpose: h.get("sec-purpose") ?? h.get("purpose") ?? (h.get("next-router-prefetch") ? "prefetch" : null),
-        at: now,
-        lastSentOrDeliveredAt: last ? new Date(last.at) : null,
-      }),
+      automatic,
       detail: {
         ...extra,
         ua: (ua ?? "").slice(0, 300),

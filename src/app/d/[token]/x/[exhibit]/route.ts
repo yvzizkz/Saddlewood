@@ -37,7 +37,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         status: 200,
         headers: {
           "Content-Type": exhibit.contentType ?? "application/octet-stream",
-          "Content-Disposition": `inline; filename="${name}"`,
+          // ?dl=1 saves the file instead of opening it in the browser.
+          "Content-Disposition": `${request.nextUrl.searchParams.get("dl") === "1" ? "attachment" : "inline"}; filename="${name}"`,
           "Content-Length": String(body.length),
           "Cache-Control": "private, no-store",
           "X-Content-Type-Options": "nosniff",
