@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import { getDocumentByToken } from "@/lib/billing/documents";
 import { listExhibits, type Exhibit } from "@/lib/billing/exhibits";
 import { recordOpening } from "@/lib/billing/opening";
@@ -122,7 +123,7 @@ export default async function DocumentPage({
                 <p className="text-xs text-charcoal-light">ROC 305762 · accounting@saddlewoodcontracting.com</p>
               </div>
             </div>
-            <div className="text-right">
+            <div className="sm:text-right">
               <p className="font-heading text-2xl text-teal">{KIND_LABEL[doc.kind]}</p>
               {/* The number only: a revision is our own record-keeping, not the client's concern. */}
               <p className="text-sm text-charcoal">No. {doc.number}</p>
@@ -148,7 +149,8 @@ export default async function DocumentPage({
             )}
           </section>
 
-          {doc.title && <h1 className="pb-4 font-heading text-lg text-teal">{doc.title}</h1>}
+          {/* Not an <h1>: the site-wide heading size would make it a headline on a phone. */}
+          {doc.title && <p className="pb-4 font-heading text-lg leading-snug text-teal">{doc.title}</p>}
 
           <table className="w-full text-sm">
             <thead>
@@ -159,7 +161,8 @@ export default async function DocumentPage({
             </thead>
             <tbody>
               {lines.map((line, i) => (
-                <tr key={i} className="border-b border-stone/70 align-top">
+                <Fragment key={i}>
+                <tr className={`${line.parts?.length ? "" : "border-b border-stone/70 "}align-top`}>
                   <td className="py-4 pr-4 text-charcoal">
                     <span className="font-medium whitespace-pre-line">{line.description}</span>
                     {line.quantity !== undefined && (
@@ -168,22 +171,6 @@ export default async function DocumentPage({
                       </span>
                     )}
                     {line.note && <span className="mt-1 block text-xs leading-relaxed text-charcoal-light whitespace-pre-line">{line.note}</span>}
-                    {line.parts && line.parts.length > 0 && (
-                      <ul className="mt-2 space-y-1.5 border-l-2 border-stone pl-3">
-                        {line.parts.map((p, j) => (
-                          <li key={j} className="flex items-baseline justify-between gap-4 text-xs">
-                            <span className="text-charcoal-light">{p.description}</span>
-                            {p.amountCents === 0 ? (
-                              <span className="shrink-0 rounded-full bg-cream px-2 py-0.5 text-[11px] font-medium text-gold-accessible">
-                                {p.label ?? "No charge"}
-                              </span>
-                            ) : (
-                              <span className="shrink-0 tabular-nums text-charcoal">{money(p.amountCents)}</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
                     {forLine(i).length > 0 && (
                       <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs print:hidden">
                         {forLine(i).map((e) => (
@@ -198,6 +185,28 @@ export default async function DocumentPage({
                     {money(line.amountCents)}
                   </td>
                 </tr>
+                {/* The pieces of a lump line, each with its price, across the full width. */}
+                {line.parts && line.parts.length > 0 && (
+                  <tr className="border-b border-stone/70">
+                    <td colSpan={2} className="pb-4">
+                      <ul className="space-y-1.5 border-l-2 border-stone pl-3 sm:mr-28">
+                        {line.parts.map((p, j) => (
+                          <li key={j} className="flex items-baseline justify-between gap-4 text-xs">
+                            <span className="text-charcoal-light">{p.description}</span>
+                            {p.amountCents === 0 ? (
+                              <span className="shrink-0 rounded-full bg-cream px-2 py-0.5 text-[11px] font-medium text-gold-accessible">
+                                {p.label ?? "No charge"}
+                              </span>
+                            ) : (
+                              <span className="shrink-0 tabular-nums text-charcoal">{money(p.amountCents)}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
             <tfoot>
