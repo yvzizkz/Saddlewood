@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Download, Package, Plus, Send, Share2, X } f
 
 import { useBot } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle, Segmented } from '@/components/bot/ui'
+import ProjectsView from '@/components/projects/ProjectsView'
 import { useCrew } from '@/components/crew/CrewProvider'
 import { ago } from '@/lib/bot/view'
 import { buildPlan, planAsk, taskStatusWord } from '@/lib/crew/plan'
@@ -49,7 +50,7 @@ import { CrewAdminProvider, useCrewAdmin } from './useCrewAdmin'
 //   Hours     the week's timesheet, corrections, the payroll export (owners)
 //   Team      who has a seat, and the list of jobs (owners)
 
-const VIEWS = ['today', 'schedule', 'runner', 'plan', 'hours', 'team'] as const
+const VIEWS = ['today', 'projects', 'schedule', 'runner', 'plan', 'hours', 'team'] as const
 type View = (typeof VIEWS)[number]
 
 type Open =
@@ -1007,6 +1008,10 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
             <Row key={j.id} onClick={() => show({ kind: 'job', job: j })}>
               <span className="block text-[15px] text-[var(--color-charcoal)]">{j.name}</span>
               <span className="mt-0.5 block truncate text-[12px] text-[var(--color-charcoal-light)]">{j.address || 'No address yet'}</span>
+              {(() => {
+                const on = data.jobPeople.filter((a) => a.jobId === j.id).map((a) => firstNameOf(data.people.find((p) => p.email === a.email)?.name ?? a.email))
+                return on.length ? <span className="mt-0.5 block truncate text-[12px] text-[var(--color-charcoal)]">On it: {on.join(', ')}</span> : null
+              })()}
             </Row>
           ))}
         </Card>
@@ -1092,6 +1097,7 @@ function Screen() {
   // The tabs follow the switches: an owner sees all of them.
   const options: { value: View; label: string; count?: number }[] = [
     { value: 'today', label: 'Today', count: needs },
+    ...(can('projects.view') ? [{ value: 'projects' as const, label: 'Projects' }] : []),
     { value: 'schedule', label: 'Schedule' },
     ...(can('pickups.stage') && !isOwner ? [{ value: 'runner' as const, label: 'Runner', count: pickupProblems }] : []),
     { value: 'plan', label: 'Plan', count: can('plan.send') && !isOwner && planDue && new Date().getHours() >= 15 ? 1 : 0 },
@@ -1105,6 +1111,7 @@ function Screen() {
       <Segmented label="Crew views" value={view} onChange={setView} options={options} />
       <div className="mt-5">
         {view === 'today' ? <TodayView data={data} show={show} /> : null}
+        {view === 'projects' && can('projects.view') ? <ProjectsView /> : null}
         {view === 'schedule' ? <ScheduleView data={data} show={show} /> : null}
         {view === 'runner' ? <RunnerView data={data} show={show} /> : null}
         {view === 'plan' ? (

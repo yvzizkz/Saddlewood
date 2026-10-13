@@ -90,6 +90,19 @@ describe("the 7 AM push", () => {
     });
   });
 
+  it("gives a project manager only the jobs they are on", () => {
+    const pmPeople = PEOPLE.map((p) => (p.email === ELI ? { ...p, perms: [...p.perms, "projects.mine"] } : p)) as MorningInput["people"];
+    const notes = buildMorning(
+      input({
+        people: pmPeople,
+        jobPeople: [{ jobId: "keim", email: ELI, role: "pm" }],
+        schedule: [slot({}), slot({ id: 2, email: MARCUS, jobId: "bambi", jobName: "6402 E Bambi Drive" })],
+        tasks: [task({ status: "done", reportedAt: "2026-10-12T22:00:00Z", jobId: "bambi" }), task({ id: 2, due: DAY })],
+      }),
+    );
+    expect(noteFor(notes, ELI)?.body).toBe("1 person on 1 job today. · 1 not confirmed yet · 1 task due today");
+  });
+
   it("tells a worker where they are going, in their language, and skips anyone off today", () => {
     const notes = buildMorning(input({ schedule: [slot({})], tasks: [task({}), task({ id: 2, title: "Tape the hallway", due: DAY })] }));
     expect(noteFor(notes, ARNOLD)).toMatchObject({

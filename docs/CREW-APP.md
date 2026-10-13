@@ -57,6 +57,27 @@ done.
   The server enforces the switches (`ACT_NEEDS` / `mayRun` in
   `src/lib/crew/auth.ts`, `OWN_DAY_NEEDS` in `act.ts`); the screens only hide
   what is off. Clocking out is never blocked, so nobody is trapped on the clock.
+- **The Project manager group** (0018, 2026-10-13; KB
+  docs/APP-PERMISSIONS-PLAN-2026-10-12.md). Built in as `pm`: the Supervisor's
+  switches plus `projects.view`, `projects.mine` and `money.view`
+  (`money.prepare`, `money.request`, `estimate.view` exist and stay off). The
+  projects and money switches have their own areas and never open the Crew tab
+  by themselves. `projects.mine` limits a seat to the jobs it is on
+  (`crew_job_people`, set by an owner in Crew > Team > Jobs > a job, "People on
+  this job"): every Crew-tab list, every act on a job (403 otherwise, checked in
+  `runAdminAct`), the crew's alerts (`notifySupervisors` with the job; a job with
+  nobody narrowed on it goes to the decisions lane) and the supervisor part of
+  the 7 AM push. Owners are never narrowed. One helper decides it:
+  `src/lib/crew/scope.ts` (`visibleCrewJobs`, `visibleBillingJobs`, `inScope`),
+  and `requireSwitch` in `auth.ts` gates a route by one switch. Projects is a
+  view in the Crew tab (and `/app/projects` alone): one card per job with what is
+  stuck, the promise, to check, verified and sent back (14 days), who is on it,
+  and the latest plans, from `GET /api/crew/projects`. The money card
+  (`src/components/projects/ProjectMoneySlot.tsx`) is the money side's, from its
+  own route under `/api/crew/` (a crew sign-in reaches nothing else). A field
+  job's billing job is `jobs.crew_job_id` (0012), set on the same job sheet
+  ("Billing job", owners only). Before moving someone into the group, put them
+  on their jobs first, or their Crew tab is empty.
 - **The Supervisor group** (Eli) gets a fifth tab, Crew (`/app/crew` inside the
   crew app): Today (what needs a check, who is on, what came in, tasks),
   Schedule (priorities, promised dates), Runner (pickups), Plan (the nightly

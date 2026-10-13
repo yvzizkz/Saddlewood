@@ -28,6 +28,7 @@ import {
   insertReport,
   insertShift,
   insertTasks,
+  linkBillingJob,
   listJobs,
   listPeople,
   listPickups,
@@ -42,11 +43,13 @@ import {
   patchShift,
   patchTask,
   savePerson,
+  setJobPeople,
   upsertSchedule,
   type CrewPersonRow,
   type CrewShiftRow,
 } from "./queries";
 import { CREW_ROLE, FORMER_ROLE } from "./role";
+import { inScope, visibleCrewJobs, type ScopeCaller } from "./scope";
 import { addDays, clock12, dayShort, localClock, localDay, localInstant } from "./time";
 import { OTHER_JOB, firstNameOf, isPlaceholderEmail, jobSlug, normalizePerms, type AdminAct, type ShiftEdit } from "./types";
 
@@ -245,9 +248,53 @@ async function addShift(
 /** A supervisor's own task is checked by an owner, never by the supervisor. */
 const OWN_WORK = "Someone else checks your own work: Marco or Lando will check this one.";
 
+const NOT_YOURS = "That job is not one of yours. Marco or Lando can add you to it.";
+
+/**
+ * The jobs an act touches, read from the rows it names when it names a row.
+ * null when it is not about a job (a question, a group, a seat).
+ */
+async function jobsOfAct(act: AdminAct): Promise<(string | null | undefined)[] | null> {
+  switch (act.kind) {
+    case "job.update":
+    case "job.people":
+    case "job.link":
+      return [act.id];
+    case "schedule.set":
+    case "shift.add":
+      return [act.jobId];
+    case "task.add":
+    case "pickup.add":
+      return [act.jobId];
+    case "schedule.remove":
+      return [(await getScheduleItem(act.id))?.jobId];
+    case "task.update":
+    case "task.verify":
+      return [(await getTask(act.id))?.jobId];
+    case "pickup.update":
+      return [(await getPickup(act.id))?.jobId];
+    case "shift.edit":
+      return [(await getShift(act.id))?.jobId, act.jobId];
+    case "shift.void":
+    case "shift.ok":
+      return [(await getShift(act.id))?.jobId];
+    case "fix.decide":
+      return [(await getEntry(act.id))?.jobId];
+    default:
+      return null;
+  }
+}
+
 export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Date()): Promise<AdminResult> {
   const now = nowDate.getTime();
   const today = localDay(now);
+  // A project manager (projects.mine) acts only on the jobs they are on.
+  const caller: ScopeCaller = { role: owner.role ?? "owner", email: owner.email, perms: owner.perms ?? [] };
+  const scope = await visibleCrewJobs(caller);
+  if (scope !== null) {
+    const touched = await jobsOfAct(act);
+    if (touched && !touched.every((j) => inScope(scope, j))) return bad(403, NOT_YOURS);
+  }
 
   switch (act.kind) {
     case "person.add": {
@@ -343,7 +390,10 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
           promiseNote: act.promiseNote,
           createdBy: owner.name,
         });
-        if (job) return ok();
+        if (job) {
+          if (scope !== null) await setJobPeople(job.id, [{ email: owner.email, role: "pm" }], owner.name);
+          return ok();
+        }
         const taken = await getJob(id);
         if (taken && taken.name.toLowerCase() === act.name.toLowerCase()) {
           if (taken.active) return bad(409, "That job is already on the list.");
@@ -368,6 +418,25 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         ...(promiseNote !== undefined ? { promise_note: promiseNote } : {}),
       });
       return job ? ok() : bad(404, "That job is not on the list.");
+    }
+
+    case "job.people": {
+      const job = await getJob(act.id);
+      if (!job) return bad(404, "That job is not on the list.");
+      const seats = new Set((await listPeople()).filter((p) => p.active).map((p) => p.email));
+      const people = act.people.filter((p, i) => seats.has(p.email) && act.people.findIndex((q) => q.email === p.email) === i);
+      if (people.length !== act.people.length) return bad(400, "Someone on that list has no active seat.");
+      const onJob = await setJobPeople(job.id, people, owner.name);
+      return ok(onJob.length ? `${onJob.length} ${onJob.length === 1 ? "person" : "people"} on ${job.name}.` : `Nobody is on ${job.name} now.`);
+    }
+
+    case "job.link": {
+      const job = await getJob(act.id);
+      if (!job) return bad(404, "That job is not on the list.");
+      const res = await linkBillingJob(job.id, act.billingJobId || null);
+      if (res === "missing") return bad(404, "That billing job is gone.");
+      if (res === "taken") return bad(409, "That billing job is already linked to another field job. Unlink it there first.");
+      return ok(act.billingJobId ? `${job.name} is linked to its billing job.` : `${job.name} has no billing job now.`);
     }
 
     case "schedule.set": {
@@ -413,7 +482,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       if (act.from === act.to) return bad(400, "Pick a different day to copy to.");
       const [from, people] = await Promise.all([listSchedule({ fromDay: act.from, toDay: act.from }), listPeople()]);
       const active = new Set(people.filter((p) => p.active).map((p) => p.email));
-      const rows = from.filter((r) => active.has(r.email));
+      const rows = from.filter((r) => active.has(r.email) && inScope(scope, r.jobId));
       if (!rows.length) return bad(400, "Nobody was scheduled that day.");
       const made = await upsertSchedule(
         rows.map((r) => ({
@@ -598,7 +667,17 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         listTasks({ closedSince: new Date(now - 24 * 3600_000).toISOString() }),
         listPickups({ fromDay: today }),
       ]);
-      const plan = buildPlan({ day: act.day, today, people, jobs, schedule, tasks, pickups, note: act.note });
+      const mine = <T extends { jobId: string }>(rows: T[]) => rows.filter((r) => inScope(scope, r.jobId));
+      const plan = buildPlan({
+        day: act.day,
+        today,
+        people,
+        jobs: jobs.filter((j) => inScope(scope, j.id)),
+        schedule: mine(schedule),
+        tasks: mine(tasks),
+        pickups: mine(pickups),
+        note: act.note,
+      });
       const report = await insertReport({ day: act.day, sentBy: owner.email, sentName: owner.name, body: plan.text, data: plan.counts });
       await notifyOwners({
         title: `${firstNameOf(owner.name)}'s plan for ${dayShort(act.day)}`,

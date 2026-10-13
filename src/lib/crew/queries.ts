@@ -22,7 +22,7 @@ import type {
   Geo,
   ShiftEdit,
 } from "./types";
-import { normalizePerms } from "./types";
+import { JOB_ROLES, normalizePerms, type BillingJobRef, type CrewJobPerson, type CrewJobRole } from "./types";
 
 // Every read and write of the crew tables. Service-role client only, after the
 // route has decided who is asking (src/lib/crew/auth.ts). The tables carry RLS
@@ -226,6 +226,76 @@ export async function deleteGroup(id: string): Promise<boolean> {
   const { data, error } = await db.from("crew_groups").delete().eq("id", id).eq("builtin", false).select("id");
   if (error) fail("crew_groups delete", error.message);
   return !!data?.length;
+}
+
+// ---- who is on a job (0018) ----------------------------------------------------
+
+type JobPersonRow = { job_id: string; email: string; role: string };
+
+function toJobPerson(r: JobPersonRow): CrewJobPerson {
+  return { jobId: r.job_id, email: r.email, role: (JOB_ROLES as readonly string[]).includes(r.role) ? (r.role as CrewJobRole) : "crew" };
+}
+
+/** Everyone on every job, or one person's jobs. */
+export async function listJobPeople(filter: { email?: string } = {}): Promise<CrewJobPerson[]> {
+  const db = getSupabaseAdmin();
+  let q = db.from("crew_job_people").select("job_id, email, role").order("job_id", { ascending: true });
+  if (filter.email) q = q.eq("email", filter.email);
+  const { data, error } = await q;
+  if (error) fail("crew_job_people list", error.message);
+  return ((data ?? []) as JobPersonRow[]).map(toJobPerson);
+}
+
+/** Who is on a job, replaced as a whole: the owner's picker sends the full list. */
+export async function setJobPeople(jobId: string, people: { email: string; role: CrewJobRole }[], by: string): Promise<CrewJobPerson[]> {
+  const db = getSupabaseAdmin();
+  const keep = people.map((p) => p.email);
+  let del = db.from("crew_job_people").delete().eq("job_id", jobId);
+  if (keep.length) del = del.not("email", "in", `(${keep.map((e) => `"${e}"`).join(",")})`);
+  const gone = await del;
+  if (gone.error) fail("crew_job_people delete", gone.error.message);
+  if (people.length) {
+    const { error } = await db
+      .from("crew_job_people")
+      .upsert(people.map((p) => ({ job_id: jobId, email: p.email, role: p.role, created_by: by })), { onConflict: "job_id,email" });
+    if (error) fail("crew_job_people upsert", error.message);
+  }
+  return (await listJobPeople()).filter((p) => p.jobId === jobId);
+}
+
+// ---- billing jobs (public.jobs, 0012), for the link -------------------------------
+
+type BillingJobRow = { id: string; name: string; client_name: string | null; number_prefix: string | null; crew_job_id: string | null };
+
+export async function listBillingJobs(): Promise<BillingJobRef[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("jobs").select("id, name, client_name, number_prefix, crew_job_id").order("name", { ascending: true });
+  if (error) fail("jobs list", error.message);
+  return ((data ?? []) as BillingJobRow[]).map((r) => ({ id: r.id, name: r.name, client: r.client_name ?? "", prefix: r.number_prefix ?? "", crewJobId: r.crew_job_id }));
+}
+
+/**
+ * Point a field job at its billing job (jobs.crew_job_id, unique), or at none.
+ * -> "taken" when that billing job already belongs to another field job.
+ */
+export async function linkBillingJob(crewJobId: string, billingJobId: string | null): Promise<"ok" | "taken" | "missing"> {
+  const db = getSupabaseAdmin();
+  if (billingJobId) {
+    const { data, error } = await db.from("jobs").select("id, crew_job_id").eq("id", billingJobId).maybeSingle();
+    if (error) fail("jobs read", error.message);
+    if (!data) return "missing";
+    const current = (data as { crew_job_id: string | null }).crew_job_id;
+    if (current && current !== crewJobId) return "taken";
+  }
+  let clear = db.from("jobs").update({ crew_job_id: null }).eq("crew_job_id", crewJobId);
+  if (billingJobId) clear = clear.neq("id", billingJobId);
+  const cleared = await clear;
+  if (cleared.error) fail("jobs unlink", cleared.error.message);
+  if (billingJobId) {
+    const { error } = await db.from("jobs").update({ crew_job_id: crewJobId }).eq("id", billingJobId);
+    if (error) fail("jobs link", error.message);
+  }
+  return "ok";
 }
 
 // ---- jobs ---------------------------------------------------------------------

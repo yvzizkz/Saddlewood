@@ -1,6 +1,7 @@
 import type { BotPeople } from "@/lib/bot/types";
 import { dayShort, clockText, weekdayOf } from "@/lib/crew/time";
-import { firstNameOf, isReportedDone, type CrewLang, type CrewPerson, type CrewReport, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
+import { inScope, scopeFrom } from "@/lib/crew/scope";
+import { firstNameOf, isReportedDone, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
 import { lanesOf } from "./lanes";
 import type { WaitingItem } from "./waiting";
 
@@ -23,6 +24,8 @@ export type MorningInput = {
   waiting: WaitingItem[];
   /** Bids the bot is tracking (the sales lane). */
   bids: number;
+  /** Who is on each job (0018): a project manager (projects.mine) hears only about theirs. */
+  jobPeople?: CrewJobPerson[];
 };
 
 function plural(n: number, one: string, many: string): string {
@@ -87,13 +90,16 @@ export function buildMorning(input: MorningInput): MorningNote[] {
   const today = input.schedule.filter((s) => s.day === day);
   const supervisorEmails = new Set(supervisors.map((p) => p.email));
   for (const p of supervisors) {
-    const unconfirmed = new Set(today.filter((s) => s.ack === "" && s.email !== p.email).map((s) => s.email)).size;
-    const cant = today.filter((s) => s.ack === "cant").length;
-    const toCheck = input.tasks.filter((t) => isReportedDone(t) && t.email !== p.email).length;
-    const dueToday = input.tasks.filter((t) => isOpen(t) && t.due === day && !supervisorEmails.has(t.email)).length;
+    const scope = scopeFrom({ role: "member", email: p.email, perms: p.perms }, input.jobPeople ?? []);
+    const theirs = today.filter((s) => inScope(scope, s.jobId));
+    const tasks = input.tasks.filter((t) => inScope(scope, t.jobId));
+    const unconfirmed = new Set(theirs.filter((s) => s.ack === "" && s.email !== p.email).map((s) => s.email)).size;
+    const cant = theirs.filter((s) => s.ack === "cant").length;
+    const toCheck = tasks.filter((t) => isReportedDone(t) && t.email !== p.email).length;
+    const dueToday = tasks.filter((t) => isOpen(t) && t.due === day && !supervisorEmails.has(t.email)).length;
     const mineToday = input.tasks.filter((t) => isOpen(t) && t.email === p.email && !!t.due && t.due <= day).length;
     const lines = [
-      crewLine(day, input.schedule),
+      crewLine(day, theirs),
       cant ? `${plural(cant, "person", "people")} can't make it` : "",
       unconfirmed ? `${unconfirmed} not confirmed yet` : "",
       toCheck ? `${plural(toCheck, "task", "tasks")} to check` : "",

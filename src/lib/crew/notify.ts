@@ -3,7 +3,7 @@ import { laneOwners, type Lane } from "@/lib/owner/lanes";
 import { sendPush } from "@/lib/bot/push";
 import { readState } from "@/lib/bot/queries";
 import { say } from "./messages";
-import { listPeople } from "./queries";
+import { listJobPeople, listPeople } from "./queries";
 import type { CrewLang } from "./types";
 
 // Notifications on the crew side. They never fail the thing that caused them:
@@ -44,15 +44,21 @@ export async function notifyOwners(note: { title: string; body: string; tag: str
  * To whoever runs the field: every seat whose group has "updates" switched on
  * (the supervisor), so updates from the crew land with them and not with
  * Marco. With nobody in such a group, the owner of the "decisions" lane (Marco). `alsoOwners` for what he must hear either way (safety).
+ * `jobId` keeps a project manager (projects.mine) to the jobs they are on.
  * The person who caused it is never told about their own act.
  */
 export async function notifySupervisors(
   note: { title: string; body: string; tag: string },
-  opts: { alsoOwners?: boolean; except?: string } = {},
+  opts: { alsoOwners?: boolean; except?: string; jobId?: string } = {},
 ): Promise<void> {
   let leads: string[] = [];
   try {
-    leads = (await listPeople()).filter((p) => p.active && p.perms.includes("updates") && p.email !== opts.except).map((p) => p.email);
+    const people = (await listPeople()).filter((p) => p.active && p.perms.includes("updates") && p.email !== opts.except);
+    // A project manager (projects.mine) hears only about the jobs they are on.
+    // With nobody left for this job, it goes to the decisions lane below.
+    const narrowed = opts.jobId && people.some((p) => p.perms.includes("projects.mine"));
+    const onJob = narrowed ? new Set((await listJobPeople()).filter((a) => a.jobId === opts.jobId).map((a) => a.email)) : null;
+    leads = people.filter((p) => !onJob || !p.perms.includes("projects.mine") || onJob.has(p.email)).map((p) => p.email);
   } catch (e) {
     console.error("[crew/notify] leads:", (e as Error).message);
   }

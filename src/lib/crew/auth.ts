@@ -73,11 +73,24 @@ export async function requireOwner(request: NextRequest): Promise<Owner | null> 
  */
 export type Manager = { role: "owner" | "member"; email: string; name: string; perms: Capability[] };
 
+/** Every switch, less the one that narrows: an owner is never limited to assigned jobs. */
+const OWNER_PERMS = CAPABILITY_KEYS.filter((k) => k !== "projects.mine");
+
 export async function requireManager(request: NextRequest): Promise<Manager | null> {
+  return requireSwitch(request, "crew.view");
+}
+
+/**
+ * For a route that one switch opens (the Crew screens: crew.view; Projects:
+ * projects.view; a job's money: money.view). The owner gate comes first and
+ * owners pass every switch. A crew seat passes when its group has the switch
+ * on; what it may then see is narrowed by visibleCrewJobs (scope.ts).
+ */
+export async function requireSwitch(request: NextRequest, perm: Capability): Promise<Manager | null> {
   const owner = await requireOwner(request);
-  if (owner) return { role: "owner", ...owner, perms: [...CAPABILITY_KEYS] };
+  if (owner) return { role: "owner", ...owner, perms: [...OWNER_PERMS] };
   const person = await requireCrew();
-  return person && hasPerm(person, "crew.view") ? { role: "member", email: person.email, name: person.name, perms: person.perms } : null;
+  return person && hasPerm(person, perm) ? { role: "member", email: person.email, name: person.name, perms: person.perms } : null;
 }
 
 /**
@@ -95,6 +108,8 @@ export const ACT_NEEDS: Record<AdminAct["kind"], Capability | "owner"> = {
   "group.delete": "owner",
   "job.add": "jobs.manage",
   "job.update": "jobs.promise",
+  "job.people": "owner",
+  "job.link": "owner",
   "schedule.set": "schedule.edit",
   "schedule.remove": "schedule.edit",
   "schedule.copy": "schedule.edit",

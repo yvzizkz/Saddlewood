@@ -5,7 +5,7 @@ import { requireBridge, unauthorized } from "@/lib/bot/auth";
 import { ownerNames } from "@/lib/bot/home";
 import { sendPush } from "@/lib/bot/push";
 import { readState } from "@/lib/bot/queries";
-import { listPeople, listReports, listSchedule, listTasks } from "@/lib/crew/queries";
+import { listJobPeople, listPeople, listReports, listSchedule, listTasks } from "@/lib/crew/queries";
 import { localDay } from "@/lib/crew/time";
 import { loadWaiting } from "@/lib/owner/load";
 import { buildMorning } from "@/lib/owner/morning";
@@ -35,15 +35,16 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const day = localDay(now);
   try {
-    const [{ sections }, people, schedule, tasks, reports] = await Promise.all([
+    const [{ sections }, people, schedule, tasks, reports, jobPeople] = await Promise.all([
       readState(),
       listPeople(),
       listSchedule({ fromDay: day, toDay: day }),
       listTasks({ closedSince: now.toISOString() }),
       listReports(day),
+      listJobPeople().catch(() => []),
     ]);
     const waiting = await loadWaiting(ownerNames(sections.people), now);
-    const notes = buildMorning({ day, owners: sections.people, people, schedule, tasks, reports, waiting, bids: sections.bids.length });
+    const notes = buildMorning({ day, owners: sections.people, people, schedule, tasks, reports, waiting, bids: sections.bids.length, jobPeople });
     if (dry) return NextResponse.json({ ok: true, day, dry: true, notes }, { headers: { "Cache-Control": "no-store" } });
     let sent = 0;
     for (const n of notes) {

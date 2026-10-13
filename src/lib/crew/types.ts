@@ -24,6 +24,9 @@ export type CrewLang = (typeof CREW_LANGS)[number];
  *
  * `own` switches shape the person's own day; `crew` switches open the Crew tab
  * and what can be done there. Any `crew` switch brings `crew.view` with it.
+ * `projects` and `money` are the project manager's (0018): their own areas, so
+ * they never open the Crew tab by themselves. Sending, payments, voids, new
+ * recipients, pay rates, seats and groups stay with the owners whatever is on.
  */
 export const CAPABILITIES = [
   { key: "clock", area: "own", label: "Clock in and out" },
@@ -41,6 +44,12 @@ export const CAPABILITIES = [
   { key: "plan.send", area: "crew", label: "Send the nightly plan to the owners" },
   { key: "hours.view", area: "crew", label: "See everyone's hours" },
   { key: "hours.edit", area: "crew", label: "Fix hours, decide time fixes, payroll export" },
+  { key: "projects.view", area: "projects", label: "Projects: every job's status, promises, what is stuck, the plans" },
+  { key: "projects.mine", area: "projects", label: "Only the jobs they are assigned to (every list, every alert)" },
+  { key: "money.view", area: "money", label: "See each job's contract, billed, paid, owed and past due (read only)" },
+  { key: "money.prepare", area: "money", label: "Start or revise an invoice or change order draft (never sends)" },
+  { key: "money.request", area: "money", label: "Ask an owner to approve and send a prepared document" },
+  { key: "estimate.view", area: "money", label: "See their jobs' estimate totals (read only)" },
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number]["key"];
 export const CAPABILITY_KEYS = CAPABILITIES.map((c) => c.key) as Capability[];
@@ -108,6 +117,14 @@ export type CrewJob = {
   promised: string | null;
   promiseNote: string;
 };
+
+/** Who is on a job, and as what (0018). Any row counts for projects.mine. */
+export const JOB_ROLES = ["pm", "supervisor", "crew"] as const;
+export type CrewJobRole = (typeof JOB_ROLES)[number];
+export type CrewJobPerson = { jobId: string; email: string; role: CrewJobRole };
+
+/** A billing job (public.jobs, 0012), as the owners' link picker shows it. Never sent to a crew seat. */
+export type BillingJobRef = { id: string; name: string; client: string; prefix: string; crewJobId: string | null };
 
 export type Geo = { lat: number; lng: number; acc: number | null };
 
@@ -313,6 +330,12 @@ export type CrewAdminHome = {
   pickups: CrewPickup[];
   /** Plans sent over the last 35 days, newest first. */
   reports: CrewReport[];
+  /** Who is on each job shown (0018). */
+  jobPeople: CrewJobPerson[];
+  /** Billing jobs for the owners' link picker; empty for anyone else. */
+  billingJobs: BillingJobRef[];
+  /** Set when the viewer sees only the jobs they are on (projects.mine). */
+  narrowed: boolean;
 };
 
 export type CrewFeed = {
@@ -493,6 +516,14 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     promised: day.or(z.literal("")).optional(),
     promiseNote: z.string().trim().max(200).optional(),
   }),
+  /** Who is on a job (0018): the whole list, replaced. Owners only. */
+  z.object({
+    kind: z.literal("job.people"),
+    id: jobId,
+    people: z.array(z.object({ email, role: z.enum(JOB_ROLES).default("pm") })).max(40),
+  }),
+  /** The billing job (public.jobs) this field job is, or "" for none. Owners only. */
+  z.object({ kind: z.literal("job.link"), id: jobId, billingJobId: z.string().uuid().or(z.literal("")) }),
   z.object({
     kind: z.literal("schedule.set"),
     day,

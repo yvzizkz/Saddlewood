@@ -10,15 +10,18 @@ import { priorityLabel, taskStatusWord } from '@/lib/crew/plan'
 import { addDays, clock12, clockText, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
 import {
   CAPABILITIES,
+  JOB_ROLES,
   PRIORITIES,
   firstNameOf,
   isPlaceholderEmail,
   isReportedDone,
   normalizePerms,
+  type BillingJobRef,
   type Capability,
   type CrewGroup,
   type CrewEntry,
   type CrewJob,
+  type CrewJobRole,
   type CrewLang,
   type CrewPerson,
   type CrewPickup,
@@ -902,7 +905,139 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
           {job.active ? 'Take it off the list (job is done)' : 'Put it back on the list'}
         </Button>
       ) : null}
+      {job && data?.viewer.role === 'owner' ? (
+        <>
+          <JobPeople job={job} />
+          <BillingLink job={job} />
+        </>
+      ) : null}
     </AdminSheet>
+  )
+}
+
+const JOB_ROLE_LABEL: Record<CrewJobRole, string> = { pm: 'Project manager', supervisor: 'Supervisor', crew: 'Crew' }
+
+/** Who is on this job (0018). A project manager sees only the jobs they are on. Owners only. */
+function JobPeople({ job }: { job: CrewJob }) {
+  const { run, data } = useCrewAdmin()
+  const saved = (data?.jobPeople ?? []).filter((a) => a.jobId === job.id)
+  const [on, setOn] = useState<Record<string, CrewJobRole>>(() => Object.fromEntries(saved.map((a) => [a.email, a.role])))
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState('')
+  if (!data) return null
+  const people = data.people.filter((p) => p.active)
+  const groupName = (p: CrewPerson) => data.groups.find((g) => g.id === p.group)?.name ?? p.groupName
+  const changed = JSON.stringify(Object.entries(on).sort()) !== JSON.stringify(saved.map((a) => [a.email, a.role]).sort())
+
+  async function save() {
+    setBusy(true)
+    setProblem('')
+    const res = await run({ kind: 'job.people', id: job.id, people: Object.entries(on).map(([email, role]) => ({ email, role })) })
+    setBusy(false)
+    if (!res.ok) setProblem(res.text)
+  }
+
+  return (
+    <Group label="People on this job">
+      <div className="rounded-xl border border-[var(--color-stone-mid)] bg-white">
+        {people.map((p) => {
+          const role = on[p.email]
+          return (
+            <div key={p.email} className="flex min-h-12 items-center justify-between gap-3 border-b border-[var(--color-stone)] px-3 py-2 last:border-b-0">
+              <label className="flex min-w-0 items-center gap-3">
+                <input
+                  type="checkbox"
+                  className="size-5 shrink-0"
+                  checked={!!role}
+                  onChange={(e) =>
+                    setOn((now) => {
+                      const next = { ...now }
+                      if (e.target.checked) next[p.email] = p.perms.includes('projects.mine') ? 'pm' : p.perms.includes('tasks.verify') ? 'supervisor' : 'crew'
+                      else delete next[p.email]
+                      return next
+                    })
+                  }
+                />
+                <span className="min-w-0">
+                  <span className="block truncate text-[14px] text-[var(--color-charcoal)]">{p.name}</span>
+                  <span className="block text-[12px] text-[var(--color-charcoal-light)]">{groupName(p)}</span>
+                </span>
+              </label>
+              {role ? (
+                <select
+                  aria-label={`${firstNameOf(p.name)} on this job as`}
+                  className="h-9 rounded-lg border border-[var(--color-stone-mid)] bg-white px-2 text-[13px]"
+                  value={role}
+                  onChange={(e) => setOn((now) => ({ ...now, [p.email]: e.target.value as CrewJobRole }))}
+                >
+                  {JOB_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {JOB_ROLE_LABEL[r]}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
+        Someone in a group with &quot;Only the jobs they are assigned to&quot; sees this job, its crew and its alerts only if they are checked here.
+      </p>
+      <Problem text={problem} />
+      {changed ? (
+        <Button full variant="secondary" busy={busy} onClick={save} className="mt-2">
+          Save who is on this job
+        </Button>
+      ) : null}
+    </Group>
+  )
+}
+
+/** The billing job (Money) this field job is: jobs.crew_job_id, one each way. Owners only. */
+function BillingLink({ job }: { job: CrewJob }) {
+  const { run, data } = useCrewAdmin()
+  const options = data?.billingJobs ?? []
+  const current = options.find((b) => b.crewJobId === job.id)?.id ?? ''
+  const [pick, setPick] = useState(current)
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState('')
+  if (!data) return null
+  const label = (b: BillingJobRef) => [b.prefix, b.name, b.client].filter(Boolean).join(' · ')
+
+  async function save() {
+    setBusy(true)
+    setProblem('')
+    const res = await run({ kind: 'job.link', id: job.id, billingJobId: pick })
+    setBusy(false)
+    if (!res.ok) setProblem(res.text)
+  }
+
+  return (
+    <Group label="Billing job">
+      {options.length ? (
+        <select className={INPUT} value={pick} onChange={(e) => setPick(e.target.value)}>
+          <option value="">None yet</option>
+          {options.map((b) => (
+            <option key={b.id} value={b.id} disabled={!!b.crewJobId && b.crewJobId !== job.id}>
+              {label(b)}
+              {b.crewJobId && b.crewJobId !== job.id ? ' (linked to another job)' : ''}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <p className="text-sm text-[var(--color-charcoal-light)]">No billing jobs yet. They come from Money.</p>
+      )}
+      <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
+        Links this job&apos;s field work to its contract and invoices, so Projects can show both.
+      </p>
+      <Problem text={problem} />
+      {pick !== current ? (
+        <Button full variant="secondary" busy={busy} onClick={save} className="mt-2">
+          {pick ? 'Link it' : 'Unlink it'}
+        </Button>
+      ) : null}
+    </Group>
   )
 }
 
@@ -1168,9 +1303,11 @@ export function PickupSheet({ pickup, onClose }: { pickup: CrewPickup; onClose: 
 
 // ---- groups (owners) ----------------------------------------------------------------------
 
-const AREAS: { area: 'own' | 'crew'; title: string; hint: string }[] = [
+const AREAS: { area: (typeof CAPABILITIES)[number]['area']; title: string; hint: string }[] = [
   { area: 'own', title: 'Their own day', hint: 'Progress photos, the end of day, notes, tasks and the schedule are always on.' },
   { area: 'crew', title: 'The Crew tab', hint: 'Any of these opens the Crew tab for them inside their app.' },
+  { area: 'projects', title: 'Projects', hint: 'For someone running several jobs. "Only the jobs they are assigned to" needs people on each job (Jobs, then a job).' },
+  { area: 'money', title: 'Money', hint: 'Read only unless the owners say otherwise. Sending, payments and pay rates always stay with the owners.' },
 ]
 
 export function GroupSheet({ group, onClose }: { group: CrewGroup | null; onClose: () => void }) {

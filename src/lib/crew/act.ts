@@ -404,13 +404,13 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       if (act.status === "blocked" && !wasBlocked) {
         await notifySupervisors(
           { title: `${first} is waiting`, body: `${task.title}${act.note ? `: ${act.note}` : ""}`, tag: `crew-task-${task.id}` },
-          { except: email },
+          { except: email, jobId: task.jobId },
         );
       }
       if (act.status === "done") {
         await notifySupervisors(
           { title: `${first} says done: check it`, body: `${task.title}${task.jobName ? ` · ${task.jobName}` : ""}${act.note ? `: ${act.note}` : ""}`, tag: `crew-task-${task.id}` },
-          { except: email },
+          { except: email, jobId: task.jobId },
         );
       }
       return ok();
@@ -442,7 +442,7 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
           act.status === "delivered"
             ? { title: `Delivered · ${pickup.jobName || pickup.supplier}`, body: `${first}: ${what}${act.note ? `. ${act.note}` : ""}`, tag: `crew-pickup-${pickup.id}` }
             : { title: `Pickup problem · ${pickup.supplier}`, body: `${first}: ${act.note}`, tag: `crew-pickup-${pickup.id}` },
-          { except: email },
+          { except: email, jobId: pickup.jobId },
         );
       }
       return ok();
@@ -454,7 +454,7 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       if (act.ack === "cant") {
         await notifySupervisors(
           { title: `${first} cannot make it`, body: `${item.jobName}, ${dayShort(item.day)}${act.note ? `: ${act.note}` : ""}`, tag: `crew-cant-${item.id}` },
-          { except: email },
+          { except: email, jobId: item.jobId },
         );
       }
       return ok();
@@ -495,13 +495,13 @@ async function announce(person: CrewPersonRow, entry: CrewEntry): Promise<void> 
       if (!field(key)) continue;
       await notifySupervisors(
         { title: `${title}${at}`, body: `${first}: ${field(key)}`, tag: `crew-eod-${key}-${entry.id}` },
-        { alsoOwners: key === "safety", except: person.email },
+        { alsoOwners: key === "safety", except: person.email, jobId: entry.jobId },
       );
     }
     return;
   }
   if (entry.kind === "note") {
-    await notifySupervisors({ title: `Note from ${first}${at}`, body: entry.body, tag: `crew-note-${entry.id}` }, { except: person.email });
+    await notifySupervisors({ title: `Note from ${first}${at}`, body: entry.body, tag: `crew-note-${entry.id}` }, { except: person.email, jobId: entry.jobId });
     return;
   }
   if (entry.kind === "timefix") {

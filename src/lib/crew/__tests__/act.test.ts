@@ -23,6 +23,8 @@ const { db, notify, auth, mail } = vi.hoisted(() => {
     questions: [] as Row[],
     pickups: [] as Row[],
     reports: [] as Row[],
+    jobPeople: [] as { jobId: string; email: string; role: string }[],
+    billing: [] as { id: string; name: string; client: string; prefix: string; crewJobId: string | null }[],
     seq: 0,
   };
   return {
@@ -186,6 +188,20 @@ vi.mock("../queries", () => {
     },
     listTasks: async () => db.tasks,
     listJobs: async () => [...db.jobs.values()],
+    listJobPeople: async (f: { email?: string } = {}) => db.jobPeople.filter((a) => !f.email || a.email === f.email),
+    setJobPeople: async (jobId: string, people: { email: string; role: string }[]) => {
+      db.jobPeople = [...db.jobPeople.filter((a) => a.jobId !== jobId), ...people.map((p) => ({ jobId, ...p }))];
+      return db.jobPeople.filter((a) => a.jobId === jobId);
+    },
+    listBillingJobs: async () => db.billing,
+    linkBillingJob: async (crewJobId: string, billingJobId: string | null) => {
+      const target = billingJobId ? db.billing.find((b) => b.id === billingJobId) : null;
+      if (billingJobId && !target) return "missing";
+      if (target?.crewJobId && target.crewJobId !== crewJobId) return "taken";
+      for (const b of db.billing) if (b.crewJobId === crewJobId) b.crewJobId = null;
+      if (target) target.crewJobId = crewJobId;
+      return "ok";
+    },
     getPickup: async (id: number) => db.pickups.find((p) => p.id === id) ?? null,
     listPickups: async () => db.pickups,
     insertPickup: async (p: Record<string, unknown>) => {
@@ -332,6 +348,8 @@ beforeEach(() => {
   db.groups.set("crew", { id: "crew", name: "Crew", perms: ["clock", "receipts"], builtin: true });
   db.groups.set("lead", { id: "lead", name: "Supervisor", perms: [], builtin: true });
   for (const k of ["shifts", "entries", "schedule", "tasks", "questions", "pickups", "reports"] as const) db[k].length = 0;
+  db.jobPeople = [];
+  db.billing = [];
   db.seq = 0;
   notify.owners.length = 0;
   notify.leads.length = 0;
@@ -932,5 +950,77 @@ describe("pay rates", () => {
     await admin({ kind: "person.update", email: ARNOLD, payRate: null }, at("09:01"));
     expect(db.people.get(ARNOLD)).toMatchObject({ pay_rate: null });
     expect(adminActSchema.safeParse({ kind: "person.update", email: ARNOLD, payRate: -1 }).success).toBe(false);
+  });
+});
+
+// ---- the project manager (0018): only the jobs they are on --------------------------------
+
+describe("a project manager with projects.mine", () => {
+  const PM_PERMS = normalizePerms([...LEAD_PERMS, "projects.view", "projects.mine", "money.view"]);
+  const asPm = { role: "member" as const, email: ELI, name: "Eli Lugo", perms: PM_PERMS };
+  const pm = (input: AdminActInput, now: Date) => runAdminAct(asPm, adminActSchema.parse(input), now);
+
+  beforeEach(() => {
+    db.people.set(ELI, { ...eli, perms: PM_PERMS });
+    db.people.set(ARNOLD, person(ARNOLD, "Arnold Mujica", "es"));
+    db.jobPeople = [{ jobId: "powell", email: ELI, role: "pm" }];
+  });
+
+  it("acts on the jobs they are on, and is refused the others", async () => {
+    expect(await pm({ kind: "task.add", emails: [ARNOLD], title: "Hang the ceiling", jobId: "powell" }, at("09:00"))).toMatchObject({ ok: true });
+    expect(await pm({ kind: "task.add", emails: [ARNOLD], title: "Frame the wall", jobId: "north-lane" }, at("09:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(await pm({ kind: "schedule.set", day: "2026-10-06", emails: [ARNOLD], jobId: "north-lane" }, at("09:00"))).toMatchObject({ ok: false, status: 403 });
+    // A task with no job is not about a job they are kept off.
+    expect(await pm({ kind: "task.add", emails: [ARNOLD], title: "Get the van washed" }, at("09:00"))).toMatchObject({ ok: true });
+    // Rows another job owns, named by id.
+    db.tasks.push({ id: 900, email: ARNOLD, title: "Other job work", jobId: "north-lane", jobName: "North Lane", status: "done", verifiedAt: null, files: [], sentBack: 0 });
+    expect(await pm({ kind: "task.verify", id: 900, ok: true, note: "" }, at("09:05"))).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it("copies only their own jobs' schedule", async () => {
+    db.schedule.push(
+      { id: 801, day: "2026-10-05", email: ARNOLD, jobId: "powell", jobName: "Powell Residence", startTime: "07:00", note: "", priority: null, ack: "", ackNote: "", ackAt: null },
+      { id: 802, day: "2026-10-05", email: ARNOLD, jobId: "north-lane", jobName: "North Lane", startTime: "07:00", note: "", priority: null, ack: "", ackNote: "", ackAt: null },
+    );
+    expect(await pm({ kind: "schedule.copy", from: "2026-10-05", to: "2026-10-06" }, at("09:00"))).toMatchObject({ ok: true });
+    expect(db.schedule.filter((r) => r.day === "2026-10-06").map((r) => r.jobId)).toEqual(["powell"]);
+  });
+
+  it("is never the one who assigns people or links billing", async () => {
+    const { mayRun } = await import("../auth");
+    expect(mayRun({ ...asPm }, "job.people")).toBe(false);
+    expect(mayRun({ ...asPm }, "job.link")).toBe(false);
+  });
+
+  it("is put on a job they add", async () => {
+    const asManager = { ...asPm, perms: normalizePerms([...PM_PERMS, "jobs.manage"]) };
+    expect(await runAdminAct(asManager, adminActSchema.parse({ kind: "job.add", name: "Keim Dr" }), at("09:00"))).toMatchObject({ ok: true });
+    expect(db.jobPeople).toContainEqual({ jobId: "keim-dr", email: ELI, role: "pm" });
+  });
+});
+
+describe("owners: who is on a job, and its billing job", () => {
+  beforeEach(() => {
+    db.people.set(ELI, { ...eli });
+    db.billing = [
+      { id: "11111111-1111-4111-8111-111111111111", name: "Powell", client: "AFT", prefix: "8009", crewJobId: null },
+      { id: "22222222-2222-4222-8222-222222222222", name: "North", client: "SB", prefix: "", crewJobId: "north-lane" },
+    ];
+  });
+
+  it("sets who is on a job, only people with a seat", async () => {
+    expect(await admin({ kind: "job.people", id: "powell", people: [{ email: ELI, role: "pm" }] }, at("09:00"))).toMatchObject({ ok: true });
+    expect(db.jobPeople).toEqual([{ jobId: "powell", email: ELI, role: "pm" }]);
+    expect(await admin({ kind: "job.people", id: "powell", people: [{ email: "nobody@example.com", role: "crew" }] }, at("09:00"))).toMatchObject({ ok: false, status: 400 });
+    expect(await admin({ kind: "job.people", id: "powell", people: [] }, at("09:01"))).toMatchObject({ ok: true });
+    expect(db.jobPeople).toEqual([]);
+  });
+
+  it("links a field job to its billing job, one each way", async () => {
+    expect(await admin({ kind: "job.link", id: "powell", billingJobId: "11111111-1111-4111-8111-111111111111" }, at("09:00"))).toMatchObject({ ok: true });
+    expect(db.billing[0].crewJobId).toBe("powell");
+    expect(await admin({ kind: "job.link", id: "powell", billingJobId: "22222222-2222-4222-8222-222222222222" }, at("09:01"))).toMatchObject({ ok: false, status: 409 });
+    expect(await admin({ kind: "job.link", id: "powell", billingJobId: "" }, at("09:02"))).toMatchObject({ ok: true });
+    expect(db.billing[0].crewJobId).toBeNull();
   });
 });

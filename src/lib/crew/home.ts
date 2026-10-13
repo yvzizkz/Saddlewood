@@ -3,6 +3,8 @@ import { getAccountingState } from "@/lib/expenses/store";
 import {
   getEntry,
   listEntries,
+  listBillingJobs,
+  listJobPeople,
   listJobs,
   listOpenShifts,
   listPeople,
@@ -20,8 +22,9 @@ import {
   type CrewShiftRow,
 } from "./queries";
 import type { Manager } from "./auth";
+import { inScope, visibleCrewJobs } from "./scope";
 import { addDays, isDay, localDay, weekStart } from "./time";
-import type { Capability, CrewAdminHome, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift } from "./types";
+import type { BillingJobRef, Capability, CrewAdminHome, CrewJobPerson, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift } from "./types";
 
 // What each side gets in one read. A crew member gets only what is theirs; an
 // owner gets everyone's; the Mac gets the last few days plus whatever it has
@@ -105,7 +108,8 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
   const day = localDay(now);
   const week = weekParam && isDay(weekParam) ? weekStart(weekParam) : weekStart(day);
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS).toISOString();
-  const [people, jobs, weekShifts, recentShifts, open, entries, schedule, tasks, questions, suggested, pickups, reports, groups] = await Promise.all([
+  const scope = await visibleCrewJobs(viewer);
+  const [people, allJobs, weekShifts, recentShifts, open, allEntries, allSchedule, allTasks, questions, suggested, allPickups, allReports, groups, jobPeople, billingJobs] = await Promise.all([
     listPeople(),
     listJobs(),
     hours ? listShifts({ fromDay: week, toDay: addDays(week, 6), includeVoid: fixes }) : Promise.resolve([] as CrewShiftRow[]),
@@ -119,7 +123,14 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     listPickups({ fromDay: addDays(day, -7) }),
     listReports(addDays(day, -35)),
     viewer.role === "owner" ? listGroups() : Promise.resolve([]),
+    listJobPeople().catch(() => [] as CrewJobPerson[]),
+    viewer.role === "owner" ? listBillingJobs().catch(() => [] as BillingJobRef[]) : Promise.resolve([] as BillingJobRef[]),
   ]);
+  // A project manager sees only the jobs they are on, and the plans they sent.
+  const mine = <T extends { jobId: string }>(rows: T[]) => rows.filter((r) => inScope(scope, r.jobId));
+  const jobs = allJobs.filter((j) => inScope(scope, j.id));
+  const [entries, schedule, tasks, pickups] = [mine(allEntries), mine(allSchedule), mine(allTasks), mine(allPickups)];
+  const reports = scope === null ? allReports : allReports.filter((r) => r.sentBy === viewer.email);
   const names = new Set(jobs.map((j) => j.name.toLowerCase()));
   return {
     ok: true,
@@ -131,7 +142,7 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     people: people.map((p) => publicPerson(p, viewer.role === "owner")),
     jobs,
     suggestedJobs: suggested.filter((n) => !names.has(n.toLowerCase())),
-    shifts: byId([...weekShifts, ...recentShifts, ...open])
+    shifts: mine(byId([...weekShifts, ...recentShifts, ...open]))
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
       .map((s) => (fixes ? publicShift(s) : { ...publicShift(s), startGeo: null, endGeo: null, edits: [] })),
     entries: fixes ? entries : entries.filter((e) => e.kind !== "timefix"),
@@ -140,6 +151,9 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     questions,
     pickups,
     reports,
+    jobPeople: jobPeople.filter((a) => inScope(scope, a.jobId)),
+    billingJobs,
+    narrowed: scope !== null,
   };
 }
 
