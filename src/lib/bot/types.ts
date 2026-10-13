@@ -519,7 +519,7 @@ export type BotHome = {
   actions: (BotAction & { who: string })[];
   push: { available: boolean; publicKey: string | null };
   /** The field crew at a glance. Owners only; null when there is nothing to show or it could not be read. */
-  crew: { people: number; onClock: number; needs: number } | null;
+  crew: { people: number; onClock: number; needs: number; supervisors?: { email: string; name: string }[] } | null;
   /** "Waiting on you" across the crew and money (src/lib/owner/waiting.ts). Owners only; [] for everyone else. */
   waiting: WaitingItem[];
   /** Whose lane is whose (src/lib/owner/lanes.ts). Owners only; null for everyone else. */

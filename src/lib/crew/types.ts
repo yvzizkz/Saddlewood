@@ -242,7 +242,11 @@ export type CrewReport = {
   sentName: string;
   body: string;
   createdAt: string;
+  /** An owner's answer to what the plan asked for, once given. */
+  answer: CrewReportAnswer | null;
 };
+
+export type CrewReportAnswer = { text: string; by: string; name: string; at: string };
 
 export const QUESTION_KINDS = ["ask", "clockout", "amount", "eod", "late"] as const;
 export type CrewQuestionKind = (typeof QUESTION_KINDS)[number];
@@ -555,6 +559,8 @@ export const adminActSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("group.delete"), id: groupId }),
   /** Send the owners the plan for `day` (normally tomorrow). */
   z.object({ kind: z.literal("report.send"), day, note: text(1000) }),
+  /** An owner answers what a plan asked for. Once; the supervisor's phone is told. */
+  z.object({ kind: z.literal("report.answer"), id, text: z.string().trim().min(1, "write the answer").max(1000) }),
   z.object({
     kind: z.literal("shift.edit"),
     id,

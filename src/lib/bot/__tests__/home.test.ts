@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildHome, ownerEmails } from "../home";
 import { emptySections, parseSection, type BotAction, type BotSections } from "../types";
-import { canApprove, needsYouCount } from "../view";
+import { canApprove, isMine, needsYouCount } from "../view";
 
 const NOW = new Date("2026-10-03T18:00:00Z");
 const LANDO = "lando@saddlewoodcontracting.com";
@@ -160,6 +160,15 @@ describe("what needs you", () => {
     expect(needsYouCount(marco)).toBe(2 + 1); // drafts 18 and 21, plus Eli's ask
     expect(home(ELI, { waiting }).waiting).toEqual([]);
     expect(home(ELI, { waiting }).lanes).toBeNull();
+  });
+
+  it("gives a hand-off back to the owner who gave it, whatever the lane", () => {
+    const waiting = [
+      { key: "h", lane: "decisions" as const, who: "Lando", kind: "decision" as const, title: "Eli says done", detail: "", href: "/app/crew", at: null },
+    ];
+    expect(isMine(home(LANDO, { waiting }), waiting[0])).toBe(true);
+    expect(isMine(home(MARCO, { waiting }), waiting[0])).toBe(false);
+    expect(needsYouCount(home(LANDO, { waiting }))).toBe(3);
   });
 
   it("names the owners for a notification to owners", () => {

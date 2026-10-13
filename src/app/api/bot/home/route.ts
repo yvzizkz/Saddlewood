@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requirePerson, unauthorized } from "@/lib/bot/auth";
-import { buildHome, whoIs } from "@/lib/bot/home";
+import { buildHome, ownerNames, whoIs } from "@/lib/bot/home";
 import { pushConfig } from "@/lib/bot/push";
 import { failStale, hasStale, listInFlight, listRecentActions, readState } from "@/lib/bot/queries";
 import { crewSummary } from "@/lib/crew/queries";
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // worth failing Home over.
     const owner = whoIs(email, state.sections.people).role === "owner";
     const [crew, waiting] = owner
-      ? await Promise.all([crewSummary().catch(() => null), loadWaiting().catch(() => [])])
+      ? await Promise.all([crewSummary().catch(() => null), loadWaiting(ownerNames(state.sections.people)).catch(() => [])])
       : [null, []];
     const home = buildHome({
       email,

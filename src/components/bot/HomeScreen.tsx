@@ -11,7 +11,7 @@ import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle } from
 import type { BotDraft, BotHome, BotLedgerItem } from '@/lib/bot/types'
 import { LANE_INFO, LANES, type Lane } from '@/lib/owner/lanes'
 import type { WaitingItem } from '@/lib/owner/waiting'
-import { ACTION_LABELS, ago, canApprove, dayTime, elapsed, firstName, greeting, healthLine, isMyLane, money, needsYouCount, personFor } from '@/lib/bot/view'
+import { ACTION_LABELS, ago, canApprove, dayTime, elapsed, firstName, greeting, healthLine, isMine, isMyLane, money, needsYouCount, personFor } from '@/lib/bot/view'
 
 // Oversight: what is waiting on you, what the bot is doing right now, what it
 // is waiting on from other people, and whether it is alive.
@@ -162,7 +162,7 @@ function WaitingRow({ item }: { item: WaitingItem }) {
   return (
     <Link href={item.href} className="flex items-start gap-3 px-4 py-3.5 active:bg-[var(--color-cream)]">
       <span className="mt-1.5">
-        <Dot tone={item.kind === 'signal' ? 'bad' : 'warn'} />
+        <Dot tone={item.kind === 'signal' ? 'bad' : item.kind === 'handoff' ? 'quiet' : 'warn'} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-medium leading-snug text-[var(--color-charcoal)]">{item.title}</span>
@@ -278,9 +278,16 @@ function OthersWaiting({ home }: { home: BotHome }) {
     const name = holders[lane].name
     byName.set(name, [...(byName.get(name) ?? []), lane])
   }
+  // A hand-off belongs to whoever gave it; everything else to its lane.
+  const owners = new Set(Object.values(home.names))
+  const ownerOf = (i: WaitingItem) => (i.who && owners.has(i.who) ? i.who : holders[i.lane].name)
+  for (const i of home.waiting ?? []) {
+    const name = ownerOf(i)
+    if (!isMine(home, i) && !byName.has(name)) byName.set(name, [])
+  }
   const groups = [...byName.entries()]
     .map(([name, lanes]) => {
-      const items = (home.waiting ?? []).filter((i) => lanes.includes(i.lane))
+      const items = (home.waiting ?? []).filter((i) => !isMine(home, i) && ownerOf(i) === name)
       const payments = lanes.includes('money') ? home.sections.payments.length : 0
       const bids = lanes.includes('sales') ? home.sections.bids.length : 0
       const expenses = lanes.includes('money') ? home.sections.expenses.length : 0
@@ -332,10 +339,97 @@ function OthersWaiting({ home }: { home: BotHome }) {
   )
 }
 
+/** Hand the field supervisor one task: it lands on their own Today, and comes back to you to check. */
+function GiveTaskSheet({ to, onClose }: { to: { email: string; name: string } | null; onClose: () => void }) {
+  const { refresh } = useBot()
+  const [title, setTitle] = useState('')
+  const [detail, setDetail] = useState('')
+  const [due, setDue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  if (!to) return null
+  const first = firstName(to.name)
+  async function give() {
+    if (!to) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch('/api/crew/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'task.add', emails: [to.email], title: title.trim(), detail: detail.trim(), due }),
+      })
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok || !json.ok) {
+        setError(json.error || `Could not give it (${res.status}).`)
+        return
+      }
+      await refresh()
+      onClose()
+    } catch {
+      setError('No connection. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <BottomSheet isOpen narrow onClose={onClose} maxHeightDvh={85} ariaLabel={`Give ${first} a task`}>
+      <div className="ph-no-capture px-5 pb-6 pt-1">
+        <p role="heading" aria-level={2} className="text-lg text-[var(--color-charcoal)]" style={{ fontFamily: 'var(--font-fraunces)' }}>
+          Give {first} a task
+        </p>
+        <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-charcoal-light)]">
+          It goes on {first}&apos;s own list. When {first} says it is done, it comes back here for you to check.
+        </p>
+        <label className="mt-4 block text-xs font-medium text-[var(--color-charcoal)]" htmlFor="give-title">
+          What
+        </label>
+        <input
+          id="give-title"
+          className={`${INPUT} mt-1.5`}
+          value={title}
+          maxLength={160}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Give the Keim Dr homeowner a date for the drywall"
+        />
+        <label className="mt-3 block text-xs font-medium text-[var(--color-charcoal)]" htmlFor="give-detail">
+          What done looks like (optional)
+        </label>
+        <textarea
+          id="give-detail"
+          className={`${INPUT} mt-1.5 min-h-[64px] resize-y`}
+          value={detail}
+          maxLength={1500}
+          onChange={(e) => setDetail(e.target.value)}
+          placeholder="The date, and that the client said yes to it"
+        />
+        <label className="mt-3 block text-xs font-medium text-[var(--color-charcoal)]" htmlFor="give-due">
+          Due (optional)
+        </label>
+        <input id="give-due" type="date" className={`${INPUT} mt-1.5`} value={due} onChange={(e) => setDue(e.target.value)} />
+        {error ? (
+          <p role="alert" className="mt-3 text-[13px] text-[var(--color-error-text)]">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-4 flex gap-2">
+          <Button full onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" full busy={busy} disabled={title.trim().length < 3} onClick={give}>
+            Give it to {first}
+          </Button>
+        </div>
+      </div>
+    </BottomSheet>
+  )
+}
+
 export default function HomeScreen() {
   const { home, error } = useBot()
   const [openDraft, setOpenDraft] = useState<number | null>(null)
   const [closing, setClosing] = useState<BotLedgerItem | null>(null)
+  const [giving, setGiving] = useState<{ email: string; name: string } | null>(null)
   const [allLedger, setAllLedger] = useState(false)
 
   const feed = useMemo(() => {
@@ -393,9 +487,11 @@ export default function HomeScreen() {
   const otherDrafts = sections.drafts.filter((d) => !canApprove(d, me.name))
   const draft = sections.drafts.find((d) => d.n === openDraft) ?? null
   const needs = needsYouCount(home)
-  const myItems = (home.waiting ?? []).filter((i) => isMyLane(home, i.lane))
+  const myItems = (home.waiting ?? []).filter((i) => isMine(home, i))
   const myDecisions = myItems.filter((i) => i.kind === 'decision')
   const mySignals = myItems.filter((i) => i.kind === 'signal')
+  const myHandoffs = myItems.filter((i) => i.kind === 'handoff')
+  const supervisors = owner ? (home.crew?.supervisors ?? []) : []
   const ledger = allLedger ? sections.ledger : sections.ledger.slice(0, 4)
   const health = sections.health
 
@@ -454,6 +550,28 @@ export default function HomeScreen() {
       ) : null}
 
       <OthersWaiting home={home} />
+
+      {myHandoffs.length || supervisors.length ? (
+        <>
+          <SectionTitle count={myHandoffs.length}>Hand-offs out</SectionTitle>
+          {myHandoffs.length ? (
+            <Card className="mb-2 divide-y divide-[var(--color-stone)] overflow-hidden">
+              {myHandoffs.map((i) => (
+                <WaitingRow key={i.key} item={i} />
+              ))}
+            </Card>
+          ) : (
+            <Empty>Nothing you gave out is open. It stays here until you check it.</Empty>
+          )}
+          <div className="mt-2 flex flex-col gap-2">
+            {supervisors.map((s) => (
+              <Button key={s.email} full onClick={() => setGiving(s)}>
+                Give {firstName(s.name)} a task
+              </Button>
+            ))}
+          </div>
+        </>
+      ) : null}
 
       {otherDrafts.length ? (
         <>
@@ -560,6 +678,7 @@ export default function HomeScreen() {
 
       <DraftSheet key={`draft-${draft?.n ?? 'none'}`} draft={draft} onClose={() => setOpenDraft(null)} />
       <LedgerCloseSheet key={`ledger-${closing?.id ?? 'none'}`} item={closing} onClose={() => setClosing(null)} />
+      <GiveTaskSheet key={`give-${giving?.email ?? 'none'}`} to={giving} onClose={() => setGiving(null)} />
     </div>
   )
 }

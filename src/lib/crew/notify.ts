@@ -71,12 +71,17 @@ export async function notifySupervisors(
 }
 
 /** To one crew member, in their language. */
-export async function notifyCrew(person: { email: string; lang: CrewLang }, text: { title: Both; body: Both }, tag: string): Promise<void> {
+export async function notifyCrew(
+  person: { email: string; lang: CrewLang },
+  text: { title: Both; body: Both },
+  tag: string,
+  url = "/app",
+): Promise<void> {
   try {
     await sendPush([person.email], {
       title: say(person.lang, text.title).slice(0, 80),
       body: say(person.lang, text.body).replace(/\s+/g, " ").slice(0, 240),
-      url: "/app",
+      url,
       tag: tag.slice(0, 60),
     });
   } catch (e) {

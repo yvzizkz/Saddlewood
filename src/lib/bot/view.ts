@@ -1,5 +1,6 @@
 import type { BotDraft, BotHome } from "./types";
 import type { Lane } from "@/lib/owner/lanes";
+import type { WaitingItem } from "@/lib/owner/waiting";
 
 // Small pure helpers for the app's screens. Client-safe: nothing here may
 // import the server-only modules (queries, push).
@@ -84,13 +85,19 @@ export function isMyLane(home: BotHome, lane: Lane): boolean {
   return !home.lanes || home.lanes.mine.includes(lane);
 }
 
+/** Whether an item from "Waiting on you" is this person's: a hand-off goes back to whoever gave it, the rest by lane. */
+export function isMine(home: BotHome, item: WaitingItem): boolean {
+  if (item.who && Object.values(home.names).includes(item.who)) return item.who === home.me.name;
+  return isMyLane(home, item.lane);
+}
+
 /** How many things on Home are waiting on this person. Drives the tab badge. */
 export function needsYouCount(home: BotHome | null): number {
   if (!home?.me.name) return 0;
   const drafts = home.sections.drafts.filter((d) => canApprove(d, home.me.name)).length;
   const payments = isMyLane(home, "money") ? home.sections.payments.length : 0;
   const bids = isMyLane(home, "sales") ? home.sections.bids.length : 0;
-  const decisions = (home.waiting ?? []).filter((i) => i.kind === "decision" && isMyLane(home, i.lane)).length;
+  const decisions = (home.waiting ?? []).filter((i) => i.kind === "decision" && isMine(home, i)).length;
   return drafts + payments + bids + decisions;
 }
 

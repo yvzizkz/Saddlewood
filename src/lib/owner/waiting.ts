@@ -1,14 +1,19 @@
 import type { Overview } from "@/lib/billing/overview";
 import { addDays, dayShort, localClock, localDay, localInstant, weekdayOf } from "@/lib/crew/time";
 import { firstNameOf, isReportedDone, type CrewJob, type CrewPerson, type CrewReport, type CrewTask } from "@/lib/crew/types";
+import { planAsk } from "@/lib/crew/plan";
 import type { Lane } from "./lanes";
+
+export { planAsk };
 
 // "Waiting on you": the owners' one list, pulled from what the app already
 // holds. Each item belongs to a lane (lanes.ts); the screen shows an owner
 // their own lanes first and the rest under "Waiting on <name>".
 //
-// Two kinds. A decision is something only an owner can say yes or no to. A
-// signal is something going wrong that an owner should know about now. What a
+// Three kinds. A decision is something only an owner can say yes or no to. A
+// signal is something going wrong that an owner should know about now. A
+// hand-off is work an owner gave a supervisor, open until the owner checks
+// it (a supervisor never checks their own work). What a
 // rule already handles (small purchases, early collection notices, a worker's
 // own day) is never here. Pure and client-safe, so it is tested without a
 // database and the screen and the server agree.
@@ -16,7 +21,9 @@ import type { Lane } from "./lanes";
 export type WaitingItem = {
   key: string;
   lane: Lane;
-  kind: "decision" | "signal";
+  /** The owner it belongs to, by name, when that is a person and not a lane (a hand-off they gave). */
+  who?: string;
+  kind: "decision" | "signal" | "handoff";
   title: string;
   detail: string;
   /** Where it is acted on. Always a screen of the app. */
@@ -36,6 +43,8 @@ export type WaitingInput = {
   timefixes: number;
   reviews: number;
   money: Overview | null;
+  /** The owners' names (bot seats), so a hand-off goes back to whoever gave it. */
+  owners?: string[];
 };
 
 /** The plan is due the evening before, by 6 PM (the 30-day routine). */
@@ -45,14 +54,6 @@ export const PROMISE_WINDOW_DAYS = 3;
 /** Marco calls at 14 days past due; Ilene at 7 (the ladder, billing/ladder.ts). */
 export const MARCO_CALLS_AT = 14;
 export const ILENE_CALLS_AT = 7;
-
-const NEED_HEADING = "NEED FROM MARCO\n";
-
-/** What the supervisor asked the owners for in a plan, or "". */
-export function planAsk(body: string): string {
-  const at = body.indexOf(NEED_HEADING);
-  return at < 0 ? "" : body.slice(at + NEED_HEADING.length).trim();
-}
 
 function daysFrom(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
@@ -94,7 +95,7 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
     if (!latest.has(r.day)) latest.set(r.day, r);
   }
   for (const r of latest.values()) {
-    if (r.day < today) continue;
+    if (r.day < today || r.answer) continue;
     const ask = planAsk(r.body);
     if (!ask) continue;
     const who = firstNameOf(r.sentName) || r.sentBy.split("@")[0];
@@ -104,7 +105,7 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       kind: "decision",
       title: `${who} asks you`,
       detail: clip(ask),
-      href: "/app/crew?view=plan",
+      href: `/app/crew?view=plan&day=${r.day}`,
       at: r.createdAt,
     });
   }
@@ -121,9 +122,45 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
     });
   }
 
+  // ---- hand-offs: what an owner gave someone who checks the others' work -------------
+  const checkers = new Set(input.people.filter((p) => p.active && p.perms.includes("tasks.verify")).map((p) => p.email));
+  const nameOf = (email: string) => firstNameOf(input.people.find((p) => p.email === email)?.name ?? "") || email.split("@")[0];
+  const owners = new Set(input.owners ?? []);
+  for (const t of input.tasks) {
+    if (!checkers.has(t.email) || !isOpen(t)) continue;
+    const who = owners.has(t.createdBy) ? t.createdBy : undefined;
+    const name = nameOf(t.email);
+    if (isReportedDone(t)) {
+      items.push({
+        key: `handoff-${t.id}`,
+        lane: "decisions",
+        who,
+        kind: "decision",
+        title: `${name} says done: ${t.title}`,
+        detail: clip([t.jobName, t.doneNote].filter(Boolean).join(" · ") || "Check it, or send it back with what is left."),
+        href: "/app/crew",
+        at: t.reportedAt ?? t.closedAt,
+      });
+      continue;
+    }
+    const late = !!t.due && t.due < today;
+    const state =
+      t.status === "blocked" ? `stuck${t.doneNote ? `: ${t.doneNote}` : ""}` : late ? `was due ${dayShort(t.due as string)}` : t.due ? `due ${dayShort(t.due)}` : t.status === "doing" ? "started" : "not started";
+    items.push({
+      key: `handoff-${t.id}`,
+      lane: "decisions",
+      who,
+      kind: late || t.status === "blocked" ? "signal" : "handoff",
+      title: `${name} · ${t.title}`,
+      detail: clip([state, t.jobName].filter(Boolean).join(" · ")),
+      href: "/app/crew",
+      at: t.createdAt,
+    });
+  }
+
   // ---- work reported done and not checked -----------------------------------------
   const stale = input.tasks.filter((t) => {
-    if (!isReportedDone(t)) return false;
+    if (!isReportedDone(t) || checkers.has(t.email)) return false;
     const said = t.reportedAt ?? t.closedAt;
     if (!said) return false;
     const due = localInstant(nextWorkday(localDay(said)), localClock(said));
@@ -197,6 +234,6 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
     }
   }
 
-  const rank = (i: WaitingItem) => (i.kind === "decision" ? 0 : 1);
+  const rank = (i: WaitingItem) => (i.kind === "decision" ? 0 : i.kind === "signal" ? 1 : 2);
   return items.sort((a, b) => rank(a) - rank(b) || (a.at ?? "9").localeCompare(b.at ?? "9"));
 }

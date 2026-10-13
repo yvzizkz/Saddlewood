@@ -31,6 +31,11 @@ export function ownerEmails(people: BotPeople): string[] {
     .map(([email]) => email);
 }
 
+/** The owners by name, once each (lando@ and info@ are both Lando). */
+export function ownerNames(people: BotPeople): string[] {
+  return [...new Set(Object.values(people).filter((p) => p.role === "owner").map((p) => p.name))].sort();
+}
+
 function nameFor(email: string, people: BotPeople): string {
   return people[email]?.name ?? email.split("@")[0];
 }

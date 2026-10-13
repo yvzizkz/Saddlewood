@@ -30,7 +30,7 @@ const { db, notify, auth, mail } = vi.hoisted(() => {
     notify: {
       owners: [] as { title: string; body: string }[],
       leads: [] as { title: string; body: string }[],
-      crew: [] as { email: string; body: string }[],
+      crew: [] as { email: string; body: string; title?: string; url?: string }[],
     },
     auth: { users: [] as { id: string; email: string; app_metadata: Record<string, unknown>; banned?: string }[] },
     mail: { sent: [] as { to: string; subject: string; text: string }[], links: [] as string[] },
@@ -201,8 +201,18 @@ vi.mock("../queries", () => {
       return row;
     },
     insertReport: async (r: Record<string, unknown>) => {
-      const row = { id: next(), createdAt: "x", ...r };
+      const row = { id: next(), createdAt: "x", answer: null, ...r };
       db.reports.push(row);
+      return row;
+    },
+    getReport: async (id: number) => {
+      const row = db.reports.find((r) => r.id === id);
+      return row ? { ...row, data: {} } : null;
+    },
+    answerReport: async (report: { id: number }, answer: Record<string, unknown>) => {
+      const row = db.reports.find((r) => r.id === report.id);
+      if (!row || row.answer) return null;
+      row.answer = answer;
       return row;
     },
     getQuestion: async (id: number) => db.questions.find((q) => q.id === id) ?? null,
@@ -240,7 +250,8 @@ vi.mock("../notify", () => ({
     if (!leads.length || o?.alsoOwners) notify.owners.push(n);
     if (leads.length) notify.leads.push(n);
   },
-  notifyCrew: async (p: { email: string }, text: { body: { en: string } }) => void notify.crew.push({ email: p.email, body: text.body.en }),
+  notifyCrew: async (p: { email: string }, text: { title: { en: string }; body: { en: string } }, _tag: string, url = "/app") =>
+    void notify.crew.push({ email: p.email, title: text.title.en, body: text.body.en, url }),
 }));
 
 vi.mock("@/lib/auth/magicLink", () => ({
@@ -282,6 +293,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 import { punchTime, runCrewAct } from "../act";
 import { runAdminAct } from "../admin";
+import { mayRun } from "../auth";
 import type { CrewPersonRow } from "../queries";
 import { crewActSchema, adminActSchema, normalizePerms, type CrewActInput, type AdminActInput } from "../types";
 
@@ -842,6 +854,30 @@ describe("the nightly plan", () => {
     expect(body).toContain("Sand the hall · Arnold: Reported done, needs checking");
     expect(body).toContain("NEED FROM MARCO\nNeed a yes on the soffit change");
     expect(notify.owners.at(-1)).toMatchObject({ title: "Eli's plan for Tue, Oct 6" });
+  });
+});
+
+describe("Marco answers the plan, and checks the supervisor's own work", () => {
+  it("records one answer, tells the supervisor, and refuses a second", async () => {
+    db.people.set(ELI, { ...eli });
+    await lead({ kind: "report.send", day: "2026-10-06", note: "OK the $6,200 lumber order?" }, at("17:30"));
+    const id = db.reports[0].id as number;
+    expect(mayRun(asLead, "report.answer")).toBe(false); // the route refuses it: answering is the owners'
+    expect(await admin({ kind: "report.answer", id, text: "Yes, order it" }, at("17:45"))).toMatchObject({ ok: true, note: "Sent to Eli." });
+    expect(db.reports[0].answer).toMatchObject({ text: "Yes, order it", name: "Lando", by: "lando@saddlewoodcontracting.com" });
+    expect(notify.crew.at(-1)).toMatchObject({ email: ELI, title: "Lando answered your plan", body: "Yes, order it", url: "/app/crew?view=plan&day=2026-10-06" });
+    expect(await admin({ kind: "report.answer", id, text: "No" }, at("17:50"))).toMatchObject({ ok: false, status: 409 });
+    expect(await admin({ kind: "report.answer", id: 9999, text: "No" }, at("17:50"))).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("lets nobody check off their own task: an owner does", async () => {
+    db.people.set(ELI, { ...eli });
+    db.tasks.push({ id: 120, email: ELI, title: "Give Keim a date", status: "done", files: [file()], doneNote: "", detail: "", sentBack: 0, verifiedAt: null, createdBy: "Marco" });
+    expect(await lead({ kind: "task.verify", id: 120, ok: true }, at("16:00"))).toMatchObject({ ok: false, status: 403 });
+    db.tasks.push({ id: 121, email: ELI, title: "Call the inspector", status: "open", files: [], doneNote: "", detail: "", sentBack: 0 });
+    expect(await lead({ kind: "task.update", id: 121, status: "done" }, at("16:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(await admin({ kind: "task.verify", id: 120, ok: true }, at("16:05"))).toMatchObject({ ok: true });
+    expect(db.tasks.find((t) => t.id === 120)).toMatchObject({ verifiedBy: "Lando" });
   });
 });
 

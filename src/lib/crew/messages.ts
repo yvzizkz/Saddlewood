@@ -83,6 +83,10 @@ export const MSG = {
       body: { en: `You are off ${job} ${d.en}.`, es: `Ya no vas a ${job} ${d.es}.` },
     };
   },
+  planAnswered: (by: string, text: string): { title: Both; body: Both } => ({
+    title: { en: `${by} answered your plan`, es: `${by} contestó tu plan` },
+    body: { en: text, es: text },
+  }),
   newTask: (title: string): { title: Both; body: Both } => ({
     title: { en: "New task", es: "Nueva tarea" },
     body: { en: title, es: title },

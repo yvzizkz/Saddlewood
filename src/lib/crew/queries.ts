@@ -12,6 +12,7 @@ import type {
   CrewPickupStatus,
   CrewGroup,
   CrewReport,
+  CrewReportAnswer,
   CrewQuestion,
   CrewQuestionKind,
   CrewScheduleItem,
@@ -1079,17 +1080,27 @@ export async function patchPickup(
 
 // ---- the nightly plan ---------------------------------------------------------
 
-type ReportRow = { id: number; day: string; sent_by: string; sent_name: string; body: string; created_at: string };
+type ReportRow = { id: number; day: string; sent_by: string; sent_name: string; body: string; created_at: string; data?: Record<string, unknown> | null };
+
+const REPORT_COLS = "id, day, sent_by, sent_name, body, created_at, data";
+
+function toAnswer(v: unknown): CrewReportAnswer | null {
+  if (!v || typeof v !== "object") return null;
+  const a = v as Record<string, unknown>;
+  return typeof a.text === "string" && typeof a.at === "string"
+    ? { text: a.text, by: String(a.by ?? ""), name: String(a.name ?? ""), at: a.at }
+    : null;
+}
 
 function toReport(r: ReportRow): CrewReport {
-  return { id: r.id, day: r.day, sentBy: r.sent_by, sentName: r.sent_name, body: r.body, createdAt: r.created_at };
+  return { id: r.id, day: r.day, sentBy: r.sent_by, sentName: r.sent_name, body: r.body, createdAt: r.created_at, answer: toAnswer(r.data?.answer) };
 }
 
 export async function listReports(fromDay: string): Promise<CrewReport[]> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("crew_reports")
-    .select("id, day, sent_by, sent_name, body, created_at")
+    .select(REPORT_COLS)
     .gte("day", fromDay)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -1102,10 +1113,33 @@ export async function insertReport(r: { day: string; sentBy: string; sentName: s
   const { data, error } = await db
     .from("crew_reports")
     .insert({ day: r.day, sent_by: r.sentBy, sent_name: r.sentName, body: r.body, data: r.data })
-    .select("id, day, sent_by, sent_name, body, created_at")
+    .select(REPORT_COLS)
     .single();
   if (error) fail("crew_reports insert", error.message);
   return toReport(data as ReportRow);
+}
+
+export async function getReport(id: number): Promise<(CrewReport & { data: Record<string, unknown> }) | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("crew_reports").select(REPORT_COLS).eq("id", id).maybeSingle();
+  if (error) fail("crew_reports get", error.message);
+  if (!data) return null;
+  const row = data as ReportRow;
+  return { ...toReport(row), data: row.data ?? {} };
+}
+
+/** Records an owner's answer, only if nobody answered first. Null when someone did. */
+export async function answerReport(report: { id: number; data: Record<string, unknown> }, answer: CrewReportAnswer): Promise<CrewReport | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("crew_reports")
+    .update({ data: { ...report.data, answer } })
+    .eq("id", report.id)
+    .is("data->answer", null)
+    .select(REPORT_COLS)
+    .maybeSingle();
+  if (error) fail("crew_reports answer", error.message);
+  return data ? toReport(data as ReportRow) : null;
 }
 
 // ---- questions ----------------------------------------------------------------
@@ -1274,7 +1308,13 @@ export async function markAnswersSeen(ids: number[]): Promise<number> {
 
 // ---- the owners' Home screen --------------------------------------------------
 
-export type CrewSummary = { people: number; onClock: number; needs: number };
+export type CrewSummary = {
+  people: number;
+  onClock: number;
+  needs: number;
+  /** Seats that check the others' work (tasks.verify): an owner can hand them a task from Home. */
+  supervisors: { email: string; name: string }[];
+};
 
 /** Four counts, no rows: how many have a seat, how many are on the clock, how many things wait on an owner. */
 export async function crewSummary(): Promise<CrewSummary> {
@@ -1292,10 +1332,14 @@ export async function crewSummary(): Promise<CrewSummary> {
     db.from("crew_tasks").select("id", head).eq("status", "blocked"),
   ]);
   for (const r of [people, onClock, fixes, review, blocked]) if (r.error) fail("crew summary", r.error.message);
+  const supervisors = (await listPeople())
+    .filter((p) => p.active && p.perms.includes("tasks.verify"))
+    .map((p) => ({ email: p.email, name: p.name }));
   if (people.count === null) fail("crew summary", "no count came back for crew_people");
   return {
     people: people.count ?? 0,
     onClock: onClock.count ?? 0,
     needs: (fixes.count ?? 0) + (review.count ?? 0) + (blocked.count ?? 0),
+    supervisors,
   };
 }

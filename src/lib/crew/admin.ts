@@ -8,6 +8,7 @@ import { MSG } from "./messages";
 import { notifyCrew, notifyOwners } from "./notify";
 import { buildPlan } from "./plan";
 import {
+  answerReport,
   cancelQuestion,
   deleteSchedule,
   getEntry,
@@ -16,6 +17,7 @@ import {
   getGroup,
   getPerson,
   getPickup,
+  getReport,
   getScheduleItem,
   getShift,
   getTask,
@@ -240,6 +242,9 @@ async function addShift(
 
 // ---- the acts -----------------------------------------------------------------
 
+/** A supervisor's own task is checked by an owner, never by the supervisor. */
+const OWN_WORK = "Someone else checks your own work: Marco or Lando will check this one.";
+
 export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Date()): Promise<AdminResult> {
   const now = nowDate.getTime();
   const today = localDay(now);
@@ -459,6 +464,8 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
     case "task.update": {
       const task = await getTask(act.id);
       if (!task) return bad(404, "That task is gone.");
+      // Done from here means checked and verified: never by the person who did it.
+      if (act.status === "done" && task.email === owner.email) return bad(403, OWN_WORK);
       const closing = act.status === "done" || act.status === "dropped";
       const at = nowDate.toISOString();
       await patchTask(task.id, {
@@ -478,6 +485,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       const task = await getTask(act.id);
       if (!task || task.status !== "done") return bad(404, "That task is not waiting on a check.");
       if (task.verifiedAt) return bad(409, `${task.verifiedBy || "Someone"} already checked it.`);
+      if (task.email === owner.email) return bad(403, OWN_WORK);
       const at = nowDate.toISOString();
       const person = await getPerson(task.email);
       if (act.ok) {
@@ -567,6 +575,19 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       if (members.length) return bad(409, `Move ${members.map((p) => firstNameOf(p.name)).join(", ")} to another group first.`);
       await deleteGroup(group.id);
       return ok(`${group.name} deleted.`);
+    }
+
+    case "report.answer": {
+      const report = await getReport(act.id);
+      if (!report) return bad(404, "That plan is gone.");
+      if (report.answer) return bad(409, `${firstNameOf(report.answer.name) || "Someone"} already answered it.`);
+      const answered = await answerReport(report, { text: act.text, by: owner.email, name: owner.name, at: nowDate.toISOString() });
+      if (!answered) return bad(409, "Someone else just answered it.");
+      const sender = await getPerson(report.sentBy);
+      if (sender?.active) {
+        await notifyCrew(sender, MSG.planAnswered(firstNameOf(owner.name), act.text), `crew-plan-answer-${report.id}`, `/app/crew?view=plan&day=${report.day}`);
+      }
+      return ok(`Sent to ${firstNameOf(report.sentName) || "the supervisor"}.`);
     }
 
     case "report.send": {

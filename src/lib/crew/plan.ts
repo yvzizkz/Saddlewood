@@ -34,6 +34,15 @@ export type Plan = {
   counts: { scheduled: number; unprioritized: number; open: number; toCheck: number; waiting: number; pickups: number };
 };
 
+/** The heading the supervisor's asks go under. Home reads the ask back from it (planAsk). */
+export const NEED_HEADING = "NEED FROM MARCO";
+
+/** What a plan asked the owners for, or "". */
+export function planAsk(body: string): string {
+  const at = body.indexOf(`${NEED_HEADING}\n`);
+  return at < 0 ? "" : body.slice(at + NEED_HEADING.length + 1).trim();
+}
+
 export function priorityLabel(n: number | null | undefined): string {
   return PRIORITIES.find((p) => p.n === n)?.short ?? "";
 }
@@ -104,7 +113,7 @@ export function buildPlan(input: PlanInput): Plan {
     for (const t of sentBack) lines.push(`- Sent back: ${t.title} (${name(t.email)})`);
   }
 
-  if (input.note?.trim()) lines.push("", "NEED FROM MARCO", input.note.trim());
+  if (input.note?.trim()) lines.push("", NEED_HEADING, input.note.trim());
 
   return {
     text: lines.join("\n"),

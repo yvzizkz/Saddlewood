@@ -8,7 +8,7 @@ import { useBot } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle, Segmented } from '@/components/bot/ui'
 import { useCrew } from '@/components/crew/CrewProvider'
 import { ago } from '@/lib/bot/view'
-import { buildPlan, taskStatusWord } from '@/lib/crew/plan'
+import { buildPlan, planAsk, taskStatusWord } from '@/lib/crew/plan'
 import { addDays, clock12, clockText, dayLabel, dayShort, hoursText, localDay, localInstant, weekDays, weekStart, workedMinutes } from '@/lib/crew/time'
 import {
   firstNameOf,
@@ -101,7 +101,8 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
   const review = can('hours.edit') ? data.shifts.filter((s) => s.status === 'ok' && s.review) : []
   const cant = data.schedule.filter((s) => s.ack === 'cant' && s.day >= data.day)
   const blocked = data.tasks.filter((x) => x.status === 'blocked')
-  const toCheck = data.tasks.filter(isReportedDone)
+  // Your own work is checked by someone else (an owner), so it is never yours to check.
+  const toCheck = data.tasks.filter((x) => isReportedDone(x) && x.email !== data.viewer.email)
   const needs = fixes.length + review.length + cant.length + blocked.length + toCheck.length
 
   const scheduledToday = data.schedule.filter((s) => s.day === data.day)
@@ -574,9 +575,13 @@ function onTime(day: string, sentAt: string): boolean {
 
 function PlanView({ data }: { data: CrewAdminHome }) {
   const { run, isOwner, can } = useCrewAdmin()
-  const [day, setDay] = useState(addDays(data.day, 1))
+  // A link can open a given day (/app/crew?view=plan&day=...), if it is one of the three shown.
+  const askedDay = useSearchParams().get('day')
+  const [day, setDay] = useState([0, 1, 2].some((i) => addDays(data.day, i) === askedDay) ? (askedDay as string) : addDays(data.day, 1))
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  const [answer, setAnswer] = useState('')
+  const [answering, setAnswering] = useState(false)
   const plan = buildPlan({ day, today: data.day, people: data.people, jobs: data.jobs, schedule: data.schedule, tasks: data.tasks, pickups: data.pickups, note })
   const sent = data.reports.filter((r) => r.day === day)
   const last = sent[0]
@@ -599,6 +604,15 @@ function PlanView({ data }: { data: CrewAdminHome }) {
     const res = await run({ kind: 'report.send', day, note: note.trim() })
     setBusy(false)
     if (res.ok) setNote('')
+  }
+
+  const ask = last ? planAsk(last.body) : ''
+  async function sendAnswer() {
+    if (!last) return
+    setAnswering(true)
+    const res = await run({ kind: 'report.answer', id: last.id, text: answer.trim() })
+    setAnswering(false)
+    if (res.ok) setAnswer('')
   }
 
   return (
@@ -647,6 +661,35 @@ function PlanView({ data }: { data: CrewAdminHome }) {
           </p>
         ) : null}
       </Card>
+
+      {last && ask ? (
+        <>
+          <SectionTitle>{firstNameOf(last.sentName)} asks</SectionTitle>
+          <Card className="px-4 py-3.5">
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-charcoal)]">{ask}</p>
+            {last.answer ? (
+              <div className="mt-3 border-t border-[var(--color-stone)] pt-3">
+                <p className="text-[12px] font-medium uppercase tracking-wide text-[var(--color-charcoal-light)]">
+                  {firstNameOf(last.answer.name)} answered, {dayLabel(localDay(last.answer.at), data.day).toLowerCase()} at {clock12(last.answer.at)}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-charcoal)]">{last.answer.text}</p>
+              </div>
+            ) : isOwner ? (
+              <div className="mt-3 space-y-2.5">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--color-charcoal)]">Your answer</span>
+                  <textarea className={`${INPUT} min-h-[64px] resize-y`} value={answer} maxLength={1000} onChange={(e) => setAnswer(e.target.value)} />
+                </label>
+                <Button variant="primary" full busy={answering} disabled={!answer.trim()} onClick={sendAnswer} className="min-h-12">
+                  <Send className="size-4" aria-hidden="true" /> Send the answer to {firstNameOf(last.sentName)}
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-2 text-[13px] text-[var(--color-charcoal-light)]">Waiting on Marco&apos;s answer. Your phone will buzz when it comes.</p>
+            )}
+          </Card>
+        </>
+      ) : null}
 
       {isOwner && last ? (
         <>
@@ -1037,7 +1080,7 @@ function Screen() {
     )
   }
 
-  const toCheck = data.tasks.filter(isReportedDone).length
+  const toCheck = data.tasks.filter((x) => isReportedDone(x) && x.email !== data.viewer.email).length
   const needs =
     data.entries.filter((e) => e.kind === 'timefix' && e.status === 'new').length +
     (can('hours.edit') ? data.shifts.filter((s) => s.status === 'ok' && s.review).length : 0) +

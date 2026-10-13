@@ -42,6 +42,17 @@ clocked in, nobody scheduled tomorrow) go to the field supervisor, and to the
 decisions lane only when no supervisor is seated. The list itself is built in
 `src/lib/owner/waiting.ts` from what the app already holds.
 
+**Hand-offs.** "Give Eli a task" on Home (one button per seat whose group can
+check work) puts a crew task on that person's own list. Nobody checks off
+their own work, so it comes back to the owner who gave it: "Eli says done"
+waits on that owner, not a lane, and Lando does not see Marco's hand-offs
+as his. Open ones show under "Hand-offs out"; late or stuck ones turn red.
+
+**Answering the plan.** When the supervisor's plan has a "Need from Marco",
+an owner answers it on the Plan view (Crew, Plan). The answer is kept with
+the plan (`crew_reports.data.answer`), it can be given once, the
+supervisor's phone is told, and the ask leaves "Waiting on you".
+
 ## How it reaches the bot
 
 The bot runs on the office Mac, which nothing on the internet can call. So the

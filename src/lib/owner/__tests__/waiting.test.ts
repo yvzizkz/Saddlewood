@@ -73,13 +73,13 @@ function job(over: Partial<CrewJob>): CrewJob {
 }
 
 function report(over: Partial<CrewReport>): CrewReport {
-  return { id: 5, day: "2026-10-15", sentBy: ELI, sentName: "Eli Garcia", body: "TOMORROW: Thu, Oct 15\n1. Arnold · Keim", createdAt: "2026-10-15T00:40:00Z", ...over };
+  return { id: 5, day: "2026-10-15", sentBy: ELI, sentName: "Eli Garcia", body: "TOMORROW: Thu, Oct 15\n1. Arnold · Keim", createdAt: "2026-10-15T00:40:00Z", answer: null, ...over };
 }
 
 function input(over: Partial<WaitingInput> = {}): WaitingInput {
   return {
     now: NOW,
-    people: [{ email: ELI, name: "Eli Garcia", active: true, perms: ["crew.view", "plan.send", "updates"] }],
+    people: [{ email: ELI, name: "Eli Garcia", active: true, perms: ["crew.view", "plan.send", "updates", "tasks.verify"] }],
     reports: [report({})],
     tasks: [],
     jobs: [],
@@ -99,8 +99,13 @@ describe("the supervisor's plan", () => {
   it("puts the ask in Marco's lane as a decision", () => {
     const items = buildWaiting(input({ reports: [report({ body: "TOMORROW\n\nNEED FROM MARCO\nA date for Keim Dr" })] }));
     expect(items).toEqual([
-      expect.objectContaining({ lane: "decisions", kind: "decision", title: "Eli asks you", detail: "A date for Keim Dr", href: "/app/crew?view=plan" }),
+      expect.objectContaining({ lane: "decisions", kind: "decision", title: "Eli asks you", detail: "A date for Keim Dr", href: "/app/crew?view=plan&day=2026-10-15" }),
     ]);
+  });
+
+  it("drops the ask once an owner answered it", () => {
+    const answered = report({ body: "x\nNEED FROM MARCO\nA date?", answer: { text: "Friday", by: MARCO, name: "Marco", at: "2026-10-15T01:00:00Z" } });
+    expect(buildWaiting(input({ reports: [answered] }))).toEqual([]);
   });
 
   it("uses the newest plan for a day, and drops asks from past days", () => {
@@ -196,4 +201,30 @@ describe("hours and money", () => {
 it("lists decisions before signals", () => {
   const items = buildWaiting(input({ reports: [], timefixes: 1 }));
   expect(items.map((i) => i.kind)).toEqual(["decision", "signal"]);
+});
+
+describe("hand-offs to the supervisor", () => {
+  const eliTask = (over: Partial<CrewTask>) => task({ id: 50, email: ELI, title: "Give Keim a date", jobId: "", jobName: "", createdBy: "Marco", ...over });
+  const owners = ["Lando", "Marco"];
+
+  it("lists open work given to the supervisor for the owner who gave it", () => {
+    const items = buildWaiting(input({ owners, tasks: [eliTask({ due: "2026-10-16" })] }));
+    expect(items).toEqual([expect.objectContaining({ key: "handoff-50", kind: "handoff", who: "Marco", title: "Eli · Give Keim a date", detail: "due Fri, Oct 16" })]);
+  });
+
+  it("asks the giver to check it once it is reported done, and keeps it out of the crew's check signal", () => {
+    const done = eliTask({ status: "done", reportedAt: "2026-10-13T15:00:00Z", doneNote: "Friday, client OK" });
+    const items = buildWaiting(input({ owners, tasks: [done] }));
+    expect(items).toEqual([expect.objectContaining({ kind: "decision", who: "Marco", title: "Eli says done: Give Keim a date", detail: "Friday, client OK" })]);
+  });
+
+  it("turns late or stuck work into a signal, and leaves a checked task out", () => {
+    expect(buildWaiting(input({ owners, tasks: [eliTask({ due: "2026-10-12" })] }))[0]).toMatchObject({ kind: "signal", detail: "was due Mon, Oct 12" });
+    expect(buildWaiting(input({ owners, tasks: [eliTask({ status: "blocked", doneNote: "client away" })] }))[0]).toMatchObject({ kind: "signal", detail: "stuck: client away" });
+    expect(buildWaiting(input({ owners, tasks: [eliTask({ status: "done", verifiedAt: "2026-10-14T20:00:00Z" })] }))).toEqual([]);
+  });
+
+  it("falls back to the lane when the giver is not an owner", () => {
+    expect(buildWaiting(input({ owners, tasks: [eliTask({ createdBy: "bot" })] }))[0]).toMatchObject({ lane: "decisions", who: undefined });
+  });
 });

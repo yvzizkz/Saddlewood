@@ -111,6 +111,7 @@ export const ACT_NEEDS: Record<AdminAct["kind"], Capability | "owner"> = {
   "pickup.add": "pickups.stage",
   "pickup.update": "pickups.stage",
   "report.send": "plan.send",
+  "report.answer": "owner",
 };
 
 export function mayRun(m: Manager, kind: AdminAct["kind"]): boolean {

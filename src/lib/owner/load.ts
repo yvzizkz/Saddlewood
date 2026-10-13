@@ -26,7 +26,7 @@ function quiet<T>(what: string, p: Promise<T>, fallback: T): Promise<T> {
   });
 }
 
-export async function loadWaiting(now: Date = new Date()): Promise<WaitingItem[]> {
+export async function loadWaiting(owners: string[], now: Date = new Date()): Promise<WaitingItem[]> {
   const today = localDay(now);
   const [people, reports, tasks, jobs, hours, money] = await Promise.all([
     quiet("crew people", listPeople(), []),
@@ -36,5 +36,5 @@ export async function loadWaiting(now: Date = new Date()): Promise<WaitingItem[]
     quiet("hours", hoursCounts(), { timefixes: 0, reviews: 0 }),
     quiet("money", moneyOverview(today), null),
   ]);
-  return buildWaiting({ now, people, reports, tasks, jobs, timefixes: hours.timefixes, reviews: hours.reviews, money });
+  return buildWaiting({ now, people, reports, tasks, jobs, timefixes: hours.timefixes, reviews: hours.reviews, money, owners });
 }
