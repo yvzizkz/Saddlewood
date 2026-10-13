@@ -36,10 +36,11 @@ function publicShift(s: CrewShiftRow): CrewShift {
   return rest;
 }
 
-function publicPerson(p: CrewPersonRow): CrewPerson {
+/** A seat as a screen sees it: never the sign-in id, and the pay rate only for owners. */
+function publicPerson(p: CrewPersonRow, showPay = false): CrewPerson {
   const { authId: _id, ...rest } = p;
   void _id;
-  return rest;
+  return showPay ? rest : { ...rest, payRate: null };
 }
 
 function byId<T extends { id: number }>(rows: T[]): T[] {
@@ -127,7 +128,7 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     viewer: { role: viewer.role, email: viewer.email, name: viewer.name, perms: viewer.perms },
     groups,
     week,
-    people: people.map(publicPerson),
+    people: people.map((p) => publicPerson(p, viewer.role === "owner")),
     jobs,
     suggestedJobs: suggested.filter((n) => !names.has(n.toLowerCase())),
     shifts: byId([...weekShifts, ...recentShifts, ...open])
@@ -195,7 +196,7 @@ export async function crewFeed(now = new Date()): Promise<CrewFeed> {
     ok: true,
     now: now.toISOString(),
     day,
-    people: people.map(publicPerson),
+    people: people.map((p) => publicPerson(p)),
     jobs,
     shifts: byId([...shifts, ...open])
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))

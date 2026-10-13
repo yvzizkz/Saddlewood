@@ -315,6 +315,7 @@ describe("the owners' door", () => {
 
   it("exports the week for payroll, and a name cannot smuggle a formula into the sheet", async () => {
     asStaff(LANDO);
+    people.set(ARNOLD, { ...(people.get(ARNOLD) as object), payRate: 21 } as never);
     people.set("eve@example.com", { email: "eve@example.com", name: '=HYPERLINK("http://evil.example","x")', lang: "en", active: true, lastSeenAt: null });
     spies.listShifts.mockResolvedValue([
       { email: ARNOLD, day: "2026-10-05", jobName: "Powell Residence", startedAt: "2026-10-05T13:02:00Z", endedAt: "2026-10-05T21:32:00Z", breakMin: 30, source: "app", endSource: "app", review: "", note: "" },
@@ -324,9 +325,10 @@ describe("the owners' door", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-disposition")).toContain("saddlewood-hours-2026-10-05-to-2026-10-11.csv");
     const lines = (await res.text()).trim().split("\r\n");
-    expect(lines[0]).toBe("Name,Date,Job,Clock in,Clock out,Break (min),Hours,In recorded by,Out recorded by,Needs a look,Note");
-    expect(lines[1]).toBe(`"'=HYPERLINK(""http://evil.example"",""x"")",2026-10-05,"Shop, yard",6:00 AM,,,,"app, sent later",,still on the clock,`);
-    expect(lines[2]).toBe("Arnold Mujica,2026-10-05,Powell Residence,6:02 AM,2:32 PM,30,8.00,app,app,,");
+    // The owners' copy carries the rate and the cost; no rate on file leaves both blank.
+    expect(lines[0]).toBe("Name,Date,Job,Clock in,Clock out,Break (min),Hours,Rate ($/h),Cost ($),In recorded by,Out recorded by,Needs a look,Note");
+    expect(lines[1]).toBe(`"'=HYPERLINK(""http://evil.example"",""x"")",2026-10-05,"Shop, yard",6:00 AM,,,,,,"app, sent later",,still on the clock,`);
+    expect(lines[2]).toBe("Arnold Mujica,2026-10-05,Powell Residence,6:02 AM,2:32 PM,30,8.00,21.00,168.00,app,app,,");
     expect(spies.listShifts).toHaveBeenCalledWith({ fromDay: "2026-10-05", toDay: "2026-10-11" });
   });
 });

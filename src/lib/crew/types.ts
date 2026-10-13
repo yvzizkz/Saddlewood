@@ -90,6 +90,8 @@ export type CrewPerson = {
   group: string;
   groupName: string;
   perms: Capability[];
+  /** Dollars per hour, owners' eyes only (null for anyone else, and when paid another way). */
+  payRate: number | null;
   active: boolean;
   addedBy: string;
   createdAt: string;
@@ -356,6 +358,7 @@ const optionalJobId = z.string().trim().max(60).default("");
 const files = z.array(fileRefSchema).max(MAX_ENTRY_FILES).default([]);
 const breakMin = z.number().int().min(0).max(240).default(0);
 const priority = z.number().int().min(1).max(5).nullable().default(null);
+const payRate = z.number().min(0).max(500).nullable().default(null);
 const groupId = z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, "bad group");
 
 // ---- what a crew member sends -------------------------------------------------
@@ -450,6 +453,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     trade: text(60),
     phone: text(30),
     group: groupId.default("crew"),
+    payRate,
     /** Email them the sign-in link now. */
     invite: z.boolean().default(true),
   }),
@@ -461,6 +465,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     trade: z.string().trim().max(60).optional(),
     phone: z.string().trim().max(30).optional(),
     group: groupId.optional(),
+    payRate: payRate.optional(),
     active: z.boolean().optional(),
   }),
   z.object({ kind: z.literal("person.invite"), email }),

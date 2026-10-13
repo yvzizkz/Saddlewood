@@ -294,6 +294,7 @@ const person = (email: string, name: string, lang: "en" | "es" = "en"): CrewPers
   group: "crew",
   groupName: "Crew",
   perms: ["clock", "receipts"],
+  payRate: null,
   active: true,
   addedBy: "Lando",
   createdAt: "x",
@@ -879,5 +880,15 @@ describe("seats with no real email", () => {
     expect(await admin({ kind: "person.invite", email: "filiberto.v@crew.saddlewoodcontracting.com" }, at("09:01"))).toMatchObject({ ok: false, status: 400 });
     expect(mail.sent).toHaveLength(0);
     expect(await admin({ kind: "person.code", email: "filiberto.v@crew.saddlewoodcontracting.com" }, at("09:02"))).toMatchObject({ ok: true, code: "12345678" });
+  });
+});
+
+describe("pay rates", () => {
+  it("keeps a rate on the seat, and clears it with null", async () => {
+    await admin({ kind: "person.update", email: ARNOLD, payRate: 21 }, at("09:00"));
+    expect(db.people.get(ARNOLD)).toMatchObject({ pay_rate: 21 });
+    await admin({ kind: "person.update", email: ARNOLD, payRate: null }, at("09:01"));
+    expect(db.people.get(ARNOLD)).toMatchObject({ pay_rate: null });
+    expect(adminActSchema.safeParse({ kind: "person.update", email: ARNOLD, payRate: -1 }).success).toBe(false);
   });
 });

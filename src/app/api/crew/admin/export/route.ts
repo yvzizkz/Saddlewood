@@ -25,6 +25,12 @@ const HOW: Record<string, string> = {
   office: "entered by the office",
 };
 
+/** Rate and cost for one shift; blank when there is no rate or the shift is still open. */
+function payCells(rate: number | null, minutes: number | null): string[] {
+  if (rate === null) return ["", ""];
+  return [rate.toFixed(2), minutes === null ? "" : ((rate * minutes) / 60).toFixed(2)];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const manager = await requireManager(request);
@@ -38,12 +44,15 @@ export async function GET(request: NextRequest) {
 
     const [people, shifts] = await Promise.all([listPeople(), listShifts({ fromDay: from, toDay: to })]);
     const names = new Map(people.map((p) => [p.email, p.name]));
+    // Pay is for the owners' copy only; a member with hours.edit gets the hours without it.
+    const showPay = manager.role === "owner";
+    const rates = new Map(people.map((p) => [p.email, p.payRate]));
     const rows = shifts
       .map((s) => ({ ...s, name: names.get(s.email) ?? s.email }))
       .sort((a, b) => a.name.localeCompare(b.name) || a.startedAt.localeCompare(b.startedAt));
 
     const lines = [
-      ["Name", "Date", "Job", "Clock in", "Clock out", "Break (min)", "Hours", "In recorded by", "Out recorded by", "Needs a look", "Note"]
+      ["Name", "Date", "Job", "Clock in", "Clock out", "Break (min)", "Hours", ...(showPay ? ["Rate ($/h)", "Cost ($)"] : []), "In recorded by", "Out recorded by", "Needs a look", "Note"]
         .map(cell)
         .join(","),
       ...rows.map((s) =>
@@ -55,6 +64,7 @@ export async function GET(request: NextRequest) {
           s.endedAt ? clock12(s.endedAt) : "",
           s.endedAt ? s.breakMin : "",
           s.endedAt ? hoursDecimal(workedMinutes(s)) : "",
+          ...(showPay ? payCells(rates.get(s.email) ?? null, s.endedAt ? workedMinutes(s) : null) : []),
           HOW[s.source] ?? s.source,
           s.endSource ? (HOW[s.endSource] ?? s.endSource) : "",
           s.endedAt ? s.review : "still on the clock",

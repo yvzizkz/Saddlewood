@@ -61,6 +61,7 @@ type PersonRow = {
   phone: string;
   trade: string;
   group_id?: string;
+  pay_rate?: number | string | null;
   /** The group, embedded through crew_people_group_fk. */
   crew_groups?: { name: string; perms: unknown } | null;
   active: boolean;
@@ -88,6 +89,8 @@ function toPerson(r: PersonRow): CrewPersonRow {
     group: r.group_id ?? "crew",
     groupName: r.crew_groups?.name ?? "Crew",
     perms: normalizePerms(asStrings(r.crew_groups?.perms)),
+    // numeric comes back from PostgREST as a number or a string.
+    payRate: r.pay_rate === null || r.pay_rate === undefined || r.pay_rate === "" ? null : Number(r.pay_rate),
     active: r.active,
     addedBy: r.added_by,
     createdAt: r.created_at,
@@ -118,6 +121,7 @@ export async function savePerson(p: {
   phone: string;
   trade: string;
   group: string;
+  payRate?: number | null;
   addedBy: string;
 }): Promise<CrewPersonRow> {
   const db = getSupabaseAdmin();
@@ -132,6 +136,7 @@ export async function savePerson(p: {
         phone: p.phone,
         trade: p.trade,
         group_id: p.group,
+        ...(p.payRate !== undefined ? { pay_rate: p.payRate } : {}),
         active: true,
         added_by: p.addedBy,
         updated_at: new Date().toISOString(),
@@ -146,7 +151,7 @@ export async function savePerson(p: {
 
 export async function patchPerson(
   email: string,
-  patch: Partial<{ name: string; lang: CrewLang; phone: string; trade: string; group_id: string; active: boolean; auth_id: string | null }>,
+  patch: Partial<{ name: string; lang: CrewLang; phone: string; trade: string; group_id: string; pay_rate: number | null; active: boolean; auth_id: string | null }>,
 ): Promise<CrewPersonRow | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db

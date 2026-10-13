@@ -726,6 +726,14 @@ function HoursView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
   const inWeek = data.shifts.filter((s) => s.status === 'ok' && s.day >= days[0] && s.day <= days[6])
   const emails = [...new Set(inWeek.map((s) => s.email))].sort((a, b) => nameOf(a).localeCompare(nameOf(b)))
   const total = inWeek.reduce((sum, s) => sum + workedMinutes(s), 0)
+  // Labor cost where a rate is on the seat (owners only: the rate is null for anyone else).
+  const rateOf = (email: string) => data.people.find((p) => p.email === email)?.payRate ?? null
+  const costOf = (email: string, minutes: number) => {
+    const r = rateOf(email)
+    return r === null ? null : (r * minutes) / 60
+  }
+  const totalCost = emails.reduce((sum, e) => sum + (costOf(e, inWeek.filter((s) => s.email === e).reduce((m, s) => m + workedMinutes(s), 0)) ?? 0), 0)
+  const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   return (
     <>
@@ -748,8 +756,11 @@ function HoursView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
         <span className="text-[13px] text-[var(--color-charcoal-light)]">
           {emails.length} {emails.length === 1 ? 'person' : 'people'}
         </span>
-        <span className="text-2xl text-[var(--color-charcoal)]" style={{ fontFamily: 'var(--font-fraunces)' }}>
-          {hoursText(total)}
+        <span className="text-right">
+          <span className="block text-2xl text-[var(--color-charcoal)]" style={{ fontFamily: 'var(--font-fraunces)' }}>
+            {hoursText(total)}
+          </span>
+          {totalCost > 0 ? <span className="block text-[12px] text-[var(--color-charcoal-light)]">{money(totalCost)} at the rates on file</span> : null}
         </span>
       </Card>
 
@@ -783,7 +794,12 @@ function HoursView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
                     {flagged ? <Dot tone="warn" /> : null}
-                    <span className="font-mono text-[15px] text-[var(--color-charcoal)]">{hoursText(minutes)}</span>
+                    <span className="text-right">
+                      <span className="block font-mono text-[15px] text-[var(--color-charcoal)]">{hoursText(minutes)}</span>
+                      {costOf(email, minutes) !== null ? (
+                        <span className="block font-mono text-[11px] text-[var(--color-charcoal-light)]">{money(costOf(email, minutes) as number)}</span>
+                      ) : null}
+                    </span>
                   </span>
                 </button>
                 {expanded ? (

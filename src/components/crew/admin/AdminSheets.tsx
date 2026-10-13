@@ -662,6 +662,7 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
   const [name, setName] = useState(person?.name ?? '')
   const { data } = useCrewAdmin()
   const [group, setGroup] = useState(person?.group ?? 'crew')
+  const [rate, setRate] = useState(person?.payRate != null ? person.payRate.toFixed(2) : '')
   const [email, setEmail] = useState(person?.email ?? '')
   const [lang, setLang] = useState<CrewLang>(person?.lang ?? 'en')
   const [trade, setTrade] = useState(person?.trade ?? '')
@@ -673,10 +674,12 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
   async function save(invite: boolean) {
     if (name.trim().length < 2) return setProblem('Type their name.')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setProblem('Type the email they use on their phone.')
+    const payRate = rate.trim() === '' ? null : Number(rate.replace(/[$,\s]/g, ''))
+    if (payRate !== null && (!Number.isFinite(payRate) || payRate < 0 || payRate > 500)) return setProblem('Type the hourly rate, like 22 or 31.25, or leave it empty.')
     setBusy(invite ? 'invite' : 'save')
     const res = person
-      ? await run({ kind: 'person.update', email: person.email, name: name.trim(), lang, trade: trade.trim(), phone: phone.trim(), group }, true)
-      : await run({ kind: 'person.add', name: name.trim(), email: email.trim(), lang, trade: trade.trim(), phone: phone.trim(), group, invite })
+      ? await run({ kind: 'person.update', email: person.email, name: name.trim(), lang, trade: trade.trim(), phone: phone.trim(), group, payRate }, true)
+      : await run({ kind: 'person.add', name: name.trim(), email: email.trim(), lang, trade: trade.trim(), phone: phone.trim(), group, payRate, invite })
     setBusy(null)
     if (!res.ok) return setProblem(res.text)
     onClose()
@@ -751,6 +754,9 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
             </option>
           ))}
         </select>
+      </Field>
+      <Field label="Hourly rate (optional)" hint="Only owners see it. It turns hours into labor cost in the Hours view and the payroll export. Leave it empty for someone paid by the job.">
+        <input className={INPUT} inputMode="decimal" value={rate} maxLength={8} placeholder="22.00" onChange={(e) => setRate(e.target.value)} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Trade (optional)">

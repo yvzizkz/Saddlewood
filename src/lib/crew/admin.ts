@@ -263,6 +263,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         phone: act.phone,
         trade: act.trade,
         group: act.group,
+        payRate: act.payRate,
         addedBy: owner.name,
       });
       if (isPlaceholderEmail(person.email)) {
@@ -301,6 +302,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         ...(act.trade !== undefined ? { trade: act.trade } : {}),
         ...(act.phone !== undefined ? { phone: act.phone } : {}),
         ...(act.group !== undefined ? { group_id: act.group } : {}),
+        ...(act.payRate !== undefined ? { pay_rate: act.payRate } : {}),
       };
       if (act.group !== undefined && !(await getGroup(act.group))) return bad(400, "That group does not exist.");
       if (Object.keys(patch).length) await patchPerson(person.email, patch);
