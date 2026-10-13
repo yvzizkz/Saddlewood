@@ -160,7 +160,7 @@ describe("one job's money", () => {
     const st = doc({ kind: "statement", number: "S", jobId: JURY, snapshot: { lines: [{ description: "Draw 7", amountCents: 5000 }] } });
     const { byJob } = placeMoney(input([st], { firstSent: new Map([[st.id, "2026-10-05T16:20:00Z"]]) }));
     const m = summarizeJobMoney(JURY, byJob.get(JURY) ?? [], null, today);
-    expect(m.open).toEqual([{ number: "S", title: "Draw 7", owedCents: 5000, dueOn: "2026-10-05", daysLate: 8 }]);
+    expect(m.open).toEqual([{ number: "S", title: "Draw 7", owedCents: 5000, dueOn: "2026-10-05", daysLate: 8, payWhenPaid: false }]);
     expect(m.pastDueCents).toBe(5000);
   });
 

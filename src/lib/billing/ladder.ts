@@ -2,6 +2,8 @@
 // Days are relative to the due date. Negative is before. The company default
 // lives here; a client's billing profile or a job may move the timing later.
 
+import type { BillingProfile } from "./types";
+
 export type LadderStep = {
   day: number;
   label: string;
@@ -44,6 +46,24 @@ export function addBusinessDays(iso: string, days: number): string {
     if (w !== 0 && w !== 6) left -= 1;
   }
   return d.toISOString().slice(0, 10);
+}
+
+/** Pay-when-paid (BillingProfile.payWhenPaidDays). The job's own setting, when it has one, wins over the client's. */
+export function isPayWhenPaid(client?: BillingProfile | null, job?: BillingProfile | null): boolean {
+  const own = job && "payWhenPaidDays" in job ? job.payWhenPaidDays : client?.payWhenPaidDays;
+  return typeof own === "number" && own >= 0;
+}
+
+/**
+ * The day the ladder counts from: the due date; for a bill with none (a
+ * statement of old invoices), the day it was first sent. A pay-when-paid bill
+ * with no due date has no clock: we are not owed it until their client pays
+ * them, so nothing chases it until an owner sets a due date.
+ */
+export function ladderClock(dueDate: string | null, firstSentAt: string | null, payWhenPaid: boolean): string | null {
+  if (dueDate) return dueDate.slice(0, 10);
+  if (payWhenPaid || !firstSentAt) return null;
+  return firstSentAt.slice(0, 10);
 }
 
 export type NextStep = { on: string; label: string; who: LadderStep["who"]; daysLate: number } | null;

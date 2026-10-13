@@ -78,6 +78,8 @@ export default async function MoneyScreen() {
                           Next: {d.next.label}, {day(d.next.on)}
                           {d.next.daysLate > 0 ? ` · ${d.next.daysLate} days on the clock` : ""}
                         </span>
+                      ) : d.payWhenPaid ? (
+                        <span className="text-xs text-[var(--color-charcoal-light)]">Pay-when-paid: no ladder until it has a due date</span>
                       ) : null}
                     </div>
                   </Card>

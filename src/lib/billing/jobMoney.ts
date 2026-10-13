@@ -1,6 +1,6 @@
-import { daysBetween } from "./ladder";
+import { daysBetween, isPayWhenPaid, ladderClock } from "./ladder";
 import { normalizeNumber } from "./numbering";
-import type { BillingDocument } from "./types";
+import type { BillingDocument, BillingProfile } from "./types";
 
 // One job's money, read only: contract, billed, paid, owed and past due
 // (money.view, KB docs/APP-PERMISSIONS-PLAN-2026-10-12.md "Project manager
@@ -17,7 +17,7 @@ import type { BillingDocument } from "./types";
 // is also in the app as its own document is left out, so it is not billed twice.
 // What cannot be placed is returned apart (`unplaced`) for the owners to link.
 
-export type MoneyJob = { id: string; prefix: string | null };
+export type MoneyJob = { id: string; prefix: string | null; billing?: BillingProfile | null };
 
 export type MoneyItem = {
   /** The invoice number as the client knows it (a statement line: the invoice it names). */
@@ -28,8 +28,10 @@ export type MoneyItem = {
   lineIndex: number | null;
   billedCents: number;
   paidCents: number;
-  /** The day it counts as due from: the due date, else the day it was first sent. Null if never sent. */
+  /** The day it counts as due from (ladder.ts ladderClock). Null: never sent, or pay-when-paid with no due date. */
   dueOn: string | null;
+  /** The client (or the job) pays when their own client pays. */
+  payWhenPaid: boolean;
 };
 
 export type MoneyInput = {
@@ -40,6 +42,8 @@ export type MoneyInput = {
   /** First "sent" per document id (ISO), for a document with no due date. */
   firstSent: Map<string, string>;
   jobs: MoneyJob[];
+  /** Billing profile per client id, for pay-when-paid. */
+  clients?: Map<string, BillingProfile>;
 };
 
 export type Placed = { byJob: Map<string, MoneyItem[]>; unplaced: MoneyItem[] };
@@ -64,11 +68,15 @@ export function jobOfNumber(number: string, jobs: MoneyJob[]): string | null {
 }
 
 export function placeMoney(input: MoneyInput): Placed {
-  const known = new Set(input.jobs.map((j) => j.id));
+  const jobBilling = new Map(input.jobs.map((j) => [j.id, j.billing ?? null]));
   const byJob = new Map<string, MoneyItem[]>();
   const unplaced: MoneyItem[] = [];
-  const put = (jobId: string | null, item: MoneyItem) => {
-    if (jobId && known.has(jobId)) byJob.set(jobId, [...(byJob.get(jobId) ?? []), item]);
+  type Draft = Omit<MoneyItem, "dueOn" | "payWhenPaid">;
+  const put = (d: BillingDocument, jobId: string | null, draft: Draft) => {
+    const placed = jobId && jobBilling.has(jobId) ? jobId : null;
+    const payWhenPaid = isPayWhenPaid(d.clientId ? input.clients?.get(d.clientId) : null, placed ? jobBilling.get(placed) : null);
+    const item = { ...draft, payWhenPaid, dueOn: ladderClock(d.dueDate, input.firstSent.get(d.id) ?? null, payWhenPaid) };
+    if (placed) byJob.set(placed, [...(byJob.get(placed) ?? []), item]);
     else unplaced.push(item);
   };
 
@@ -77,22 +85,20 @@ export function placeMoney(input: MoneyInput): Placed {
 
   for (const d of bills) {
     const paid = input.paid.get(d.id);
-    const dueOn = d.dueDate ?? input.firstSent.get(d.id)?.slice(0, 10) ?? null;
     if (d.kind !== "statement") {
-      put(d.jobId ?? jobOfNumber(d.number, input.jobs), {
+      put(d, d.jobId ?? jobOfNumber(d.number, input.jobs), {
         number: normalizeNumber(d.number),
         title: d.title,
         documentId: d.id,
         lineIndex: null,
         billedCents: d.totalCents,
         paidCents: paid?.total ?? 0,
-        dueOn,
       });
       continue;
     }
 
     const lines = d.snapshot.lines ?? [];
-    const items: { jobId: string | null; item: MoneyItem }[] = [];
+    const items: { jobId: string | null; item: Draft }[] = [];
     lines.forEach((l, i) => {
       const named = invoiceNamedIn(l.description);
       if (named && ownDocs.has(named)) return;
@@ -105,7 +111,6 @@ export function placeMoney(input: MoneyInput): Placed {
           lineIndex: i,
           billedCents: l.amountCents,
           paidCents: paid?.byLine.get(i) ?? 0,
-          dueOn,
         },
       });
     });
@@ -117,22 +122,21 @@ export function placeMoney(input: MoneyInput): Placed {
       const only = jobsOn.size === 1 ? [...jobsOn][0] : null;
       if (only && items.length) items[0].item = { ...items[0].item, paidCents: items[0].item.paidCents + lineless };
       else
-        unplaced.push({
+        put(d, null, {
           number: normalizeNumber(d.number),
           title: "Paid on the statement, not on a line",
           documentId: d.id,
           lineIndex: null,
           billedCents: 0,
           paidCents: lineless,
-          dueOn,
         });
     }
-    for (const x of items) put(x.jobId, x.item);
+    for (const x of items) put(d, x.jobId, x.item);
   }
   return { byJob, unplaced };
 }
 
-export type OpenBill = { number: string; title: string; owedCents: number; dueOn: string | null; daysLate: number | null };
+export type OpenBill = { number: string; title: string; owedCents: number; dueOn: string | null; daysLate: number | null; payWhenPaid: boolean };
 
 export type JobMoney = {
   jobId: string;
@@ -147,7 +151,7 @@ export type JobMoney = {
   asOf: string;
 };
 
-/** A bill is past due from the day after it was due (the ladder's day 1). */
+/** A bill is past due from the day after it was due (the ladder's day 1). A pay-when-paid bill with no due date never is. */
 export function summarizeJobMoney(jobId: string, items: MoneyItem[], contractCents: number | null, today: string): JobMoney {
   let billed = 0;
   let paid = 0;
@@ -162,7 +166,7 @@ export function summarizeJobMoney(jobId: string, items: MoneyItem[], contractCen
     owed += left;
     const daysLate = it.dueOn ? daysBetween(it.dueOn, today) : null;
     if (daysLate !== null && daysLate >= 1) pastDue += left;
-    open.push({ number: it.number, title: it.title, owedCents: left, dueOn: it.dueOn, daysLate });
+    open.push({ number: it.number, title: it.title, owedCents: left, dueOn: it.dueOn, daysLate, payWhenPaid: it.payWhenPaid });
   }
   open.sort((a, b) => (b.daysLate ?? -Infinity) - (a.daysLate ?? -Infinity) || b.owedCents - a.owedCents);
   return { jobId, contractCents, billedCents: billed, paidCents: paid, owedCents: owed, pastDueCents: pastDue, open, asOf: today };

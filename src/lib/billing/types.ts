@@ -15,8 +15,12 @@ export type BillingProfile = {
   cutoffDay?: number;
   /** Days from the invoice date to the due date. */
   netDays?: number;
-  /** Paid only after their own client pays them, and how many days after. */
-  payWhenPaidDays?: number;
+  /**
+   * Paid only after their own client pays them, and how many days after. Set
+   * (any number) = pay-when-paid: the past-due ladder does not start until an
+   * owner gives the bill a due date. A job's null overrides its client's mark.
+   */
+  payWhenPaidDays?: number | null;
   /** Percent held back until the end. */
   retainagePct?: number;
   /** What must go out with every invoice, or they reject it. */

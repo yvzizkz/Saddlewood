@@ -52,6 +52,11 @@ export function JobMoneyFigures({ m }: { m: JobMoney }) {
           ))}
         </ul>
       ) : null}
+      {m.open.some((o) => o.payWhenPaid && o.daysLate === null) ? (
+        <p className="mt-2 text-[12px] text-[var(--color-charcoal-light)]">
+          Pay-when-paid: {m.open.filter((o) => o.payWhenPaid && o.daysLate === null).map((o) => `${o.number} ${money(o.owedCents)}`).join(', ')}. Not past due until a due date is set.
+        </p>
+      ) : null}
       {m.billedCents === 0 ? (
         <p className="mt-2 text-[12px] text-[var(--color-charcoal-light)]">Nothing billed from the app on this job yet.</p>
       ) : null}
