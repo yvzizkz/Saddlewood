@@ -57,6 +57,8 @@ export type DocumentSnapshot = {
   job?: { name: string; address?: string };
   date?: string;
   lines?: DocumentLine[];
+  /** Work named on the document but not in its total (priced later, by others, ...); shown apart so no one reads it as included. */
+  notIncluded?: { description: string; note?: string }[];
   /** Printed under the lines: terms, how to pay, reference to the contract or estimate. */
   terms?: string;
   note?: string;
