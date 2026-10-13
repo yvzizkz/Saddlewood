@@ -675,6 +675,17 @@ export function parseAmount(raw: string): number | null {
   return Number.isFinite(n) && n > 0 && n <= 100_000 ? Math.round(n * 100) / 100 : null;
 }
 
+/**
+ * Seats for people with no email of their own sign in on a placeholder under
+ * this domain (omar.p@crew.saddlewoodcontracting.com). It has no mailbox: an
+ * owner hands them a code ("Get a code"), and nothing is ever emailed there.
+ */
+export const PLACEHOLDER_EMAIL_DOMAIN = "crew.saddlewoodcontracting.com";
+
+export function isPlaceholderEmail(email: string): boolean {
+  return email.trim().toLowerCase().endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`);
+}
+
 export function firstNameOf(name: string): string {
   return name.trim().split(/\s+/)[0] ?? "";
 }

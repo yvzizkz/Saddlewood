@@ -46,7 +46,7 @@ import {
 } from "./queries";
 import { CREW_ROLE, FORMER_ROLE } from "./role";
 import { addDays, clock12, dayShort, localClock, localDay, localInstant } from "./time";
-import { OTHER_JOB, firstNameOf, jobSlug, normalizePerms, type AdminAct, type ShiftEdit } from "./types";
+import { OTHER_JOB, firstNameOf, isPlaceholderEmail, jobSlug, normalizePerms, type AdminAct, type ShiftEdit } from "./types";
 
 /** Whoever is acting from the Crew screens: an owner, or a member (limited by their group's switches in the route). */
 type Owner = Pick<Manager, "email" | "name"> & { role?: Manager["role"]; perms?: readonly string[] };
@@ -265,6 +265,9 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         group: act.group,
         addedBy: owner.name,
       });
+      if (isPlaceholderEmail(person.email)) {
+        return ok(`${person.name} has a seat. There is no real email behind it: use "Get a code" to sign them in on their phone.`);
+      }
       if (!act.invite) return ok(`${person.name} has a seat. Send them the link when you are ready.`);
       try {
         await sendCrewInvite(person);
@@ -307,6 +310,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
     case "person.invite": {
       const person = await getPerson(act.email);
       if (!person || !person.active) return bad(404, "That person does not have a seat.");
+      if (isPlaceholderEmail(person.email)) return bad(400, 'There is no real email behind this seat. Use "Get a code" and type it on their phone.');
       await sendCrewInvite(person);
       return ok(`Sent to ${person.email}.`);
     }

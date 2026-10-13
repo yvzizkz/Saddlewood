@@ -12,10 +12,11 @@ import {
   CAPABILITIES,
   PRIORITIES,
   firstNameOf,
+  isPlaceholderEmail,
+  isReportedDone,
   normalizePerms,
   type Capability,
   type CrewGroup,
-  isReportedDone,
   type CrewEntry,
   type CrewJob,
   type CrewLang,
@@ -771,9 +772,15 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
               <p className="text-[13px] leading-relaxed text-[var(--color-charcoal-light)]">
                 {person.lastSeenAt ? `Opened the app ${ago(person.lastSeenAt)}.` : 'Has not opened the app yet.'} They sign in with their email and a code that is emailed to them.
               </p>
-              <Button full busy={busy === 'person.invite'} onClick={() => act('person.invite')}>
-                <Mail className="size-4" aria-hidden="true" /> Email them the sign-in link
-              </Button>
+              {isPlaceholderEmail(person.email) ? (
+                <p className="text-[13px] leading-relaxed text-[var(--color-charcoal)]">
+                  No real email behind this seat. Get a code and type it on their phone; they stay signed in there.
+                </p>
+              ) : (
+                <Button full busy={busy === 'person.invite'} onClick={() => act('person.invite')}>
+                  <Mail className="size-4" aria-hidden="true" /> Email them the sign-in link
+                </Button>
+              )}
               <Button full busy={busy === 'person.code'} onClick={() => act('person.code')}>
                 Get a code to give them in person
               </Button>

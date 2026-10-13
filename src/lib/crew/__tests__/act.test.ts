@@ -871,3 +871,13 @@ describe("groups and their switches", () => {
     expect(await runAdminAct(manager, adminActSchema.parse({ kind: "job.update", id: "powell", name: "Powell" }), at("09:00"))).toMatchObject({ ok: true });
   });
 });
+
+describe("seats with no real email", () => {
+  it("never emails a placeholder address, and says to use a code", async () => {
+    const res = await admin({ kind: "person.add", name: "Filiberto Villegas", email: "filiberto.v@crew.saddlewoodcontracting.com", lang: "es" }, at("09:00"));
+    expect(res).toMatchObject({ ok: true, note: expect.stringContaining("Get a code") });
+    expect(await admin({ kind: "person.invite", email: "filiberto.v@crew.saddlewoodcontracting.com" }, at("09:01"))).toMatchObject({ ok: false, status: 400 });
+    expect(mail.sent).toHaveLength(0);
+    expect(await admin({ kind: "person.code", email: "filiberto.v@crew.saddlewoodcontracting.com" }, at("09:02"))).toMatchObject({ ok: true, code: "12345678" });
+  });
+});
