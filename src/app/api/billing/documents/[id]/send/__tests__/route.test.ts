@@ -70,7 +70,7 @@ describe("POST /api/billing/documents/[id]/send", () => {
       expect(json.preview.from).toContain("accounting@saddlewoodcontracting.com");
       expect(json.preview.to).toEqual(["ap@client.com"]);
       expect(json.preview.body).toContain(LINK);
-      expect(json.preview.internalCopy.to).toEqual(["marco@saddlewoodcontracting.com"]);
+      expect(json.preview.internalCopy.to).toEqual(["marco@saddlewoodcontracting.com", "info@saddlewoodcontracting.com"]);
     }
     expect(sendMock).not.toHaveBeenCalled();
     expect(recordEvent).not.toHaveBeenCalled();
@@ -79,8 +79,10 @@ describe("POST /api/billing/documents/[id]/send", () => {
   it("sends from accounting@ and writes the sent line with the mail id", async () => {
     const res = await call({ ...GOOD, cc: [], confirm: true });
     const json = await res.json();
-    expect(json).toMatchObject({ ok: true, sent: true, emailId: "em_1", recorded: true, copySent: null });
-    expect(sendMock).toHaveBeenCalledTimes(1);
+    // The office copy (info@) goes out even when no one of ours is on the message.
+    expect(json).toMatchObject({ ok: true, sent: true, emailId: "em_1", recorded: true, copySent: true });
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock.mock.calls[1][0].to).toEqual(["info@saddlewoodcontracting.com"]);
     const mail = sendMock.mock.calls[0][0];
     expect(mail.from).toBe("Saddlewood Contracting Accounting <accounting@saddlewoodcontracting.com>");
     expect(mail.replyTo).toBe("accounting@saddlewoodcontracting.com");
@@ -106,11 +108,11 @@ describe("POST /api/billing/documents/[id]/send", () => {
     expect(client.cc).toBeUndefined();
     expect(client.text).toContain(LINK);
     expect(client.text).not.toContain("copy=1");
-    expect(ours.to).toEqual(["marco@saddlewoodcontracting.com"]);
+    expect(ours.to).toEqual(["marco@saddlewoodcontracting.com", "info@saddlewoodcontracting.com"]);
     expect(ours.text).toContain(`${LINK}?copy=1`);
     expect(ours.text).toContain("This went to ap@client.com.");
     expect(recordEvent).toHaveBeenCalledTimes(1);
-    expect(recordEvent.mock.calls[0][0].detail).toMatchObject({ to: ["ap@client.com"], internalCopy: ["marco@saddlewoodcontracting.com"] });
+    expect(recordEvent.mock.calls[0][0].detail).toMatchObject({ to: ["ap@client.com"], internalCopy: ["marco@saddlewoodcontracting.com", "info@saddlewoodcontracting.com"] });
   });
 
   it("still answers sent when only the internal copy fails", async () => {
