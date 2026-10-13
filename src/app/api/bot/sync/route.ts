@@ -5,6 +5,7 @@ import { ownerEmails } from "@/lib/bot/home";
 import { sendPush } from "@/lib/bot/push";
 import { applySync, claimWork, readState } from "@/lib/bot/queries";
 import { parseSection, syncPostSchema } from "@/lib/bot/types";
+import { laneOwners } from "@/lib/owner/lanes";
 
 // The Mac's door. Saddlewood-KB bot/app_bridge.py calls this with
 // OPS_AGENT_TOKEN and nothing else may: a portal session is refused here
@@ -76,7 +77,13 @@ export async function POST(request: NextRequest) {
             : (await readState()).sections.people;
         for (const n of parsed.data.notify) {
           // Only people with a seat are ever notified, whatever the list says.
-          const to = n.to === "owners" ? ownerEmails(people) : n.to.filter((email) => !!people[email]);
+          // The bot's own health goes to whoever runs the app and the bot.
+          const to =
+            n.to === "owners"
+              ? n.tag.startsWith("bot-health")
+                ? laneOwners("systems", people)
+                : ownerEmails(people)
+              : n.to.filter((email) => !!people[email]);
           pushed += (await sendPush(to, { title: n.title, body: n.body, url: n.url, tag: n.tag })).sent;
         }
       }

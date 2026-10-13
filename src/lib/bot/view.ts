@@ -1,4 +1,5 @@
 import type { BotDraft, BotHome } from "./types";
+import type { Lane } from "@/lib/owner/lanes";
 
 // Small pure helpers for the app's screens. Client-safe: nothing here may
 // import the server-only modules (queries, push).
@@ -78,11 +79,19 @@ export function canApprove(draft: BotDraft, name: string | null): boolean {
   return !!name && !draft.held && !draft.blocked && draft.status === "open" && draft.approvers.includes(name);
 }
 
+/** Whether a lane is this person's. Without lanes (not an owner), everything they were given is theirs. */
+export function isMyLane(home: BotHome, lane: Lane): boolean {
+  return !home.lanes || home.lanes.mine.includes(lane);
+}
+
 /** How many things on Home are waiting on this person. Drives the tab badge. */
 export function needsYouCount(home: BotHome | null): number {
   if (!home?.me.name) return 0;
   const drafts = home.sections.drafts.filter((d) => canApprove(d, home.me.name)).length;
-  return drafts + home.sections.payments.length + home.sections.bids.length;
+  const payments = isMyLane(home, "money") ? home.sections.payments.length : 0;
+  const bids = isMyLane(home, "sales") ? home.sections.bids.length : 0;
+  const decisions = (home.waiting ?? []).filter((i) => i.kind === "decision" && isMyLane(home, i.lane)).length;
+  return drafts + payments + bids + decisions;
 }
 
 /** One line on what is wrong, or null when the bot is healthy. */

@@ -9,6 +9,8 @@ import {
   type BotSections,
   type BridgeSeen,
 } from "./types";
+import { laneNames, lanesOf } from "@/lib/owner/lanes";
+import type { WaitingItem } from "@/lib/owner/waiting";
 
 // Who sees what. The Mac decides who may DO something; this decides who may
 // LOOK. An owner sees the whole picture. A requester (an employee who can ask
@@ -41,6 +43,7 @@ export function buildHome(input: {
   actions: BotAction[];
   push: BotHome["push"];
   crew?: BotHome["crew"];
+  waiting?: WaitingItem[];
   now?: Date;
 }): BotHome {
   const now = input.now ?? new Date();
@@ -88,7 +91,8 @@ export function buildHome(input: {
       health.problems.requests =
         "Requests sent from the app are not being picked up. Taps still work. Fix: on the Mac, check that the launchd job com.saddlewood.bot-app-agent is loaded.";
     }
-    return { ...base, sections: { ...rest, health }, team, names, inFlight, actions, crew: input.crew ?? null };
+    const lanes = { mine: lanesOf(input.email, people), holders: laneNames(people) };
+    return { ...base, sections: { ...rest, health }, team, names, inFlight, actions, crew: input.crew ?? null, waiting: input.waiting ?? [], lanes };
   }
 
   // Everyone else starts from an empty picture and is given only what is
@@ -110,5 +114,7 @@ export function buildHome(input: {
     inFlight: inFlight.filter((m) => m.mine),
     actions: actions.filter((a) => a.actor === input.email),
     crew: null,
+    waiting: [],
+    lanes: null,
   };
 }

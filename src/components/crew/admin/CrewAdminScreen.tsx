@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Download, Package, Plus, Send, Share2, X } from 'lucide-react'
 
 import { useBot } from '@/components/bot/BotProvider'
@@ -48,7 +49,8 @@ import { CrewAdminProvider, useCrewAdmin } from './useCrewAdmin'
 //   Hours     the week's timesheet, corrections, the payroll export (owners)
 //   Team      who has a seat, and the list of jobs (owners)
 
-type View = 'today' | 'schedule' | 'runner' | 'plan' | 'hours' | 'team'
+const VIEWS = ['today', 'schedule', 'runner', 'plan', 'hours', 'team'] as const
+type View = (typeof VIEWS)[number]
 
 type Open =
   | { kind: 'assign'; day: string; preset?: { jobId: string; startTime: string; note: string; priority?: number | null } }
@@ -1005,7 +1007,9 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
 
 function Screen() {
   const { data, error, refresh, isOwner, can } = useCrewAdmin()
-  const [view, setView] = useState<View>('today')
+  // A link from Home can open a view: /app/crew?view=plan.
+  const asked = useSearchParams().get('view')
+  const [view, setView] = useState<View>(asked && (VIEWS as readonly string[]).includes(asked) ? (asked as View) : 'today')
   const [open, setOpen] = useState<Open>(null)
   const [sheetKey, setSheetKey] = useState(0)
 

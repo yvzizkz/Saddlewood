@@ -5,6 +5,7 @@ import { buildHome, whoIs } from "@/lib/bot/home";
 import { pushConfig } from "@/lib/bot/push";
 import { failStale, hasStale, listInFlight, listRecentActions, readState } from "@/lib/bot/queries";
 import { crewSummary } from "@/lib/crew/queries";
+import { loadWaiting } from "@/lib/owner/load";
 
 // Everything the app's Home, Duties and More screens show, in one read: what
 // the Mac last reported the bot is holding, who is asking it for what right
@@ -27,8 +28,12 @@ export async function GET(request: NextRequest) {
       [state, inFlight, actions] = await Promise.all([readState(), listInFlight(), listRecentActions()]);
     }
     const config = pushConfig();
-    // The crew at a glance, for an owner. Never worth failing Home over.
-    const crew = whoIs(email, state.sections.people).role === "owner" ? await crewSummary().catch(() => null) : null;
+    // The crew at a glance and what is waiting on whom, for an owner. Never
+    // worth failing Home over.
+    const owner = whoIs(email, state.sections.people).role === "owner";
+    const [crew, waiting] = owner
+      ? await Promise.all([crewSummary().catch(() => null), loadWaiting().catch(() => [])])
+      : [null, []];
     const home = buildHome({
       email,
       sections: state.sections,
@@ -37,6 +42,7 @@ export async function GET(request: NextRequest) {
       actions,
       push: { available: !!config, publicKey: config?.publicKey ?? null },
       crew,
+      waiting,
     });
     return NextResponse.json(home, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

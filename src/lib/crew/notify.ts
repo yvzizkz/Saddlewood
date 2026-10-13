@@ -1,4 +1,5 @@
 import { ownerEmails } from "@/lib/bot/home";
+import { laneOwners, type Lane } from "@/lib/owner/lanes";
 import { sendPush } from "@/lib/bot/push";
 import { readState } from "@/lib/bot/queries";
 import { say } from "./messages";
@@ -15,10 +16,20 @@ export async function ownerAddresses(): Promise<string[]> {
   return ownerEmails(sections.people);
 }
 
-/** To every owner's phone. Opens the Crew tab. */
-export async function notifyOwners(note: { title: string; body: string; tag: string }): Promise<void> {
+/** The owner who holds a lane (src/lib/owner/lanes.ts), or every owner if nobody does. */
+export async function laneAddresses(lane: Lane): Promise<string[]> {
+  const { sections } = await readState();
+  return laneOwners(lane, sections.people);
+}
+
+/**
+ * To the phone of the owner whose lane this is: field escalations and the
+ * supervisor's plan to Marco ("decisions"), hours to whoever runs payroll
+ * ("money"). Opens the Crew tab.
+ */
+export async function notifyOwners(note: { title: string; body: string; tag: string }, lane: Lane): Promise<void> {
   try {
-    await sendPush(await ownerAddresses(), {
+    await sendPush(await laneAddresses(lane), {
       title: note.title.slice(0, 80),
       body: note.body.replace(/\s+/g, " ").slice(0, 240),
       url: "/app/crew",
@@ -32,7 +43,7 @@ export async function notifyOwners(note: { title: string; body: string; tag: str
 /**
  * To whoever runs the field: every seat whose group has "updates" switched on
  * (the supervisor), so updates from the crew land with them and not with
- * Marco. With nobody in such a group, the owners, as before. `alsoOwners` for what the owners must hear either way (safety).
+ * Marco. With nobody in such a group, the owner of the "decisions" lane (Marco). `alsoOwners` for what he must hear either way (safety).
  * The person who caused it is never told about their own act.
  */
 export async function notifySupervisors(
@@ -45,7 +56,7 @@ export async function notifySupervisors(
   } catch (e) {
     console.error("[crew/notify] leads:", (e as Error).message);
   }
-  if (!leads.length || opts.alsoOwners) await notifyOwners(note);
+  if (!leads.length || opts.alsoOwners) await notifyOwners(note, "decisions");
   if (!leads.length) return;
   try {
     await sendPush(leads, {

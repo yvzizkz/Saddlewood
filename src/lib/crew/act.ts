@@ -509,6 +509,6 @@ async function announce(person: CrewPersonRow, entry: CrewEntry): Promise<void> 
       title: `Time fix from ${first}`,
       body: `${dayShort(entry.day)}${at}: ${entry.body}`,
       tag: `crew-fix-${entry.id}`,
-    });
+    }, "money");
   }
 }

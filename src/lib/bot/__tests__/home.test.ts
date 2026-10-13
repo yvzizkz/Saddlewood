@@ -8,6 +8,7 @@ const NOW = new Date("2026-10-03T18:00:00Z");
 const LANDO = "lando@saddlewoodcontracting.com";
 const MARCO = "marco@saddlewoodcontracting.com";
 const ELI = "eli@saddlewoodcontracting.com";
+const ILENE = "ilene8a@gmail.com";
 
 function sections(): BotSections {
   const s = emptySections();
@@ -133,10 +134,32 @@ describe("is the bot there", () => {
 });
 
 describe("what needs you", () => {
-  it("counts drafts you can send now plus payments, never a held draft", () => {
+  it("counts drafts you can send now, never a held draft, and payments only for the money lane", () => {
     const h = home(LANDO);
     expect(h.sections.drafts.filter((d) => canApprove(d, "Lando")).map((d) => d.n)).toEqual([18, 21]);
-    expect(needsYouCount(h)).toBe(3);
+    // Ilene holds payments and payroll, so the payment is hers, not Lando's.
+    expect(needsYouCount(h)).toBe(2);
+    expect(needsYouCount(home(ILENE))).toBe(1);
+  });
+
+  it("falls back to the backup when the lane's owner has no seat", () => {
+    const s = sections();
+    delete s.people[ILENE];
+    expect(needsYouCount(home(LANDO, { sections: s }))).toBe(3);
+    expect(home(LANDO, { sections: s }).lanes?.holders.money).toEqual({ name: "Lando", backup: true });
+  });
+
+  it("counts the decisions in your lanes and leaves the signals and other lanes out", () => {
+    const waiting = [
+      { key: "a", lane: "decisions" as const, kind: "decision" as const, title: "Eli asks you", detail: "", href: "/app/crew", at: null },
+      { key: "b", lane: "decisions" as const, kind: "signal" as const, title: "Promise", detail: "", href: "/app/crew", at: null },
+      { key: "c", lane: "money" as const, kind: "decision" as const, title: "Hours", detail: "", href: "/app/crew", at: null },
+    ];
+    const marco = home(MARCO, { waiting });
+    expect(marco.lanes?.mine).toEqual(["sales", "decisions"]);
+    expect(needsYouCount(marco)).toBe(2 + 1); // drafts 18 and 21, plus Eli's ask
+    expect(home(ELI, { waiting }).waiting).toEqual([]);
+    expect(home(ELI, { waiting }).lanes).toBeNull();
   });
 
   it("names the owners for a notification to owners", () => {

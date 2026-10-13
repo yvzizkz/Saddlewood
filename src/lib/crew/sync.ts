@@ -1,6 +1,6 @@
 import { sendPush } from "@/lib/bot/push";
 import { MSG } from "./messages";
-import { notifyCrew, ownerAddresses } from "./notify";
+import { laneAddresses, notifyCrew, ownerAddresses } from "./notify";
 import {
   getEntry,
   getJob,
@@ -94,9 +94,15 @@ export async function applyCrewSync(post: CrewSync, nowDate = new Date()): Promi
   if (post.notify.length) {
     try {
       const owners = await ownerAddresses();
+      // What the Mac sends "to owners" here is field supervision (still on the
+      // clock, has not clocked in, nobody scheduled tomorrow). It goes to
+      // whoever runs the field (a seat with "updates" switched on), and only
+      // with nobody seated there to the owner of the "decisions" lane.
+      const leads = people.filter((p) => p.active && p.perms.includes("updates")).map((p) => p.email);
+      const field = leads.length ? leads : await laneAddresses("decisions");
       for (const n of post.notify) {
         // Only owners and people with an active seat are ever notified, whatever the list says.
-        const to = n.to === "owners" ? owners : n.to.filter((email) => active.has(email) || owners.includes(email));
+        const to = n.to === "owners" ? field : n.to.filter((email) => active.has(email) || owners.includes(email));
         const res = await sendPush(to, { title: n.title, body: n.body, url: n.url, tag: n.tag });
         applied.pushed += res.sent;
       }

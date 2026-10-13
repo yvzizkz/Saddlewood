@@ -2,14 +2,16 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ArrowRight, ChevronRight, Lock, Paperclip } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, Lock, Paperclip } from 'lucide-react'
 
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { useBot } from './BotProvider'
 import DraftSheet from './DraftSheet'
 import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle } from './ui'
 import type { BotDraft, BotHome, BotLedgerItem } from '@/lib/bot/types'
-import { ACTION_LABELS, ago, canApprove, dayTime, elapsed, firstName, greeting, healthLine, money, personFor } from '@/lib/bot/view'
+import { LANE_INFO, LANES, type Lane } from '@/lib/owner/lanes'
+import type { WaitingItem } from '@/lib/owner/waiting'
+import { ACTION_LABELS, ago, canApprove, dayTime, elapsed, firstName, greeting, healthLine, isMyLane, money, needsYouCount, personFor } from '@/lib/bot/view'
 
 // Oversight: what is waiting on you, what the bot is doing right now, what it
 // is waiting on from other people, and whether it is alive.
@@ -156,12 +158,185 @@ function LedgerCloseSheet({ item, onClose }: { item: BotLedgerItem | null; onClo
   )
 }
 
+function WaitingRow({ item }: { item: WaitingItem }) {
+  return (
+    <Link href={item.href} className="flex items-start gap-3 px-4 py-3.5 active:bg-[var(--color-cream)]">
+      <span className="mt-1.5">
+        <Dot tone={item.kind === 'signal' ? 'bad' : 'warn'} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-medium leading-snug text-[var(--color-charcoal)]">{item.title}</span>
+        {item.detail ? (
+          <span className="mt-0.5 block text-[13px] leading-snug text-[var(--color-charcoal-light)]">{item.detail}</span>
+        ) : null}
+      </span>
+      <ChevronRight className="mt-1 size-4 shrink-0 text-[var(--color-charcoal-light)]" aria-hidden="true" />
+    </Link>
+  )
+}
+
+function PaymentsCard({ home }: { home: BotHome }) {
+  const { act, busy } = useBot()
+  const [armedPayment, setArmedPayment] = useState<number | null>(null)
+  if (!home.sections.payments.length) return null
+  return (
+    <Card className="mt-3 divide-y divide-[var(--color-stone)]">
+      {home.sections.payments.map((p) => {
+        const key = `payment:${p.n}`
+        const armed = armedPayment === p.n
+        return (
+          <div key={p.n} className="px-4 py-3.5">
+            <p className="text-[15px] font-medium text-[var(--color-charcoal)]">
+              {money(p.amount)} from {p.client}
+            </p>
+            <p className="mt-0.5 text-[13px] text-[var(--color-charcoal-light)]">
+              <span className="font-mono">P{p.n}</span> · invoice {p.invoice} · {p.date}
+              {p.evidence ? ` · ${p.evidence}` : ''}
+            </p>
+            <div className="mt-2.5 flex gap-2">
+              <Button
+                variant="primary"
+                busy={!!busy[key]}
+                disabled={!home.bridge.online}
+                onClick={async () => {
+                  if (!armed) {
+                    setArmedPayment(p.n)
+                    window.setTimeout(() => setArmedPayment((n) => (n === p.n ? null : n)), 7000)
+                    return
+                  }
+                  setArmedPayment(null)
+                  await act({ kind: 'payment.confirm', payload: { n: p.n, yes: true } }, key)
+                }}
+              >
+                {armed ? 'Yes, record it in Joist' : 'Record in Joist'}
+              </Button>
+              <Button
+                disabled={!!busy[key] || !home.bridge.online}
+                onClick={() => act({ kind: 'payment.confirm', payload: { n: p.n, yes: false } }, key)}
+              >
+                Skip
+              </Button>
+            </div>
+          </div>
+        )
+      })}
+    </Card>
+  )
+}
+
+function BidsCard({ home }: { home: BotHome }) {
+  const { act, busy } = useBot()
+  if (!home.sections.bids.length) return null
+  return (
+    <Card className="mt-3 divide-y divide-[var(--color-stone)]">
+      {home.sections.bids.map((b) => {
+        const key = `bid:${b.n}`
+        return (
+          <div key={b.n} className="flex items-center gap-3 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-medium leading-snug text-[var(--color-charcoal)]">{b.project}</p>
+              <p className="mt-0.5 text-[13px] text-[var(--color-charcoal-light)]">
+                Bid invite from {b.gc || 'a GC'} · {b.ageDays} {b.ageDays === 1 ? 'day' : 'days'}, no reply yet
+              </p>
+            </div>
+            <Button busy={!!busy[key]} disabled={!home.bridge.online} onClick={() => act({ kind: 'bid.ack', payload: { n: b.n } }, key)}>
+              Handled
+            </Button>
+          </div>
+        )
+      })}
+    </Card>
+  )
+}
+
+function ExpensesLink({ count }: { count: number }) {
+  if (!count) return null
+  return (
+    <Link
+      href="/internal/expenses"
+      className="mt-3 flex items-center justify-between rounded-2xl border border-[var(--color-stone)] bg-white px-4 py-3.5 active:bg-[var(--color-cream)]"
+    >
+      <span className="text-[15px] text-[var(--color-charcoal)]">
+        <span className="font-semibold">{count}</span> {count === 1 ? 'expense needs' : 'expenses need'} a job tag
+      </span>
+      <ArrowRight className="size-4 text-[var(--color-charcoal-light)]" aria-hidden="true" />
+    </Link>
+  )
+}
+
+/**
+ * What is waiting on the other owners, one fold per person. Everyone can
+ * still act on anything here; the lane only decides who is asked first.
+ */
+function OthersWaiting({ home }: { home: BotHome }) {
+  const [open, setOpen] = useState<string | null>(null)
+  if (!home.lanes) return null
+  const holders = home.lanes.holders
+  const byName = new Map<string, Lane[]>()
+  for (const lane of LANES) {
+    if (isMyLane(home, lane)) continue
+    const name = holders[lane].name
+    byName.set(name, [...(byName.get(name) ?? []), lane])
+  }
+  const groups = [...byName.entries()]
+    .map(([name, lanes]) => {
+      const items = (home.waiting ?? []).filter((i) => lanes.includes(i.lane))
+      const payments = lanes.includes('money') ? home.sections.payments.length : 0
+      const bids = lanes.includes('sales') ? home.sections.bids.length : 0
+      const expenses = lanes.includes('money') ? home.sections.expenses.length : 0
+      return { name, lanes, items, payments, bids, expenses, count: items.length + payments + bids + (expenses ? 1 : 0) }
+    })
+    .filter((g) => g.count > 0)
+  if (!groups.length) return null
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      {groups.map((g) => {
+        const isOpen = open === g.name
+        const covering = g.lanes.filter((l) => holders[l].backup)
+        return (
+          <div key={g.name}>
+            <button
+              type="button"
+              aria-expanded={isOpen}
+              onClick={() => setOpen(isOpen ? null : g.name)}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--color-stone)] bg-white px-4 py-3 text-left active:bg-[var(--color-cream)]"
+            >
+              <span className="text-[15px] text-[var(--color-charcoal)]">
+                Waiting on {g.name} <span className="text-[var(--color-charcoal-light)]">· {g.count}</span>
+                {covering.map((l) => (
+                  <span key={l} className="block text-[12px] text-[var(--color-charcoal-light)]">
+                    Covers {LANE_INFO[l].label.toLowerCase()} until {LANE_INFO[l].primary} has a seat in the app
+                  </span>
+                ))}
+              </span>
+              <ChevronDown className={`size-4 shrink-0 text-[var(--color-charcoal-light)] transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
+            {isOpen ? (
+              <div className="mt-2">
+                {g.items.length ? (
+                  <Card className="divide-y divide-[var(--color-stone)] overflow-hidden">
+                    {g.items.map((i) => (
+                      <WaitingRow key={i.key} item={i} />
+                    ))}
+                  </Card>
+                ) : null}
+                {g.payments ? <PaymentsCard home={home} /> : null}
+                {g.bids ? <BidsCard home={home} /> : null}
+                {g.expenses ? <ExpensesLink count={g.expenses} /> : null}
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function HomeScreen() {
-  const { home, error, act, busy } = useBot()
+  const { home, error } = useBot()
   const [openDraft, setOpenDraft] = useState<number | null>(null)
   const [closing, setClosing] = useState<BotLedgerItem | null>(null)
   const [allLedger, setAllLedger] = useState(false)
-  const [armedPayment, setArmedPayment] = useState<number | null>(null)
 
   const feed = useMemo(() => {
     if (!home) return []
@@ -217,7 +392,10 @@ export default function HomeScreen() {
   const mineDrafts = sections.drafts.filter((d) => canApprove(d, me.name))
   const otherDrafts = sections.drafts.filter((d) => !canApprove(d, me.name))
   const draft = sections.drafts.find((d) => d.n === openDraft) ?? null
-  const needs = mineDrafts.length + sections.payments.length + sections.bids.length
+  const needs = needsYouCount(home)
+  const myItems = (home.waiting ?? []).filter((i) => isMyLane(home, i.lane))
+  const myDecisions = myItems.filter((i) => i.kind === 'decision')
+  const mySignals = myItems.filter((i) => i.kind === 'signal')
   const ledger = allLedger ? sections.ledger : sections.ledger.slice(0, 4)
   const health = sections.health
 
@@ -242,9 +420,17 @@ export default function HomeScreen() {
         </Link>
       ) : null}
 
-      <SectionTitle count={needs}>Needs your OK</SectionTitle>
-      {needs === 0 ? (
-        <Empty>Nothing is waiting on you. When the bot drafts something that needs a yes, it lands here.</Empty>
+      <SectionTitle count={needs}>Waiting on you</SectionTitle>
+      {needs === 0 && !mySignals.length ? (
+        <Empty>Nothing is waiting on you. When something needs your yes, or something goes wrong, it lands here.</Empty>
+      ) : null}
+
+      {myDecisions.length ? (
+        <Card className="mb-3 divide-y divide-[var(--color-stone)] overflow-hidden">
+          {myDecisions.map((i) => (
+            <WaitingRow key={i.key} item={i} />
+          ))}
+        </Card>
       ) : null}
 
       {mineDrafts.length ? (
@@ -255,87 +441,19 @@ export default function HomeScreen() {
         </Card>
       ) : null}
 
-      {sections.payments.length ? (
-        <Card className="mt-3 divide-y divide-[var(--color-stone)]">
-          {sections.payments.map((p) => {
-            const key = `payment:${p.n}`
-            const armed = armedPayment === p.n
-            return (
-              <div key={p.n} className="px-4 py-3.5">
-                <p className="text-[15px] font-medium text-[var(--color-charcoal)]">
-                  {money(p.amount)} from {p.client}
-                </p>
-                <p className="mt-0.5 text-[13px] text-[var(--color-charcoal-light)]">
-                  <span className="font-mono">P{p.n}</span> · invoice {p.invoice} · {p.date}
-                  {p.evidence ? ` · ${p.evidence}` : ''}
-                </p>
-                <div className="mt-2.5 flex gap-2">
-                  <Button
-                    variant="primary"
-                    busy={!!busy[key]}
-                    disabled={!home.bridge.online}
-                    onClick={async () => {
-                      if (!armed) {
-                        setArmedPayment(p.n)
-                        window.setTimeout(() => setArmedPayment((n) => (n === p.n ? null : n)), 7000)
-                        return
-                      }
-                      setArmedPayment(null)
-                      await act({ kind: 'payment.confirm', payload: { n: p.n, yes: true } }, key)
-                    }}
-                  >
-                    {armed ? 'Yes, record it in Joist' : 'Record in Joist'}
-                  </Button>
-                  <Button
-                    disabled={!!busy[key] || !home.bridge.online}
-                    onClick={() => act({ kind: 'payment.confirm', payload: { n: p.n, yes: false } }, key)}
-                  >
-                    Skip
-                  </Button>
-                </div>
-              </div>
-            )
-          })}
+      {isMyLane(home, 'money') ? <PaymentsCard home={home} /> : null}
+      {isMyLane(home, 'sales') ? <BidsCard home={home} /> : null}
+      {isMyLane(home, 'money') ? <ExpensesLink count={sections.expenses.length} /> : null}
+
+      {mySignals.length ? (
+        <Card className="mt-3 divide-y divide-[var(--color-stone)] overflow-hidden">
+          {mySignals.map((i) => (
+            <WaitingRow key={i.key} item={i} />
+          ))}
         </Card>
       ) : null}
 
-      {sections.bids.length ? (
-        <Card className="mt-3 divide-y divide-[var(--color-stone)]">
-          {sections.bids.map((b) => {
-            const key = `bid:${b.n}`
-            return (
-              <div key={b.n} className="flex items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-medium leading-snug text-[var(--color-charcoal)]">{b.project}</p>
-                  <p className="mt-0.5 text-[13px] text-[var(--color-charcoal-light)]">
-                    Bid invite from {b.gc || 'a GC'} · {b.ageDays} {b.ageDays === 1 ? 'day' : 'days'}, no reply yet
-                  </p>
-                </div>
-                <Button
-                  busy={!!busy[key]}
-                  disabled={!home.bridge.online}
-                  onClick={() => act({ kind: 'bid.ack', payload: { n: b.n } }, key)}
-                >
-                  Handled
-                </Button>
-              </div>
-            )
-          })}
-        </Card>
-      ) : null}
-
-      {sections.expenses.length ? (
-        <Link
-          href="/internal/expenses"
-          className="mt-3 flex items-center justify-between rounded-2xl border border-[var(--color-stone)] bg-white px-4 py-3.5 active:bg-[var(--color-cream)]"
-        >
-          <span className="text-[15px] text-[var(--color-charcoal)]">
-            <span className="font-semibold">{sections.expenses.length}</span>{' '}
-            {sections.expenses.length === 1 ? 'expense needs' : 'expenses need'} a job tag
-          </span>
-          <ArrowRight className="size-4 text-[var(--color-charcoal-light)]" aria-hidden="true" />
-        </Link>
-      ) : null}
+      <OthersWaiting home={home} />
 
       {otherDrafts.length ? (
         <>

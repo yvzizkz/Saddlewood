@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import type { Lane } from "@/lib/owner/lanes";
+import type { WaitingItem } from "@/lib/owner/waiting";
+
 // The contract between three parties:
 //   the app (people, portal session)      -> /api/bot/{home,messages,actions,...}
 //   the Mac bridge (OPS_AGENT_TOKEN)      -> /api/bot/sync
@@ -517,6 +520,10 @@ export type BotHome = {
   push: { available: boolean; publicKey: string | null };
   /** The field crew at a glance. Owners only; null when there is nothing to show or it could not be read. */
   crew: { people: number; onClock: number; needs: number } | null;
+  /** "Waiting on you" across the crew and money (src/lib/owner/waiting.ts). Owners only; [] for everyone else. */
+  waiting: WaitingItem[];
+  /** Whose lane is whose (src/lib/owner/lanes.ts). Owners only; null for everyone else. */
+  lanes: { mine: Lane[]; holders: Record<Lane, { name: string; backup: boolean }> } | null;
 };
 
 // ---- small shared helpers --------------------------------------------------

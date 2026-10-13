@@ -583,7 +583,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         title: `${firstNameOf(owner.name)}'s plan for ${dayShort(act.day)}`,
         body: `${plan.counts.scheduled} scheduled · ${plan.counts.open} open tasks${plan.counts.toCheck ? ` · ${plan.counts.toCheck} to check` : ""}${act.note ? ` · needs you: ${act.note}` : ""}`,
         tag: `crew-plan-${report.day}`,
-      });
+      }, "decisions");
       return ok("Sent to Marco.");
     }
 

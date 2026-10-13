@@ -15,11 +15,32 @@ is described in `docs/CREW-APP.md`. This page is the owners' side.
 
 | Tab | What it is for |
 |---|---|
-| Home | Oversight. Drafts waiting on your OK (read, approve and send, send later, cancel), payments and bid invites to clear, what the bot is working on, what it is waiting on from other people, recent activity, bot health. |
+| Home | Oversight. "Waiting on you" first: drafts waiting on your OK (read, approve and send, send later, cancel), payments and bid invites to clear, and what the crew and money need from an owner (see "Lanes" below). Then what is waiting on the other owners, what the bot is working on, what it is waiting on from other people, recent activity, bot health. |
 | Ask | Delegation. A conversation with the bot, with photos and files. Same agent, rules and memory as a text or an email to it. Short commands (`drafts`, `approve 4`, `payments`) are answered in seconds. |
 | Crew | Owners only. The field crew: who is on the clock, what came in from the field, the schedule, hours, and who has a seat. See `docs/CREW-APP.md`. |
 | Duties | Standing to-dos (`bot/tasks.json`), recurring duties the bot carries out on a schedule, and the built-in jobs with their last-run state. |
 | More | Install help, notifications, invite a teammate, the rest of the portal, the automatic-sending kill switch. |
+
+## Lanes: whose item is whose
+
+Every owner can open everything. A lane decides whose "Waiting on you" an item
+sits in and whose phone buzzes (`src/lib/owner/lanes.ts`, owner decision
+2026-10-12):
+
+| Lane | Who | What lands there |
+|---|---|---|
+| Sales | Marco | Bid invites |
+| Decisions | Marco | The supervisor's "Need from Marco", his plan not in by 6 PM, work reported done and not checked for a working day, a promise to a client within 3 days with work still open, invoices 14+ days late, safety reports |
+| Money | Ilene | Payments to record, expenses to tag, time fixes and shifts to review, invoices 7 to 13 days late |
+| Systems | Lando | Bot health alerts |
+
+A lane names a person. When that person has no owner seat in `bot/app_allow.json`,
+the lane falls to its backup (Lando for Marco's and Ilene's lanes, Marco for
+Lando's), and with neither, to every owner. Until Ilene has a seat, Lando
+covers money. Field notices from the Mac (still on the clock, has not
+clocked in, nobody scheduled tomorrow) go to the field supervisor, and to the
+decisions lane only when no supervisor is seated. The list itself is built in
+`src/lib/owner/waiting.ts` from what the app already holds.
 
 ## How it reaches the bot
 
