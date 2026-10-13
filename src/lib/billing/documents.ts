@@ -22,7 +22,7 @@ function fail(what: string, message: string): never {
   throw new Error(`${what} failed: ${message}`);
 }
 
-type DocumentRow = {
+export type DocumentRow = {
   id: string;
   kind: DocumentKind;
   job_id: string | null;
@@ -42,7 +42,7 @@ type DocumentRow = {
   created_at: string;
 };
 
-function toDocument(r: DocumentRow): BillingDocument {
+export function toDocument(r: DocumentRow): BillingDocument {
   return {
     id: r.id,
     kind: r.kind,
