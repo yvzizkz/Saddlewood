@@ -11,6 +11,8 @@ import { escapeHtml } from "@/lib/emailTemplate";
 export const BILLING_FROM = "Saddlewood Contracting Accounting <accounting@saddlewoodcontracting.com>";
 export const BILLING_REPLY_TO = "accounting@saddlewoodcontracting.com";
 export const INTERNAL_DOMAIN = "@saddlewoodcontracting.com";
+/** Every message accounting@ sends is copied here, so the office sees what went out. */
+export const RECORDS_COPY = "info@saddlewoodcontracting.com";
 
 const EMAIL = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 
@@ -67,6 +69,23 @@ export function documentLink(siteUrl: string, token: string): string {
  */
 export function internalLink(link: string): string {
   return `${link}?copy=1`;
+}
+
+/**
+ * Our people's copy of a message: any button that opens one of our document
+ * pages gets ?copy=1, so opening it from the copy is not counted as the client.
+ */
+export function copyLinks(links: MailLink[]): MailLink[] {
+  return links.map((l) => {
+    try {
+      const u = new URL(l.url);
+      if (!/(^|\.)saddlewoodcontracting\.com$/.test(u.hostname) || !u.pathname.startsWith("/d/")) return l;
+      u.searchParams.set("copy", "1");
+      return { ...l, url: u.toString() };
+    } catch {
+      return l;
+    }
+  });
 }
 
 /** Split recipients into the client's side and ours. */
@@ -211,6 +230,9 @@ export function buildMessage(parts: MessageParts): BillingMessage | { error: str
 
   const para = (p: string): string => {
     const only = p.trim();
+    if (only === "{buttons}") {
+      return `<p style="margin:4px 0 12px">${[...(doc ? [{ label: doc.label, url: doc.link }] : []), ...links].map(button).join("")}</p>`;
+    }
     if (only === "{link}" && doc) return `<p style="margin:4px 0 16px">${button({ label: doc.label, url: doc.link })}</p>`;
     if (only === "{links}") {
       // One row that wraps, not a stack of single buttons.
@@ -224,8 +246,10 @@ export function buildMessage(parts: MessageParts): BillingMessage | { error: str
   const html =
     '<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#2c2926;max-width:640px">' +
     // A marker alone on its line becomes a button, wherever the line sits.
+    // "{link}" on the line right above "{links}": the document's button and the others in one row.
     b
-      .replace(/^[ \t]*(\{links?\})[ \t]*$/gm, "\n\n$1\n\n")
+      .replace(/^[ \t]*\{link\}[ \t]*\n[ \t]*\{links\}[ \t]*$/m, "{buttons}")
+      .replace(/^[ \t]*(\{links?\}|\{buttons\})[ \t]*$/gm, "\n\n$1\n\n")
       .split(/\n{2,}/)
       .filter((p) => p.trim())
       .map(para)

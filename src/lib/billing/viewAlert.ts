@@ -2,7 +2,7 @@ import { Resend } from "resend";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { describeDevice } from "./proof";
-import { BILLING_FROM, BILLING_REPLY_TO } from "./send";
+import { BILLING_FROM, BILLING_REPLY_TO, RECORDS_COPY } from "./send";
 import type { BillingDocument, DocumentEvent, DocumentKind } from "./types";
 
 // Tells Marco when a client opens a document, the way Joist's "viewed"
@@ -107,6 +107,7 @@ export async function sendViewAlert(input: {
       from: BILLING_FROM,
       replyTo: BILLING_REPLY_TO,
       to: [ALERT_TO],
+      ...(ALERT_TO === RECORDS_COPY ? {} : { bcc: [RECORDS_COPY] }),
       subject,
       text,
     });

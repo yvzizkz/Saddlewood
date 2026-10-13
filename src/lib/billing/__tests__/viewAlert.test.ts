@@ -60,3 +60,33 @@ describe("view alerts to Marco", () => {
     expect(m.subject).toBe("A Finer Touch Construction LLC downloaded Conditional waiver 8009-14 (Invoice 8009-14)");
   });
 });
+
+describe("our people's copy of a billing message", () => {
+  it("marks our document pages so opening them from the copy is not the client", async () => {
+    const { copyLinks } = await import("../send");
+    const out = copyLinks([
+      { label: "Invoice 8009-14", url: "https://saddlewoodcontracting.com/d/abc" },
+      { label: "In Joist", url: "https://client.joistapp.com/invoices/x" },
+      { label: "Already", url: "https://saddlewoodcontracting.com/d/abc?copy=1" },
+    ]);
+    expect(out[0].url).toBe("https://saddlewoodcontracting.com/d/abc?copy=1");
+    expect(out[1].url).toBe("https://client.joistapp.com/invoices/x");
+    expect(out[2].url).toBe("https://saddlewoodcontracting.com/d/abc?copy=1");
+  });
+
+  it("puts the document's button and the others in one row when {link} sits above {links}", async () => {
+    const { buildMessage } = await import("../send");
+    const m = buildMessage({
+      subject: "s",
+      body: "Hello\n\n{link}\n{links}\n\nThanks",
+      document: { link: "https://saddlewoodcontracting.com/d/abc", label: "View invoice" },
+      links: [{ label: "Invoice 8009-14", url: "https://saddlewoodcontracting.com/d/def" }],
+    });
+    if ("error" in m) throw new Error(m.error);
+    const rows = m.html.match(/<p style="margin:4px 0 12px">.*?<\/p>/g) ?? [];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain("View invoice");
+    expect(rows[0]).toContain("Invoice 8009-14");
+    expect(m.text).toContain("View invoice: https://saddlewoodcontracting.com/d/abc");
+  });
+});

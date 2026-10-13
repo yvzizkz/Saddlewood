@@ -8,8 +8,10 @@ import {
   checkAttachments,
   checkLinks,
   checkRecipients,
+  copyLinks,
   documentLink,
   internalLink,
+  RECORDS_COPY,
   splitInternal,
 } from "./send";
 import type { BillingDocument, DocumentKind } from "./types";
@@ -51,10 +53,16 @@ export async function deliver(actor: string, doc: BillingDocument | null, input:
 
   const link = doc?.token ? documentLink(process.env.NEXT_PUBLIC_SITE_URL || SITE_URL, doc.token) : null;
   const label = doc ? VIEW_LABEL[doc.kind] : "";
-  const { outside, inside } = splitInternal(checked.recipients);
+  const parts = splitInternal(checked.recipients);
+  const { outside } = parts;
   const hasOutside = outside.to.length + outside.cc.length > 0;
+  // The office (info@) sees everything accounting@ sends: on a client message
+  // it is on our own copy; otherwise it is a bcc.
+  const inside = parts.inside.includes(RECORDS_COPY) ? parts.inside : [...parts.inside, RECORDS_COPY];
   // A plain note, or a document going only to our own people, is one message.
-  const split = Boolean(doc) && hasOutside && inside.length > 0;
+  const split = Boolean(doc) && hasOutside;
+  const allRecipients = [...checked.recipients.to, ...checked.recipients.cc];
+  const bcc = !split && !allRecipients.includes(RECORDS_COPY) ? [RECORDS_COPY] : [];
 
   const main = buildMessage({
     subject: input.subject,
@@ -72,7 +80,7 @@ export async function deliver(actor: string, doc: BillingDocument | null, input:
         subject: input.subject,
         body: `Copy for our records. This went to ${[...mainTo, ...mainCc].join(", ")}.\n\n${String(input.body)}`,
         document: { link: internalLink(link!), label },
-        links: links.links,
+        links: copyLinks(links.links),
       })
     : null;
   if (copy && "error" in copy) return refuse(400, copy.error);
@@ -87,6 +95,7 @@ export async function deliver(actor: string, doc: BillingDocument | null, input:
     attachments: attached.files.map((f) => ({ filename: f.filename, bytes: f.content.length })),
     document: doc ? { number: doc.number, kind: doc.kind, link } : null,
     internalCopy: split ? { to: inside, note: "separate copy; its link is not counted as a viewing" } : null,
+    bcc,
   };
   if (input.confirm !== true) return { status: 200, body: { ok: true, sent: false, preview } };
 
@@ -100,6 +109,7 @@ export async function deliver(actor: string, doc: BillingDocument | null, input:
     replyTo: BILLING_REPLY_TO,
     to: mainTo,
     ...(mainCc.length ? { cc: mainCc } : {}),
+    ...(bcc.length ? { bcc } : {}),
     subject: main.subject,
     text: main.text,
     html: main.html,
