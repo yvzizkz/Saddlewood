@@ -128,6 +128,13 @@ describe("POST /api/billing/documents/[id]/send", () => {
     expect(sendMock.mock.calls[0][0].text).toContain(`${LINK}?copy=1`);
   });
 
+  it("names the document's button when asked", async () => {
+    const res = await call({ ...GOOD, cc: [], linkLabel: "Invoice 8009-13", confirm: true });
+    expect((await res.json()).sent).toBe(true);
+    expect(sendMock.mock.calls[0][0].html).toContain(">Invoice 8009-13</a>");
+    expect(sendMock.mock.calls[0][0].text).toContain(`Invoice 8009-13: ${LINK}`);
+  });
+
   it("adds the link when the body left it out", async () => {
     await call({ ...GOOD, cc: [], body: "Please see the statement.", confirm: true });
     expect(sendMock.mock.calls[0][0].text).toBe(`Please see the statement.\n\nView statement: ${LINK}`);

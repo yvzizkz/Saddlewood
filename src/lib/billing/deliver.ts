@@ -52,7 +52,9 @@ export async function deliver(actor: string, doc: BillingDocument | null, input:
   if (!attached.ok) return refuse(400, attached.error);
 
   const link = doc?.token ? documentLink(process.env.NEXT_PUBLIC_SITE_URL || SITE_URL, doc.token) : null;
-  const label = doc ? VIEW_LABEL[doc.kind] : "";
+  // The document's button reads "View invoice" unless the sender names it (e.g. "Invoice 8009-13").
+  const named = typeof input.linkLabel === "string" ? input.linkLabel.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+  const label = doc ? named || VIEW_LABEL[doc.kind] : "";
   const parts = splitInternal(checked.recipients);
   const { outside } = parts;
   const hasOutside = outside.to.length + outside.cc.length > 0;
