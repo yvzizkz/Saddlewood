@@ -56,6 +56,10 @@ export const MSG = {
     en: "Add a photo of the finished work. Done means it can be checked.",
     es: "Agrega una foto del trabajo terminado. Terminado quiere decir que se puede revisar.",
   },
+  notAllowed: {
+    en: "Your group does not have that turned on. Ask your supervisor.",
+    es: "Tu grupo no tiene eso activado. Pregúntale a tu supervisor.",
+  },
   noPickup: { en: "That pickup is no longer on your list.", es: "Ese recogido ya no está en tu lista." },
   deliveredPhoto: { en: "Add a photo of the material at the job.", es: "Agrega una foto del material en la obra." },
   problemNote: { en: "Say what the problem is.", es: "Di cuál es el problema." },

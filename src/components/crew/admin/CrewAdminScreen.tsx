@@ -14,6 +14,7 @@ import {
   isReportedDone,
   type CrewAdminHome,
   type CrewEntry,
+  type CrewGroup,
   type CrewJob,
   type CrewPerson,
   type CrewPickup,
@@ -25,6 +26,7 @@ import {
   AssignSheet,
   EntryCard,
   FixSheet,
+  GroupSheet,
   JobSheet,
   PICKUP_STATUS,
   PersonSheet,
@@ -52,6 +54,7 @@ type Open =
   | { kind: 'assign'; day: string; preset?: { jobId: string; startTime: string; note: string; priority?: number | null } }
   | { kind: 'pickup-add'; day: string }
   | { kind: 'pickup'; pickup: CrewPickup }
+  | { kind: 'group'; group: CrewGroup | null }
   | { kind: 'task-add'; to?: string }
   | { kind: 'task'; task: CrewTask }
   | { kind: 'ask'; to?: string }
@@ -84,16 +87,16 @@ function Row({ children, onClick }: { children: React.ReactNode; onClick?: () =>
 // ---- Today ------------------------------------------------------------------------
 
 function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void }) {
-  const { nameOf, run, isLead } = useCrewAdmin()
+  const { nameOf, run, can } = useCrewAdmin()
   const now = useNow()
   const [range, setRange] = useState<'today' | 'week'>('today')
   // Hours stay with the owners: the lead sees who is on, not the timesheet.
-  const openShiftSheet = (s: CrewShift) => (isLead ? undefined : () => show({ kind: 'shift', shift: s }))
+  const openShiftSheet = (s: CrewShift) => (can('hours.edit') ? () => show({ kind: 'shift', shift: s }) : undefined)
 
   const onClock = data.shifts.filter((s) => s.status === 'ok' && !s.endedAt)
   const todayShifts = data.shifts.filter((s) => s.status === 'ok' && s.day === data.day)
   const fixes = data.entries.filter((e) => e.kind === 'timefix' && e.status === 'new')
-  const review = isLead ? [] : data.shifts.filter((s) => s.status === 'ok' && s.review)
+  const review = can('hours.edit') ? data.shifts.filter((s) => s.status === 'ok' && s.review) : []
   const cant = data.schedule.filter((s) => s.ack === 'cant' && s.day >= data.day)
   const blocked = data.tasks.filter((x) => x.status === 'blocked')
   const toCheck = data.tasks.filter(isReportedDone)
@@ -268,9 +271,11 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
       <SectionTitle
         count={openTasks.length}
         action={
-          <Button className="min-h-9 px-3 text-[13px]" onClick={() => show({ kind: 'task-add' })}>
-            <Plus className="size-4" aria-hidden="true" /> Task
-          </Button>
+          can('tasks.assign') ? (
+            <Button className="min-h-9 px-3 text-[13px]" onClick={() => show({ kind: 'task-add' })}>
+              <Plus className="size-4" aria-hidden="true" /> Task
+            </Button>
+          ) : undefined
         }
       >
         Tasks out
@@ -300,9 +305,11 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
       <SectionTitle
         count={openQuestions.length}
         action={
-          <Button className="min-h-9 px-3 text-[13px]" onClick={() => show({ kind: 'ask' })}>
-            <Plus className="size-4" aria-hidden="true" /> Question
-          </Button>
+          can('questions.ask') ? (
+            <Button className="min-h-9 px-3 text-[13px]" onClick={() => show({ kind: 'ask' })}>
+              <Plus className="size-4" aria-hidden="true" /> Question
+            </Button>
+          ) : undefined
         }
       >
         Questions out
@@ -347,7 +354,9 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
 // ---- Schedule ---------------------------------------------------------------------
 
 function ScheduleView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void }) {
-  const { nameOf, run } = useCrewAdmin()
+  const { nameOf, run, can } = useCrewAdmin()
+  const edit = can('schedule.edit')
+  const editJobs = can('jobs.promise') || can('jobs.manage')
   const [day, setDay] = useState(addDays(data.day, 1))
   const days = Array.from({ length: 8 }, (_, i) => addDays(data.day, i))
   const rows = data.schedule.filter((s) => s.day === day)
@@ -405,12 +414,14 @@ function ScheduleView({ data, show }: { data: CrewAdminHome; show: (o: Open) => 
                   </p>
                 ) : null}
               </div>
-              <Button
-                className="min-h-9 shrink-0 px-3 text-[13px]"
-                onClick={() => show({ kind: 'assign', day, preset: { jobId, startTime: items[0].startTime, note: items[0].note, priority: items[0].priority } })}
-              >
-                <Plus className="size-4" aria-hidden="true" /> Add
-              </Button>
+              {edit ? (
+                <Button
+                  className="min-h-9 shrink-0 px-3 text-[13px]"
+                  onClick={() => show({ kind: 'assign', day, preset: { jobId, startTime: items[0].startTime, note: items[0].note, priority: items[0].priority } })}
+                >
+                  <Plus className="size-4" aria-hidden="true" /> Add
+                </Button>
+              ) : null}
             </div>
             {items[0].note ? <p className="mt-2 whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--color-charcoal)]">{items[0].note}</p> : null}
             <ul className="mt-3 space-y-1.5">
@@ -422,14 +433,16 @@ function ScheduleView({ data, show }: { data: CrewAdminHome; show: (o: Open) => 
                     {r.ack === 'ok' ? <Chip tone="ok">Got it</Chip> : r.ack === 'cant' ? <Chip tone="bad">Cannot make it</Chip> : null}
                     {r.startTime !== items[0].startTime && r.startTime ? <Chip tone="quiet">{clockText(r.startTime)}</Chip> : null}
                   </span>
-                  <button
-                    type="button"
-                    aria-label={`Take ${nameOf(r.email)} off`}
-                    onClick={() => void run({ kind: 'schedule.remove', id: r.id }, true)}
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--color-charcoal-light)] active:bg-[var(--color-cream)]"
-                  >
-                    <X className="size-4" aria-hidden="true" />
-                  </button>
+                  {edit ? (
+                    <button
+                      type="button"
+                      aria-label={`Take ${nameOf(r.email)} off`}
+                      onClick={() => void run({ kind: 'schedule.remove', id: r.id }, true)}
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--color-charcoal-light)] active:bg-[var(--color-cream)]"
+                    >
+                      <X className="size-4" aria-hidden="true" />
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -453,10 +466,12 @@ function ScheduleView({ data, show }: { data: CrewAdminHome; show: (o: Open) => 
       ) : null}
 
       <div className="mt-4 grid gap-2.5">
-        <Button variant="primary" full onClick={() => show({ kind: 'assign', day })} className="min-h-12">
-          <Plus className="size-4" aria-hidden="true" /> Put people on a job
-        </Button>
-        {!rows.length && before.length ? (
+        {edit ? (
+          <Button variant="primary" full onClick={() => show({ kind: 'assign', day })} className="min-h-12">
+            <Plus className="size-4" aria-hidden="true" /> Put people on a job
+          </Button>
+        ) : null}
+        {edit && !rows.length && before.length ? (
           <Button full onClick={() => void run({ kind: 'schedule.copy', from: addDays(day, -1), to: day })}>
             Same as {dayLabel(addDays(day, -1), data.day).toLowerCase()} ({before.length})
           </Button>
@@ -479,7 +494,7 @@ function ScheduleView({ data, show }: { data: CrewAdminHome; show: (o: Open) => 
             const late = !!j.promised && j.promised < data.day
             const soon = !!j.promised && !late && j.promised <= addDays(data.day, 3)
             return (
-              <Row key={j.id} onClick={() => show({ kind: 'job', job: j })}>
+              <Row key={j.id} onClick={editJobs ? () => show({ kind: 'job', job: j }) : undefined}>
                 <span className="flex items-center justify-between gap-3">
                   <span className="truncate text-[15px] text-[var(--color-charcoal)]">{j.name}</span>
                   {j.promised ? <Chip tone={late ? 'bad' : soon ? 'warn' : 'quiet'}>{dayShort(j.promised)}</Chip> : <Chip tone="quiet">No date</Chip>}
@@ -504,7 +519,7 @@ function RunnerView({ data, show }: { data: CrewAdminHome; show: (o: Open) => vo
     .filter((p) => p.status === 'staged' || p.status === 'picked' || p.status === 'problem')
     .sort((a, b) => Number(b.status === 'problem') - Number(a.status === 'problem') || a.day.localeCompare(b.day))
   const done = data.pickups.filter((p) => p.status === 'delivered').slice(0, 12)
-  const runners = data.people.filter((p) => p.active && p.role === 'runner')
+  const runners = data.people.filter((p) => p.active && p.perms.includes('pickups.run'))
 
   const line = (p: CrewPickup) => (
     <Row key={p.id} onClick={() => show({ kind: 'pickup', pickup: p })}>
@@ -531,7 +546,7 @@ function RunnerView({ data, show }: { data: CrewAdminHome; show: (o: Open) => vo
       </Button>
       <p className="mt-2 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
         Order it, have it staged for will-call, and put it here. The runner picks it up and brings it to the job, so you stay on site.
-        {runners.length ? ` Runners: ${runners.map((p) => firstNameOf(p.name)).join(', ')}.` : ' Nobody has a runner seat yet: an owner gives one under Team.'}
+        {runners.length ? ` Runners: ${runners.map((p) => firstNameOf(p.name)).join(', ')}.` : ' Nobody is in a group with pickups switched on yet: an owner sets that under Team.'}
       </p>
 
       <SectionTitle count={open.length}>Waiting to be picked up or delivered</SectionTitle>
@@ -556,7 +571,7 @@ function onTime(day: string, sentAt: string): boolean {
 }
 
 function PlanView({ data }: { data: CrewAdminHome }) {
-  const { run, isLead } = useCrewAdmin()
+  const { run, isOwner, can } = useCrewAdmin()
   const [day, setDay] = useState(addDays(data.day, 1))
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -631,7 +646,7 @@ function PlanView({ data }: { data: CrewAdminHome }) {
         ) : null}
       </Card>
 
-      {!isLead && last ? (
+      {isOwner && last ? (
         <>
           <SectionTitle>What {firstNameOf(last.sentName)} sent</SectionTitle>
           <Card className="px-4 py-3.5">
@@ -640,7 +655,7 @@ function PlanView({ data }: { data: CrewAdminHome }) {
         </>
       ) : null}
 
-      {!isLead && last ? (
+      {isOwner && last ? (
         <details className="mt-4">
           <summary className="min-h-9 cursor-pointer text-[13px] text-[var(--color-charcoal-light)]">The same plan as it stands right now</summary>
           <Card className="mt-1.5 px-4 py-3.5">
@@ -661,9 +676,11 @@ function PlanView({ data }: { data: CrewAdminHome }) {
           <span className="mb-1.5 block text-xs font-medium text-[var(--color-charcoal)]">Need from Marco (decisions only)</span>
           <textarea className={`${INPUT} min-h-[64px] resize-y`} value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <Button variant="primary" full busy={busy} onClick={send} className="min-h-12">
-          <Send className="size-4" aria-hidden="true" /> {last ? 'Send the update to Marco' : 'Send the plan to Marco'}
-        </Button>
+        {can('plan.send') ? (
+          <Button variant="primary" full busy={busy} onClick={send} className="min-h-12">
+            <Send className="size-4" aria-hidden="true" /> {last ? 'Send the update to Marco' : 'Send the plan to Marco'}
+          </Button>
+        ) : null}
         <p className="text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
           Marco gets a notification and reads it here. Every night by 6 PM for the first 30 days; then Marco decides if it can go weekly.
         </p>
@@ -865,7 +882,7 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
                 {!p.active ? <Chip tone="bad">No seat</Chip> : p.lastSeenAt ? <Chip tone="ok">In the app</Chip> : <Chip tone="warn">Not in yet</Chip>}
               </span>
               <span className="mt-0.5 block truncate text-[12px] text-[var(--color-charcoal-light)]">
-                {[p.role === 'lead' ? 'Supervisor' : p.role === 'runner' ? 'Runner' : '', p.trade, p.lang === 'es' ? 'Español' : 'English', p.email, p.lastSeenAt ? `opened ${ago(p.lastSeenAt)}` : '']
+                {[p.groupName, p.trade, p.lang === 'es' ? 'Español' : 'English', p.email, p.lastSeenAt ? `opened ${ago(p.lastSeenAt)}` : '']
                   .filter(Boolean)
                   .join(' · ')}
               </span>
@@ -880,6 +897,37 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
       </Button>
       <p className="mt-2 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
         The link is the same for everyone: {link.replace(/^https?:\/\//, '')}. It only opens for someone on this list.
+      </p>
+
+      <SectionTitle
+        count={data.groups.length}
+        action={
+          <Button className="min-h-9 px-3 text-[13px]" onClick={() => show({ kind: 'group', group: null })}>
+            <Plus className="size-4" aria-hidden="true" /> Group
+          </Button>
+        }
+      >
+        Groups
+      </SectionTitle>
+      <Card className="divide-y divide-[var(--color-stone)]">
+        {data.groups.map((g) => {
+          const members = data.people.filter((p) => p.active && p.group === g.id)
+          return (
+            <Row key={g.id} onClick={() => show({ kind: 'group', group: g })}>
+              <span className="flex items-center justify-between gap-3">
+                <span className="truncate text-[15px] text-[var(--color-charcoal)]">{g.name}</span>
+                <Chip tone={g.perms.includes('crew.view') ? 'warn' : 'quiet'}>{`${g.perms.length} on`}</Chip>
+              </span>
+              <span className="mt-0.5 block truncate text-[12px] text-[var(--color-charcoal-light)]">
+                {members.length ? members.map((p) => firstNameOf(p.name)).join(', ') : 'Nobody yet'}
+                {g.description ? ` · ${g.description}` : ''}
+              </span>
+            </Row>
+          )
+        })}
+      </Card>
+      <p className="mt-2 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
+        Each group is a set of switches. Move someone to another group from their seat, or flip a group&apos;s switches here.
       </p>
 
       <SectionTitle
@@ -940,7 +988,7 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
 // ---- the screen -------------------------------------------------------------------
 
 function Screen() {
-  const { data, error, refresh, isLead } = useCrewAdmin()
+  const { data, error, refresh, isOwner, can } = useCrewAdmin()
   const [view, setView] = useState<View>('today')
   const [open, setOpen] = useState<Open>(null)
   const [sheetKey, setSheetKey] = useState(0)
@@ -972,30 +1020,25 @@ function Screen() {
   const toCheck = data.tasks.filter(isReportedDone).length
   const needs =
     data.entries.filter((e) => e.kind === 'timefix' && e.status === 'new').length +
-    (isLead ? 0 : data.shifts.filter((s) => s.status === 'ok' && s.review).length) +
+    (can('hours.edit') ? data.shifts.filter((s) => s.status === 'ok' && s.review).length : 0) +
     data.tasks.filter((x) => x.status === 'blocked').length +
     toCheck
   const planDue = !data.reports.some((r) => r.day === addDays(data.day, 1))
   const pickupProblems = data.pickups.filter((p) => p.status === 'problem').length
 
-  const options: { value: View; label: string; count?: number }[] = isLead
-    ? [
-        { value: 'today', label: 'Today', count: needs },
-        { value: 'schedule', label: 'Schedule' },
-        { value: 'runner', label: 'Runner', count: pickupProblems },
-        { value: 'plan', label: 'Plan', count: planDue && new Date().getHours() >= 15 ? 1 : 0 },
-      ]
-    : [
-        { value: 'today', label: 'Today', count: needs },
-        { value: 'schedule', label: 'Schedule' },
-        { value: 'plan', label: 'Plan' },
-        { value: 'hours', label: 'Hours' },
-        { value: 'team', label: 'Team' },
-      ]
+  // The tabs follow the switches: an owner sees all of them.
+  const options: { value: View; label: string; count?: number }[] = [
+    { value: 'today', label: 'Today', count: needs },
+    { value: 'schedule', label: 'Schedule' },
+    ...(can('pickups.stage') && !isOwner ? [{ value: 'runner' as const, label: 'Runner', count: pickupProblems }] : []),
+    { value: 'plan', label: 'Plan', count: can('plan.send') && !isOwner && planDue && new Date().getHours() >= 15 ? 1 : 0 },
+    ...(can('hours.view') ? [{ value: 'hours' as const, label: 'Hours' }] : []),
+    ...(isOwner ? [{ value: 'team' as const, label: 'Team' }] : []),
+  ]
 
   return (
     <div className="px-4 pb-8 pt-6">
-      <ScreenTitle eyebrow={dayShort(data.day)} title={isLead ? 'Your crew' : 'Crew'} />
+      <ScreenTitle eyebrow={dayShort(data.day)} title={isOwner ? 'Crew' : 'Your crew'} />
       <Segmented label="Crew views" value={view} onChange={setView} options={options} />
       <div className="mt-5">
         {view === 'today' ? <TodayView data={data} show={show} /> : null}
@@ -1004,7 +1047,7 @@ function Screen() {
         {view === 'plan' ? (
           <>
             <PlanView data={data} />
-            {!isLead ? (
+            {isOwner || !can('pickups.stage') ? (
               <>
                 <SectionTitle>Pickups</SectionTitle>
                 <RunnerView data={data} show={show} />
@@ -1012,8 +1055,8 @@ function Screen() {
             ) : null}
           </>
         ) : null}
-        {view === 'hours' && !isLead ? <HoursView data={data} show={show} /> : null}
-        {view === 'team' && !isLead ? <TeamView data={data} show={show} /> : null}
+        {view === 'hours' && can('hours.view') ? <HoursView data={data} show={show} /> : null}
+        {view === 'team' && isOwner ? <TeamView data={data} show={show} /> : null}
       </div>
 
       {open?.kind === 'assign' ? <AssignSheet key={sheetKey} day={open.day} preset={open.preset} onClose={close} /> : null}
@@ -1023,10 +1066,11 @@ function Screen() {
       {open?.kind === 'pickup-add' ? <PickupAddSheet key={sheetKey} day={open.day} onClose={close} /> : null}
       {open?.kind === 'pickup' ? <PickupSheet key={sheetKey} pickup={open.pickup} onClose={close} /> : null}
       {open?.kind === 'job' ? <JobSheet key={sheetKey} job={open.job} suggested={open.suggested} onClose={close} /> : null}
-      {!isLead && open?.kind === 'shift' ? <ShiftSheet key={sheetKey} shift={open.shift} onClose={close} /> : null}
-      {!isLead && open?.kind === 'shift-add' ? <ShiftAddSheet key={sheetKey} day={open.day} email={open.email} onClose={close} /> : null}
-      {!isLead && open?.kind === 'fix' ? <FixSheet key={sheetKey} entry={open.entry} onClose={close} /> : null}
-      {!isLead && open?.kind === 'person' ? <PersonSheet key={sheetKey} person={open.person} onClose={close} /> : null}
+      {can('hours.edit') && open?.kind === 'shift' ? <ShiftSheet key={sheetKey} shift={open.shift} onClose={close} /> : null}
+      {can('hours.edit') && open?.kind === 'shift-add' ? <ShiftAddSheet key={sheetKey} day={open.day} email={open.email} onClose={close} /> : null}
+      {can('hours.edit') && open?.kind === 'fix' ? <FixSheet key={sheetKey} entry={open.entry} onClose={close} /> : null}
+      {isOwner && open?.kind === 'group' ? <GroupSheet key={sheetKey} group={open.group} onClose={close} /> : null}
+      {isOwner && open?.kind === 'person' ? <PersonSheet key={sheetKey} person={open.person} onClose={close} /> : null}
     </div>
   )
 }
@@ -1049,11 +1093,11 @@ export default function CrewAdminScreen() {
   )
 }
 
-/** The field supervisor's Crew tab, inside their crew app. The server decides what is in it. */
+/** The Crew tab inside the crew app, for a seat whose group has it switched on. The server decides what is in it. */
 export function LeadCrewScreen() {
   const { toast } = useCrew()
   return (
-    <CrewAdminProvider toast={toast} lead>
+    <CrewAdminProvider toast={toast} member>
       <Screen />
     </CrewAdminProvider>
   )

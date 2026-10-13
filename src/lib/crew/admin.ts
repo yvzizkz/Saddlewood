@@ -12,11 +12,14 @@ import {
   deleteSchedule,
   getEntry,
   getJob,
+  deleteGroup,
+  getGroup,
   getPerson,
   getPickup,
   getScheduleItem,
   getShift,
   getTask,
+  insertGroup,
   insertJob,
   insertPickup,
   insertQuestion,
@@ -30,6 +33,7 @@ import {
   listShifts,
   listTasks,
   patchEntry,
+  patchGroup,
   patchJob,
   patchPerson,
   patchPickup,
@@ -42,10 +46,10 @@ import {
 } from "./queries";
 import { CREW_ROLE, FORMER_ROLE } from "./role";
 import { addDays, clock12, dayShort, localClock, localDay, localInstant } from "./time";
-import { OTHER_JOB, firstNameOf, jobSlug, type AdminAct, type ShiftEdit } from "./types";
+import { OTHER_JOB, firstNameOf, jobSlug, normalizePerms, type AdminAct, type ShiftEdit } from "./types";
 
-/** Whoever is acting from the Crew screens: an owner, or the lead (limited to LEAD_ACTS by the route). */
-type Owner = Pick<Manager, "email" | "name"> & { role?: Manager["role"] };
+/** Whoever is acting from the Crew screens: an owner, or a member (limited by their group's switches in the route). */
+type Owner = Pick<Manager, "email" | "name"> & { role?: Manager["role"]; perms?: readonly string[] };
 
 // Everything an owner can do to the crew side: seats, jobs, the schedule,
 // tasks, time corrections, questions. Every change to someone's time keeps
@@ -249,6 +253,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       // was deployed before migration 0011), this throws and no sign-in is made:
       // a crew sign-in must never exist without the locks that migration puts on.
       await getPerson(act.email);
+      if (!(await getGroup(act.group))) return bad(400, "That group does not exist.");
       const authId = await ensureCrewUser(act.email);
       const person = await savePerson({
         email: act.email,
@@ -257,7 +262,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         lang: act.lang,
         phone: act.phone,
         trade: act.trade,
-        role: act.role,
+        group: act.group,
         addedBy: owner.name,
       });
       if (!act.invite) return ok(`${person.name} has a seat. Send them the link when you are ready.`);
@@ -292,8 +297,9 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         ...(act.lang !== undefined ? { lang: act.lang } : {}),
         ...(act.trade !== undefined ? { trade: act.trade } : {}),
         ...(act.phone !== undefined ? { phone: act.phone } : {}),
-        ...(act.role !== undefined ? { role: act.role } : {}),
+        ...(act.group !== undefined ? { group_id: act.group } : {}),
       };
+      if (act.group !== undefined && !(await getGroup(act.group))) return bad(400, "That group does not exist.");
       if (Object.keys(patch).length) await patchPerson(person.email, patch);
       return ok();
     }
@@ -340,10 +346,10 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
     case "job.update": {
       const { kind: _kind, id, promised, promiseNote, ...rest } = act;
       void _kind;
-      // The lead keeps the promise, the address and the site note current. The
-      // name (receipts and hours are filed under it) and the list stay with the owners.
-      if (owner.role === "lead" && (rest.name !== undefined || rest.active !== undefined)) {
-        return bad(403, "Renaming or closing a job is for Marco or Lando.");
+      // Keeping the promise, the address and the site note current is jobs.promise.
+      // The name (receipts and hours are filed under it) and the list need jobs.manage.
+      if (owner.role === "member" && !owner.perms?.includes("jobs.manage") && (rest.name !== undefined || rest.active !== undefined)) {
+        return bad(403, "Renaming or closing a job needs the jobs switch. Marco or Lando can turn it on.");
       }
       const job = await patchJob(id, {
         ...rest,
@@ -513,7 +519,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         email: act.email,
         createdBy: owner.name,
       });
-      const to = people.filter((p) => p.active && (act.email ? p.email === act.email : p.role === "runner"));
+      const to = people.filter((p) => p.active && (act.email ? p.email === act.email : p.perms.includes("pickups.run")));
       for (const p of to) await notifyCrew(p, MSG.newPickup(pickup.supplier, pickup.jobName, pickup.day, today), `crew-pickup-${pickup.id}`);
       return ok(to.length ? `On ${to.map((p) => firstNameOf(p.name)).join(", ")}'s list.` : "Staged. Nobody has a runner seat yet, so nobody was told.");
     }
@@ -531,6 +537,30 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         ...(act.day !== undefined ? { day: act.day } : {}),
       });
       return saved ? ok() : bad(404, "That pickup is gone.");
+    }
+
+    case "group.save": {
+      const perms = normalizePerms(act.perms);
+      if (act.id) {
+        const saved = await patchGroup(act.id, { name: act.name, description: act.description, perms });
+        return saved ? ok(`${saved.name} saved. Everyone in it has the new switches on their next tap.`) : bad(404, "That group is gone.");
+      }
+      const base = jobSlug(act.name).replace(/^job-/, "group-").slice(0, 36).replace(/-+$/, "");
+      for (const id of [base, `${base}-2`, `${base}-3`]) {
+        const made = await insertGroup({ id, name: act.name, description: act.description, perms, createdBy: owner.name });
+        if (made) return ok(`${made.name} made. Put people in it from their seat.`);
+      }
+      return bad(409, "A group with a name that close already exists.");
+    }
+
+    case "group.delete": {
+      const group = await getGroup(act.id);
+      if (!group) return ok();
+      if (group.builtin) return bad(400, `${group.name} is one of the three the app starts with. Change its switches instead.`);
+      const members = (await listPeople()).filter((p) => p.group === group.id);
+      if (members.length) return bad(409, `Move ${members.map((p) => firstNameOf(p.name)).join(", ")} to another group first.`);
+      await deleteGroup(group.id);
+      return ok(`${group.name} deleted.`);
     }
 
     case "report.send": {

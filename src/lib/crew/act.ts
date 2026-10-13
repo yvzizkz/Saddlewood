@@ -33,7 +33,9 @@ import {
   MAX_ENTRIES_PER_DAY,
   OTHER_JOB,
   firstNameOf,
+  hasPerm,
   parseAmount,
+  type Capability,
   type CrewAct,
   type CrewEntry,
   type Geo,
@@ -81,10 +83,22 @@ function ownFiles(files: BotFileRef[], email: string): boolean {
   return files.every((f) => f.path.startsWith(prefix));
 }
 
+const OWN_DAY_NEEDS: Partial<Record<CrewAct["kind"], Capability>> = {
+  "punch.in": "clock",
+  "punch.switch": "clock",
+  "timefix.add": "clock",
+  "receipt.add": "receipts",
+};
+
 export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = new Date()): Promise<ActResult> {
   const { email, lang } = person;
   const now = nowDate.getTime();
   const first = firstNameOf(person.name);
+
+  // The group's switches for the person's own day. Everything else (progress,
+  // the end of day, notes, tasks, answers) is always on.
+  const needs = OWN_DAY_NEEDS[act.kind];
+  if (needs && !hasPerm(person, needs)) return bad(403, say(lang, MSG.notAllowed));
 
   switch (act.kind) {
     case "punch.in": {
@@ -405,7 +419,7 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
     case "pickup.update": {
       if (!ownFiles(act.files, email)) return bad(400, say(lang, MSG.notYours));
       const pickup = await getPickup(act.id);
-      const mine = pickup && (pickup.email === email || (pickup.email === "" && person.role === "runner"));
+      const mine = pickup && (pickup.email === email || (pickup.email === "" && hasPerm(person, "pickups.run")));
       if (!pickup || !mine || pickup.status === "cancelled" || pickup.status === "delivered") return bad(404, say(lang, MSG.noPickup));
       if (act.status === "delivered" && !act.files.length) return bad(400, say(lang, MSG.deliveredPhoto));
       if (act.status === "problem" && act.note.length < 2) return bad(400, say(lang, MSG.problemNote));

@@ -17,15 +17,54 @@ export const CREW_LANGS = ["en", "es"] as const;
 export type CrewLang = (typeof CREW_LANGS)[number];
 
 /**
- * What a seat is for. Everyone is crew-marked underneath (sw_role = 'crew');
- * this only decides what the site lets them do beyond their own day.
- *   crew    their own day
- *   lead    the field supervisor: also the schedule, tasks, checking work,
- *           pickups, and the nightly plan for the owners
- *   runner  their own day, plus the pickups
+ * Every switch a group can have on. A seat belongs to one group; owners make
+ * groups and flip these in the app. Everyone in a group is still crew-marked
+ * underneath (sw_role = 'crew'). Seats and groups themselves are not a switch:
+ * only owners manage them, so nobody can raise their own access.
+ *
+ * `own` switches shape the person's own day; `crew` switches open the Crew tab
+ * and what can be done there. Any `crew` switch brings `crew.view` with it.
  */
-export const CREW_ROLES = ["crew", "lead", "runner"] as const;
-export type CrewRole = (typeof CREW_ROLES)[number];
+export const CAPABILITIES = [
+  { key: "clock", area: "own", label: "Clock in and out" },
+  { key: "receipts", area: "own", label: "Send receipts" },
+  { key: "pickups.run", area: "own", label: "Fetch pickups (runner)" },
+  { key: "crew.view", area: "crew", label: "Open the Crew tab: who is on, what came in, photos, the plan" },
+  { key: "updates", area: "crew", label: "Get the crew's updates: done, stuck, cannot make it" },
+  { key: "schedule.edit", area: "crew", label: "Set the schedule" },
+  { key: "tasks.assign", area: "crew", label: "Give and change tasks" },
+  { key: "tasks.verify", area: "crew", label: "Check work: verify it or send it back" },
+  { key: "questions.ask", area: "crew", label: "Ask the crew questions" },
+  { key: "jobs.promise", area: "crew", label: "Keep a job's promise, address and site note" },
+  { key: "jobs.manage", area: "crew", label: "Add, rename and close jobs" },
+  { key: "pickups.stage", area: "crew", label: "Stage pickups for the runner" },
+  { key: "plan.send", area: "crew", label: "Send the nightly plan to the owners" },
+  { key: "hours.view", area: "crew", label: "See everyone's hours" },
+  { key: "hours.edit", area: "crew", label: "Fix hours, decide time fixes, payroll export" },
+] as const;
+export type Capability = (typeof CAPABILITIES)[number]["key"];
+export const CAPABILITY_KEYS = CAPABILITIES.map((c) => c.key) as Capability[];
+
+/** Only switches that exist, each once; any Crew-tab switch brings the tab itself. */
+export function normalizePerms(perms: readonly string[]): Capability[] {
+  const set = new Set(perms.filter((p): p is Capability => (CAPABILITY_KEYS as string[]).includes(p)));
+  if (CAPABILITIES.some((c) => c.area === "crew" && c.key !== "crew.view" && set.has(c.key))) set.add("crew.view");
+  if (set.has("hours.edit")) set.add("hours.view");
+  return CAPABILITY_KEYS.filter((k) => set.has(k));
+}
+
+export type CrewGroup = {
+  id: string;
+  name: string;
+  description: string;
+  perms: Capability[];
+  builtin: boolean;
+};
+
+/** The group's switches, as a seat carries them. */
+export function hasPerm(p: { perms: readonly string[] }, perm: Capability): boolean {
+  return p.perms.includes(perm);
+}
 
 /**
  * The priority order, highest first. The schedule fills from the top: if a
@@ -47,7 +86,10 @@ export type CrewPerson = {
   lang: CrewLang;
   phone: string;
   trade: string;
-  role: CrewRole;
+  /** The access group's id, and its switches as they are right now. */
+  group: string;
+  groupName: string;
+  perms: Capability[];
   active: boolean;
   addedBy: string;
   createdAt: string;
@@ -228,7 +270,7 @@ export type CrewHome = {
   now: string;
   /** The Phoenix calendar day right now. */
   day: string;
-  me: { email: string; name: string; lang: CrewLang; role: CrewRole };
+  me: { email: string; name: string; lang: CrewLang; group: string; perms: Capability[] };
   jobs: CrewJob[];
   /** The shift this person is on right now, if any. */
   shift: CrewShift | null;
@@ -248,7 +290,9 @@ export type CrewAdminHome = {
   now: string;
   day: string;
   /** Who is looking: an owner sees everything; the lead sees the field (no hours, no seats). */
-  viewer: { role: "owner" | "lead"; email: string; name: string };
+  viewer: { role: "owner" | "member"; email: string; name: string; perms: Capability[] };
+  /** Every access group, for the owners' Team view. */
+  groups: CrewGroup[];
   /** Monday of the week the Hours view is showing. */
   week: string;
   people: CrewPerson[];
@@ -312,6 +356,7 @@ const optionalJobId = z.string().trim().max(60).default("");
 const files = z.array(fileRefSchema).max(MAX_ENTRY_FILES).default([]);
 const breakMin = z.number().int().min(0).max(240).default(0);
 const priority = z.number().int().min(1).max(5).nullable().default(null);
+const groupId = z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, "bad group");
 
 // ---- what a crew member sends -------------------------------------------------
 
@@ -404,7 +449,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     lang: z.enum(CREW_LANGS).default("en"),
     trade: text(60),
     phone: text(30),
-    role: z.enum(CREW_ROLES).default("crew"),
+    group: groupId.default("crew"),
     /** Email them the sign-in link now. */
     invite: z.boolean().default(true),
   }),
@@ -415,7 +460,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     lang: z.enum(CREW_LANGS).optional(),
     trade: z.string().trim().max(60).optional(),
     phone: z.string().trim().max(30).optional(),
-    role: z.enum(CREW_ROLES).optional(),
+    group: groupId.optional(),
     active: z.boolean().optional(),
   }),
   z.object({ kind: z.literal("person.invite"), email }),
@@ -494,6 +539,15 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     note: z.string().trim().max(300).optional(),
     day: day.optional(),
   }),
+  /** Make a group, or change its name and switches. Owners only. */
+  z.object({
+    kind: z.literal("group.save"),
+    id: groupId.optional(),
+    name: z.string().trim().min(2, "name the group").max(40),
+    description: text(200),
+    perms: z.array(z.string().max(40)).max(40),
+  }),
+  z.object({ kind: z.literal("group.delete"), id: groupId }),
   /** Send the owners the plan for `day` (normally tomorrow). */
   z.object({ kind: z.literal("report.send"), day, note: text(1000) }),
   z.object({

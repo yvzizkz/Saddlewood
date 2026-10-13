@@ -9,15 +9,18 @@ import { ago } from '@/lib/bot/view'
 import { priorityLabel, taskStatusWord } from '@/lib/crew/plan'
 import { addDays, clock12, clockText, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
 import {
+  CAPABILITIES,
   PRIORITIES,
   firstNameOf,
+  normalizePerms,
+  type Capability,
+  type CrewGroup,
   isReportedDone,
   type CrewEntry,
   type CrewJob,
   type CrewLang,
   type CrewPerson,
   type CrewPickup,
-  type CrewRole,
   type CrewShift,
   type CrewTask,
 } from '@/lib/crew/types'
@@ -245,7 +248,7 @@ export function TaskAddSheet({ onClose, to }: { onClose: () => void; to?: string
 }
 
 export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => void }) {
-  const { run, nameOf } = useCrewAdmin()
+  const { run, nameOf, can } = useCrewAdmin()
   const [busy, setBusy] = useState<string | null>(null)
   const [left, setLeft] = useState('')
   const [problem, setProblem] = useState('')
@@ -286,7 +289,7 @@ export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => vo
         </p>
       ) : null}
       <Photos files={task.files} />
-      {toCheck ? (
+      {toCheck && can('tasks.verify') ? (
         <>
           <p className="text-[13px] leading-relaxed text-[var(--color-charcoal)]">
             {firstNameOf(nameOf(task.email))} says this is done{task.reportedAt ? ` (${clock12(task.reportedAt)})` : ''}. Look at it on site or in the photos. Only verified work counts as done.
@@ -304,7 +307,7 @@ export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => vo
             </Button>
           </div>
         </>
-      ) : (
+      ) : toCheck || !can('tasks.assign') ? null : (
         <div className="grid grid-cols-2 gap-3">
           {task.status === 'done' || task.status === 'dropped' ? (
             <Button full busy={busy === 'open'} onClick={() => set('open')}>
@@ -656,7 +659,8 @@ export function FixSheet({ entry, onClose }: { entry: CrewEntry; onClose: () => 
 export function PersonSheet({ person, onClose }: { person: CrewPerson | null; onClose: () => void }) {
   const { run, toast } = useCrewAdmin()
   const [name, setName] = useState(person?.name ?? '')
-  const [role, setRole] = useState<CrewRole>(person?.role ?? 'crew')
+  const { data } = useCrewAdmin()
+  const [group, setGroup] = useState(person?.group ?? 'crew')
   const [email, setEmail] = useState(person?.email ?? '')
   const [lang, setLang] = useState<CrewLang>(person?.lang ?? 'en')
   const [trade, setTrade] = useState(person?.trade ?? '')
@@ -670,8 +674,8 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setProblem('Type the email they use on their phone.')
     setBusy(invite ? 'invite' : 'save')
     const res = person
-      ? await run({ kind: 'person.update', email: person.email, name: name.trim(), lang, trade: trade.trim(), phone: phone.trim(), role }, true)
-      : await run({ kind: 'person.add', name: name.trim(), email: email.trim(), lang, trade: trade.trim(), phone: phone.trim(), role, invite })
+      ? await run({ kind: 'person.update', email: person.email, name: name.trim(), lang, trade: trade.trim(), phone: phone.trim(), group }, true)
+      : await run({ kind: 'person.add', name: name.trim(), email: email.trim(), lang, trade: trade.trim(), phone: phone.trim(), group, invite })
     setBusy(null)
     if (!res.ok) return setProblem(res.text)
     onClose()
@@ -738,26 +742,15 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
           ]}
         />
       </div>
-      <div>
-        <p className="mb-1.5 text-xs font-medium text-[var(--color-charcoal)]">Their seat</p>
-        <Segmented
-          label="Seat"
-          value={role}
-          onChange={setRole}
-          options={[
-            { value: 'crew', label: 'Crew' },
-            { value: 'lead', label: 'Supervisor' },
-            { value: 'runner', label: 'Runner' },
-          ]}
-        />
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
-          {role === 'lead'
-            ? 'Their own day, plus a Crew tab: the schedule, checking work, pickups, and the nightly plan to Marco. No hours, no seats.'
-            : role === 'runner'
-              ? 'Their own day, plus the pickups staged for them.'
-              : 'Their own day: the clock, receipts, photos, schedule and tasks.'}
-        </p>
-      </div>
+      <Field label="Group" hint={data?.groups.find((g) => g.id === group)?.description || 'What they can do. Change a group\'s switches under Team, Groups.'}>
+        <select className={INPUT} value={group} onChange={(e) => setGroup(e.target.value)}>
+          {(data?.groups ?? []).map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+      </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Trade (optional)">
           <input className={INPUT} value={trade} maxLength={60} placeholder="Framer" onChange={(e) => setTrade(e.target.value)} />
@@ -833,7 +826,8 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
 }
 
 export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null; onClose: () => void; suggested?: string }) {
-  const { run, isLead, data } = useCrewAdmin()
+  const { run, can, data } = useCrewAdmin()
+  const manage = can('jobs.manage')
   const [name, setName] = useState(job?.name ?? suggested)
   const [address, setAddress] = useState(job?.address ?? '')
   const [note, setNote] = useState(job?.note ?? '')
@@ -848,7 +842,7 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
     setBusy('save')
     const fields = { address: address.trim(), note: note.trim(), promised, promiseNote: promiseNote.trim() }
     const res = job
-      ? await run({ kind: 'job.update', id: job.id, ...(isLead ? {} : { name: name.trim() }), ...fields }, true)
+      ? await run({ kind: 'job.update', id: job.id, ...(manage ? { name: name.trim() } : {}), ...fields }, true)
       : await run({ kind: 'job.add', name: name.trim(), ...fields })
     setBusy(null)
     if (!res.ok) return setProblem(res.text)
@@ -866,7 +860,7 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
 
   return (
     <AdminSheet title={job ? job.name : 'Add a job'} onClose={onClose}>
-      {isLead ? null : (
+      {!manage ? null : (
         <Field label="Job name" hint="What the crew calls it. Receipts and hours are filed under this name.">
           <input className={INPUT} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
         </Field>
@@ -890,7 +884,7 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
       <Button variant="primary" full busy={busy === 'save'} onClick={save} className="min-h-12">
         {job ? 'Save' : 'Add the job'}
       </Button>
-      {job && !isLead ? (
+      {job && manage ? (
         <Button full variant={job.active ? 'danger' : 'secondary'} busy={busy === 'active'} onClick={() => setActive(!job.active)}>
           {job.active ? 'Take it off the list (job is done)' : 'Put it back on the list'}
         </Button>
@@ -1031,8 +1025,8 @@ export function PickupAddSheet({ day, onClose }: { day: string; onClose: () => v
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState('')
   if (!data) return null
-  const runners = data.people.filter((p) => p.active && p.role === 'runner')
-  const others = data.people.filter((p) => p.active && p.role !== 'runner')
+  const runners = data.people.filter((p) => p.active && p.perms.includes('pickups.run'))
+  const others = data.people.filter((p) => p.active && !p.perms.includes('pickups.run'))
 
   async function go() {
     if (supplier.trim().length < 2) return setProblem('Say where it is: the store or supplier.')
@@ -1078,7 +1072,7 @@ export function PickupAddSheet({ day, onClose }: { day: string; onClose: () => v
           {[...runners, ...others].map((p) => (
             <option key={p.email} value={p.email}>
               {p.name}
-              {p.role === 'runner' ? ' (runner)' : ''}
+              {p.perms.includes('pickups.run') ? ' (runner)' : ''}
             </option>
           ))}
         </select>
@@ -1155,6 +1149,90 @@ export function PickupSheet({ pickup, onClose }: { pickup: CrewPickup; onClose: 
           )}
         </div>
       )}
+    </AdminSheet>
+  )
+}
+
+// ---- groups (owners) ----------------------------------------------------------------------
+
+const AREAS: { area: 'own' | 'crew'; title: string; hint: string }[] = [
+  { area: 'own', title: 'Their own day', hint: 'Progress photos, the end of day, notes, tasks and the schedule are always on.' },
+  { area: 'crew', title: 'The Crew tab', hint: 'Any of these opens the Crew tab for them inside their app.' },
+]
+
+export function GroupSheet({ group, onClose }: { group: CrewGroup | null; onClose: () => void }) {
+  const { data, run } = useCrewAdmin()
+  const [name, setName] = useState(group?.name ?? '')
+  const [description, setDescription] = useState(group?.description ?? '')
+  const [perms, setPerms] = useState<Capability[]>(group?.perms ?? ['clock', 'receipts'])
+  const [busy, setBusy] = useState<string | null>(null)
+  const [problem, setProblem] = useState('')
+  if (!data) return null
+  const members = group ? data.people.filter((p) => p.active && p.group === group.id) : []
+
+  function flip(key: Capability, on: boolean) {
+    setPerms((now) => normalizePerms(on ? [...now, key] : now.filter((k) => k !== key && !(key === 'crew.view' && CAPABILITIES.find((c) => c.key === k)?.area === 'crew') && !(key === 'hours.view' && k === 'hours.edit'))))
+  }
+
+  async function save() {
+    if (name.trim().length < 2) return setProblem('Name the group.')
+    setBusy('save')
+    const res = await run({ kind: 'group.save', ...(group ? { id: group.id } : {}), name: name.trim(), description: description.trim(), perms })
+    setBusy(null)
+    if (res.ok) onClose()
+    else setProblem(res.text)
+  }
+
+  async function remove() {
+    if (!group) return
+    setBusy('delete')
+    const res = await run({ kind: 'group.delete', id: group.id }, true)
+    setBusy(null)
+    if (res.ok) onClose()
+    else setProblem(res.text)
+  }
+
+  return (
+    <AdminSheet title={group ? group.name : 'New group'} onClose={onClose}>
+      <Field label="Name">
+        <input className={INPUT} value={name} maxLength={40} placeholder="Foreman" onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="What it is for (optional)">
+        <input className={INPUT} value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} />
+      </Field>
+      {AREAS.map(({ area, title, hint }) => (
+        <Group key={area} label={title}>
+          <div className="rounded-xl border border-[var(--color-stone-mid)] bg-white">
+            {CAPABILITIES.filter((c) => c.area === area).map((c) => {
+              const on = perms.includes(c.key)
+              return (
+                <label key={c.key} className="flex min-h-12 items-center justify-between gap-3 border-b border-[var(--color-stone)] px-3 py-2 last:border-b-0">
+                  <span className="text-[14px] leading-snug text-[var(--color-charcoal)]">{c.label}</span>
+                  <input type="checkbox" role="switch" aria-checked={on} className="size-5 shrink-0" checked={on} onChange={(e) => flip(c.key, e.target.checked)} />
+                </label>
+              )
+            })}
+          </div>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">{hint}</p>
+        </Group>
+      ))}
+      <p className="text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
+        Seats and groups are never a switch: only owners add people, move them between groups, or change these. Changes reach everyone in the group on their next tap.
+      </p>
+      {group ? (
+        <p className="text-[13px] text-[var(--color-charcoal)]">
+          {members.length ? `In this group: ${members.map((p) => firstNameOf(p.name)).join(', ')}.` : 'Nobody is in this group yet.'}
+        </p>
+      ) : null}
+      <Problem text={problem} />
+      <Button variant="primary" full busy={busy === 'save'} onClick={save} className="min-h-12">
+        {group ? 'Save the switches' : 'Make the group'}
+      </Button>
+      {group && !group.builtin ? (
+        <Button variant="danger" full busy={busy === 'delete'} onClick={remove}>
+          Delete the group
+        </Button>
+      ) : null}
     </AdminSheet>
   )
 }

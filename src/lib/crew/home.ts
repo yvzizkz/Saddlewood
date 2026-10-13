@@ -6,6 +6,7 @@ import {
   listJobs,
   listOpenShifts,
   listPeople,
+  listGroups,
   listPickups,
   listQuestions,
   listReports,
@@ -20,7 +21,7 @@ import {
 } from "./queries";
 import type { Manager } from "./auth";
 import { addDays, isDay, localDay, weekStart } from "./time";
-import type { CrewAdminHome, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift } from "./types";
+import type { Capability, CrewAdminHome, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift } from "./types";
 
 // What each side gets in one read. A crew member gets only what is theirs; an
 // owner gets everyone's; the Mac gets the last few days plus whatever it has
@@ -68,7 +69,7 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
     ok: true,
     now: now.toISOString(),
     day,
-    me: { email, name: person.name, lang: person.lang, role: person.role },
+    me: { email, name: person.name, lang: person.lang, group: person.group, perms: person.perms },
     jobs: jobs.filter((j) => j.active).map((j) => (mine.has(j.id) ? j : { ...j, note: "" })),
     shift: open ? publicShift(open) : null,
     // A shift left open since before last week still has to show.
@@ -84,50 +85,55 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
       .map((q) => ({ ...q, askedBy: q.askedBy === "bot" ? "bot" : "office" })),
     entries,
     // A pickup that names nobody is for the runners; one that names someone is theirs.
-    pickups: pickups.filter((p) => p.email === email || person.role === "runner"),
+    pickups: pickups.filter((p) => p.email === email || person.perms.includes("pickups.run")),
     push,
   };
 }
 
 /**
- * The Crew screens' read. An owner gets everything. The lead gets the field:
- * who is on the clock today, what came in, the schedule, tasks, pickups and
- * the plans; not the week's timesheet, not time-fix requests (hours stay with
- * the owners), not the expense tracker's project list.
+ * The Crew screens' read. An owner gets everything. A member gets what their
+ * group's switches open: always who is on the clock today, what came in, the
+ * schedule, tasks, pickups and the plans; the week's timesheet only with
+ * hours.view; time-fix requests and where a punch was made only with
+ * hours.edit; the expense tracker's project list only with jobs.manage.
  */
 export async function adminHome(viewer: Manager, weekParam: string | null, now = new Date()): Promise<CrewAdminHome> {
-  const lead = viewer.role === "lead";
+  const can = (p: Capability) => viewer.perms.includes(p);
+  const hours = can("hours.view");
+  const fixes = can("hours.edit");
   const day = localDay(now);
   const week = weekParam && isDay(weekParam) ? weekStart(weekParam) : weekStart(day);
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS).toISOString();
-  const [people, jobs, weekShifts, recentShifts, open, entries, schedule, tasks, questions, suggested, pickups, reports] = await Promise.all([
+  const [people, jobs, weekShifts, recentShifts, open, entries, schedule, tasks, questions, suggested, pickups, reports, groups] = await Promise.all([
     listPeople(),
     listJobs(),
-    lead ? Promise.resolve([] as CrewShiftRow[]) : listShifts({ fromDay: week, toDay: addDays(week, 6), includeVoid: true }),
-    listShifts({ fromDay: addDays(day, -1), includeVoid: !lead }),
+    hours ? listShifts({ fromDay: week, toDay: addDays(week, 6), includeVoid: fixes }) : Promise.resolve([] as CrewShiftRow[]),
+    listShifts({ fromDay: addDays(day, -1), includeVoid: fixes }),
     listOpenShifts(),
     listEntries({ fromDay: addDays(day, -7), limit: 250 }),
     listSchedule({ fromDay: addDays(day, -1), toDay: addDays(day, 13) }),
     listTasks({ closedSince: weekAgo }),
     listQuestions({ since: weekAgo }),
-    lead ? Promise.resolve([] as string[]) : suggestedJobs(),
+    can("jobs.manage") ? suggestedJobs() : Promise.resolve([] as string[]),
     listPickups({ fromDay: addDays(day, -7) }),
     listReports(addDays(day, -35)),
+    viewer.role === "owner" ? listGroups() : Promise.resolve([]),
   ]);
   const names = new Set(jobs.map((j) => j.name.toLowerCase()));
   return {
     ok: true,
     now: now.toISOString(),
     day,
-    viewer: { role: viewer.role, email: viewer.email, name: viewer.name },
+    viewer: { role: viewer.role, email: viewer.email, name: viewer.name, perms: viewer.perms },
+    groups,
     week,
     people: people.map(publicPerson),
     jobs,
     suggestedJobs: suggested.filter((n) => !names.has(n.toLowerCase())),
     shifts: byId([...weekShifts, ...recentShifts, ...open])
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
-      .map((s) => (lead ? { ...publicShift(s), startGeo: null, endGeo: null, edits: [] } : publicShift(s))),
-    entries: lead ? entries.filter((e) => e.kind !== "timefix") : entries,
+      .map((s) => (fixes ? publicShift(s) : { ...publicShift(s), startGeo: null, endGeo: null, edits: [] })),
+    entries: fixes ? entries : entries.filter((e) => e.kind !== "timefix"),
     schedule,
     tasks,
     questions,

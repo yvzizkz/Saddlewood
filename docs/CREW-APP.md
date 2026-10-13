@@ -41,18 +41,27 @@ Added 2026-10-12 for Eli (field supervisor): Marco sells and estimates, the
 supervisor runs the field, and every task is either reported done or verified
 done.
 
-- **A seat has a role**: crew, lead (shown as Supervisor), or runner. All three
-  are crew-marked sign-ins (`sw_role = 'crew'`), so every lock from 0011 holds
-  for the supervisor too. The role only decides what the site allows
-  (`LEAD_ACTS` in `src/lib/crew/auth.ts`).
-- **The supervisor** gets a fifth tab, Crew (`/app/crew` inside the crew app):
-  Today (what needs a check, who is on, what came in, tasks), Schedule (with
-  priorities and the promised dates), Runner (pickups), Plan (the nightly plan
-  to Marco and the 30-day record). The supervisor can schedule, assign, verify
-  or send work back, ask questions, stage pickups, keep a job's promise,
-  address and site note current, and send the plan. Not hours, time fixes,
-  seats, job names, or closing jobs: those stay with the owners (403). The
-  supervisor opens any crew member's photos through `/api/crew/files`.
+- **Groups with switches** (`crew_groups`). Every seat belongs to one group:
+  Crew, Supervisor, Runner (made by 0016, can be changed but not deleted), or
+  one an owner makes under Team, Groups. A group is a list of switches
+  (`CAPABILITIES` in `src/lib/crew/types.ts`): for their own day, clock and
+  receipts (progress, end of day, notes, tasks are always on) and fetching
+  pickups; for the Crew tab, opening it, getting the crew's updates, setting
+  the schedule, giving tasks, checking work, asking questions, keeping a job's
+  promise, managing jobs, staging pickups, sending the plan, seeing hours,
+  fixing hours. Any Crew-tab switch brings the tab itself; hours.edit brings
+  hours.view. Seats and groups are never a switch: only owners manage them,
+  so nobody raises their own access. Changes apply on the next tap: the site
+  reads the group with the seat on every request. Everyone in any group is a
+  crew-marked sign-in (`sw_role = 'crew'`), so every lock from 0011 holds.
+  The server enforces the switches (`ACT_NEEDS` / `mayRun` in
+  `src/lib/crew/auth.ts`, `OWN_DAY_NEEDS` in `act.ts`); the screens only hide
+  what is off. Clocking out is never blocked, so nobody is trapped on the clock.
+- **The Supervisor group** (Eli) gets a fifth tab, Crew (`/app/crew` inside the
+  crew app): Today (what needs a check, who is on, what came in, tasks),
+  Schedule (priorities, promised dates), Runner (pickups), Plan (the nightly
+  plan to Marco and the 30-day record). A member with the Crew tab opens any
+  crew member's photos through `/api/crew/files`.
 - **Priority** 1 to 5 on each assignment and task: safety, promised to the
   client, blocks the next step, closes out a job or payment, can wait. The
   schedule sorts by it. Each job can carry `promised` + `promise_note`.
@@ -63,14 +72,14 @@ done.
   An owner's "Verified done" counts as checked. Checked work cannot be reopened
   by the worker. Tasks done before 0016 were marked verified.
 - **Pickups** (`crew_pickups`): the supervisor stages will-call material; a
-  runner (or the person named) marks picked up, then delivered with a photo,
+  seat with the pickups switch (or the person named) marks picked up, then delivered with a photo,
   or a problem with a note.
 - **The nightly plan** (`crew_reports`): built by `src/lib/crew/plan.ts`, the
   same function the screen previews with. Sending notifies the owners. On time
   = sent by 6 PM the evening before. The record starts with the first plan.
 - **Who hears what**: crew updates (done, waiting, cannot make it, notes,
-  end-of-day flags, pickups) go to the supervisor when one is seated, else to
-  the owners as before. Safety reports and answers to questions also reach the
+  end-of-day flags, pickups) go to every seat whose group has the updates
+  switch, else to the owners as before. Safety reports and answers to questions also reach the
   owners. Time fixes stay owners only.
 
 ## Who can do what

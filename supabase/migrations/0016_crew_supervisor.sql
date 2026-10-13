@@ -3,11 +3,11 @@
 -- Marco moves to selling and estimating; the field supervisor runs the jobs.
 -- What this adds, all on the crew tables from 0011:
 --
---   * a seat can be a lead (the field supervisor) or a runner, not only crew.
---     A lead is still a crew-marked sign-in (sw_role = 'crew'), so every lock
---     0011 put on the estimate tables still holds for them. What a lead may do
---     beyond their own day is decided by the site (src/lib/crew/auth.ts), never
---     by the database.
+--   * groups with switches: every seat belongs to a group (Crew, Supervisor,
+--     Runner, or one an owner makes), and the group says what the person can
+--     do. Everyone in them is still a crew-marked sign-in (sw_role = 'crew'),
+--     so every lock 0011 put on the estimate tables holds. The site enforces
+--     the switches (src/lib/crew/auth.ts), never the database.
 --   * a priority on each scheduled assignment and each task, and on each job
 --     the date we promised the client, so the schedule can put promises first.
 --   * "reported done" and "verified done" are no longer the same thing: a
@@ -21,16 +21,46 @@
 
 begin;
 
--- ---- seats --------------------------------------------------------------------
+-- ---- groups: who can do what ----------------------------------------------------
+--
+-- Every seat belongs to one group, and a group is a list of switches
+-- (src/lib/crew/types.ts CAPABILITIES): clock, receipts, the Crew tab, setting
+-- the schedule, checking work, hours, and so on. Owners make groups and flip
+-- the switches in the app; moving a person to another group changes what they
+-- can do on their next tap. Seats and groups themselves are never a switch:
+-- only owners manage them, so nobody can raise their own access.
+
+create table if not exists public.crew_groups (
+  id          text primary key,
+  name        text not null,
+  description text not null default '',
+  perms       jsonb not null default '[]'::jsonb,
+  -- The three this migration makes. They can be changed, not deleted.
+  builtin     boolean not null default false,
+  created_by  text not null default '',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint crew_groups_id_check check (id ~ '^[a-z0-9][a-z0-9-]{1,39}$'),
+  constraint crew_groups_perms_check check (jsonb_typeof(perms) = 'array')
+);
+
+insert into public.crew_groups (id, name, description, perms, builtin, created_by) values
+  ('crew', 'Crew', 'Their own day: the clock, receipts, photos, schedule and tasks.',
+   '["clock", "receipts"]'::jsonb, true, 'setup'),
+  ('lead', 'Supervisor', 'Runs the field: the schedule, checking work, pickups, the nightly plan.',
+   '["clock", "receipts", "crew.view", "updates", "schedule.edit", "tasks.assign", "tasks.verify", "questions.ask", "jobs.promise", "pickups.stage", "plan.send"]'::jsonb, true, 'setup'),
+  ('runner', 'Runner', 'Fetches staged material and brings it to the job.',
+   '["clock", "receipts", "pickups.run"]'::jsonb, true, 'setup')
+on conflict (id) do nothing;
 
 alter table public.crew_people
-  add column if not exists role text not null default 'crew';
+  add column if not exists group_id text not null default 'crew';
 
 do $$
 begin
-  if not exists (select 1 from pg_constraint where conname = 'crew_people_role_check') then
+  if not exists (select 1 from pg_constraint where conname = 'crew_people_group_fk') then
     alter table public.crew_people
-      add constraint crew_people_role_check check (role in ('crew', 'lead', 'runner'));
+      add constraint crew_people_group_fk foreign key (group_id) references public.crew_groups (id) on update cascade;
   end if;
 end
 $$;
@@ -131,12 +161,14 @@ create table if not exists public.crew_reports (
 
 create index if not exists crew_reports_day_idx on public.crew_reports (day, created_at desc);
 
+alter table public.crew_groups enable row level security;
 alter table public.crew_pickups enable row level security;
 alter table public.crew_reports enable row level security;
 
-revoke all on table public.crew_pickups, public.crew_reports from anon, authenticated;
-grant select, insert, update, delete on table public.crew_pickups, public.crew_reports to service_role;
+revoke all on table public.crew_groups, public.crew_pickups, public.crew_reports from anon, authenticated;
+grant select, insert, update, delete on table public.crew_groups, public.crew_pickups, public.crew_reports to service_role;
 
+comment on table public.crew_groups is 'Access groups for crew seats: a name and the switches that are on. Managed by owners. Service-role access only.';
 comment on table public.crew_pickups is 'Material staged for will-call that a runner fetches and delivers to a job. Service-role access only.';
 comment on table public.crew_reports is 'The nightly plan the field supervisor sends the owners: tomorrow''s schedule, open tasks, pickups. Service-role access only.';
 

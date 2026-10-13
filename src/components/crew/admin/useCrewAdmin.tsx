@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { botApi } from '@/components/bot/BotProvider'
-import type { AdminActInput, CrewAdminHome } from '@/lib/crew/types'
+import type { AdminActInput, Capability, CrewAdminHome } from '@/lib/crew/types'
 
 // The live picture of the crew, shared by the views of the Crew tab: the
 // owners' (inside the owners' app) and the lead's (inside the crew app, with
@@ -23,8 +23,10 @@ type Ctx = {
   run: (input: AdminActInput, quiet?: boolean) => Promise<RunResult>
   nameOf: (email: string) => string
   toast: (text: string, tone?: 'ok' | 'bad' | 'info') => void
-  /** The field supervisor's view: no hours, no seats, no time fixes. */
-  isLead: boolean
+  /** An owner: every switch, plus seats and groups. */
+  isOwner: boolean
+  /** Whether the viewer's group has this switched on (owners: always). */
+  can: (perm: Capability) => boolean
   /** Where a crew photo opens: owners through the bot's file door, the lead through the crew's. */
   filesBase: string
 }
@@ -36,11 +38,12 @@ const POLL_MS = 30_000
 export function CrewAdminProvider({
   children,
   toast,
-  lead = false,
+  member = false,
 }: {
   children: ReactNode
   toast: Ctx['toast']
-  lead?: boolean
+  /** Inside the crew app (a crew seat with the Crew tab on), not the owners' app. */
+  member?: boolean
 }) {
   const [data, setData] = useState<CrewAdminHome | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -112,10 +115,13 @@ export function CrewAdminProvider({
   const names = useMemo(() => new Map((data?.people ?? []).map((p) => [p.email, p.name])), [data])
   const nameOf = useCallback((email: string) => names.get(email) ?? email.split('@')[0], [names])
 
-  const filesBase = lead ? '/api/crew/files' : '/api/bot/files'
+  const filesBase = member ? '/api/crew/files' : '/api/bot/files'
+  const isOwner = data?.viewer.role === 'owner'
+  const perms = data?.viewer.perms
+  const can = useCallback((perm: Capability) => !!perms?.includes(perm), [perms])
   const value = useMemo<Ctx>(
-    () => ({ data, error, week, setWeek, refresh, run, nameOf, toast, isLead: lead, filesBase }),
-    [data, error, week, setWeek, refresh, run, nameOf, toast, lead, filesBase],
+    () => ({ data, error, week, setWeek, refresh, run, nameOf, toast, isOwner, can, filesBase }),
+    [data, error, week, setWeek, refresh, run, nameOf, toast, isOwner, can, filesBase],
   )
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>
 }

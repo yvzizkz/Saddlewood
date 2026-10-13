@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireOwner } from "@/lib/crew/auth";
+import { requireManager } from "@/lib/crew/auth";
 import { listPeople, listShifts } from "@/lib/crew/queries";
 import { addDays, clock12, hoursDecimal, isDay, localDay, weekStart, workedMinutes } from "@/lib/crew/time";
 
-// The week's hours as a spreadsheet, for payroll: one row per shift. Owners
-// only. Open shifts are listed with no clock-out and no hours, so nobody is
+// The week's hours as a spreadsheet, for payroll: one row per shift. Owners,
+// and a group with "hours.edit" switched on. Open shifts are listed with no clock-out and no hours, so nobody is
 // paid off a number that is still counting.
 
 export const runtime = "nodejs";
@@ -27,8 +27,8 @@ const HOW: Record<string, string> = {
 
 export async function GET(request: NextRequest) {
   try {
-    const owner = await requireOwner(request);
-    if (!owner) return NextResponse.json({ ok: false, error: "Owners only." }, { status: 403 });
+    const manager = await requireManager(request);
+    if (!manager || !manager.perms.includes("hours.edit")) return NextResponse.json({ ok: false, error: "Owners only." }, { status: 403 });
     const params = new URL(request.url).searchParams;
     const fromParam = params.get("from");
     const from = fromParam && isDay(fromParam) ? fromParam : weekStart(localDay());

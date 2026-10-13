@@ -8,6 +8,7 @@ import { authorizeOps } from "@/lib/ops/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getPerson, type CrewPersonRow } from "./queries";
 import { hasCrewRole } from "./role";
+import { CAPABILITY_KEYS, hasPerm, type AdminAct, type Capability } from "./types";
 
 // Three kinds of caller on the crew side, and none may stand in for another.
 //
@@ -65,39 +66,61 @@ export async function requireOwner(request: NextRequest): Promise<Owner | null> 
 }
 
 /**
- * Who may run the field from the Crew screens: an owner (everything), or the
- * lead (the field supervisor). A lead is a crew seat with role 'lead': still a
- * crew-marked sign-in, never on the portal allowlist, so the estimate tables
- * stay shut for them. What a lead may do is LEAD_ACTS, nothing else.
+ * Who may use the Crew screens: an owner (everything), or a crew seat whose
+ * group has the Crew tab switched on. A member is still a crew-marked sign-in,
+ * never on the portal allowlist, so the estimate tables stay shut for them.
+ * What a member may do is their group's switches (ACT_NEEDS), nothing else.
  */
-export type Manager = { role: "owner" | "lead"; email: string; name: string };
+export type Manager = { role: "owner" | "member"; email: string; name: string; perms: Capability[] };
 
 export async function requireManager(request: NextRequest): Promise<Manager | null> {
   const owner = await requireOwner(request);
-  if (owner) return { role: "owner", ...owner };
+  if (owner) return { role: "owner", ...owner, perms: [...CAPABILITY_KEYS] };
   const person = await requireCrew();
-  return person && person.role === "lead" ? { role: "lead", email: person.email, name: person.name } : null;
+  return person && hasPerm(person, "crew.view") ? { role: "member", email: person.email, name: person.name, perms: person.perms } : null;
 }
 
 /**
- * What the lead may do from the Crew screens. Not seats, not hours, not time
- * fixes: those stay with the owners. Job edits are limited further in
- * runAdminAct (the promise, the address and the site note only).
+ * The switch each Crew-screen action needs. "owner" is never a switch: seats
+ * and groups stay with the owners. job.update is checked again in runAdminAct
+ * (renaming or closing a job needs jobs.manage; the promise, address and site
+ * note need jobs.promise or jobs.manage).
  */
-export const LEAD_ACTS = new Set<string>([
-  "schedule.set",
-  "schedule.remove",
-  "schedule.copy",
-  "task.add",
-  "task.update",
-  "task.verify",
-  "question.ask",
-  "question.cancel",
-  "job.update",
-  "pickup.add",
-  "pickup.update",
-  "report.send",
-]);
+export const ACT_NEEDS: Record<AdminAct["kind"], Capability | "owner"> = {
+  "person.add": "owner",
+  "person.update": "owner",
+  "person.invite": "owner",
+  "person.code": "owner",
+  "group.save": "owner",
+  "group.delete": "owner",
+  "job.add": "jobs.manage",
+  "job.update": "jobs.promise",
+  "schedule.set": "schedule.edit",
+  "schedule.remove": "schedule.edit",
+  "schedule.copy": "schedule.edit",
+  "task.add": "tasks.assign",
+  "task.update": "tasks.assign",
+  "task.verify": "tasks.verify",
+  "shift.edit": "hours.edit",
+  "shift.add": "hours.edit",
+  "shift.void": "hours.edit",
+  "shift.ok": "hours.edit",
+  "fix.decide": "hours.edit",
+  "question.ask": "questions.ask",
+  "question.cancel": "questions.ask",
+  "pickup.add": "pickups.stage",
+  "pickup.update": "pickups.stage",
+  "report.send": "plan.send",
+};
+
+export function mayRun(m: Manager, kind: AdminAct["kind"]): boolean {
+  if (m.role === "owner") return true;
+  const need = ACT_NEEDS[kind];
+  if (need === "owner") return false;
+  // Keeping a job current is either switch.
+  if (kind === "job.update") return m.perms.includes("jobs.promise") || m.perms.includes("jobs.manage");
+  return m.perms.includes(need);
+}
 
 export type Viewer =
   | { kind: "anonymous" }

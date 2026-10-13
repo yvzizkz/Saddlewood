@@ -97,7 +97,7 @@ beforeEach(() => {
   session.user = null;
   db.down = false;
   people.clear();
-  people.set(ARNOLD, { email: ARNOLD, name: "Arnold Mujica", lang: "en", active: true, lastSeenAt: null });
+  people.set(ARNOLD, { email: ARNOLD, name: "Arnold Mujica", lang: "en", active: true, lastSeenAt: null, group: "crew", perms: ["clock", "receipts"] } as never);
   for (const fn of Object.values(spies)) fn.mockReset();
   const sections: BotSections = emptySections();
   sections.people = { [LANDO]: { name: "Lando", role: "owner" }, [ELI]: { name: "Eli", role: "requester" } };
@@ -230,18 +230,26 @@ describe("the owners' door", () => {
   it("opens for an owner", async () => {
     asStaff(LANDO);
     expect((await getAdmin(req("/api/crew/admin?week=2026-10-05"))).status).toBe(200);
-    expect(spies.adminHome).toHaveBeenCalledWith({ role: "owner", email: LANDO, name: "Lando" }, "2026-10-05");
+    expect(spies.adminHome).toHaveBeenCalledWith(expect.objectContaining({ role: "owner", email: LANDO, name: "Lando" }), "2026-10-05");
     const res = await postAdmin(req("/api/crew/admin", "POST", { kind: "person.add", name: "Arnold Mujica", email: ARNOLD }));
     expect(res.status).toBe(200);
-    expect(spies.runAdminAct.mock.calls[0][0]).toEqual({ role: "owner", email: LANDO, name: "Lando" });
+    expect(spies.runAdminAct.mock.calls[0][0]).toMatchObject({ role: "owner", email: LANDO, name: "Lando" });
   });
 
   it("opens the field to the lead, and nothing else", async () => {
     const LEAD = "eli.field@example.com";
-    people.set(LEAD, { email: LEAD, name: "Eli Lugo", lang: "en", active: true, lastSeenAt: null, role: "lead" } as never);
+    people.set(LEAD, {
+      email: LEAD,
+      name: "Eli Lugo",
+      lang: "en",
+      active: true,
+      lastSeenAt: null,
+      group: "lead",
+      perms: ["clock", "crew.view", "updates", "schedule.edit", "tasks.assign", "tasks.verify", "questions.ask", "jobs.promise", "pickups.stage", "plan.send"],
+    } as never);
     asCrew(LEAD);
     expect((await getAdmin(req("/api/crew/admin"))).status).toBe(200);
-    expect(spies.adminHome).toHaveBeenCalledWith({ role: "lead", email: LEAD, name: "Eli Lugo" }, null);
+    expect(spies.adminHome).toHaveBeenCalledWith(expect.objectContaining({ role: "member", email: LEAD, name: "Eli Lugo" }), null);
     for (const body of [
       { kind: "schedule.set", day: "2026-10-06", emails: [ARNOLD], jobId: "powell", priority: 2 },
       { kind: "task.verify", id: 5, ok: true },
@@ -250,14 +258,15 @@ describe("the owners' door", () => {
     ]) {
       expect((await postAdmin(req("/api/crew/admin", "POST", body))).status).toBe(200);
     }
-    expect(spies.runAdminAct.mock.calls[0][0]).toEqual({ role: "lead", email: LEAD, name: "Eli Lugo" });
+    expect(spies.runAdminAct.mock.calls[0][0]).toMatchObject({ role: "member", email: LEAD, name: "Eli Lugo" });
     spies.runAdminAct.mockClear();
     for (const body of [
       { kind: "shift.ok", id: 1 },
       { kind: "fix.decide", id: 1, approve: true },
       { kind: "person.add", name: "Beto Ruiz", email: "beto@example.com" },
-      { kind: "person.update", email: ARNOLD, role: "lead" },
+      { kind: "person.update", email: ARNOLD, group: "lead" },
       { kind: "person.code", email: ARNOLD },
+      { kind: "group.save", id: "lead", name: "Supervisor", perms: ["hours.edit"] },
     ]) {
       expect((await postAdmin(req("/api/crew/admin", "POST", body))).status).toBe(403);
     }

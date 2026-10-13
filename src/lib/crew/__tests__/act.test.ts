@@ -14,6 +14,7 @@ type Row = Record<string, unknown> & { id: number };
 const { db, notify, auth, mail } = vi.hoisted(() => {
   const db = {
     people: new Map<string, Record<string, unknown>>(),
+    groups: new Map<string, Record<string, unknown>>(),
     jobs: new Map<string, Record<string, unknown>>(),
     shifts: [] as Row[],
     entries: [] as Row[],
@@ -50,10 +51,22 @@ vi.mock("../queries", () => {
     patchPerson: async (email: string, patch: Record<string, unknown>) => {
       const row = db.people.get(email);
       if (!row) return null;
-      const { auth_id, ...rest } = patch;
-      Object.assign(row, rest, auth_id !== undefined ? { authId: auth_id } : {});
+      const { auth_id, group_id, ...rest } = patch;
+      Object.assign(row, rest, auth_id !== undefined ? { authId: auth_id } : {}, group_id !== undefined ? { group: group_id } : {});
       return row;
     },
+    getGroup: async (id: string) => db.groups.get(id) ?? null,
+    insertGroup: async (g: Record<string, unknown>) => {
+      if (db.groups.has(g.id as string)) return null;
+      const row = { builtin: false, ...g };
+      db.groups.set(g.id as string, row);
+      return row;
+    },
+    patchGroup: async (id: string, patch: Record<string, unknown>) => {
+      const row = db.groups.get(id);
+      return row ? Object.assign(row, patch) : null;
+    },
+    deleteGroup: async (id: string) => db.groups.delete(id),
     getJob: async (id: string) => db.jobs.get(id) ?? null,
     insertJob: async (j: Record<string, unknown>) => {
       if (db.jobs.has(j.id as string)) return null;
@@ -223,7 +236,7 @@ vi.mock("../notify", () => ({
   notifyOwners: async (n: { title: string; body: string }) => void notify.owners.push(n),
   // With no lead seated these go to the owners; the tests below that seat a lead check `leads`.
   notifySupervisors: async (n: { title: string; body: string }, o?: { alsoOwners?: boolean }) => {
-    const leads = [...db.people.values()].filter((p) => p.active && p.role === "lead");
+    const leads = [...db.people.values()].filter((p) => p.active && (p.perms as string[]).includes("updates"));
     if (!leads.length || o?.alsoOwners) notify.owners.push(n);
     if (leads.length) notify.leads.push(n);
   },
@@ -270,7 +283,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { punchTime, runCrewAct } from "../act";
 import { runAdminAct } from "../admin";
 import type { CrewPersonRow } from "../queries";
-import { crewActSchema, adminActSchema, type CrewActInput, type AdminActInput } from "../types";
+import { crewActSchema, adminActSchema, normalizePerms, type CrewActInput, type AdminActInput } from "../types";
 
 const person = (email: string, name: string, lang: "en" | "es" = "en"): CrewPersonRow => ({
   email,
@@ -278,7 +291,9 @@ const person = (email: string, name: string, lang: "en" | "es" = "en"): CrewPers
   lang,
   phone: "",
   trade: "",
-  role: "crew",
+  group: "crew",
+  groupName: "Crew",
+  perms: ["clock", "receipts"],
   active: true,
   addedBy: "Lando",
   createdAt: "x",
@@ -300,6 +315,9 @@ const file = (key = KEY) => ({ path: `u/${key}/202610/a1b2c3d4e5f6-r.jpg`, name:
 beforeEach(() => {
   db.people.clear();
   db.jobs.clear();
+  db.groups.clear();
+  db.groups.set("crew", { id: "crew", name: "Crew", perms: ["clock", "receipts"], builtin: true });
+  db.groups.set("lead", { id: "lead", name: "Supervisor", perms: [], builtin: true });
   for (const k of ["shifts", "entries", "schedule", "tasks", "questions", "pickups", "reports"] as const) db[k].length = 0;
   db.seq = 0;
   notify.owners.length = 0;
@@ -709,9 +727,10 @@ describe("what an owner can do", () => {
 
 const ELI = "eli@example.com";
 const FELIPE = "felipe@example.com";
-const eli: CrewPersonRow = { ...person(ELI, "Eli Lugo"), role: "lead" };
-const felipe: CrewPersonRow = { ...person(FELIPE, "Felipe Soto", "es"), role: "runner" };
-const asLead = { role: "lead" as const, email: ELI, name: "Eli Lugo" };
+const LEAD_PERMS = normalizePerms(["clock", "receipts", "updates", "schedule.edit", "tasks.assign", "tasks.verify", "questions.ask", "jobs.promise", "pickups.stage", "plan.send"]);
+const eli: CrewPersonRow = { ...person(ELI, "Eli Lugo"), group: "lead", groupName: "Supervisor", perms: LEAD_PERMS };
+const felipe: CrewPersonRow = { ...person(FELIPE, "Felipe Soto", "es"), group: "runner", groupName: "Runner", perms: ["clock", "receipts", "pickups.run"] };
+const asLead = { role: "member" as const, email: ELI, name: "Eli Lugo", perms: LEAD_PERMS };
 const lead = (input: AdminActInput, now: Date) => runAdminAct(asLead, adminActSchema.parse(input), now);
 
 describe("reported done vs verified done", () => {
@@ -822,5 +841,33 @@ describe("the nightly plan", () => {
     expect(body).toContain("Sand the hall · Arnold: Reported done, needs checking");
     expect(body).toContain("NEED FROM MARCO\nNeed a yes on the soffit change");
     expect(notify.owners.at(-1)).toMatchObject({ title: "Eli's plan for Tue, Oct 6" });
+  });
+});
+
+describe("groups and their switches", () => {
+  it("lets an owner make a group, flip its switches, and only delete an empty one", async () => {
+    const made = await admin({ kind: "group.save", name: "Foreman", perms: ["clock", "schedule.edit", "made-up"] }, at("09:00"));
+    expect(made).toMatchObject({ ok: true });
+    // Unknown switches drop out; any Crew-tab switch brings the tab itself.
+    expect(db.groups.get("foreman")).toMatchObject({ name: "Foreman", perms: ["clock", "crew.view", "schedule.edit"] });
+    await admin({ kind: "person.update", email: ARNOLD, group: "foreman" }, at("09:01"));
+    expect(db.people.get(ARNOLD)).toMatchObject({ group: "foreman" });
+    expect(await admin({ kind: "group.delete", id: "foreman" }, at("09:02"))).toMatchObject({ ok: false, status: 409 });
+    expect(await admin({ kind: "group.delete", id: "crew" }, at("09:02"))).toMatchObject({ ok: false, status: 400 });
+    expect(await admin({ kind: "person.update", email: ARNOLD, group: "nope" }, at("09:03"))).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("keeps the clock and receipts behind their switches, but never traps someone on the clock", async () => {
+    const noClock: CrewPersonRow = { ...arnold, perms: [] };
+    expect(await crew(noClock, { kind: "punch.in", jobId: "powell", clientId: cid() }, at("06:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(await crew(noClock, { kind: "receipt.add", jobId: "powell", files: [file()], clientId: cid() }, at("06:00"))).toMatchObject({ ok: false, status: 403 });
+    await crew(arnold, { kind: "punch.in", jobId: "powell", clientId: cid() }, at("06:00"));
+    expect(await crew(noClock, { kind: "punch.out", clientId: cid() }, at("14:00"))).toEqual({ ok: true });
+  });
+
+  it("lets a member keep a job's promise but not rename it without the jobs switch", async () => {
+    expect(await lead({ kind: "job.update", id: "powell", name: "Powell" }, at("09:00"))).toMatchObject({ ok: false, status: 403 });
+    const manager = { ...asLead, perms: normalizePerms([...LEAD_PERMS, "jobs.manage"]) };
+    expect(await runAdminAct(manager, adminActSchema.parse({ kind: "job.update", id: "powell", name: "Powell" }), at("09:00"))).toMatchObject({ ok: true });
   });
 });

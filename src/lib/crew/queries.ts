@@ -10,8 +10,8 @@ import type {
   CrewPerson,
   CrewPickup,
   CrewPickupStatus,
+  CrewGroup,
   CrewReport,
-  CrewRole,
   CrewQuestion,
   CrewQuestionKind,
   CrewScheduleItem,
@@ -21,6 +21,7 @@ import type {
   Geo,
   ShiftEdit,
 } from "./types";
+import { normalizePerms } from "./types";
 
 // Every read and write of the crew tables. Service-role client only, after the
 // route has decided who is asking (src/lib/crew/auth.ts). The tables carry RLS
@@ -59,15 +60,20 @@ type PersonRow = {
   lang: string;
   phone: string;
   trade: string;
-  role?: string;
+  group_id?: string;
+  /** The group, embedded through crew_people_group_fk. */
+  crew_groups?: { name: string; perms: unknown } | null;
   active: boolean;
   added_by: string;
   created_at: string;
   last_seen_at: string | null;
 };
 
-function asRole(v: unknown): CrewRole {
-  return v === "lead" || v === "runner" ? v : "crew";
+/** A seat with its group's switches as they are right now. */
+const PERSON_COLS = "*, crew_groups(name, perms)";
+
+function asStrings(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
 export type CrewPersonRow = CrewPerson & { authId: string | null };
@@ -79,7 +85,9 @@ function toPerson(r: PersonRow): CrewPersonRow {
     lang: (r.lang === "es" ? "es" : "en") as CrewLang,
     phone: r.phone,
     trade: r.trade,
-    role: asRole(r.role),
+    group: r.group_id ?? "crew",
+    groupName: r.crew_groups?.name ?? "Crew",
+    perms: normalizePerms(asStrings(r.crew_groups?.perms)),
     active: r.active,
     addedBy: r.added_by,
     createdAt: r.created_at,
@@ -90,14 +98,14 @@ function toPerson(r: PersonRow): CrewPersonRow {
 
 export async function getPerson(email: string): Promise<CrewPersonRow | null> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("crew_people").select("*").eq("email", email).maybeSingle();
+  const { data, error } = await db.from("crew_people").select(PERSON_COLS).eq("email", email).maybeSingle();
   if (error) fail("crew_people read", error.message);
   return data ? toPerson(data as PersonRow) : null;
 }
 
 export async function listPeople(): Promise<CrewPersonRow[]> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("crew_people").select("*").order("name", { ascending: true });
+  const { data, error } = await db.from("crew_people").select(PERSON_COLS).order("name", { ascending: true });
   if (error) fail("crew_people list", error.message);
   return ((data ?? []) as PersonRow[]).map(toPerson);
 }
@@ -109,7 +117,7 @@ export async function savePerson(p: {
   lang: CrewLang;
   phone: string;
   trade: string;
-  role: CrewRole;
+  group: string;
   addedBy: string;
 }): Promise<CrewPersonRow> {
   const db = getSupabaseAdmin();
@@ -123,14 +131,14 @@ export async function savePerson(p: {
         lang: p.lang,
         phone: p.phone,
         trade: p.trade,
-        role: p.role,
+        group_id: p.group,
         active: true,
         added_by: p.addedBy,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "email" },
     )
-    .select("*")
+    .select(PERSON_COLS)
     .single();
   if (error) fail("crew_people save", error.message);
   return toPerson(data as PersonRow);
@@ -138,14 +146,14 @@ export async function savePerson(p: {
 
 export async function patchPerson(
   email: string,
-  patch: Partial<{ name: string; lang: CrewLang; phone: string; trade: string; role: CrewRole; active: boolean; auth_id: string | null }>,
+  patch: Partial<{ name: string; lang: CrewLang; phone: string; trade: string; group_id: string; active: boolean; auth_id: string | null }>,
 ): Promise<CrewPersonRow | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("crew_people")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("email", email)
-    .select("*");
+    .select(PERSON_COLS);
   if (error) fail("crew_people update", error.message);
   const row = (data as PersonRow[] | null)?.[0];
   return row ? toPerson(row) : null;
@@ -156,6 +164,62 @@ export async function touchSeen(person: CrewPerson): Promise<void> {
   if (person.lastSeenAt && Date.now() - Date.parse(person.lastSeenAt) < 5 * 60_000) return;
   const db = getSupabaseAdmin();
   await db.from("crew_people").update({ last_seen_at: new Date().toISOString() }).eq("email", person.email);
+}
+
+// ---- groups -------------------------------------------------------------------
+
+type GroupRow = { id: string; name: string; description: string; perms: unknown; builtin: boolean };
+
+function toGroup(r: GroupRow): CrewGroup {
+  return { id: r.id, name: r.name, description: r.description, perms: normalizePerms(asStrings(r.perms)), builtin: r.builtin };
+}
+
+export async function listGroups(): Promise<CrewGroup[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("crew_groups").select("id, name, description, perms, builtin").order("created_at", { ascending: true });
+  if (error) fail("crew_groups list", error.message);
+  return ((data ?? []) as GroupRow[]).map(toGroup);
+}
+
+export async function getGroup(id: string): Promise<CrewGroup | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("crew_groups").select("id, name, description, perms, builtin").eq("id", id).maybeSingle();
+  if (error) fail("crew_groups read", error.message);
+  return data ? toGroup(data as GroupRow) : null;
+}
+
+/** -> null when a new group's id is taken. */
+export async function insertGroup(g: { id: string; name: string; description: string; perms: string[]; createdBy: string }): Promise<CrewGroup | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("crew_groups")
+    .insert({ id: g.id, name: g.name, description: g.description, perms: g.perms, created_by: g.createdBy })
+    .select("id, name, description, perms, builtin")
+    .single();
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) return null;
+    fail("crew_groups insert", error.message);
+  }
+  return toGroup(data as GroupRow);
+}
+
+export async function patchGroup(id: string, patch: { name: string; description: string; perms: string[] }): Promise<CrewGroup | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("crew_groups")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id, name, description, perms, builtin");
+  if (error) fail("crew_groups update", error.message);
+  const row = (data as GroupRow[] | null)?.[0];
+  return row ? toGroup(row) : null;
+}
+
+export async function deleteGroup(id: string): Promise<boolean> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("crew_groups").delete().eq("id", id).eq("builtin", false).select("id");
+  if (error) fail("crew_groups delete", error.message);
+  return !!data?.length;
 }
 
 // ---- jobs ---------------------------------------------------------------------

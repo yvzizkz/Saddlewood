@@ -282,6 +282,8 @@ export default function TodayScreen() {
   }
 
   const shift = home.shift
+  // The clock follows the group's switch; a shift already open can always be closed.
+  const canClock = home.me.perms.includes('clock') || !!shift
   const todayMinutes = home.shifts.filter((s) => s.day === home.day).reduce((sum, s) => sum + workedMinutes(s, nowMs), 0)
   const today = home.schedule.filter((s) => s.day === home.day)
   const tomorrow = home.schedule.filter((s) => s.day === addDays(home.day, 1))
@@ -321,6 +323,8 @@ export default function TodayScreen() {
         </>
       ) : null}
 
+      {canClock ? (
+        <>
       <Card className="px-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -364,6 +368,8 @@ export default function TodayScreen() {
           )}
         </div>
       </Card>
+        </>
+      ) : null}
 
       {today.length ? (
         <div className="mt-4 space-y-3">
@@ -382,7 +388,7 @@ export default function TodayScreen() {
 
       <SectionTitle>{t.send_}</SectionTitle>
       <div className="grid grid-cols-2 gap-3">
-        <Tile icon={Receipt} label={t.receipt} hint={t.receiptHint} onClick={() => show({ kind: 'receipt' })} />
+        {home.me.perms.includes('receipts') ? <Tile icon={Receipt} label={t.receipt} hint={t.receiptHint} onClick={() => show({ kind: 'receipt' })} /> : null}
         <Tile icon={Camera} label={t.progress} hint={t.progressHint} onClick={() => show({ kind: 'progress' })} />
         <Tile icon={ClipboardCheck} label={t.eod} hint={t.eodHint} done={eodDone} onClick={() => show({ kind: 'eod' })} />
         <Tile icon={MessageSquare} label={t.noteToOffice} hint={t.noteHint} onClick={() => show({ kind: 'note' })} />

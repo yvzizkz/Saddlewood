@@ -13,8 +13,8 @@ import { CrewProvider, useCrew } from './CrewProvider'
 import type { CrewStrings } from './strings'
 
 // The frame a crew member's screens sit in: a slim header that says whether
-// they are on the clock, and four thumb tabs. The lead (field supervisor) gets
-// a fifth, Crew: the schedule, tasks to check, pickups and the nightly plan.
+// they are on the clock, and four thumb tabs. A seat whose group has the Crew
+// tab switched on (the supervisor) gets a fifth: what that group may do.
 
 type Tab = { href: string; label: (t: CrewStrings) => string; icon: LucideIcon }
 
@@ -59,7 +59,7 @@ function TabBar() {
   const { home, t } = useCrew()
   const keyboardOpen = useKeyboardOpen()
   const badge = home?.questions.length ?? 0
-  const tabs = home?.me.role === 'lead' ? [...TABS.slice(0, 3), CREW_TAB, TABS[3]] : TABS
+  const tabs = home?.me.perms.includes('crew.view') ? [...TABS.slice(0, 3), CREW_TAB, TABS[3]] : TABS
   if (keyboardOpen) return null
   return (
     <nav aria-label="App" className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--color-stone)] bg-[var(--color-background)] pb-safe">

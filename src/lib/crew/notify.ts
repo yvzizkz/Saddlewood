@@ -30,9 +30,9 @@ export async function notifyOwners(note: { title: string; body: string; tag: str
 }
 
 /**
- * To whoever runs the field: the leads (the field supervisor), so updates from
- * the crew land with them and not with Marco. With no lead seated, the owners,
- * as before. `alsoOwners` for what the owners must hear either way (safety).
+ * To whoever runs the field: every seat whose group has "updates" switched on
+ * (the supervisor), so updates from the crew land with them and not with
+ * Marco. With nobody in such a group, the owners, as before. `alsoOwners` for what the owners must hear either way (safety).
  * The person who caused it is never told about their own act.
  */
 export async function notifySupervisors(
@@ -41,7 +41,7 @@ export async function notifySupervisors(
 ): Promise<void> {
   let leads: string[] = [];
   try {
-    leads = (await listPeople()).filter((p) => p.active && p.role === "lead" && p.email !== opts.except).map((p) => p.email);
+    leads = (await listPeople()).filter((p) => p.active && p.perms.includes("updates") && p.email !== opts.except).map((p) => p.email);
   } catch (e) {
     console.error("[crew/notify] leads:", (e as Error).message);
   }
