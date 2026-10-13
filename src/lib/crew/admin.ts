@@ -3,28 +3,36 @@ import { buildSignInEmail } from "@/lib/auth/signInEmail";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { ActResult } from "./act";
-import type { Owner } from "./auth";
+import type { Manager } from "./auth";
 import { MSG } from "./messages";
-import { notifyCrew } from "./notify";
+import { notifyCrew, notifyOwners } from "./notify";
+import { buildPlan } from "./plan";
 import {
   cancelQuestion,
   deleteSchedule,
   getEntry,
   getJob,
   getPerson,
+  getPickup,
   getScheduleItem,
   getShift,
   getTask,
   insertJob,
+  insertPickup,
   insertQuestion,
+  insertReport,
   insertShift,
   insertTasks,
+  listJobs,
   listPeople,
+  listPickups,
   listSchedule,
   listShifts,
+  listTasks,
   patchEntry,
   patchJob,
   patchPerson,
+  patchPickup,
   patchShift,
   patchTask,
   savePerson,
@@ -33,8 +41,11 @@ import {
   type CrewShiftRow,
 } from "./queries";
 import { CREW_ROLE, FORMER_ROLE } from "./role";
-import { addDays, clock12, localClock, localDay, localInstant } from "./time";
-import { OTHER_JOB, jobSlug, type AdminAct, type ShiftEdit } from "./types";
+import { addDays, clock12, dayShort, localClock, localDay, localInstant } from "./time";
+import { OTHER_JOB, firstNameOf, jobSlug, type AdminAct, type ShiftEdit } from "./types";
+
+/** Whoever is acting from the Crew screens: an owner, or the lead (limited to LEAD_ACTS by the route). */
+type Owner = Pick<Manager, "email" | "name"> & { role?: Manager["role"] };
 
 // Everything an owner can do to the crew side: seats, jobs, the schedule,
 // tasks, time corrections, questions. Every change to someone's time keeps
@@ -246,6 +257,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         lang: act.lang,
         phone: act.phone,
         trade: act.trade,
+        role: act.role,
         addedBy: owner.name,
       });
       if (!act.invite) return ok(`${person.name} has a seat. Send them the link when you are ready.`);
@@ -280,6 +292,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         ...(act.lang !== undefined ? { lang: act.lang } : {}),
         ...(act.trade !== undefined ? { trade: act.trade } : {}),
         ...(act.phone !== undefined ? { phone: act.phone } : {}),
+        ...(act.role !== undefined ? { role: act.role } : {}),
       };
       if (Object.keys(patch).length) await patchPerson(person.email, patch);
       return ok();
@@ -304,7 +317,15 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
     case "job.add": {
       const base = jobSlug(act.name);
       for (const id of [base, `${base}-2`, `${base}-3`, `${base}-4`]) {
-        const job = await insertJob({ id, name: act.name, address: act.address, note: act.note, createdBy: owner.name });
+        const job = await insertJob({
+          id,
+          name: act.name,
+          address: act.address,
+          note: act.note,
+          promised: act.promised || null,
+          promiseNote: act.promiseNote,
+          createdBy: owner.name,
+        });
         if (job) return ok();
         const taken = await getJob(id);
         if (taken && taken.name.toLowerCase() === act.name.toLowerCase()) {
@@ -317,9 +338,18 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
     }
 
     case "job.update": {
-      const { kind: _kind, id, ...patch } = act;
+      const { kind: _kind, id, promised, promiseNote, ...rest } = act;
       void _kind;
-      const job = await patchJob(id, patch);
+      // The lead keeps the promise, the address and the site note current. The
+      // name (receipts and hours are filed under it) and the list stay with the owners.
+      if (owner.role === "lead" && (rest.name !== undefined || rest.active !== undefined)) {
+        return bad(403, "Renaming or closing a job is for Marco or Lando.");
+      }
+      const job = await patchJob(id, {
+        ...rest,
+        ...(promised !== undefined ? { promised: promised || null } : {}),
+        ...(promiseNote !== undefined ? { promise_note: promiseNote } : {}),
+      });
       return job ? ok() : bad(404, "That job is not on the list.");
     }
 
@@ -337,6 +367,7 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
           jobName: job.name,
           startTime: act.startTime,
           note: act.note,
+          priority: act.priority,
           createdBy: owner.name,
         })),
       );
@@ -368,7 +399,16 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       const rows = from.filter((r) => active.has(r.email));
       if (!rows.length) return bad(400, "Nobody was scheduled that day.");
       const made = await upsertSchedule(
-        rows.map((r) => ({ day: act.to, email: r.email, jobId: r.jobId, jobName: r.jobName, startTime: r.startTime, note: r.note, createdBy: owner.name })),
+        rows.map((r) => ({
+          day: act.to,
+          email: r.email,
+          jobId: r.jobId,
+          jobName: r.jobName,
+          startTime: r.startTime,
+          note: r.note,
+          priority: r.priority,
+          createdBy: owner.name,
+        })),
       );
       if (act.to === today || act.to === addDays(today, 1)) {
         for (const r of made) {
@@ -389,7 +429,16 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       const people = (await listPeople()).filter((p) => p.active && act.emails.includes(p.email));
       if (!people.length) return bad(400, "Pick who it is for.");
       await insertTasks(
-        people.map((p) => ({ email: p.email, title: act.title, detail: act.detail, jobId: job.id, jobName: job.name, due: act.due || null, createdBy: owner.name })),
+        people.map((p) => ({
+          email: p.email,
+          title: act.title,
+          detail: act.detail,
+          jobId: job.id,
+          jobName: job.name,
+          due: act.due || null,
+          priority: act.priority,
+          createdBy: owner.name,
+        })),
       );
       for (const p of people) await notifyCrew(p, MSG.newTask(act.title), "crew-task");
       return ok();
@@ -399,13 +448,107 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       const task = await getTask(act.id);
       if (!task) return bad(404, "That task is gone.");
       const closing = act.status === "done" || act.status === "dropped";
+      const at = nowDate.toISOString();
       await patchTask(task.id, {
-        ...(act.status !== undefined ? { status: act.status, closed_at: closing ? nowDate.toISOString() : null } : {}),
+        ...(act.status !== undefined ? { status: act.status, closed_at: closing ? at : null } : {}),
+        // Marked done by whoever checks the work: that is verified done.
+        ...(act.status === "done" ? { verified_at: at, verified_by: owner.name } : {}),
+        ...(act.status === "open" ? { verified_at: null, verified_by: "", reported_at: null } : {}),
         ...(act.title !== undefined ? { title: act.title } : {}),
         ...(act.detail !== undefined ? { detail: act.detail } : {}),
         ...(act.due !== undefined ? { due: act.due || null } : {}),
+        ...(act.priority !== undefined ? { priority: act.priority } : {}),
       });
       return ok();
+    }
+
+    case "task.verify": {
+      const task = await getTask(act.id);
+      if (!task || task.status !== "done") return bad(404, "That task is not waiting on a check.");
+      if (task.verifiedAt) return bad(409, `${task.verifiedBy || "Someone"} already checked it.`);
+      const at = nowDate.toISOString();
+      const person = await getPerson(task.email);
+      if (act.ok) {
+        const saved = await patchTask(task.id, { verified_at: at, verified_by: owner.name }, { status: "done", unverified: true });
+        if (!saved) return bad(409, "Someone else just checked it.");
+        if (person?.active && person.email !== owner.email) await notifyCrew(person, MSG.verified(task.title, firstNameOf(owner.name)), `crew-task-${task.id}`);
+        return ok("Verified done.");
+      }
+      if (act.note.trim().length < 3) return bad(400, "Say what is left, so they know what to come back for.");
+      const saved = await patchTask(
+        task.id,
+        {
+          status: "open",
+          closed_at: null,
+          reported_at: null,
+          sent_back: task.sentBack + 1,
+          detail: `${task.detail ? `${task.detail}\n\n` : ""}Sent back by ${firstNameOf(owner.name)} (${dayShort(today)}): ${act.note.trim()}`.slice(0, 1500),
+        },
+        { status: "done", unverified: true },
+      );
+      if (!saved) return bad(409, "Someone else just checked it.");
+      if (person?.active) await notifyCrew(person, MSG.sentBack(task.title, firstNameOf(owner.name), act.note.trim()), `crew-task-${task.id}`);
+      return ok("Sent back. It is open again on their list.");
+    }
+
+    case "pickup.add": {
+      let job = { id: "", name: "" };
+      if (act.jobId) {
+        const found = await getJob(act.jobId);
+        if (!found) return bad(400, "That job is not on the list.");
+        job = { id: found.id, name: found.name };
+      }
+      if (act.day < today) return bad(400, "That day has passed.");
+      const people = await listPeople();
+      if (act.email && !people.some((p) => p.active && p.email === act.email)) return bad(400, "That person does not have a seat.");
+      const pickup = await insertPickup({
+        day: act.day,
+        jobId: job.id,
+        jobName: job.name,
+        supplier: act.supplier,
+        place: act.place,
+        orderRef: act.orderRef,
+        items: act.items,
+        note: act.note,
+        email: act.email,
+        createdBy: owner.name,
+      });
+      const to = people.filter((p) => p.active && (act.email ? p.email === act.email : p.role === "runner"));
+      for (const p of to) await notifyCrew(p, MSG.newPickup(pickup.supplier, pickup.jobName, pickup.day, today), `crew-pickup-${pickup.id}`);
+      return ok(to.length ? `On ${to.map((p) => firstNameOf(p.name)).join(", ")}'s list.` : "Staged. Nobody has a runner seat yet, so nobody was told.");
+    }
+
+    case "pickup.update": {
+      const pickup = await getPickup(act.id);
+      if (!pickup) return bad(404, "That pickup is gone.");
+      const at = nowDate.toISOString();
+      const saved = await patchPickup(pickup.id, {
+        ...(act.status !== undefined ? { status: act.status } : {}),
+        ...(act.status === "staged" ? { picked_at: null, picked_by: "", delivered_at: null, runner_note: "" } : {}),
+        ...(act.status === "delivered" && !pickup.deliveredAt ? { delivered_at: at } : {}),
+        ...(act.email !== undefined ? { email: act.email } : {}),
+        ...(act.note !== undefined ? { note: act.note } : {}),
+        ...(act.day !== undefined ? { day: act.day } : {}),
+      });
+      return saved ? ok() : bad(404, "That pickup is gone.");
+    }
+
+    case "report.send": {
+      const [people, jobs, schedule, tasks, pickups] = await Promise.all([
+        listPeople(),
+        listJobs(),
+        listSchedule({ fromDay: today, toDay: addDays(act.day, 7) }),
+        listTasks({ closedSince: new Date(now - 24 * 3600_000).toISOString() }),
+        listPickups({ fromDay: today }),
+      ]);
+      const plan = buildPlan({ day: act.day, today, people, jobs, schedule, tasks, pickups, note: act.note });
+      const report = await insertReport({ day: act.day, sentBy: owner.email, sentName: owner.name, body: plan.text, data: plan.counts });
+      await notifyOwners({
+        title: `${firstNameOf(owner.name)}'s plan for ${dayShort(act.day)}`,
+        body: `${plan.counts.scheduled} scheduled · ${plan.counts.open} open tasks${plan.counts.toCheck ? ` · ${plan.counts.toCheck} to check` : ""}${act.note ? ` · needs you: ${act.note}` : ""}`,
+        tag: `crew-plan-${report.day}`,
+      });
+      return ok("Sent to Marco.");
     }
 
     case "shift.edit": {

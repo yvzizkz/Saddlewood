@@ -3,13 +3,25 @@
 import { useState, type ReactNode } from 'react'
 import { Copy, Mail, Share2 } from 'lucide-react'
 
-import { useBot } from '@/components/bot/BotProvider'
 import { Button, Chip, Field, INPUT, Segmented } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { ago } from '@/lib/bot/view'
-import { clock12, clockText, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
-import { firstNameOf, type CrewEntry, type CrewJob, type CrewLang, type CrewPerson, type CrewShift, type CrewTask } from '@/lib/crew/types'
-import { useCrewAdmin } from './useCrewAdmin'
+import { priorityLabel, taskStatusWord } from '@/lib/crew/plan'
+import { addDays, clock12, clockText, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
+import {
+  PRIORITIES,
+  firstNameOf,
+  isReportedDone,
+  type CrewEntry,
+  type CrewJob,
+  type CrewLang,
+  type CrewPerson,
+  type CrewPickup,
+  type CrewRole,
+  type CrewShift,
+  type CrewTask,
+} from '@/lib/crew/types'
+import { useCrewAdmin, useFilesBase } from './useCrewAdmin'
 
 // The owner's forms on the Crew tab. Each is mounted only while it is open.
 
@@ -90,23 +102,53 @@ function JobSelect({ value, onChange, jobs, allowNone = false }: { value: string
   )
 }
 
+/** The priority order, highest first: if this does not happen today, what breaks? */
+export function PrioritySelect({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  return (
+    <select className={INPUT} value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
+      <option value="">Pick one</option>
+      {PRIORITIES.map((p) => (
+        <option key={p.n} value={p.n}>
+          {p.n}. {p.en}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+export function PriorityChip({ n }: { n: number | null | undefined }) {
+  if (!n) return null
+  return <Chip tone={n <= 2 ? 'bad' : n === 3 ? 'warn' : 'quiet'}>{`${n} · ${priorityLabel(n)}`}</Chip>
+}
+
 // ---- schedule ---------------------------------------------------------------------
 
-export function AssignSheet({ day, onClose, preset }: { day: string; onClose: () => void; preset?: { jobId: string; startTime: string; note: string } }) {
+export function AssignSheet({
+  day,
+  onClose,
+  preset,
+}: {
+  day: string
+  onClose: () => void
+  preset?: { jobId: string; startTime: string; note: string; priority?: number | null }
+}) {
   const { data, run } = useCrewAdmin()
   const [jobId, setJobId] = useState(preset?.jobId ?? '')
   const [startTime, setStartTime] = useState(preset?.startTime ?? '06:00')
   const [note, setNote] = useState(preset?.note ?? '')
+  const [priority, setPriority] = useState<number | null>(preset?.priority ?? null)
   const [emails, setEmails] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState('')
   if (!data) return null
+  const job = data.jobs.find((j) => j.id === jobId)
 
   async function go() {
     if (!jobId) return setProblem('Choose a job.')
     if (!emails.length) return setProblem('Pick who is going.')
+    if (!priority) return setProblem('Pick why this goes first: the priority.')
     setBusy(true)
-    const res = await run({ kind: 'schedule.set', day, emails, jobId, startTime, note: note.trim() }, true)
+    const res = await run({ kind: 'schedule.set', day, emails, jobId, startTime, note: note.trim(), priority }, true)
     setBusy(false)
     if (!res.ok) return setProblem(res.text)
     onClose()
@@ -118,6 +160,14 @@ export function AssignSheet({ day, onClose, preset }: { day: string; onClose: ()
         <>
           <Field label="Job">
             <JobSelect value={jobId} onChange={setJobId} jobs={data.jobs} />
+          </Field>
+          {job?.promised ? (
+            <p className="-mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--color-gold-accessible)' }}>
+              Promised to the client: {job.promiseNote || 'done'} by {dayShort(job.promised)}
+            </p>
+          ) : null}
+          <Field label="Priority" hint="If this does not happen that day, what breaks? Fill the top of the list first.">
+            <PrioritySelect value={priority} onChange={setPriority} />
           </Field>
           <Field label="Start time" hint="Leave it empty if there is no set time.">
             <input type="time" className={INPUT} value={startTime} onChange={(e) => setStartTime(e.target.value)} />
@@ -148,6 +198,7 @@ export function TaskAddSheet({ onClose, to }: { onClose: () => void; to?: string
   const [detail, setDetail] = useState('')
   const [jobId, setJobId] = useState('')
   const [due, setDue] = useState('')
+  const [priority, setPriority] = useState<number | null>(null)
   const [emails, setEmails] = useState<string[]>(to ? [to] : [])
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState('')
@@ -157,7 +208,7 @@ export function TaskAddSheet({ onClose, to }: { onClose: () => void; to?: string
     if (title.trim().length < 3) return setProblem('Say what the task is.')
     if (!emails.length) return setProblem('Pick who it is for.')
     setBusy(true)
-    const res = await run({ kind: 'task.add', emails, title: title.trim(), detail: detail.trim(), jobId, due }, true)
+    const res = await run({ kind: 'task.add', emails, title: title.trim(), detail: detail.trim(), jobId, due, priority }, true)
     setBusy(false)
     if (!res.ok) return setProblem(res.text)
     onClose()
@@ -179,6 +230,9 @@ export function TaskAddSheet({ onClose, to }: { onClose: () => void; to?: string
           <input type="date" className={INPUT} value={due} min={data.day} onChange={(e) => setDue(e.target.value)} />
         </Field>
       </div>
+      <Field label="Priority">
+        <PrioritySelect value={priority} onChange={setPriority} />
+      </Field>
       <Group label="Who">
         <PeoplePicker value={emails} onChange={setEmails} people={data.people} />
       </Group>
@@ -193,6 +247,9 @@ export function TaskAddSheet({ onClose, to }: { onClose: () => void; to?: string
 export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => void }) {
   const { run, nameOf } = useCrewAdmin()
   const [busy, setBusy] = useState<string | null>(null)
+  const [left, setLeft] = useState('')
+  const [problem, setProblem] = useState('')
+  const toCheck = isReportedDone(task)
 
   async function set(status: 'open' | 'done' | 'dropped') {
     setBusy(status)
@@ -201,10 +258,26 @@ export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => vo
     if (res.ok) onClose()
   }
 
+  async function verify(ok: boolean) {
+    if (!ok && left.trim().length < 3) return setProblem('Say what is left, so they know what to come back for.')
+    setBusy(ok ? 'verify' : 'back')
+    setProblem('')
+    const res = await run({ kind: 'task.verify', id: task.id, ok, note: left.trim() })
+    setBusy(null)
+    if (res.ok) onClose()
+    else setProblem(res.text)
+  }
+
   return (
-    <AdminSheet title={task.title} onClose={onClose} tall={false}>
+    <AdminSheet title={task.title} onClose={onClose} tall={toCheck}>
       <p className="text-[13px] text-[var(--color-charcoal-light)]">
         {[nameOf(task.email), task.jobName, task.due ? `due ${dayShort(task.due)}` : '', `from ${task.createdBy}`].filter(Boolean).join(' · ')}
+      </p>
+      <p className="flex flex-wrap items-center gap-1.5">
+        <Chip tone={task.status === 'blocked' ? 'bad' : toCheck ? 'warn' : task.status === 'done' ? 'ok' : 'quiet'}>{taskStatusWord(task)}</Chip>
+        <PriorityChip n={task.priority} />
+        {task.sentBack ? <Chip tone="warn">{`Sent back ${task.sentBack === 1 ? 'once' : `${task.sentBack} times`}`}</Chip> : null}
+        {task.verifiedAt && task.verifiedBy ? <Chip tone="quiet">{`Checked by ${firstNameOf(task.verifiedBy)}`}</Chip> : null}
       </p>
       {task.detail ? <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-charcoal)]">{task.detail}</p> : null}
       {task.doneNote ? (
@@ -213,22 +286,42 @@ export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => vo
         </p>
       ) : null}
       <Photos files={task.files} />
-      <div className="grid grid-cols-2 gap-3">
-        {task.status === 'done' || task.status === 'dropped' ? (
-          <Button full busy={busy === 'open'} onClick={() => set('open')}>
-            Reopen
-          </Button>
-        ) : (
-          <>
-            <Button variant="danger" busy={busy === 'dropped'} onClick={() => set('dropped')}>
-              Drop it
+      {toCheck ? (
+        <>
+          <p className="text-[13px] leading-relaxed text-[var(--color-charcoal)]">
+            {firstNameOf(nameOf(task.email))} says this is done{task.reportedAt ? ` (${clock12(task.reportedAt)})` : ''}. Look at it on site or in the photos. Only verified work counts as done.
+          </p>
+          <Field label="If it is not done: what is left?" hint="They get it back on their list with this note.">
+            <textarea className={AREA} value={left} maxLength={600} placeholder="Still needs sanding by the window" onChange={(e) => setLeft(e.target.value)} />
+          </Field>
+          <Problem text={problem} />
+          <div className="grid grid-cols-2 gap-3">
+            <Button busy={busy === 'back'} onClick={() => verify(false)} className="min-h-12">
+              Not done: send back
             </Button>
-            <Button variant="primary" busy={busy === 'done'} onClick={() => set('done')}>
-              Mark done
+            <Button variant="primary" busy={busy === 'verify'} onClick={() => verify(true)} className="min-h-12">
+              Verified done
             </Button>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {task.status === 'done' || task.status === 'dropped' ? (
+            <Button full busy={busy === 'open'} onClick={() => set('open')}>
+              Reopen
+            </Button>
+          ) : (
+            <>
+              <Button variant="danger" busy={busy === 'dropped'} onClick={() => set('dropped')}>
+                Drop it
+              </Button>
+              <Button variant="primary" busy={busy === 'done'} onClick={() => set('done')}>
+                Verified done
+              </Button>
+            </>
+          )}
+        </div>
+      )}
     </AdminSheet>
   )
 }
@@ -561,9 +654,9 @@ export function FixSheet({ entry, onClose }: { entry: CrewEntry; onClose: () => 
 // ---- people and jobs ----------------------------------------------------------------
 
 export function PersonSheet({ person, onClose }: { person: CrewPerson | null; onClose: () => void }) {
-  const { run } = useCrewAdmin()
-  const { toast } = useBot()
+  const { run, toast } = useCrewAdmin()
   const [name, setName] = useState(person?.name ?? '')
+  const [role, setRole] = useState<CrewRole>(person?.role ?? 'crew')
   const [email, setEmail] = useState(person?.email ?? '')
   const [lang, setLang] = useState<CrewLang>(person?.lang ?? 'en')
   const [trade, setTrade] = useState(person?.trade ?? '')
@@ -577,8 +670,8 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setProblem('Type the email they use on their phone.')
     setBusy(invite ? 'invite' : 'save')
     const res = person
-      ? await run({ kind: 'person.update', email: person.email, name: name.trim(), lang, trade: trade.trim(), phone: phone.trim() }, true)
-      : await run({ kind: 'person.add', name: name.trim(), email: email.trim(), lang, trade: trade.trim(), phone: phone.trim(), invite })
+      ? await run({ kind: 'person.update', email: person.email, name: name.trim(), lang, trade: trade.trim(), phone: phone.trim(), role }, true)
+      : await run({ kind: 'person.add', name: name.trim(), email: email.trim(), lang, trade: trade.trim(), phone: phone.trim(), role, invite })
     setBusy(null)
     if (!res.ok) return setProblem(res.text)
     onClose()
@@ -644,6 +737,26 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
             { value: 'es', label: 'Español' },
           ]}
         />
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs font-medium text-[var(--color-charcoal)]">Their seat</p>
+        <Segmented
+          label="Seat"
+          value={role}
+          onChange={setRole}
+          options={[
+            { value: 'crew', label: 'Crew' },
+            { value: 'lead', label: 'Supervisor' },
+            { value: 'runner', label: 'Runner' },
+          ]}
+        />
+        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
+          {role === 'lead'
+            ? 'Their own day, plus a Crew tab: the schedule, checking work, pickups, and the nightly plan to Marco. No hours, no seats.'
+            : role === 'runner'
+              ? 'Their own day, plus the pickups staged for them.'
+              : 'Their own day: the clock, receipts, photos, schedule and tasks.'}
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Trade (optional)">
@@ -720,19 +833,23 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
 }
 
 export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null; onClose: () => void; suggested?: string }) {
-  const { run } = useCrewAdmin()
+  const { run, isLead, data } = useCrewAdmin()
   const [name, setName] = useState(job?.name ?? suggested)
   const [address, setAddress] = useState(job?.address ?? '')
   const [note, setNote] = useState(job?.note ?? '')
+  const [promised, setPromised] = useState(job?.promised ?? '')
+  const [promiseNote, setPromiseNote] = useState(job?.promiseNote ?? '')
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState('')
 
   async function save() {
     if (name.trim().length < 2) return setProblem('Name the job.')
+    if (promised && !promiseNote.trim()) return setProblem('Say what was promised by that date.')
     setBusy('save')
+    const fields = { address: address.trim(), note: note.trim(), promised, promiseNote: promiseNote.trim() }
     const res = job
-      ? await run({ kind: 'job.update', id: job.id, name: name.trim(), address: address.trim(), note: note.trim() }, true)
-      : await run({ kind: 'job.add', name: name.trim(), address: address.trim(), note: note.trim() })
+      ? await run({ kind: 'job.update', id: job.id, ...(isLead ? {} : { name: name.trim() }), ...fields }, true)
+      : await run({ kind: 'job.add', name: name.trim(), ...fields })
     setBusy(null)
     if (!res.ok) return setProblem(res.text)
     onClose()
@@ -749,9 +866,20 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
 
   return (
     <AdminSheet title={job ? job.name : 'Add a job'} onClose={onClose}>
-      <Field label="Job name" hint="What the crew calls it. Receipts and hours are filed under this name.">
-        <input className={INPUT} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
-      </Field>
+      {isLead ? null : (
+        <Field label="Job name" hint="What the crew calls it. Receipts and hours are filed under this name.">
+          <input className={INPUT} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+        </Field>
+      )}
+      <div className="grid grid-cols-[1fr_1.4fr] gap-3">
+        <Field label="Promised by">
+          <input type="date" className={INPUT} value={promised} min={data ? addDays(data.day, -30) : undefined} onChange={(e) => setPromised(e.target.value)} />
+        </Field>
+        <Field label="What we promised">
+          <input className={INPUT} value={promiseNote} maxLength={200} placeholder="Drywall ready for paint" onChange={(e) => setPromiseNote(e.target.value)} />
+        </Field>
+      </div>
+      <p className="-mt-2 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">The date we gave the client. It shows on the schedule so the promise goes first.</p>
       <Field label="Address" hint="Gives the crew a Directions button.">
         <input className={INPUT} value={address} maxLength={200} autoComplete="off" onChange={(e) => setAddress(e.target.value)} />
       </Field>
@@ -762,7 +890,7 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
       <Button variant="primary" full busy={busy === 'save'} onClick={save} className="min-h-12">
         {job ? 'Save' : 'Add the job'}
       </Button>
-      {job ? (
+      {job && !isLead ? (
         <Button full variant={job.active ? 'danger' : 'secondary'} busy={busy === 'active'} onClick={() => setActive(!job.active)}>
           {job.active ? 'Take it off the list (job is done)' : 'Put it back on the list'}
         </Button>
@@ -774,11 +902,12 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
 // ---- what came in from the field ------------------------------------------------------
 
 export function Photos({ files }: { files: { path: string; name: string; type: string }[] }) {
+  const base = useFilesBase()
   if (!files.length) return null
   return (
     <div className="flex flex-wrap gap-2">
       {files.map((f) => {
-        const href = `/api/bot/files?path=${encodeURIComponent(f.path)}`
+        const href = `${base}?path=${encodeURIComponent(f.path)}`
         return (
           <a key={f.path} href={href} target="_blank" rel="noreferrer" className="block size-20 overflow-hidden rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)]">
             {f.type.startsWith('image/') ? (
@@ -884,5 +1013,148 @@ export function EntryCard({ entry, onFix }: { entry: CrewEntry; onFix?: () => vo
         </Button>
       ) : null}
     </div>
+  )
+}
+
+// ---- pickups (the runner) ---------------------------------------------------------------
+
+export function PickupAddSheet({ day, onClose }: { day: string; onClose: () => void }) {
+  const { data, run } = useCrewAdmin()
+  const [when, setWhen] = useState(day)
+  const [supplier, setSupplier] = useState('')
+  const [place, setPlace] = useState('')
+  const [orderRef, setOrderRef] = useState('')
+  const [items, setItems] = useState('')
+  const [jobId, setJobId] = useState('')
+  const [note, setNote] = useState('')
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState('')
+  if (!data) return null
+  const runners = data.people.filter((p) => p.active && p.role === 'runner')
+  const others = data.people.filter((p) => p.active && p.role !== 'runner')
+
+  async function go() {
+    if (supplier.trim().length < 2) return setProblem('Say where it is: the store or supplier.')
+    if (items.trim().length < 2) return setProblem('Say what to pick up.')
+    setBusy(true)
+    const res = await run(
+      { kind: 'pickup.add', day: when, jobId, supplier: supplier.trim(), place: place.trim(), orderRef: orderRef.trim(), items: items.trim(), note: note.trim(), email },
+      true,
+    )
+    setBusy(false)
+    if (!res.ok) return setProblem(res.text)
+    onClose()
+  }
+
+  return (
+    <AdminSheet title="Stage a pickup" onClose={onClose}>
+      <p className="text-[13px] leading-relaxed text-[var(--color-charcoal-light)]">
+        You order it and have it staged for will-call. The runner just picks it up and brings it to the job.
+      </p>
+      <Field label="Where">
+        <input className={INPUT} value={supplier} maxLength={80} placeholder="Home Depot, 35th Ave" onChange={(e) => setSupplier(e.target.value)} />
+      </Field>
+      <Field label="Address (optional)" hint="Gives the runner a Directions button.">
+        <input className={INPUT} value={place} maxLength={200} autoComplete="off" onChange={(e) => setPlace(e.target.value)} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Order or will-call #">
+          <input className={INPUT} value={orderRef} maxLength={80} onChange={(e) => setOrderRef(e.target.value)} />
+        </Field>
+        <Field label="Day">
+          <input type="date" className={INPUT} value={when} min={data.day} onChange={(e) => setWhen(e.target.value)} />
+        </Field>
+      </div>
+      <Field label="What to pick up">
+        <textarea className={AREA} value={items} maxLength={1500} placeholder="1 box of 5,000 1-1/4 in. drywall screws" onChange={(e) => setItems(e.target.value)} />
+      </Field>
+      <Field label="Bring it to">
+        <JobSelect value={jobId} onChange={setJobId} jobs={data.jobs} allowNone />
+      </Field>
+      <Field label="Who picks it up">
+        <select className={INPUT} value={email} onChange={(e) => setEmail(e.target.value)}>
+          <option value="">{runners.length ? 'Any runner' : 'Nobody has a runner seat yet'}</option>
+          {[...runners, ...others].map((p) => (
+            <option key={p.email} value={p.email}>
+              {p.name}
+              {p.role === 'runner' ? ' (runner)' : ''}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Note (optional)">
+        <input className={INPUT} value={note} maxLength={300} placeholder="Ask for Mike at the pro desk" onChange={(e) => setNote(e.target.value)} />
+      </Field>
+      <Problem text={problem} />
+      <Button variant="primary" full busy={busy} onClick={go} className="min-h-12">
+        Stage it
+      </Button>
+    </AdminSheet>
+  )
+}
+
+export const PICKUP_STATUS: Record<CrewPickup['status'], { label: string; tone: 'ok' | 'bad' | 'warn' | 'quiet' }> = {
+  staged: { label: 'Staged', tone: 'quiet' },
+  picked: { label: 'Picked up', tone: 'warn' },
+  delivered: { label: 'Delivered', tone: 'ok' },
+  problem: { label: 'Problem', tone: 'bad' },
+  cancelled: { label: 'Cancelled', tone: 'quiet' },
+}
+
+export function PickupSheet({ pickup, onClose }: { pickup: CrewPickup; onClose: () => void }) {
+  const { data, run, nameOf } = useCrewAdmin()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [problem, setProblem] = useState('')
+  if (!data) return null
+  const st = PICKUP_STATUS[pickup.status]
+
+  async function set(patch: { status?: 'staged' | 'cancelled'; day?: string }, key: string) {
+    setBusy(key)
+    const res = await run({ kind: 'pickup.update', id: pickup.id, ...patch }, true)
+    setBusy(null)
+    if (res.ok) onClose()
+    else setProblem(res.text)
+  }
+
+  return (
+    <AdminSheet title={pickup.supplier} onClose={onClose} tall={false}>
+      <p className="flex flex-wrap items-center gap-1.5 text-[13px] text-[var(--color-charcoal-light)]">
+        <Chip tone={st.tone}>{st.label}</Chip>
+        {[dayShort(pickup.day), pickup.orderRef ? `order ${pickup.orderRef}` : '', pickup.jobName ? `to ${pickup.jobName}` : '', pickup.email ? firstNameOf(nameOf(pickup.email)) : 'any runner']
+          .filter(Boolean)
+          .join(' · ')}
+      </p>
+      <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-charcoal)]">{pickup.items}</p>
+      {pickup.note ? <p className="text-[13px] text-[var(--color-charcoal-light)]">{pickup.note}</p> : null}
+      {pickup.runnerNote ? (
+        <p className="rounded-xl bg-white px-3 py-2.5 text-[14px] leading-relaxed text-[var(--color-charcoal)]">
+          <span className="font-medium">{pickup.pickedBy ? firstNameOf(nameOf(pickup.pickedBy)) : 'Runner'}:</span> {pickup.runnerNote}
+        </p>
+      ) : null}
+      {pickup.pickedAt || pickup.deliveredAt ? (
+        <p className="text-[12px] text-[var(--color-charcoal-light)]">
+          {[pickup.pickedAt ? `Picked up ${clock12(pickup.pickedAt)}` : '', pickup.deliveredAt ? `delivered ${clock12(pickup.deliveredAt)}` : ''].filter(Boolean).join(', ')}
+        </p>
+      ) : null}
+      <Photos files={pickup.files} />
+      <Problem text={problem} />
+      {pickup.status === 'delivered' || pickup.status === 'cancelled' ? null : (
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="danger" busy={busy === 'cancel'} onClick={() => set({ status: 'cancelled' }, 'cancel')}>
+            Cancel it
+          </Button>
+          {pickup.status === 'problem' ? (
+            <Button busy={busy === 'restage'} onClick={() => set({ status: 'staged' }, 'restage')}>
+              Fixed: stage again
+            </Button>
+          ) : (
+            <Button busy={busy === 'move'} onClick={() => set({ day: addDays(pickup.day < data.day ? data.day : pickup.day, 1) }, 'move')}>
+              Move to the next day
+            </Button>
+          )}
+        </div>
+      )}
+    </AdminSheet>
   )
 }

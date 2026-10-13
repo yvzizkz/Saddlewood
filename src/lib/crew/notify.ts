@@ -2,6 +2,7 @@ import { ownerEmails } from "@/lib/bot/home";
 import { sendPush } from "@/lib/bot/push";
 import { readState } from "@/lib/bot/queries";
 import { say } from "./messages";
+import { listPeople } from "./queries";
 import type { CrewLang } from "./types";
 
 // Notifications on the crew side. They never fail the thing that caused them:
@@ -25,6 +26,36 @@ export async function notifyOwners(note: { title: string; body: string; tag: str
     });
   } catch (e) {
     console.error("[crew/notify] owners:", (e as Error).message);
+  }
+}
+
+/**
+ * To whoever runs the field: the leads (the field supervisor), so updates from
+ * the crew land with them and not with Marco. With no lead seated, the owners,
+ * as before. `alsoOwners` for what the owners must hear either way (safety).
+ * The person who caused it is never told about their own act.
+ */
+export async function notifySupervisors(
+  note: { title: string; body: string; tag: string },
+  opts: { alsoOwners?: boolean; except?: string } = {},
+): Promise<void> {
+  let leads: string[] = [];
+  try {
+    leads = (await listPeople()).filter((p) => p.active && p.role === "lead" && p.email !== opts.except).map((p) => p.email);
+  } catch (e) {
+    console.error("[crew/notify] leads:", (e as Error).message);
+  }
+  if (!leads.length || opts.alsoOwners) await notifyOwners(note);
+  if (!leads.length) return;
+  try {
+    await sendPush(leads, {
+      title: note.title.slice(0, 80),
+      body: note.body.replace(/\s+/g, " ").slice(0, 240),
+      url: "/app/crew",
+      tag: note.tag.slice(0, 60),
+    });
+  } catch (e) {
+    console.error("[crew/notify] leads:", (e as Error).message);
   }
 }
 

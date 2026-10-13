@@ -2,11 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import { botApi, useBot } from '@/components/bot/BotProvider'
+import { botApi } from '@/components/bot/BotProvider'
 import type { AdminActInput, CrewAdminHome } from '@/lib/crew/types'
 
-// The owners' live picture of the crew, shared by the four views of the Crew
-// tab. Re-read every 30 seconds while the app is on screen.
+// The live picture of the crew, shared by the views of the Crew tab: the
+// owners' (inside the owners' app) and the lead's (inside the crew app, with
+// what the lead may not see left out by the server). Re-read every 30 seconds
+// while the app is on screen.
 
 type RunResult = { ok: boolean; text: string; code?: string; link?: string; hours?: number }
 
@@ -20,14 +22,26 @@ type Ctx = {
   /** Carry out an owner's action, say how it went, and re-read. */
   run: (input: AdminActInput, quiet?: boolean) => Promise<RunResult>
   nameOf: (email: string) => string
+  toast: (text: string, tone?: 'ok' | 'bad' | 'info') => void
+  /** The field supervisor's view: no hours, no seats, no time fixes. */
+  isLead: boolean
+  /** Where a crew photo opens: owners through the bot's file door, the lead through the crew's. */
+  filesBase: string
 }
 
 const AdminContext = createContext<Ctx | null>(null)
 
 const POLL_MS = 30_000
 
-export function CrewAdminProvider({ children }: { children: ReactNode }) {
-  const { toast } = useBot()
+export function CrewAdminProvider({
+  children,
+  toast,
+  lead = false,
+}: {
+  children: ReactNode
+  toast: Ctx['toast']
+  lead?: boolean
+}) {
   const [data, setData] = useState<CrewAdminHome | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [week, setWeekState] = useState<string | null>(null)
@@ -98,8 +112,17 @@ export function CrewAdminProvider({ children }: { children: ReactNode }) {
   const names = useMemo(() => new Map((data?.people ?? []).map((p) => [p.email, p.name])), [data])
   const nameOf = useCallback((email: string) => names.get(email) ?? email.split('@')[0], [names])
 
-  const value = useMemo<Ctx>(() => ({ data, error, week, setWeek, refresh, run, nameOf }), [data, error, week, setWeek, refresh, run, nameOf])
+  const filesBase = lead ? '/api/crew/files' : '/api/bot/files'
+  const value = useMemo<Ctx>(
+    () => ({ data, error, week, setWeek, refresh, run, nameOf, toast, isLead: lead, filesBase }),
+    [data, error, week, setWeek, refresh, run, nameOf, toast, lead, filesBase],
+  )
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>
+}
+
+/** The file door for a photo, outside the provider too (the bot's door, as before). */
+export function useFilesBase(): string {
+  return useContext(AdminContext)?.filesBase ?? '/api/bot/files'
 }
 
 export function useCrewAdmin(): Ctx {

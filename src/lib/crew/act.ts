@@ -1,7 +1,7 @@
 import { threadKey } from "@/lib/bot/queries";
 import type { BotFileRef } from "@/lib/bot/types";
 import { MSG, say } from "./messages";
-import { notifyOwners } from "./notify";
+import { notifyOwners, notifySupervisors } from "./notify";
 import {
   ackSchedule,
   answerQuestion,
@@ -10,6 +10,7 @@ import {
   countEntries,
   getEntry,
   getJob,
+  getPickup,
   getQuestion,
   getShift,
   getTask,
@@ -19,6 +20,7 @@ import {
   openShift,
   patchEntry,
   patchPerson,
+  patchPickup,
   patchTask,
   type CrewPersonRow,
   type NewEntry,
@@ -351,11 +353,11 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       const answered = await answerQuestion(q.id, email, act.answer);
       if (!answered) return bad(409, say(lang, MSG.noQuestion));
       if (q.askedBy !== "bot") {
-        await notifyOwners({
-          title: `${first} answered`,
-          body: `${q.body.slice(0, 90)} → ${act.answer}`,
-          tag: `crew-answer-${q.id}`,
-        });
+        // Asked by an owner or by the lead: both hear the answer.
+        await notifySupervisors(
+          { title: `${first} answered`, body: `${q.body.slice(0, 90)} → ${act.answer}`, tag: `crew-answer-${q.id}` },
+          { alsoOwners: true, except: email },
+        );
       }
       return ok();
     }
@@ -364,24 +366,70 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       if (!ownFiles(act.files, email)) return bad(400, say(lang, MSG.notYours));
       const task = await getTask(act.id);
       if (!task || task.email !== email || task.status === "dropped") return bad(404, say(lang, MSG.noTask));
+      // Checked work is closed: only the person who checked it can reopen it.
+      if (task.status === "done" && task.verifiedAt) return bad(409, say(lang, MSG.noTask));
+      // Done means it can be checked: a photo of the finished work comes with it.
+      if (act.status === "done" && !act.files.length) return bad(400, say(lang, MSG.donePhoto));
       const wasBlocked = task.status === "blocked";
+      const at = nowDate.toISOString();
       const updated = await patchTask(
         task.id,
         {
           status: act.status,
           done_note: act.note,
           files: act.files.length ? act.files : task.files,
-          closed_at: act.status === "done" ? nowDate.toISOString() : null,
+          closed_at: act.status === "done" ? at : null,
+          // Reported done, not verified: the lead (or an owner) checks it.
+          reported_at: act.status === "done" ? at : null,
+          verified_at: null,
+          verified_by: "",
         },
         { email },
       );
       if (!updated) return bad(404, say(lang, MSG.noTask));
       if (act.status === "blocked" && !wasBlocked) {
-        await notifyOwners({
-          title: `${first} is blocked`,
-          body: `${task.title}${act.note ? `: ${act.note}` : ""}`,
-          tag: `crew-task-${task.id}`,
-        });
+        await notifySupervisors(
+          { title: `${first} is waiting`, body: `${task.title}${act.note ? `: ${act.note}` : ""}`, tag: `crew-task-${task.id}` },
+          { except: email },
+        );
+      }
+      if (act.status === "done") {
+        await notifySupervisors(
+          { title: `${first} says done: check it`, body: `${task.title}${task.jobName ? ` · ${task.jobName}` : ""}${act.note ? `: ${act.note}` : ""}`, tag: `crew-task-${task.id}` },
+          { except: email },
+        );
+      }
+      return ok();
+    }
+
+    case "pickup.update": {
+      if (!ownFiles(act.files, email)) return bad(400, say(lang, MSG.notYours));
+      const pickup = await getPickup(act.id);
+      const mine = pickup && (pickup.email === email || (pickup.email === "" && person.role === "runner"));
+      if (!pickup || !mine || pickup.status === "cancelled" || pickup.status === "delivered") return bad(404, say(lang, MSG.noPickup));
+      if (act.status === "delivered" && !act.files.length) return bad(400, say(lang, MSG.deliveredPhoto));
+      if (act.status === "problem" && act.note.length < 2) return bad(400, say(lang, MSG.problemNote));
+      const at = nowDate.toISOString();
+      const saved = await patchPickup(
+        pickup.id,
+        {
+          status: act.status,
+          runner_note: act.note,
+          files: act.files.length ? [...pickup.files, ...act.files].slice(-8) : pickup.files,
+          ...(act.status === "picked" || (act.status === "delivered" && !pickup.pickedAt) ? { picked_by: email, picked_at: at } : {}),
+          ...(act.status === "delivered" ? { delivered_at: at } : {}),
+        },
+        { statusIn: ["staged", "picked", "problem"] },
+      );
+      if (!saved) return bad(409, say(lang, MSG.noPickup));
+      if (act.status !== "picked") {
+        const what = `${pickup.supplier}${pickup.jobName ? ` → ${pickup.jobName}` : ""}`;
+        await notifySupervisors(
+          act.status === "delivered"
+            ? { title: `Delivered · ${pickup.jobName || pickup.supplier}`, body: `${first}: ${what}${act.note ? `. ${act.note}` : ""}`, tag: `crew-pickup-${pickup.id}` }
+            : { title: `Pickup problem · ${pickup.supplier}`, body: `${first}: ${act.note}`, tag: `crew-pickup-${pickup.id}` },
+          { except: email },
+        );
       }
       return ok();
     }
@@ -390,11 +438,10 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       const item = await ackSchedule(act.id, email, act.ack, act.note);
       if (!item) return bad(404, say(lang, MSG.noSchedule));
       if (act.ack === "cant") {
-        await notifyOwners({
-          title: `${first} cannot make it`,
-          body: `${item.jobName}, ${dayShort(item.day)}${act.note ? `: ${act.note}` : ""}`,
-          tag: `crew-cant-${item.id}`,
-        });
+        await notifySupervisors(
+          { title: `${first} cannot make it`, body: `${item.jobName}, ${dayShort(item.day)}${act.note ? `: ${act.note}` : ""}`, tag: `crew-cant-${item.id}` },
+          { except: email },
+        );
       }
       return ok();
     }
@@ -430,11 +477,17 @@ async function announce(person: CrewPersonRow, entry: CrewEntry): Promise<void> 
         : field("decision")
           ? ["Needs your call", field("decision")]
           : ["", ""];
-    if (title) await notifyOwners({ title: `${title}${at}`, body: `${first}: ${text}`, tag: `crew-eod-${entry.id}` });
+    if (title) {
+      await notifySupervisors(
+        { title: `${title}${at}`, body: `${first}: ${text}`, tag: `crew-eod-${entry.id}` },
+        // A safety report reaches the owners whoever runs the field.
+        { alsoOwners: title === "Safety report", except: person.email },
+      );
+    }
     return;
   }
   if (entry.kind === "note") {
-    await notifyOwners({ title: `Note from ${first}${at}`, body: entry.body, tag: `crew-note-${entry.id}` });
+    await notifySupervisors({ title: `Note from ${first}${at}`, body: entry.body, tag: `crew-note-${entry.id}` }, { except: person.email });
     return;
   }
   if (entry.kind === "timefix") {

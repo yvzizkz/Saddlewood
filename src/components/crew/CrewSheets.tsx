@@ -1,13 +1,21 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { MapPin } from 'lucide-react'
 
-import { Button, Field, INPUT, Segmented } from '@/components/bot/ui'
+import { Button, Chip, Field, INPUT, Segmented } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { addDays, clock12, dayLabel, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
-import { OTHER_JOB, parseAmount, type CrewHome, type CrewShift, type CrewTask, type Geo } from '@/lib/crew/types'
+import { OTHER_JOB, parseAmount, type CrewHome, type CrewPickup, type CrewShift, type CrewTask, type Geo } from '@/lib/crew/types'
 import { locate, newClientId, useCrew } from './CrewProvider'
 import { PhotoStrip, usePhotos } from './Photos'
+
+/** Apple Maps on an iPhone, Google Maps everywhere else. */
+function mapsLink(address: string): string {
+  const q = encodeURIComponent(address)
+  const ios = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)
+  return ios ? `https://maps.apple.com/?q=${q}` : `https://www.google.com/maps/search/?api=1&query=${q}`
+}
 
 // The forms a crew member fills in: clock in and out, a receipt, progress
 // photos, the end-of-day check-in, a note, a task, a time fix. Each is mounted
@@ -490,11 +498,13 @@ export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => vo
   const { home, t, act, toast, lang } = useCrew()
   const photos = usePhotos()
   const [note, setNote] = useState(task.status === 'blocked' ? task.doneNote : '')
-  const [busy, setBusy] = useState<'done' | 'blocked' | 'open' | null>(null)
+  const [busy, setBusy] = useState<'done' | 'blocked' | 'open' | 'doing' | null>(null)
   const [problem, setProblem] = useState('')
 
-  async function set(status: 'done' | 'blocked' | 'open') {
+  async function set(status: 'done' | 'blocked' | 'open' | 'doing') {
     if (status === 'blocked' && note.trim().length < 2) return setProblem(t.blockedWhy)
+    // Done means it can be checked: the photo comes with it.
+    if (status === 'done' && !photos.refs.length) return setProblem(t.donePhotoHint)
     setBusy(status)
     setProblem('')
     const res = await act({ kind: 'task.update', id: task.id, status, note: note.trim(), files: photos.refs })
@@ -502,6 +512,7 @@ export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => vo
     if (!res.ok) return setProblem(res.text)
     if (status === 'done') toast(t.taskDone, 'ok')
     if (status === 'blocked') toast(t.taskBlocked, 'info')
+    if (status === 'doing') toast(t.taskStarted, 'ok')
     onClose()
   }
 
@@ -512,15 +523,26 @@ export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => vo
       </p>
       {task.detail ? <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-charcoal)]">{task.detail}</p> : null}
       {task.status === 'done' ? (
-        <Button full busy={busy === 'open'} onClick={() => set('open')}>
-          {t.reopen}
-        </Button>
+        <>
+          <p>
+            <Chip tone="quiet">{t.sentForCheck}</Chip>
+          </p>
+          <Button full busy={busy === 'open'} onClick={() => set('open')}>
+            {t.reopen}
+          </Button>
+        </>
       ) : (
         <>
+          {task.status === 'open' ? (
+            <Button full busy={busy === 'doing'} onClick={() => set('doing')}>
+              {t.markStarted}
+            </Button>
+          ) : null}
           <Field label={`${t.doneNote} / ${t.blockedWhy}`}>
             <textarea className={`${INPUT} min-h-[64px] resize-y`} value={note} maxLength={600} onChange={(e) => setNote(e.target.value)} />
           </Field>
           <PhotoStrip photos={photos} cameraFirst />
+          <p className="text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">{t.donePhotoHint}</p>
           <Problem text={problem} />
           <div className="grid grid-cols-2 gap-3">
             <Button busy={busy === 'blocked'} disabled={photos.busy} onClick={() => set('blocked')} className="min-h-12">
@@ -532,6 +554,68 @@ export function TaskSheet({ task, onClose }: { task: CrewTask; onClose: () => vo
           </div>
         </>
       )}
+    </Sheet>
+  )
+}
+
+// ---- pickups (runners) ---------------------------------------------------------------
+
+export function PickupSheet({ pickup, onClose }: { pickup: CrewPickup; onClose: () => void }) {
+  const { t, act, toast } = useCrew()
+  const photos = usePhotos()
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState<'picked' | 'delivered' | 'problem' | null>(null)
+  const [problem, setProblem] = useState('')
+
+  async function set(status: 'picked' | 'delivered' | 'problem') {
+    if (status === 'problem' && note.trim().length < 2) return setProblem(t.pickupProblemWhat)
+    if (status === 'delivered' && !photos.refs.length) return setProblem(t.deliveredPhotoHint)
+    setBusy(status)
+    setProblem('')
+    const res = await act({ kind: 'pickup.update', id: pickup.id, status, note: note.trim(), files: photos.refs })
+    setBusy(null)
+    if (!res.ok) return setProblem(res.text)
+    toast(t.pickupSaved, 'ok')
+    onClose()
+  }
+
+  return (
+    <Sheet title={pickup.supplier} onClose={onClose}>
+      <p className="text-[13px] text-[var(--color-charcoal-light)]">
+        {[pickup.orderRef ? t.orderRef(pickup.orderRef) : '', pickup.jobName ? t.pickupFor(pickup.jobName) : ''].filter(Boolean).join(' · ')}
+      </p>
+      <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-charcoal)]">{pickup.items}</p>
+      {pickup.note ? <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--color-charcoal-light)]">{pickup.note}</p> : null}
+      {pickup.place ? (
+        <a
+          href={mapsLink(pickup.place)}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--color-stone-mid)] bg-white px-3.5 text-sm font-medium text-[var(--color-charcoal)]"
+        >
+          <MapPin className="size-4" aria-hidden="true" />
+          {t.directions}
+        </a>
+      ) : null}
+      {pickup.status === 'staged' || pickup.status === 'problem' ? (
+        <Button variant="primary" full busy={busy === 'picked'} onClick={() => set('picked')} className="min-h-12">
+          {t.markPicked}
+        </Button>
+      ) : null}
+      <Field label={t.doneNote}>
+        <textarea className={`${INPUT} min-h-[56px] resize-y`} value={note} maxLength={600} onChange={(e) => setNote(e.target.value)} />
+      </Field>
+      <PhotoStrip photos={photos} cameraFirst />
+      <p className="text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">{t.deliveredPhotoHint}</p>
+      <Problem text={problem} />
+      <div className="grid grid-cols-2 gap-3">
+        <Button busy={busy === 'problem'} disabled={photos.busy} onClick={() => set('problem')} className="min-h-12">
+          {t.pickupProblem}
+        </Button>
+        <Button variant="primary" busy={busy === 'delivered'} disabled={photos.busy} onClick={() => set('delivered')} className="min-h-12">
+          {t.markDelivered}
+        </Button>
+      </div>
     </Sheet>
   )
 }

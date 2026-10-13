@@ -27,7 +27,7 @@ export default function WeekScreen() {
 
   const byDay = new Map<string, CrewScheduleItem[]>()
   for (const s of home.schedule) byDay.set(s.day, [...(byDay.get(s.day) ?? []), s])
-  const live = home.tasks.filter((x) => x.status === 'open' || x.status === 'blocked')
+  const live = home.tasks.filter((x) => x.status === 'open' || x.status === 'doing' || x.status === 'blocked')
   const finished = home.tasks.filter((x) => x.status === 'done')
 
   return (

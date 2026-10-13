@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Camera, ClipboardCheck, MapPin, MessageSquare, Receipt, type LucideIcon } from 'lucide-react'
+import { Camera, ClipboardCheck, MapPin, MessageSquare, Package, Receipt, type LucideIcon } from 'lucide-react'
 
 import { Button, Card, Chip, Empty, INPUT, ScreenTitle, SectionTitle } from '@/components/bot/ui'
 import { addDays, clock12, clockText, dayLabel, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
-import { firstNameOf, parseAmount, type CrewEntry, type CrewQuestion, type CrewScheduleItem, type CrewTask } from '@/lib/crew/types'
+import { firstNameOf, isReportedDone, parseAmount, type CrewEntry, type CrewPickup, type CrewQuestion, type CrewScheduleItem, type CrewTask } from '@/lib/crew/types'
 import { useCrew } from './CrewProvider'
-import { CantSheet, EodSheet, NoteSheet, ProgressSheet, PunchSheet, ReceiptSheet, TaskSheet, type PunchMode } from './CrewSheets'
+import { CantSheet, EodSheet, NoteSheet, PickupSheet, ProgressSheet, PunchSheet, ReceiptSheet, TaskSheet, type PunchMode } from './CrewSheets'
 import type { CrewStrings } from './strings'
 
 // A crew member's day on one screen: the clock, where they are supposed to
@@ -19,6 +19,7 @@ type Open =
   | { kind: 'receipt' | 'progress' | 'note' }
   | { kind: 'eod'; day?: string }
   | { kind: 'task'; task: CrewTask }
+  | { kind: 'pickup'; pickup: CrewPickup }
   | { kind: 'cant'; id: number }
   | null
 
@@ -237,10 +238,13 @@ export function TaskRow({ task, onOpen }: { task: CrewTask; onOpen: () => void }
   const late = !!task.due && !!home && task.due < home.day && task.status !== 'done'
   return (
     <button type="button" onClick={onOpen} className="block w-full px-4 py-3 text-left active:bg-[var(--color-cream)]">
-      <span className={`block text-[15px] leading-snug text-[var(--color-charcoal)] ${task.status === 'done' ? 'line-through opacity-60' : ''}`}>{task.title}</span>
+      <span className={`block text-[15px] leading-snug text-[var(--color-charcoal)] ${task.status === 'done' && task.verifiedAt ? 'line-through opacity-60' : ''}`}>{task.title}</span>
       <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-[var(--color-charcoal-light)]">
         {task.status === 'blocked' ? <Chip tone="bad">{t.stuck}</Chip> : null}
-        {task.status === 'done' ? <Chip tone="ok">{t.done}</Chip> : null}
+        {task.status === 'doing' ? <Chip tone="ok">{t.started}</Chip> : null}
+        {isReportedDone(task) ? <Chip tone="quiet">{t.sentForCheck}</Chip> : null}
+        {task.status === 'done' && task.verifiedAt ? <Chip tone="ok">{t.done}</Chip> : null}
+        {task.sentBack > 0 && task.status !== 'done' ? <Chip tone="warn">{t.sentBack}</Chip> : null}
         {task.due && home && task.status !== 'done' ? <Chip tone={late ? 'bad' : 'quiet'}>{t.due(dayLabel(task.due, home.day, lang))}</Chip> : null}
         {task.jobName}
       </span>
@@ -281,7 +285,8 @@ export default function TodayScreen() {
   const todayMinutes = home.shifts.filter((s) => s.day === home.day).reduce((sum, s) => sum + workedMinutes(s, nowMs), 0)
   const today = home.schedule.filter((s) => s.day === home.day)
   const tomorrow = home.schedule.filter((s) => s.day === addDays(home.day, 1))
-  const openTasks = home.tasks.filter((x) => x.status === 'open' || x.status === 'blocked')
+  const openTasks = home.tasks.filter((x) => x.status === 'open' || x.status === 'doing' || x.status === 'blocked' || isReportedDone(x))
+  const pickups = home.pickups.filter((p) => p.status === 'staged' || p.status === 'picked' || p.status === 'problem')
   const sentToday = home.entries.filter((e) => e.day === home.day)
   const eodDone = sentToday.some((e) => e.kind === 'eod')
   const waiting = queue.length > 0
@@ -383,6 +388,28 @@ export default function TodayScreen() {
         <Tile icon={MessageSquare} label={t.noteToOffice} hint={t.noteHint} onClick={() => show({ kind: 'note' })} />
       </div>
 
+      {pickups.length ? (
+        <>
+          <SectionTitle count={pickups.length}>{t.pickups}</SectionTitle>
+          <Card className="divide-y divide-[var(--color-stone)]">
+            {pickups.map((p) => (
+              <button key={p.id} type="button" onClick={() => show({ kind: 'pickup', pickup: p })} className="block w-full px-4 py-3 text-left active:bg-[var(--color-cream)]">
+                <span className="flex items-center gap-2 text-[15px] leading-snug text-[var(--color-charcoal)]">
+                  <Package className="size-4 shrink-0 text-[var(--color-charcoal-light)]" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{p.supplier}</span>
+                </span>
+                <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-[var(--color-charcoal-light)]">
+                  {p.status === 'picked' ? <Chip tone="ok">{t.pickedUp}</Chip> : null}
+                  {p.status === 'problem' ? <Chip tone="bad">{t.pickupProblem}</Chip> : null}
+                  {p.day !== home.day ? <Chip tone="quiet">{dayLabel(p.day, home.day, lang)}</Chip> : null}
+                  {[p.orderRef ? t.orderRef(p.orderRef) : '', p.jobName ? t.pickupFor(p.jobName) : ''].filter(Boolean).join(' · ')}
+                </span>
+              </button>
+            ))}
+          </Card>
+        </>
+      ) : null}
+
       {openTasks.length ? (
         <>
           <SectionTitle count={openTasks.length}>{t.tasks}</SectionTitle>
@@ -434,6 +461,7 @@ export default function TodayScreen() {
       {open?.kind === 'eod' ? <EodSheet key={sheetKey} forDay={open.day} onClose={() => setOpen(null)} /> : null}
       {open?.kind === 'note' ? <NoteSheet key={sheetKey} onClose={() => setOpen(null)} /> : null}
       {open?.kind === 'task' ? <TaskSheet key={sheetKey} task={open.task} onClose={() => setOpen(null)} /> : null}
+      {open?.kind === 'pickup' ? <PickupSheet key={sheetKey} pickup={open.pickup} onClose={() => setOpen(null)} /> : null}
       {open?.kind === 'cant' ? <CantSheet key={sheetKey} id={open.id} onClose={() => setOpen(null)} /> : null}
     </div>
   )

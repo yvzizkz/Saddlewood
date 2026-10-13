@@ -64,6 +64,41 @@ export async function requireOwner(request: NextRequest): Promise<Owner | null> 
   return me.role === "owner" && me.name ? { email: who.actor, name: me.name } : null;
 }
 
+/**
+ * Who may run the field from the Crew screens: an owner (everything), or the
+ * lead (the field supervisor). A lead is a crew seat with role 'lead': still a
+ * crew-marked sign-in, never on the portal allowlist, so the estimate tables
+ * stay shut for them. What a lead may do is LEAD_ACTS, nothing else.
+ */
+export type Manager = { role: "owner" | "lead"; email: string; name: string };
+
+export async function requireManager(request: NextRequest): Promise<Manager | null> {
+  const owner = await requireOwner(request);
+  if (owner) return { role: "owner", ...owner };
+  const person = await requireCrew();
+  return person && person.role === "lead" ? { role: "lead", email: person.email, name: person.name } : null;
+}
+
+/**
+ * What the lead may do from the Crew screens. Not seats, not hours, not time
+ * fixes: those stay with the owners. Job edits are limited further in
+ * runAdminAct (the promise, the address and the site note only).
+ */
+export const LEAD_ACTS = new Set<string>([
+  "schedule.set",
+  "schedule.remove",
+  "schedule.copy",
+  "task.add",
+  "task.update",
+  "task.verify",
+  "question.ask",
+  "question.cancel",
+  "job.update",
+  "pickup.add",
+  "pickup.update",
+  "report.send",
+]);
+
 export type Viewer =
   | { kind: "anonymous" }
   | { kind: "staff"; email: string }

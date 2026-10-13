@@ -6,7 +6,9 @@ import {
   listJobs,
   listOpenShifts,
   listPeople,
+  listPickups,
   listQuestions,
+  listReports,
   listSchedule,
   listShifts,
   listTasks,
@@ -16,6 +18,7 @@ import {
   type CrewPersonRow,
   type CrewShiftRow,
 } from "./queries";
+import type { Manager } from "./auth";
 import { addDays, isDay, localDay, weekStart } from "./time";
 import type { CrewAdminHome, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift } from "./types";
 
@@ -47,7 +50,7 @@ function byId<T extends { id: number }>(rows: T[]): T[] {
 export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], now = new Date()): Promise<CrewHome> {
   const day = localDay(now);
   const email = person.email;
-  const [jobs, shifts, open, schedule, tasks, questions, entries] = await Promise.all([
+  const [jobs, shifts, open, schedule, tasks, questions, entries, pickups] = await Promise.all([
     listJobs(),
     listShifts({ email, fromDay: addDays(weekStart(day), -7) }),
     openShift(email),
@@ -55,6 +58,7 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
     listTasks({ email, closedSince: new Date(now.getTime() - 2 * DAY_MS).toISOString() }),
     listQuestions({ email, since: now.toISOString() }),
     listEntries({ email, fromDay: addDays(day, -7), limit: 60 }),
+    listPickups({ fromDay: addDays(day, -1), email }),
   ]);
 
   // A job's note can hold a gate code. Only the people headed there see it.
@@ -64,7 +68,7 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
     ok: true,
     now: now.toISOString(),
     day,
-    me: { email, name: person.name, lang: person.lang },
+    me: { email, name: person.name, lang: person.lang, role: person.role },
     jobs: jobs.filter((j) => j.active).map((j) => (mine.has(j.id) ? j : { ...j, note: "" })),
     shift: open ? publicShift(open) : null,
     // A shift left open since before last week still has to show.
@@ -79,42 +83,56 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
       .filter((q) => q.status === "open" && now.getTime() - Date.parse(q.createdAt) < 4 * DAY_MS)
       .map((q) => ({ ...q, askedBy: q.askedBy === "bot" ? "bot" : "office" })),
     entries,
+    // A pickup that names nobody is for the runners; one that names someone is theirs.
+    pickups: pickups.filter((p) => p.email === email || person.role === "runner"),
     push,
   };
 }
 
-export async function adminHome(weekParam: string | null, now = new Date()): Promise<CrewAdminHome> {
+/**
+ * The Crew screens' read. An owner gets everything. The lead gets the field:
+ * who is on the clock today, what came in, the schedule, tasks, pickups and
+ * the plans; not the week's timesheet, not time-fix requests (hours stay with
+ * the owners), not the expense tracker's project list.
+ */
+export async function adminHome(viewer: Manager, weekParam: string | null, now = new Date()): Promise<CrewAdminHome> {
+  const lead = viewer.role === "lead";
   const day = localDay(now);
   const week = weekParam && isDay(weekParam) ? weekStart(weekParam) : weekStart(day);
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS).toISOString();
-  const [people, jobs, weekShifts, recentShifts, open, entries, schedule, tasks, questions, suggested] = await Promise.all([
+  const [people, jobs, weekShifts, recentShifts, open, entries, schedule, tasks, questions, suggested, pickups, reports] = await Promise.all([
     listPeople(),
     listJobs(),
-    listShifts({ fromDay: week, toDay: addDays(week, 6), includeVoid: true }),
-    listShifts({ fromDay: addDays(day, -1), includeVoid: true }),
+    lead ? Promise.resolve([] as CrewShiftRow[]) : listShifts({ fromDay: week, toDay: addDays(week, 6), includeVoid: true }),
+    listShifts({ fromDay: addDays(day, -1), includeVoid: !lead }),
     listOpenShifts(),
     listEntries({ fromDay: addDays(day, -7), limit: 250 }),
     listSchedule({ fromDay: addDays(day, -1), toDay: addDays(day, 13) }),
     listTasks({ closedSince: weekAgo }),
     listQuestions({ since: weekAgo }),
-    suggestedJobs(),
+    lead ? Promise.resolve([] as string[]) : suggestedJobs(),
+    listPickups({ fromDay: addDays(day, -7) }),
+    listReports(addDays(day, -35)),
   ]);
   const names = new Set(jobs.map((j) => j.name.toLowerCase()));
   return {
     ok: true,
     now: now.toISOString(),
     day,
+    viewer: { role: viewer.role, email: viewer.email, name: viewer.name },
     week,
     people: people.map(publicPerson),
     jobs,
     suggestedJobs: suggested.filter((n) => !names.has(n.toLowerCase())),
     shifts: byId([...weekShifts, ...recentShifts, ...open])
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
-      .map(publicShift),
-    entries,
+      .map((s) => (lead ? { ...publicShift(s), startGeo: null, endGeo: null, edits: [] } : publicShift(s))),
+    entries: lead ? entries.filter((e) => e.kind !== "timefix") : entries,
     schedule,
     tasks,
     questions,
+    pickups,
+    reports,
   };
 }
 

@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { CalendarDays, Clock, Home, Menu, type LucideIcon } from 'lucide-react'
+import { CalendarDays, Clock, Home, Menu, Users, type LucideIcon } from 'lucide-react'
 
 import { Dot } from '@/components/bot/ui'
 import { clock12 } from '@/lib/crew/time'
@@ -13,7 +13,8 @@ import { CrewProvider, useCrew } from './CrewProvider'
 import type { CrewStrings } from './strings'
 
 // The frame a crew member's screens sit in: a slim header that says whether
-// they are on the clock, and four thumb tabs.
+// they are on the clock, and four thumb tabs. The lead (field supervisor) gets
+// a fifth, Crew: the schedule, tasks to check, pickups and the nightly plan.
 
 type Tab = { href: string; label: (t: CrewStrings) => string; icon: LucideIcon }
 
@@ -23,6 +24,8 @@ const TABS: Tab[] = [
   { href: '/app/hours', label: (t) => t.tabHours, icon: Clock },
   { href: '/app/more', label: (t) => t.tabMore, icon: Menu },
 ]
+
+const CREW_TAB: Tab = { href: '/app/crew', label: (t) => t.tabCrew, icon: Users }
 
 function useKeyboardOpen(): boolean {
   const [open, setOpen] = useState(false)
@@ -56,11 +59,12 @@ function TabBar() {
   const { home, t } = useCrew()
   const keyboardOpen = useKeyboardOpen()
   const badge = home?.questions.length ?? 0
+  const tabs = home?.me.role === 'lead' ? [...TABS.slice(0, 3), CREW_TAB, TABS[3]] : TABS
   if (keyboardOpen) return null
   return (
     <nav aria-label="App" className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--color-stone)] bg-[var(--color-background)] pb-safe">
       <div className="mx-auto flex max-w-xl">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon
           const active = tab.href === '/app' ? pathname === '/app' : pathname.startsWith(tab.href)
           const showBadge = tab.href === '/app' && badge > 0

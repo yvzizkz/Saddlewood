@@ -20,11 +20,17 @@ const { db, notify, auth, mail } = vi.hoisted(() => {
     schedule: [] as Row[],
     tasks: [] as Row[],
     questions: [] as Row[],
+    pickups: [] as Row[],
+    reports: [] as Row[],
     seq: 0,
   };
   return {
     db,
-    notify: { owners: [] as { title: string; body: string }[], crew: [] as { email: string; body: string }[] },
+    notify: {
+      owners: [] as { title: string; body: string }[],
+      leads: [] as { title: string; body: string }[],
+      crew: [] as { email: string; body: string }[],
+    },
     auth: { users: [] as { id: string; email: string; app_metadata: Record<string, unknown>; banned?: string }[] },
     mail: { sent: [] as { to: string; subject: string; text: string }[], links: [] as string[] },
   };
@@ -145,15 +151,45 @@ vi.mock("../queries", () => {
     getTask: async (id: number) => db.tasks.find((t) => t.id === id) ?? null,
     insertTasks: async (rows: Record<string, unknown>[]) =>
       rows.map((r) => {
-        const row = { id: next(), status: "open", doneNote: "", files: [], closedAt: null, ...r };
+        const row = { id: next(), status: "open", doneNote: "", files: [], closedAt: null, verifiedAt: null, verifiedBy: "", sentBack: 0, detail: "", ...r };
         db.tasks.push(row);
         return row;
       }),
-    patchTask: async (id: number, patch: Record<string, unknown>, only?: { email?: string }) => {
-      const row = db.tasks.find((t) => t.id === id && (!only?.email || t.email === only.email));
+    patchTask: async (id: number, patch: Record<string, unknown>, only?: { email?: string; status?: string; unverified?: boolean }) => {
+      const row = db.tasks.find(
+        (t) => t.id === id && (!only?.email || t.email === only.email) && (!only?.status || t.status === only.status) && (!only?.unverified || !t.verifiedAt),
+      );
       if (!row) return null;
-      const { done_note, closed_at, ...rest } = patch;
-      Object.assign(row, rest, done_note !== undefined ? { doneNote: done_note } : {}, closed_at !== undefined ? { closedAt: closed_at } : {});
+      const map: Record<string, string> = {
+        done_note: "doneNote",
+        closed_at: "closedAt",
+        reported_at: "reportedAt",
+        verified_at: "verifiedAt",
+        verified_by: "verifiedBy",
+        sent_back: "sentBack",
+      };
+      for (const [k, v] of Object.entries(patch)) row[map[k] ?? k] = v;
+      return row;
+    },
+    listTasks: async () => db.tasks,
+    listJobs: async () => [...db.jobs.values()],
+    getPickup: async (id: number) => db.pickups.find((p) => p.id === id) ?? null,
+    listPickups: async () => db.pickups,
+    insertPickup: async (p: Record<string, unknown>) => {
+      const row = { id: next(), status: "staged", runnerNote: "", files: [], pickedBy: "", pickedAt: null, deliveredAt: null, createdAt: "x", ...p };
+      db.pickups.push(row);
+      return row;
+    },
+    patchPickup: async (id: number, patch: Record<string, unknown>, only?: { statusIn?: string[] }) => {
+      const row = db.pickups.find((p) => p.id === id && (!only?.statusIn || only.statusIn.includes(p.status as string)));
+      if (!row) return null;
+      const map: Record<string, string> = { runner_note: "runnerNote", picked_by: "pickedBy", picked_at: "pickedAt", delivered_at: "deliveredAt" };
+      for (const [k, v] of Object.entries(patch)) row[map[k] ?? k] = v;
+      return row;
+    },
+    insertReport: async (r: Record<string, unknown>) => {
+      const row = { id: next(), createdAt: "x", ...r };
+      db.reports.push(row);
       return row;
     },
     getQuestion: async (id: number) => db.questions.find((q) => q.id === id) ?? null,
@@ -185,6 +221,12 @@ vi.mock("@/lib/bot/queries", () => ({ threadKey: () => KEY }));
 
 vi.mock("../notify", () => ({
   notifyOwners: async (n: { title: string; body: string }) => void notify.owners.push(n),
+  // With no lead seated these go to the owners; the tests below that seat a lead check `leads`.
+  notifySupervisors: async (n: { title: string; body: string }, o?: { alsoOwners?: boolean }) => {
+    const leads = [...db.people.values()].filter((p) => p.active && p.role === "lead");
+    if (!leads.length || o?.alsoOwners) notify.owners.push(n);
+    if (leads.length) notify.leads.push(n);
+  },
   notifyCrew: async (p: { email: string }, text: { body: { en: string } }) => void notify.crew.push({ email: p.email, body: text.body.en }),
 }));
 
@@ -236,6 +278,7 @@ const person = (email: string, name: string, lang: "en" | "es" = "en"): CrewPers
   lang,
   phone: "",
   trade: "",
+  role: "crew",
   active: true,
   addedBy: "Lando",
   createdAt: "x",
@@ -257,9 +300,10 @@ const file = (key = KEY) => ({ path: `u/${key}/202610/a1b2c3d4e5f6-r.jpg`, name:
 beforeEach(() => {
   db.people.clear();
   db.jobs.clear();
-  for (const k of ["shifts", "entries", "schedule", "tasks", "questions"] as const) db[k].length = 0;
+  for (const k of ["shifts", "entries", "schedule", "tasks", "questions", "pickups", "reports"] as const) db[k].length = 0;
   db.seq = 0;
   notify.owners.length = 0;
+  notify.leads.length = 0;
   notify.crew.length = 0;
   auth.users.length = 0;
   mail.sent.length = 0;
@@ -487,11 +531,24 @@ describe("answering what was asked", () => {
 describe("tasks and the schedule, from the crew's side", () => {
   it("lets a person finish or flag their own task and nobody else's", async () => {
     db.tasks.push({ id: 70, email: ARNOLD, title: "Pick up hold-downs", status: "open", files: [], doneNote: "" });
-    expect(await crew(beto, { kind: "task.update", id: 70, status: "done" }, at("10:00"))).toMatchObject({ ok: false, status: 404 });
+    expect(await crew(beto, { kind: "task.update", id: 70, status: "done", files: [file()] }, at("10:00"))).toMatchObject({ ok: false, status: 404 });
     expect(await crew(arnold, { kind: "task.update", id: 70, status: "blocked", note: "White Cap is out" }, at("10:00"))).toEqual({ ok: true });
-    expect(notify.owners.at(-1)).toMatchObject({ title: "Arnold is blocked", body: "Pick up hold-downs: White Cap is out" });
-    expect(await crew(arnold, { kind: "task.update", id: 70, status: "done" }, at("11:00"))).toEqual({ ok: true });
-    expect(db.tasks[0]).toMatchObject({ status: "done", closedAt: at("11:00").toISOString() });
+    expect(notify.owners.at(-1)).toMatchObject({ title: "Arnold is waiting", body: "Pick up hold-downs: White Cap is out" });
+    expect(await crew(arnold, { kind: "task.update", id: 70, status: "done", files: [file()] }, at("11:00"))).toEqual({ ok: true });
+    expect(db.tasks[0]).toMatchObject({ status: "done", closedAt: at("11:00").toISOString(), reportedAt: at("11:00").toISOString(), verifiedAt: null });
+  });
+
+  it("will not take 'done' without a photo of the finished work", async () => {
+    db.tasks.push({ id: 71, email: ARNOLD, title: "Sand and second coat, hall", status: "doing", files: [], doneNote: "" });
+    const res = await crew(arnold, { kind: "task.update", id: 71, status: "done" }, at("15:00"));
+    expect(res).toMatchObject({ ok: false, status: 400, error: expect.stringContaining("photo") });
+    expect(db.tasks[0].status).toBe("doing");
+  });
+
+  it("can mark a task started", async () => {
+    db.tasks.push({ id: 72, email: ARNOLD, title: "Tape the garage", status: "open", files: [], doneNote: "" });
+    expect(await crew(arnold, { kind: "task.update", id: 72, status: "doing" }, at("07:00"))).toEqual({ ok: true });
+    expect(db.tasks[0].status).toBe("doing");
   });
 
   it("tells the owners when someone cannot make it", async () => {
@@ -645,5 +702,125 @@ describe("what an owner can do", () => {
     expect(await admin({ kind: "job.add", name: "bellevue heights" }, at("09:00"))).toMatchObject({ ok: false, status: 409 });
     expect(await admin({ kind: "job.add", name: "Old Job" }, at("09:00"))).toMatchObject({ ok: true });
     expect(db.jobs.get("old-job")?.active).toBe(true);
+  });
+});
+
+// ---- the field supervisor ---------------------------------------------------------
+
+const ELI = "eli@example.com";
+const FELIPE = "felipe@example.com";
+const eli: CrewPersonRow = { ...person(ELI, "Eli Lugo"), role: "lead" };
+const felipe: CrewPersonRow = { ...person(FELIPE, "Felipe Soto", "es"), role: "runner" };
+const asLead = { role: "lead" as const, email: ELI, name: "Eli Lugo" };
+const lead = (input: AdminActInput, now: Date) => runAdminAct(asLead, adminActSchema.parse(input), now);
+
+describe("reported done vs verified done", () => {
+  beforeEach(() => {
+    db.people.set(ELI, { ...eli });
+  });
+
+  it("sends 'done' to the lead, not Marco, and waits for the check", async () => {
+    db.tasks.push({ id: 90, email: ARNOLD, title: "Finish drywall, kitchen", jobName: "Powell Residence", status: "doing", files: [], doneNote: "", detail: "", sentBack: 0 });
+    expect(await crew(arnold, { kind: "task.update", id: 90, status: "done", note: "all coats", files: [file()] }, at("15:30"))).toEqual({ ok: true });
+    expect(notify.leads.at(-1)).toMatchObject({ title: "Arnold says done: check it" });
+    expect(notify.owners).toHaveLength(0);
+    expect(db.tasks[0]).toMatchObject({ status: "done", verifiedAt: null });
+  });
+
+  it("sends it back with what is left, and the worker hears why", async () => {
+    db.tasks.push({ id: 91, email: ARNOLD, title: "Finish drywall, kitchen", status: "done", files: [file()], doneNote: "", detail: "", sentBack: 0, verifiedAt: null });
+    expect(await lead({ kind: "task.verify", id: 91, ok: false, note: "x" }, at("16:00"))).toMatchObject({ ok: false, status: 400 });
+    expect(await lead({ kind: "task.verify", id: 91, ok: false, note: "Still needs sanding by the window" }, at("16:00"))).toMatchObject({ ok: true });
+    expect(db.tasks[0]).toMatchObject({ status: "open", closedAt: null, reportedAt: null, sentBack: 1 });
+    expect(String(db.tasks[0].detail)).toContain("Sent back by Eli (Mon, Oct 5): Still needs sanding by the window");
+    expect(notify.crew.at(-1)).toMatchObject({ email: ARNOLD, body: expect.stringContaining("Still needs sanding") });
+  });
+
+  it("verifies it once, and the worker cannot reopen checked work", async () => {
+    db.tasks.push({ id: 92, email: ARNOLD, title: "Hang board, garage", status: "done", files: [file()], doneNote: "", detail: "", sentBack: 0, verifiedAt: null });
+    expect(await lead({ kind: "task.verify", id: 92, ok: true }, at("16:00"))).toMatchObject({ ok: true });
+    expect(db.tasks[0]).toMatchObject({ status: "done", verifiedBy: "Eli Lugo" });
+    expect(await lead({ kind: "task.verify", id: 92, ok: true }, at("16:01"))).toMatchObject({ ok: false, status: 409 });
+    expect(await crew(arnold, { kind: "task.update", id: 92, status: "open" }, at("16:05"))).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("counts an owner's 'mark done' as checked", async () => {
+    db.tasks.push({ id: 93, email: ARNOLD, title: "Punch list, bath 2", status: "open", files: [], doneNote: "", detail: "", sentBack: 0 });
+    await admin({ kind: "task.update", id: 93, status: "done" }, at("12:00"));
+    expect(db.tasks[0]).toMatchObject({ status: "done", verifiedBy: "Lando" });
+  });
+
+  it("still tells the owners about a safety report", async () => {
+    await crew(arnold, { kind: "eod.add", jobId: "powell", done: "Framed the north wall", safety: "Ladder slipped, nobody hurt", clientId: cid() }, at("16:00"));
+    expect(notify.leads.at(-1)).toMatchObject({ title: "Safety report · Powell Residence" });
+    expect(notify.owners.at(-1)).toMatchObject({ title: "Safety report · Powell Residence" });
+  });
+});
+
+describe("priorities and promises", () => {
+  it("keeps the priority on the schedule and when a day is copied", async () => {
+    await lead({ kind: "schedule.set", day: "2026-10-06", emails: [ARNOLD], jobId: "powell", startTime: "06:00", priority: 2 }, at("17:00"));
+    expect(db.schedule[0]).toMatchObject({ priority: 2, createdBy: "Eli Lugo" });
+    await lead({ kind: "schedule.copy", from: "2026-10-06", to: "2026-10-07" }, at("17:05"));
+    expect(db.schedule[1]).toMatchObject({ day: "2026-10-07", priority: 2 });
+  });
+
+  it("lets the lead keep the promise current but not rename or close a job", async () => {
+    expect(await lead({ kind: "job.update", id: "powell", promised: "2026-10-09", promiseNote: "Drywall ready for paint" }, at("09:00"))).toMatchObject({ ok: true });
+    expect(db.jobs.get("powell")).toMatchObject({ promised: "2026-10-09", promise_note: "Drywall ready for paint" });
+    expect(await lead({ kind: "job.update", id: "powell", name: "Powell" }, at("09:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(await lead({ kind: "job.update", id: "powell", active: false }, at("09:00"))).toMatchObject({ ok: false, status: 403 });
+  });
+});
+
+describe("pickups for the runner", () => {
+  beforeEach(() => {
+    db.people.set(ELI, { ...eli });
+    db.people.set(FELIPE, { ...felipe });
+  });
+
+  it("stages a pickup and tells the runners", async () => {
+    const res = await lead(
+      { kind: "pickup.add", day: "2026-10-06", jobId: "powell", supplier: "Home Depot 35th Ave", orderRef: "W123", items: "Box of 5,000 1-1/4 screws" },
+      at("16:00"),
+    );
+    expect(res).toMatchObject({ ok: true, note: "On Felipe's list." });
+    expect(db.pickups[0]).toMatchObject({ status: "staged", jobName: "Powell Residence", email: "" });
+    expect(notify.crew.at(-1)).toMatchObject({ email: FELIPE, body: "Home Depot 35th Ave for Powell Residence, tomorrow." });
+  });
+
+  it("lets the runner pick up and deliver, with a photo at the job", async () => {
+    db.pickups.push({ id: 100, day: "2026-10-05", supplier: "White Cap", jobName: "Powell Residence", email: "", status: "staged", files: [], pickedAt: null, deliveredAt: null });
+    const runner = db.people.get(FELIPE) as CrewPersonRow;
+    expect(await crew(arnold, { kind: "pickup.update", id: 100, status: "picked" }, at("08:00"))).toMatchObject({ ok: false, status: 404 });
+    expect(await crew(runner, { kind: "pickup.update", id: 100, status: "picked" }, at("08:00"))).toEqual({ ok: true });
+    expect(await crew(runner, { kind: "pickup.update", id: 100, status: "delivered" }, at("09:00"))).toMatchObject({ ok: false, status: 400 });
+    expect(await crew(runner, { kind: "pickup.update", id: 100, status: "delivered", files: [file()] }, at("09:00"))).toEqual({ ok: true });
+    expect(db.pickups[0]).toMatchObject({ status: "delivered", pickedBy: FELIPE, deliveredAt: at("09:00").toISOString() });
+    expect(notify.leads.at(-1)).toMatchObject({ title: "Delivered · Powell Residence" });
+    expect(await crew(runner, { kind: "pickup.update", id: 100, status: "problem", note: "wrong" }, at("09:05"))).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("flags a problem to the lead", async () => {
+    db.pickups.push({ id: 101, day: "2026-10-05", supplier: "Home Depot", jobName: "", email: FELIPE, status: "staged", files: [] });
+    const runner = db.people.get(FELIPE) as CrewPersonRow;
+    expect(await crew(runner, { kind: "pickup.update", id: 101, status: "problem", note: "Only the 35th Ave store has the 5,000 box" }, at("08:30"))).toEqual({ ok: true });
+    expect(notify.leads.at(-1)).toMatchObject({ title: "Pickup problem · Home Depot" });
+  });
+});
+
+describe("the nightly plan", () => {
+  it("puts tomorrow in priority order and tells the owners", async () => {
+    db.people.set(ELI, { ...eli });
+    await lead({ kind: "schedule.set", day: "2026-10-06", emails: [BETO], jobId: "north-lane", startTime: "07:00", priority: 5 }, at("17:00"));
+    await lead({ kind: "schedule.set", day: "2026-10-06", emails: [ARNOLD], jobId: "powell", startTime: "06:00", priority: 2 }, at("17:00"));
+    db.tasks.push({ id: 110, email: ARNOLD, title: "Sand the hall", jobName: "Powell Residence", status: "done", verifiedAt: null, files: [], doneNote: "", sentBack: 0 });
+    const res = await lead({ kind: "report.send", day: "2026-10-06", note: "Need a yes on the soffit change" }, at("17:30"));
+    expect(res).toMatchObject({ ok: true, note: "Sent to Marco." });
+    const body = String(db.reports[0].body);
+    expect(body.indexOf("Arnold · Powell Residence")).toBeLessThan(body.indexOf("Beto · North Lane"));
+    expect(body).toContain("Sand the hall · Arnold: Reported done, needs checking");
+    expect(body).toContain("NEED FROM MARCO\nNeed a yes on the soffit change");
+    expect(notify.owners.at(-1)).toMatchObject({ title: "Eli's plan for Tue, Oct 6" });
   });
 });

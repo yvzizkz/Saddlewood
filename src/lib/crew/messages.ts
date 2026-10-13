@@ -52,6 +52,13 @@ export const MSG = {
   notAnAmount: { en: "Type the amount, like 146.61.", es: "Escribe la cantidad, como 146.61." },
   noTask: { en: "That task could not be found.", es: "No se encontró esa tarea." },
   noSchedule: { en: "That is no longer on your schedule.", es: "Eso ya no está en tu horario." },
+  donePhoto: {
+    en: "Add a photo of the finished work. Done means it can be checked.",
+    es: "Agrega una foto del trabajo terminado. Terminado quiere decir que se puede revisar.",
+  },
+  noPickup: { en: "That pickup is no longer on your list.", es: "Ese recogido ya no está en tu lista." },
+  deliveredPhoto: { en: "Add a photo of the material at the job.", es: "Agrega una foto del material en la obra." },
+  problemNote: { en: "Say what the problem is.", es: "Di cuál es el problema." },
 
   // ---- notifications to a crew member ----
   scheduled: (job: string, day: string, today: string, time: string): { title: Both; body: Both } => {
@@ -76,6 +83,27 @@ export const MSG = {
     title: { en: "New task", es: "Nueva tarea" },
     body: { en: title, es: title },
   }),
+  sentBack: (title: string, by: string, note: string): { title: Both; body: Both } => ({
+    title: { en: "Not done yet", es: "Todavía no está terminado" },
+    body: {
+      en: `${by} checked "${title}" and sent it back${note ? `: ${note}` : "."}`,
+      es: `${by} revisó "${title}" y la regresó${note ? `: ${note}` : "."}`,
+    },
+  }),
+  verified: (title: string, by: string): { title: Both; body: Both } => ({
+    title: { en: "Checked and done", es: "Revisado y terminado" },
+    body: { en: `${by} checked "${title}". Good work.`, es: `${by} revisó "${title}". Buen trabajo.` },
+  }),
+  newPickup: (supplier: string, job: string, day: string, today: string): { title: Both; body: Both } => {
+    const d = dayWord(day, today);
+    return {
+      title: { en: "Pickup", es: "Recoger material" },
+      body: {
+        en: `${supplier}${job ? ` for ${job}` : ""}, ${d.en}.`,
+        es: `${supplier}${job ? ` para ${job}` : ""}, ${d.es}.`,
+      },
+    };
+  },
   newQuestion: (body: string, bodyEs: string, fromBot: boolean): { title: Both; body: Both } => ({
     title: fromBot ? { en: "Quick question", es: "Una pregunta" } : { en: "The office has a question", es: "La oficina tiene una pregunta" },
     body: { en: body, es: bodyEs || body },

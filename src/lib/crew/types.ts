@@ -16,6 +16,29 @@ import { isClock, isDay } from "./time";
 export const CREW_LANGS = ["en", "es"] as const;
 export type CrewLang = (typeof CREW_LANGS)[number];
 
+/**
+ * What a seat is for. Everyone is crew-marked underneath (sw_role = 'crew');
+ * this only decides what the site lets them do beyond their own day.
+ *   crew    their own day
+ *   lead    the field supervisor: also the schedule, tasks, checking work,
+ *           pickups, and the nightly plan for the owners
+ *   runner  their own day, plus the pickups
+ */
+export const CREW_ROLES = ["crew", "lead", "runner"] as const;
+export type CrewRole = (typeof CREW_ROLES)[number];
+
+/**
+ * The priority order, highest first. The schedule fills from the top: if a
+ * task does not happen today, what breaks?
+ */
+export const PRIORITIES = [
+  { n: 1, en: "Safety or protection", es: "Seguridad o protección", short: "Safety" },
+  { n: 2, en: "Promised to the client", es: "Prometido al cliente", short: "Promised" },
+  { n: 3, en: "Blocks the next step", es: "Detiene el siguiente paso", short: "Blocks next" },
+  { n: 4, en: "Finishes a job or a payment", es: "Termina un trabajo o un pago", short: "Closes out" },
+  { n: 5, en: "Can wait", es: "Puede esperar", short: "Can wait" },
+] as const;
+
 // ---- rows ---------------------------------------------------------------------
 
 export type CrewPerson = {
@@ -24,13 +47,23 @@ export type CrewPerson = {
   lang: CrewLang;
   phone: string;
   trade: string;
+  role: CrewRole;
   active: boolean;
   addedBy: string;
   createdAt: string;
   lastSeenAt: string | null;
 };
 
-export type CrewJob = { id: string; name: string; address: string; note: string; active: boolean };
+export type CrewJob = {
+  id: string;
+  name: string;
+  address: string;
+  note: string;
+  active: boolean;
+  /** The date we promised the client, and what. */
+  promised: string | null;
+  promiseNote: string;
+};
 
 export type Geo = { lat: number; lng: number; acc: number | null };
 
@@ -89,13 +122,20 @@ export type CrewScheduleItem = {
   jobName: string;
   startTime: string;
   note: string;
+  /** 1 (safety) to 5 (can wait); null when nobody set it. */
+  priority: number | null;
   ack: "" | "ok" | "cant";
   ackNote: string;
   ackAt: string | null;
   createdBy: string;
 };
 
-export type CrewTaskStatus = "open" | "done" | "blocked" | "dropped";
+/**
+ * open = not started, doing = started, blocked = waiting on something,
+ * done = reported done (verifiedAt empty) or verified done, dropped.
+ */
+export type CrewTaskStatus = "open" | "doing" | "done" | "blocked" | "dropped";
+export const LIVE_TASK = ["open", "doing", "blocked"] as const;
 
 export type CrewTask = {
   id: number;
@@ -109,7 +149,54 @@ export type CrewTask = {
   doneNote: string;
   files: BotFileRef[];
   closedAt: string | null;
+  priority: number | null;
+  /** When the worker said it was done. */
+  reportedAt: string | null;
+  /** When the lead or an owner checked it. A done task without this is only reported done. */
+  verifiedAt: string | null;
+  verifiedBy: string;
+  /** How many times it was reported done and sent back. */
+  sentBack: number;
   createdBy: string;
+  createdAt: string;
+};
+
+export function isReportedDone(t: Pick<CrewTask, "status" | "verifiedAt">): boolean {
+  return t.status === "done" && !t.verifiedAt;
+}
+
+export type CrewPickupStatus = "staged" | "picked" | "delivered" | "problem" | "cancelled";
+
+/** Material the lead ordered and had staged, for a runner to fetch and bring to the job. */
+export type CrewPickup = {
+  id: number;
+  day: string;
+  jobId: string;
+  jobName: string;
+  supplier: string;
+  place: string;
+  orderRef: string;
+  items: string;
+  note: string;
+  /** Who is fetching it; "" is any runner. */
+  email: string;
+  status: CrewPickupStatus;
+  runnerNote: string;
+  files: BotFileRef[];
+  pickedBy: string;
+  pickedAt: string | null;
+  deliveredAt: string | null;
+  createdBy: string;
+  createdAt: string;
+};
+
+/** The plan the lead sends the owners in the evening. */
+export type CrewReport = {
+  id: number;
+  day: string;
+  sentBy: string;
+  sentName: string;
+  body: string;
   createdAt: string;
 };
 
@@ -141,7 +228,7 @@ export type CrewHome = {
   now: string;
   /** The Phoenix calendar day right now. */
   day: string;
-  me: { email: string; name: string; lang: CrewLang };
+  me: { email: string; name: string; lang: CrewLang; role: CrewRole };
   jobs: CrewJob[];
   /** The shift this person is on right now, if any. */
   shift: CrewShift | null;
@@ -151,6 +238,8 @@ export type CrewHome = {
   tasks: CrewTask[];
   questions: CrewQuestion[];
   entries: CrewEntry[];
+  /** Pickups for this person to fetch (runners, and anyone a pickup names). */
+  pickups: CrewPickup[];
   push: { available: boolean; publicKey: string | null };
 };
 
@@ -158,6 +247,8 @@ export type CrewAdminHome = {
   ok: true;
   now: string;
   day: string;
+  /** Who is looking: an owner sees everything; the lead sees the field (no hours, no seats). */
+  viewer: { role: "owner" | "lead"; email: string; name: string };
   /** Monday of the week the Hours view is showing. */
   week: string;
   people: CrewPerson[];
@@ -169,6 +260,9 @@ export type CrewAdminHome = {
   schedule: CrewScheduleItem[];
   tasks: CrewTask[];
   questions: CrewQuestion[];
+  pickups: CrewPickup[];
+  /** Plans sent over the last 35 days, newest first. */
+  reports: CrewReport[];
 };
 
 export type CrewFeed = {
@@ -217,6 +311,7 @@ const jobId = z.string().trim().min(1).max(60);
 const optionalJobId = z.string().trim().max(60).default("");
 const files = z.array(fileRefSchema).max(MAX_ENTRY_FILES).default([]);
 const breakMin = z.number().int().min(0).max(240).default(0);
+const priority = z.number().int().min(1).max(5).nullable().default(null);
 
 // ---- what a crew member sends -------------------------------------------------
 
@@ -278,7 +373,14 @@ export const crewActSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("task.update"),
     id,
-    status: z.enum(["done", "blocked", "open"]),
+    status: z.enum(["done", "blocked", "open", "doing"]),
+    note: text(600),
+    files,
+  }),
+  z.object({
+    kind: z.literal("pickup.update"),
+    id,
+    status: z.enum(["picked", "delivered", "problem"]),
     note: text(600),
     files,
   }),
@@ -302,6 +404,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     lang: z.enum(CREW_LANGS).default("en"),
     trade: text(60),
     phone: text(30),
+    role: z.enum(CREW_ROLES).default("crew"),
     /** Email them the sign-in link now. */
     invite: z.boolean().default(true),
   }),
@@ -312,12 +415,20 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     lang: z.enum(CREW_LANGS).optional(),
     trade: z.string().trim().max(60).optional(),
     phone: z.string().trim().max(30).optional(),
+    role: z.enum(CREW_ROLES).optional(),
     active: z.boolean().optional(),
   }),
   z.object({ kind: z.literal("person.invite"), email }),
   /** A one-time code and link for an owner to hand a crew member in person or by text. */
   z.object({ kind: z.literal("person.code"), email }),
-  z.object({ kind: z.literal("job.add"), name: z.string().trim().min(2).max(80), address: text(200), note: text(300) }),
+  z.object({
+    kind: z.literal("job.add"),
+    name: z.string().trim().min(2).max(80),
+    address: text(200),
+    note: text(300),
+    promised: day.or(z.literal("")).default(""),
+    promiseNote: text(200),
+  }),
   z.object({
     kind: z.literal("job.update"),
     id: jobId,
@@ -325,6 +436,8 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     address: z.string().trim().max(200).optional(),
     note: z.string().trim().max(300).optional(),
     active: z.boolean().optional(),
+    promised: day.or(z.literal("")).optional(),
+    promiseNote: z.string().trim().max(200).optional(),
   }),
   z.object({
     kind: z.literal("schedule.set"),
@@ -333,6 +446,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     jobId,
     startTime: clock.or(z.literal("")).default(""),
     note: text(300),
+    priority,
   }),
   z.object({ kind: z.literal("schedule.remove"), id }),
   z.object({ kind: z.literal("schedule.copy"), from: day, to: day }),
@@ -343,6 +457,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     detail: text(1500),
     jobId: optionalJobId,
     due: day.or(z.literal("")).default(""),
+    priority,
   }),
   z.object({
     kind: z.literal("task.update"),
@@ -351,7 +466,36 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     title: z.string().trim().min(3).max(160).optional(),
     detail: z.string().trim().max(1500).optional(),
     due: day.or(z.literal("")).optional(),
+    priority: priority.optional(),
   }),
+  /** Checked it: verified done, or not done and sent back with what is left. */
+  z.object({
+    kind: z.literal("task.verify"),
+    id,
+    ok: z.boolean(),
+    note: text(600),
+  }),
+  z.object({
+    kind: z.literal("pickup.add"),
+    day,
+    jobId: optionalJobId,
+    supplier: z.string().trim().min(2, "say where it is").max(80),
+    place: text(200),
+    orderRef: text(80),
+    items: z.string().trim().min(2, "say what to pick up").max(1500),
+    note: text(300),
+    email: email.or(z.literal("")).default(""),
+  }),
+  z.object({
+    kind: z.literal("pickup.update"),
+    id,
+    status: z.enum(["staged", "picked", "delivered", "cancelled"]).optional(),
+    email: email.or(z.literal("")).optional(),
+    note: z.string().trim().max(300).optional(),
+    day: day.optional(),
+  }),
+  /** Send the owners the plan for `day` (normally tomorrow). */
+  z.object({ kind: z.literal("report.send"), day, note: text(1000) }),
   z.object({
     kind: z.literal("shift.edit"),
     id,

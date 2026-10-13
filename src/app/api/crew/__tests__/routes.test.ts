@@ -230,10 +230,44 @@ describe("the owners' door", () => {
   it("opens for an owner", async () => {
     asStaff(LANDO);
     expect((await getAdmin(req("/api/crew/admin?week=2026-10-05"))).status).toBe(200);
-    expect(spies.adminHome).toHaveBeenCalledWith("2026-10-05");
+    expect(spies.adminHome).toHaveBeenCalledWith({ role: "owner", email: LANDO, name: "Lando" }, "2026-10-05");
     const res = await postAdmin(req("/api/crew/admin", "POST", { kind: "person.add", name: "Arnold Mujica", email: ARNOLD }));
     expect(res.status).toBe(200);
-    expect(spies.runAdminAct.mock.calls[0][0]).toEqual({ email: LANDO, name: "Lando" });
+    expect(spies.runAdminAct.mock.calls[0][0]).toEqual({ role: "owner", email: LANDO, name: "Lando" });
+  });
+
+  it("opens the field to the lead, and nothing else", async () => {
+    const LEAD = "eli.field@example.com";
+    people.set(LEAD, { email: LEAD, name: "Eli Lugo", lang: "en", active: true, lastSeenAt: null, role: "lead" } as never);
+    asCrew(LEAD);
+    expect((await getAdmin(req("/api/crew/admin"))).status).toBe(200);
+    expect(spies.adminHome).toHaveBeenCalledWith({ role: "lead", email: LEAD, name: "Eli Lugo" }, null);
+    for (const body of [
+      { kind: "schedule.set", day: "2026-10-06", emails: [ARNOLD], jobId: "powell", priority: 2 },
+      { kind: "task.verify", id: 5, ok: true },
+      { kind: "pickup.add", day: "2026-10-06", supplier: "Home Depot", items: "screws" },
+      { kind: "report.send", day: "2026-10-06" },
+    ]) {
+      expect((await postAdmin(req("/api/crew/admin", "POST", body))).status).toBe(200);
+    }
+    expect(spies.runAdminAct.mock.calls[0][0]).toEqual({ role: "lead", email: LEAD, name: "Eli Lugo" });
+    spies.runAdminAct.mockClear();
+    for (const body of [
+      { kind: "shift.ok", id: 1 },
+      { kind: "fix.decide", id: 1, approve: true },
+      { kind: "person.add", name: "Beto Ruiz", email: "beto@example.com" },
+      { kind: "person.update", email: ARNOLD, role: "lead" },
+      { kind: "person.code", email: ARNOLD },
+    ]) {
+      expect((await postAdmin(req("/api/crew/admin", "POST", body))).status).toBe(403);
+    }
+    expect(spies.runAdminAct).not.toHaveBeenCalled();
+    expect((await getExport(req("/api/crew/admin/export"))).status).toBe(403);
+  });
+
+  it("does not open for a crew seat that is not a lead", async () => {
+    asCrew();
+    expect((await getAdmin(req("/api/crew/admin"))).status).toBe(403);
   });
 
   it("is shut to crew, to staff without an owner's seat, to the agent token, and to strangers", async () => {

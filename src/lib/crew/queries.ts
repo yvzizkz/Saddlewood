@@ -8,6 +8,10 @@ import type {
   CrewLang,
   CrewOption,
   CrewPerson,
+  CrewPickup,
+  CrewPickupStatus,
+  CrewReport,
+  CrewRole,
   CrewQuestion,
   CrewQuestionKind,
   CrewScheduleItem,
@@ -55,11 +59,16 @@ type PersonRow = {
   lang: string;
   phone: string;
   trade: string;
+  role?: string;
   active: boolean;
   added_by: string;
   created_at: string;
   last_seen_at: string | null;
 };
+
+function asRole(v: unknown): CrewRole {
+  return v === "lead" || v === "runner" ? v : "crew";
+}
 
 export type CrewPersonRow = CrewPerson & { authId: string | null };
 
@@ -70,6 +79,7 @@ function toPerson(r: PersonRow): CrewPersonRow {
     lang: (r.lang === "es" ? "es" : "en") as CrewLang,
     phone: r.phone,
     trade: r.trade,
+    role: asRole(r.role),
     active: r.active,
     addedBy: r.added_by,
     createdAt: r.created_at,
@@ -99,6 +109,7 @@ export async function savePerson(p: {
   lang: CrewLang;
   phone: string;
   trade: string;
+  role: CrewRole;
   addedBy: string;
 }): Promise<CrewPersonRow> {
   const db = getSupabaseAdmin();
@@ -112,6 +123,7 @@ export async function savePerson(p: {
         lang: p.lang,
         phone: p.phone,
         trade: p.trade,
+        role: p.role,
         active: true,
         added_by: p.addedBy,
         updated_at: new Date().toISOString(),
@@ -126,7 +138,7 @@ export async function savePerson(p: {
 
 export async function patchPerson(
   email: string,
-  patch: Partial<{ name: string; lang: CrewLang; phone: string; trade: string; active: boolean; auth_id: string | null }>,
+  patch: Partial<{ name: string; lang: CrewLang; phone: string; trade: string; role: CrewRole; active: boolean; auth_id: string | null }>,
 ): Promise<CrewPersonRow | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
@@ -148,33 +160,51 @@ export async function touchSeen(person: CrewPerson): Promise<void> {
 
 // ---- jobs ---------------------------------------------------------------------
 
-type JobRow = { id: string; name: string; address: string; note: string; active: boolean };
+type JobRow = { id: string; name: string; address: string; note: string; active: boolean; promised?: string | null; promise_note?: string };
+
+const JOB_COLS = "id, name, address, note, active, promised, promise_note";
 
 function toJob(r: JobRow): CrewJob {
-  return { id: r.id, name: r.name, address: r.address, note: r.note, active: r.active };
+  return { id: r.id, name: r.name, address: r.address, note: r.note, active: r.active, promised: r.promised ?? null, promiseNote: r.promise_note ?? "" };
 }
 
 export async function listJobs(): Promise<CrewJob[]> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("crew_jobs").select("id, name, address, note, active").order("name", { ascending: true });
+  const { data, error } = await db.from("crew_jobs").select(JOB_COLS).order("name", { ascending: true });
   if (error) fail("crew_jobs list", error.message);
   return ((data ?? []) as JobRow[]).map(toJob);
 }
 
 export async function getJob(id: string): Promise<CrewJob | null> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("crew_jobs").select("id, name, address, note, active").eq("id", id).maybeSingle();
+  const { data, error } = await db.from("crew_jobs").select(JOB_COLS).eq("id", id).maybeSingle();
   if (error) fail("crew_jobs read", error.message);
   return data ? toJob(data as JobRow) : null;
 }
 
 /** -> null when a job with that id already exists. */
-export async function insertJob(job: { id: string; name: string; address: string; note: string; createdBy: string }): Promise<CrewJob | null> {
+export async function insertJob(job: {
+  id: string;
+  name: string;
+  address: string;
+  note: string;
+  promised: string | null;
+  promiseNote: string;
+  createdBy: string;
+}): Promise<CrewJob | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("crew_jobs")
-    .insert({ id: job.id, name: job.name, address: job.address, note: job.note, created_by: job.createdBy })
-    .select("id, name, address, note, active")
+    .insert({
+      id: job.id,
+      name: job.name,
+      address: job.address,
+      note: job.note,
+      promised: job.promised,
+      promise_note: job.promiseNote,
+      created_by: job.createdBy,
+    })
+    .select(JOB_COLS)
     .single();
   if (error) {
     if (error.code === UNIQUE_VIOLATION) return null;
@@ -183,13 +213,16 @@ export async function insertJob(job: { id: string; name: string; address: string
   return toJob(data as JobRow);
 }
 
-export async function patchJob(id: string, patch: Partial<{ name: string; address: string; note: string; active: boolean }>): Promise<CrewJob | null> {
+export async function patchJob(
+  id: string,
+  patch: Partial<{ name: string; address: string; note: string; active: boolean; promised: string | null; promise_note: string }>,
+): Promise<CrewJob | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("crew_jobs")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .select("id, name, address, note, active");
+    .select(JOB_COLS);
   if (error) fail("crew_jobs update", error.message);
   const row = (data as JobRow[] | null)?.[0];
   return row ? toJob(row) : null;
@@ -553,6 +586,7 @@ type ScheduleRow = {
   job_name: string;
   start_time: string;
   note: string;
+  priority?: number | null;
   ack: string;
   ack_note: string;
   ack_at: string | null;
@@ -568,6 +602,7 @@ function toSchedule(r: ScheduleRow): CrewScheduleItem {
     jobName: r.job_name,
     startTime: r.start_time,
     note: r.note,
+    priority: r.priority ?? null,
     ack: r.ack === "ok" || r.ack === "cant" ? r.ack : "",
     ackNote: r.ack_note,
     ackAt: r.ack_at,
@@ -591,7 +626,17 @@ export async function getScheduleItem(id: number): Promise<CrewScheduleItem | nu
   return data ? toSchedule(data as ScheduleRow) : null;
 }
 
-export type NewSchedule = { day: string; email: string; jobId: string; jobName: string; startTime: string; note: string; createdBy: string };
+export type NewSchedule = {
+  day: string;
+  email: string;
+  jobId: string;
+  jobName: string;
+  startTime: string;
+  note: string;
+  /** undefined leaves an existing row's priority as it was. */
+  priority?: number | null;
+  createdBy: string;
+};
 
 /**
  * Put people on a job for a day. Someone already on that job that day keeps
@@ -621,6 +666,7 @@ export async function upsertSchedule(rows: NewSchedule[]): Promise<CrewScheduleI
           job_name: r.jobName,
           start_time: r.startTime,
           note: r.note,
+          ...(r.priority !== undefined ? { priority: r.priority } : {}),
           updated_at: now,
           ...(changed ? { ack: "", ack_note: "", ack_at: null } : {}),
         })
@@ -633,7 +679,16 @@ export async function upsertSchedule(rows: NewSchedule[]): Promise<CrewScheduleI
     }
     const { data, error } = await db
       .from("crew_schedule")
-      .insert({ day: r.day, email: r.email, job_id: r.jobId, job_name: r.jobName, start_time: r.startTime, note: r.note, created_by: r.createdBy })
+      .insert({
+        day: r.day,
+        email: r.email,
+        job_id: r.jobId,
+        job_name: r.jobName,
+        start_time: r.startTime,
+        note: r.note,
+        priority: r.priority ?? null,
+        created_by: r.createdBy,
+      })
       .select("*")
       .single();
     if (error) {
@@ -680,6 +735,11 @@ type TaskRow = {
   done_note: string;
   files: unknown;
   closed_at: string | null;
+  priority?: number | null;
+  reported_at?: string | null;
+  verified_at?: string | null;
+  verified_by?: string;
+  sent_back?: number;
   created_by: string;
   created_at: string;
 };
@@ -693,28 +753,46 @@ function toTask(r: TaskRow): CrewTask {
     jobId: r.job_id,
     jobName: r.job_name,
     due: r.due,
-    status: (["open", "done", "blocked", "dropped"] as const).find((s) => s === r.status) ?? "open",
+    status: (["open", "doing", "done", "blocked", "dropped"] as const).find((s) => s === r.status) ?? "open",
     doneNote: r.done_note,
     files: asFiles(r.files),
     closedAt: r.closed_at,
+    priority: r.priority ?? null,
+    reportedAt: r.reported_at ?? null,
+    verifiedAt: r.verified_at ?? null,
+    verifiedBy: r.verified_by ?? "",
+    sentBack: r.sent_back ?? 0,
     createdBy: r.created_by,
     createdAt: r.created_at,
   };
 }
 
-/** Open and blocked tasks, plus the ones closed since `closedSince`. */
+/**
+ * Live tasks (not started, started, waiting), tasks reported done that nobody
+ * has checked yet (however old), plus the ones closed since `closedSince`.
+ */
 export async function listTasks(filter: { email?: string; closedSince: string }): Promise<CrewTask[]> {
   const db = getSupabaseAdmin();
-  let live = db.from("crew_tasks").select("*").in("status", ["open", "blocked"]);
+  let live = db.from("crew_tasks").select("*").in("status", ["open", "doing", "blocked"]);
+  let unchecked = db.from("crew_tasks").select("*").eq("status", "done").is("verified_at", null);
   let closed = db.from("crew_tasks").select("*").in("status", ["done", "dropped"]).gte("closed_at", filter.closedSince);
   if (filter.email) {
     live = live.eq("email", filter.email);
+    unchecked = unchecked.eq("email", filter.email);
     closed = closed.eq("email", filter.email);
   }
-  const [a, b] = await Promise.all([live.order("id", { ascending: true }).limit(500), closed.order("closed_at", { ascending: false }).limit(200)]);
+  const [a, u, b] = await Promise.all([
+    live.order("id", { ascending: true }).limit(500),
+    unchecked.order("id", { ascending: true }).limit(300),
+    closed.order("closed_at", { ascending: false }).limit(200),
+  ]);
   if (a.error) fail("crew_tasks list", a.error.message);
+  if (u.error) fail("crew_tasks list", u.error.message);
   if (b.error) fail("crew_tasks list", b.error.message);
-  return [...((a.data ?? []) as TaskRow[]), ...((b.data ?? []) as TaskRow[])].map(toTask);
+  const seen = new Set<number>();
+  return [...((a.data ?? []) as TaskRow[]), ...((u.data ?? []) as TaskRow[]), ...((b.data ?? []) as TaskRow[])]
+    .filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)))
+    .map(toTask);
 }
 
 export async function getTask(id: number): Promise<CrewTask | null> {
@@ -724,14 +802,34 @@ export async function getTask(id: number): Promise<CrewTask | null> {
   return data ? toTask(data as TaskRow) : null;
 }
 
-export type NewTask = { email: string; title: string; detail: string; jobId: string; jobName: string; due: string | null; createdBy: string };
+export type NewTask = {
+  email: string;
+  title: string;
+  detail: string;
+  jobId: string;
+  jobName: string;
+  due: string | null;
+  priority?: number | null;
+  createdBy: string;
+};
 
 export async function insertTasks(rows: NewTask[]): Promise<CrewTask[]> {
   if (!rows.length) return [];
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("crew_tasks")
-    .insert(rows.map((r) => ({ email: r.email, title: r.title, detail: r.detail, job_id: r.jobId, job_name: r.jobName, due: r.due, created_by: r.createdBy })))
+    .insert(
+      rows.map((r) => ({
+        email: r.email,
+        title: r.title,
+        detail: r.detail,
+        job_id: r.jobId,
+        job_name: r.jobName,
+        due: r.due,
+        priority: r.priority ?? null,
+        created_by: r.createdBy,
+      })),
+    )
     .select("*");
   if (error) fail("crew_tasks insert", error.message);
   return ((data ?? []) as TaskRow[]).map(toTask);
@@ -739,8 +837,21 @@ export async function insertTasks(rows: NewTask[]): Promise<CrewTask[]> {
 
 export async function patchTask(
   id: number,
-  patch: Partial<{ status: CrewTaskStatus; title: string; detail: string; due: string | null; done_note: string; files: BotFileRef[]; closed_at: string | null }>,
-  only?: { email?: string },
+  patch: Partial<{
+    status: CrewTaskStatus;
+    title: string;
+    detail: string;
+    due: string | null;
+    done_note: string;
+    files: BotFileRef[];
+    closed_at: string | null;
+    priority: number | null;
+    reported_at: string | null;
+    verified_at: string | null;
+    verified_by: string;
+    sent_back: number;
+  }>,
+  only?: { email?: string; status?: CrewTaskStatus; unverified?: boolean },
 ): Promise<CrewTask | null> {
   const db = getSupabaseAdmin();
   let q = db
@@ -748,6 +859,8 @@ export async function patchTask(
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (only?.email) q = q.eq("email", only.email);
+  if (only?.status) q = q.eq("status", only.status);
+  if (only?.unverified) q = q.is("verified_at", null);
   const { data, error } = await q.select("*");
   if (error) fail("crew_tasks update", error.message);
   const row = (data as TaskRow[] | null)?.[0];
@@ -757,9 +870,173 @@ export async function patchTask(
 /** A task the bot already made for this person with this title is not made twice. */
 export async function taskExists(email: string, title: string): Promise<boolean> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("crew_tasks").select("id").eq("email", email).eq("title", title).in("status", ["open", "blocked"]).limit(1);
+  const { data, error } = await db.from("crew_tasks").select("id").eq("email", email).eq("title", title).in("status", ["open", "doing", "blocked"]).limit(1);
   if (error) fail("crew_tasks check", error.message);
   return !!data?.length;
+}
+
+// ---- pickups ------------------------------------------------------------------
+
+type PickupRow = {
+  id: number;
+  day: string;
+  job_id: string;
+  job_name: string;
+  supplier: string;
+  place: string;
+  order_ref: string;
+  items: string;
+  note: string;
+  email: string;
+  status: string;
+  runner_note: string;
+  files: unknown;
+  picked_by: string;
+  picked_at: string | null;
+  delivered_at: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+const PICKUP_STATUSES: CrewPickupStatus[] = ["staged", "picked", "delivered", "problem", "cancelled"];
+
+function toPickup(r: PickupRow): CrewPickup {
+  return {
+    id: r.id,
+    day: r.day,
+    jobId: r.job_id,
+    jobName: r.job_name,
+    supplier: r.supplier,
+    place: r.place,
+    orderRef: r.order_ref,
+    items: r.items,
+    note: r.note,
+    email: r.email,
+    status: PICKUP_STATUSES.find((s) => s === r.status) ?? "staged",
+    runnerNote: r.runner_note,
+    files: asFiles(r.files),
+    pickedBy: r.picked_by,
+    pickedAt: r.picked_at,
+    deliveredAt: r.delivered_at,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+  };
+}
+
+/** Everything not finished, plus what was finished or cancelled on or after `fromDay`. */
+export async function listPickups(filter: { fromDay: string; email?: string }): Promise<CrewPickup[]> {
+  const db = getSupabaseAdmin();
+  let open = db.from("crew_pickups").select("*").in("status", ["staged", "picked", "problem"]);
+  let recent = db.from("crew_pickups").select("*").in("status", ["delivered", "cancelled"]).gte("day", filter.fromDay);
+  if (filter.email !== undefined) {
+    // A runner sees what names them and what names nobody.
+    open = open.in("email", [filter.email, ""]);
+    recent = recent.in("email", [filter.email, ""]);
+  }
+  const [a, b] = await Promise.all([open.order("day", { ascending: true }).order("id").limit(300), recent.order("id", { ascending: false }).limit(200)]);
+  if (a.error) fail("crew_pickups list", a.error.message);
+  if (b.error) fail("crew_pickups list", b.error.message);
+  return [...((a.data ?? []) as PickupRow[]), ...((b.data ?? []) as PickupRow[])].map(toPickup);
+}
+
+export async function getPickup(id: number): Promise<CrewPickup | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("crew_pickups").select("*").eq("id", id).maybeSingle();
+  if (error) fail("crew_pickups read", error.message);
+  return data ? toPickup(data as PickupRow) : null;
+}
+
+export type NewPickup = {
+  day: string;
+  jobId: string;
+  jobName: string;
+  supplier: string;
+  place: string;
+  orderRef: string;
+  items: string;
+  note: string;
+  email: string;
+  createdBy: string;
+};
+
+export async function insertPickup(p: NewPickup): Promise<CrewPickup> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("crew_pickups")
+    .insert({
+      day: p.day,
+      job_id: p.jobId,
+      job_name: p.jobName,
+      supplier: p.supplier,
+      place: p.place,
+      order_ref: p.orderRef,
+      items: p.items,
+      note: p.note,
+      email: p.email,
+      created_by: p.createdBy,
+    })
+    .select("*")
+    .single();
+  if (error) fail("crew_pickups insert", error.message);
+  return toPickup(data as PickupRow);
+}
+
+export async function patchPickup(
+  id: number,
+  patch: Partial<{
+    day: string;
+    status: CrewPickupStatus;
+    email: string;
+    note: string;
+    runner_note: string;
+    files: BotFileRef[];
+    picked_by: string;
+    picked_at: string | null;
+    delivered_at: string | null;
+  }>,
+  only?: { statusIn?: CrewPickupStatus[] },
+): Promise<CrewPickup | null> {
+  const db = getSupabaseAdmin();
+  let q = db
+    .from("crew_pickups")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (only?.statusIn) q = q.in("status", only.statusIn);
+  const { data, error } = await q.select("*");
+  if (error) fail("crew_pickups update", error.message);
+  const row = (data as PickupRow[] | null)?.[0];
+  return row ? toPickup(row) : null;
+}
+
+// ---- the nightly plan ---------------------------------------------------------
+
+type ReportRow = { id: number; day: string; sent_by: string; sent_name: string; body: string; created_at: string };
+
+function toReport(r: ReportRow): CrewReport {
+  return { id: r.id, day: r.day, sentBy: r.sent_by, sentName: r.sent_name, body: r.body, createdAt: r.created_at };
+}
+
+export async function listReports(fromDay: string): Promise<CrewReport[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("crew_reports")
+    .select("id, day, sent_by, sent_name, body, created_at")
+    .gte("day", fromDay)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) fail("crew_reports list", error.message);
+  return ((data ?? []) as ReportRow[]).map(toReport);
+}
+
+export async function insertReport(r: { day: string; sentBy: string; sentName: string; body: string; data: Record<string, unknown> }): Promise<CrewReport> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("crew_reports")
+    .insert({ day: r.day, sent_by: r.sentBy, sent_name: r.sentName, body: r.body, data: r.data })
+    .select("id, day, sent_by, sent_name, body, created_at")
+    .single();
+  if (error) fail("crew_reports insert", error.message);
+  return toReport(data as ReportRow);
 }
 
 // ---- questions ----------------------------------------------------------------

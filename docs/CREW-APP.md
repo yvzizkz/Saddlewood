@@ -35,6 +35,44 @@ visitors, safety, a decision for Marco).
 Home also shows one line ("Crew: 3 on the clock") and the Crew tab carries a
 badge when something waits on an owner.
 
+## The field supervisor, the runner, and checked work (migration 0016)
+
+Added 2026-10-12 for Eli (field supervisor): Marco sells and estimates, the
+supervisor runs the field, and every task is either reported done or verified
+done.
+
+- **A seat has a role**: crew, lead (shown as Supervisor), or runner. All three
+  are crew-marked sign-ins (`sw_role = 'crew'`), so every lock from 0011 holds
+  for the supervisor too. The role only decides what the site allows
+  (`LEAD_ACTS` in `src/lib/crew/auth.ts`).
+- **The supervisor** gets a fifth tab, Crew (`/app/crew` inside the crew app):
+  Today (what needs a check, who is on, what came in, tasks), Schedule (with
+  priorities and the promised dates), Runner (pickups), Plan (the nightly plan
+  to Marco and the 30-day record). The supervisor can schedule, assign, verify
+  or send work back, ask questions, stage pickups, keep a job's promise,
+  address and site note current, and send the plan. Not hours, time fixes,
+  seats, job names, or closing jobs: those stay with the owners (403). The
+  supervisor opens any crew member's photos through `/api/crew/files`.
+- **Priority** 1 to 5 on each assignment and task: safety, promised to the
+  client, blocks the next step, closes out a job or payment, can wait. The
+  schedule sorts by it. Each job can carry `promised` + `promise_note`.
+- **Reported vs verified done.** A worker's "Mark done" needs a photo and
+  leaves the task reported (`verified_at` empty). The supervisor (or an owner)
+  verifies it, or sends it back with what is left: the task reopens, the note
+  is added to its details, `sent_back` counts it, and the worker is notified.
+  An owner's "Verified done" counts as checked. Checked work cannot be reopened
+  by the worker. Tasks done before 0016 were marked verified.
+- **Pickups** (`crew_pickups`): the supervisor stages will-call material; a
+  runner (or the person named) marks picked up, then delivered with a photo,
+  or a problem with a note.
+- **The nightly plan** (`crew_reports`): built by `src/lib/crew/plan.ts`, the
+  same function the screen previews with. Sending notifies the owners. On time
+  = sent by 6 PM the evening before. The record starts with the first plan.
+- **Who hears what**: crew updates (done, waiting, cannot make it, notes,
+  end-of-day flags, pickups) go to the supervisor when one is seated, else to
+  the owners as before. Safety reports and answers to questions also reach the
+  owners. Time fixes stay owners only.
+
 ## Who can do what
 
 - **Crew** are a row in `crew_people` AND `app_metadata.sw_role = "crew"` on
@@ -205,8 +243,6 @@ The Mac (agent token):
 
 ## Not built yet
 
-- A lead or foreman seat (sees their crew, sets the schedule). Today that is
-  the owners.
 - Telling the bot in Ask to schedule people or assign tasks. The agent can
   read the crew's record; changes are made in the Crew tab.
 - Working fully offline. The app needs signal to open; only a punch is kept
