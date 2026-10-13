@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { voidPayment } from "@/lib/billing/payments";
-import { authorizeOps } from "@/lib/ops/auth";
+import { authorizeBillingWrite } from "@/lib/billing/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // A payment recorded in error is voided with a reason. It stays in the record.
+// Owners only, signed in.
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const who = await authorizeOps(request);
-  if (!who) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const gate = await authorizeBillingWrite(request, { allowToken: false });
+  if (gate.response) return gate.response;
+  const who = gate.who;
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   let reason = "";

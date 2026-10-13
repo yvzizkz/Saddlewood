@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getDocument } from "@/lib/billing/documents";
 import { addFileExhibit, addLinkExhibit, listExhibits, removeExhibit } from "@/lib/billing/exhibits";
+import { authorizeBillingWrite } from "@/lib/billing/access";
 import { checkAttachments, checkLinks } from "@/lib/billing/send";
 import type { BillingDocument } from "@/lib/billing/types";
 import { authorizeOps, type OpsActor } from "@/lib/ops/auth";
@@ -9,7 +10,7 @@ import { authorizeOps, type OpsActor } from "@/lib/ops/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Staff: put an original invoice link or a waiver file on a document's page,
+// Owners (or the Mac): put an original invoice link or a waiver file on a document's page,
 // or take one down with a reason. The same checks as billing mail: links go to
 // approved sites only; files are PDF, PNG, JPG or XLSX.
 
@@ -40,6 +41,9 @@ export async function GET(request: NextRequest, ctx: Ctx): Promise<NextResponse>
 
 export async function POST(request: NextRequest, ctx: Ctx): Promise<NextResponse> {
   try {
+    // Looking is for staff; adding or taking down is for the owners or the Mac.
+    const gate = await authorizeBillingWrite(request, { allowToken: true });
+    if (gate.response) return gate.response;
     const got = await open(request, ctx);
     if ("error" in got) return got.error;
     const { who, doc } = got;

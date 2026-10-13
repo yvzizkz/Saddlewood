@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { deliver } from "@/lib/billing/deliver";
 import { getDocument } from "@/lib/billing/documents";
-import { authorizeOps } from "@/lib/ops/auth";
+import { authorizeBillingWrite } from "@/lib/billing/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Mail an issued document to its client, from accounting@. Staff only.
+// Mail an issued document to its client, from accounting@. Owners, or the Mac's
+// billing_send.py (src/lib/billing/access.ts).
 // The rules (preview unless confirmed, who may receive it, the copy our own
 // people get) live in src/lib/billing/deliver.ts.
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const who = await authorizeOps(request);
-  if (!who) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const gate = await authorizeBillingWrite(request, { allowToken: true });
+  if (gate.response) return gate.response;
+  const who = gate.who;
 
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });

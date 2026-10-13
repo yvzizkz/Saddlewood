@@ -9,6 +9,14 @@ vi.mock("resend", () => ({
 
 const authorizeOps = vi.fn();
 vi.mock("@/lib/ops/auth", () => ({ authorizeOps: (...a: unknown[]) => authorizeOps(...a) }));
+// Billing changes are for the owners (src/lib/billing/access.ts).
+const readState = vi.fn();
+vi.mock("@/lib/bot/queries", () => ({ readState: (...a: unknown[]) => readState(...a) }));
+const OWNERS = {
+  "lando@saddlewoodcontracting.com": { name: "Lando", role: "owner" },
+  "ilene@saddlewoodcontracting.com": { name: "Ilene Ochoa", role: "owner" },
+  "bot@saddlewoodcontracting.com": { name: "Bot", role: "requester" },
+};
 
 const getDocument = vi.fn();
 const clientContactEmails = vi.fn();
@@ -39,6 +47,7 @@ function call(body: unknown, id = ID) {
 beforeEach(() => {
   sendMock.mockReset().mockResolvedValue({ data: { id: "em_1" }, error: null });
   authorizeOps.mockReset().mockResolvedValue({ actor: "lando@saddlewoodcontracting.com", via: "session" });
+  readState.mockReset().mockResolvedValue({ sections: { people: OWNERS }, bridge: {} });
   getDocument.mockReset().mockResolvedValue(DOC);
   clientContactEmails.mockReset().mockResolvedValue(["ap@client.com"]);
   recordEvent.mockReset().mockResolvedValue(true);
@@ -59,6 +68,14 @@ describe("POST /api/billing/documents/[id]/send", () => {
     expect(res.status).toBe(401);
     expect(getDocument).not.toHaveBeenCalled();
     expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("answers 403 to staff who are not owners; the Mac's token may still send", async () => {
+    authorizeOps.mockResolvedValue({ actor: "bot@saddlewoodcontracting.com", via: "session" });
+    expect((await call({ ...GOOD, confirm: true })).status).toBe(403);
+    expect(getDocument).not.toHaveBeenCalled();
+    authorizeOps.mockResolvedValue({ actor: "billing_send", via: "token" });
+    expect((await call(GOOD)).status).toBe(200);
   });
 
   it("shows the exact message and sends nothing until confirm is true", async () => {

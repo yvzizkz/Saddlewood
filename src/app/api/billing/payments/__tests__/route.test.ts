@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authorizeOps = vi.fn();
 vi.mock("@/lib/ops/auth", () => ({ authorizeOps: (...a: unknown[]) => authorizeOps(...a) }));
+// Billing changes are for the owners (src/lib/billing/access.ts).
+const readState = vi.fn();
+vi.mock("@/lib/bot/queries", () => ({ readState: (...a: unknown[]) => readState(...a) }));
+const OWNERS = {
+  "lando@saddlewoodcontracting.com": { name: "Lando", role: "owner" },
+  "ilene@saddlewoodcontracting.com": { name: "Ilene Ochoa", role: "owner" },
+  "bot@saddlewoodcontracting.com": { name: "Bot", role: "requester" },
+};
 
 const getDocument = vi.fn();
 vi.mock("@/lib/billing/documents", () => ({ getDocument: (...a: unknown[]) => getDocument(...a) }));
@@ -38,6 +46,7 @@ function call(body: unknown) {
 
 beforeEach(() => {
   authorizeOps.mockReset().mockResolvedValue({ actor: "ilene@saddlewoodcontracting.com", via: "session" });
+  readState.mockReset().mockResolvedValue({ sections: { people: OWNERS }, bridge: {} });
   getDocument.mockReset().mockResolvedValue(DOC);
   paidByDocument.mockReset().mockResolvedValue(new Map());
   recordPayment.mockReset().mockResolvedValue({ id: "p1" });
@@ -47,6 +56,14 @@ describe("POST /api/billing/payments", () => {
   it("answers 401 to anyone who is not staff", async () => {
     authorizeOps.mockResolvedValue(null);
     expect((await call({ ...GOOD, confirm: true })).status).toBe(401);
+    expect(recordPayment).not.toHaveBeenCalled();
+  });
+
+  it("records money only for an owner who is signed in: not the agent token, not other staff", async () => {
+    authorizeOps.mockResolvedValue({ actor: "billing_send", via: "token" });
+    expect((await call({ ...GOOD, confirm: true })).status).toBe(403);
+    authorizeOps.mockResolvedValue({ actor: "bot@saddlewoodcontracting.com", via: "session" });
+    expect((await call({ ...GOOD, confirm: true })).status).toBe(403);
     expect(recordPayment).not.toHaveBeenCalled();
   });
 

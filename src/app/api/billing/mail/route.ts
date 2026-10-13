@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { deliver } from "@/lib/billing/deliver";
-import { authorizeOps } from "@/lib/ops/auth";
+import { authorizeBillingWrite } from "@/lib/billing/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // A note from accounting@ with no document behind it: to our own people only,
 // since there is no client whose contacts could vouch for an outside address.
-// Staff only; preview unless confirmed (src/lib/billing/deliver.ts).
+// Owners, or the Mac's billing_send.py; preview unless confirmed (src/lib/billing/deliver.ts).
 
 export async function POST(request: NextRequest) {
-  const who = await authorizeOps(request);
-  if (!who) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const gate = await authorizeBillingWrite(request, { allowToken: true });
+  if (gate.response) return gate.response;
+  const who = gate.who;
 
   let input: Record<string, unknown>;
   try {

@@ -2,18 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getDocument } from "@/lib/billing/documents";
 import { paidByDocument, PAYMENT_METHODS, recordPayment, type PaymentMethod } from "@/lib/billing/payments";
-import { authorizeOps } from "@/lib/ops/auth";
+import { authorizeBillingWrite } from "@/lib/billing/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Record money received against one document (and, for a statement, one of
-// its lines). Staff only. Without "confirm": true the answer shows what would
+// its lines). Owners only, signed in. Without "confirm": true the answer shows what would
 // be recorded and the balance it would leave, and writes nothing.
 
 export async function POST(request: NextRequest) {
-  const who = await authorizeOps(request);
-  if (!who) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const gate = await authorizeBillingWrite(request, { allowToken: false });
+  if (gate.response) return gate.response;
+  const who = gate.who;
 
   let input: Record<string, unknown>;
   try {

@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authorizeOps = vi.fn();
 vi.mock("@/lib/ops/auth", () => ({ authorizeOps: (...a: unknown[]) => authorizeOps(...a) }));
+// Billing changes are for the owners (src/lib/billing/access.ts).
+const readState = vi.fn();
+vi.mock("@/lib/bot/queries", () => ({ readState: (...a: unknown[]) => readState(...a) }));
+const OWNERS = {
+  "lando@saddlewoodcontracting.com": { name: "Lando", role: "owner" },
+  "ilene@saddlewoodcontracting.com": { name: "Ilene Ochoa", role: "owner" },
+  "bot@saddlewoodcontracting.com": { name: "Bot", role: "requester" },
+};
 
 const getDocument = vi.fn();
 vi.mock("@/lib/billing/documents", () => ({ getDocument: (...a: unknown[]) => getDocument(...a) }));
@@ -37,6 +45,7 @@ function call(body: unknown, id = ID) {
 
 beforeEach(() => {
   authorizeOps.mockReset().mockResolvedValue({ actor: "lando@saddlewoodcontracting.com", via: "session" });
+  readState.mockReset().mockResolvedValue({ sections: { people: OWNERS }, bridge: {} });
   getDocument.mockReset().mockResolvedValue(DOC);
   addLinkExhibit.mockReset().mockResolvedValue({ id: "e1" });
   addFileExhibit.mockReset().mockResolvedValue({ id: "e2" });
@@ -47,6 +56,12 @@ describe("POST /api/billing/documents/[id]/exhibits", () => {
   it("answers 401 to anyone who is not staff", async () => {
     authorizeOps.mockResolvedValue(null);
     expect((await call({ label: "View original invoice", url: JOIST })).status).toBe(401);
+    expect(getDocument).not.toHaveBeenCalled();
+  });
+
+  it("lets staff who are not owners look, not add", async () => {
+    authorizeOps.mockResolvedValue({ actor: "bot@saddlewoodcontracting.com", via: "session" });
+    expect((await call({ label: "View original invoice", url: JOIST })).status).toBe(403);
     expect(getDocument).not.toHaveBeenCalled();
   });
 
