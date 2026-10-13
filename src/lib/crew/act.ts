@@ -482,20 +482,20 @@ async function announce(person: CrewPersonRow, entry: CrewEntry): Promise<void> 
   const at = entry.jobName ? ` · ${entry.jobName}` : "";
   const field = (k: string) => (typeof entry.data[k] === "string" ? (entry.data[k] as string) : "");
   if (entry.kind === "eod") {
-    // Safety first, then scope ("someone asked for work that is not on the
-    // plans" has to be written up the same day), then a decision for tomorrow.
-    const [title, text] = field("safety")
-      ? ["Safety report", field("safety")]
-      : field("asked")
-        ? ["Extra work asked for", field("asked")]
-        : field("decision")
-          ? ["Needs your call", field("decision")]
-          : ["", ""];
-    if (title) {
+    // Each flag is its own alert, so a decision sent with extra work is not
+    // swallowed. Safety also reaches the owners whoever runs the field; scope
+    // and decisions go to the supervisor, who passes on what needs Marco in
+    // the nightly plan.
+    const flags: [key: string, title: string][] = [
+      ["safety", "Safety report"],
+      ["asked", "Extra work asked for"],
+      ["decision", "Needs a decision"],
+    ];
+    for (const [key, title] of flags) {
+      if (!field(key)) continue;
       await notifySupervisors(
-        { title: `${title}${at}`, body: `${first}: ${text}`, tag: `crew-eod-${entry.id}` },
-        // A safety report reaches the owners whoever runs the field.
-        { alsoOwners: title === "Safety report", except: person.email },
+        { title: `${title}${at}`, body: `${first}: ${field(key)}`, tag: `crew-eod-${key}-${entry.id}` },
+        { alsoOwners: key === "safety", except: person.email },
       );
     }
     return;

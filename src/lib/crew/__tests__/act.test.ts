@@ -488,8 +488,14 @@ describe("what they send in", () => {
     expect(notify.owners).toHaveLength(0);
     await crew(arnold, { kind: "eod.add", jobId: "powell", done: "Framed", asked: "Super wants furring at the soffit", clientId: cid() }, at("14:40"));
     expect(notify.owners.at(-1)).toMatchObject({ title: "Extra work asked for · Powell Residence", body: "Arnold: Super wants furring at the soffit" });
-    await crew(beto, { kind: "eod.add", jobId: "powell", done: "Framed", asked: "x", safety: "Cut on the hand, bandaged", clientId: cid() }, at("14:45"));
-    expect(notify.owners.at(-1)?.title).toBe("Safety report · Powell Residence");
+    notify.owners.length = 0;
+    await crew(beto, { kind: "eod.add", jobId: "powell", done: "Framed", asked: "x", safety: "Cut on the hand, bandaged", decision: "Island outlets now or after inspection?", clientId: cid() }, at("14:45"));
+    // One alert per flag, so a decision next to extra work is not swallowed.
+    expect(notify.owners.map((n) => n.title)).toEqual([
+      "Safety report · Powell Residence",
+      "Extra work asked for · Powell Residence",
+      "Needs a decision · Powell Residence",
+    ]);
   });
 
   it("files the end of day for today or yesterday only, and closes the bot's ask for it", async () => {
