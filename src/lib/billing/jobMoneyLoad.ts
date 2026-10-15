@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { localDay } from "@/lib/crew/time";
 import { contractOf, placeMoney, summarizeJobMoney, type JobMoney, type MoneyItem } from "./jobMoney";
 import { toDocument, type DocumentRow } from "./documents";
 import type { BillingProfile } from "./types";
@@ -13,7 +14,7 @@ import { paidByDocument } from "./payments";
 
 export async function loadJobMoney(
   jobIds: string[],
-  today: string = new Date().toISOString().slice(0, 10),
+  today: string = localDay(),
 ): Promise<{ jobs: JobMoney[]; unplaced: MoneyItem[] }> {
   if (jobIds.length === 0) return { jobs: [], unplaced: [] };
   const db = getSupabaseAdmin();

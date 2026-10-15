@@ -2,6 +2,7 @@
 // Days are relative to the due date. Negative is before. The company default
 // lives here; a client's billing profile or a job may move the timing later.
 
+import { localDay } from "@/lib/crew/time";
 import type { BillingProfile } from "./types";
 
 export type LadderStep = {
@@ -23,6 +24,15 @@ export const LADDER: LadderStep[] = [
 export const VIEW_WITHIN_BUSINESS_DAYS = 2;
 
 const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * The Phoenix calendar day a date or timestamp names. A bare YYYY-MM-DD is
+ * already a day; a timestamp is read in Phoenix time, so a bill sent at 6 PM
+ * belongs to that day and not to tomorrow's UTC date.
+ */
+export function dayOf(dateOrAt: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateOrAt) ? dateOrAt : localDay(dateOrAt);
+}
 
 function dayAt(iso: string): Date {
   return new Date(`${iso.slice(0, 10)}T12:00:00Z`);
@@ -63,7 +73,7 @@ export function isPayWhenPaid(client?: BillingProfile | null, job?: BillingProfi
 export function ladderClock(dueDate: string | null, firstSentAt: string | null, payWhenPaid: boolean): string | null {
   if (dueDate) return dueDate.slice(0, 10);
   if (payWhenPaid || !firstSentAt) return null;
-  return firstSentAt.slice(0, 10);
+  return dayOf(firstSentAt);
 }
 
 export type NextStep = { on: string; label: string; who: LadderStep["who"]; daysLate: number } | null;

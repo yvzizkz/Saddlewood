@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { addBusinessDays, isPayWhenPaid, ladderClock, nextStep, VIEW_WITHIN_BUSINESS_DAYS, type NextStep } from "./ladder";
+import { localDay } from "@/lib/crew/time";
+import { addBusinessDays, dayOf, isPayWhenPaid, ladderClock, nextStep, VIEW_WITHIN_BUSINESS_DAYS, type NextStep } from "./ladder";
 import { paidByDocument } from "./payments";
 import { summarizeProof, type ProofSummary } from "./proof";
 import type { BillingDocument, BillingProfile, DocumentEvent } from "./types";
@@ -70,7 +71,7 @@ export function buildOverview(input: OverviewInput): Overview {
     const balanceCents = doc.totalCents - paidCents;
     if (balanceCents <= 0) continue;
     const proof = summarizeProof(input.events.get(doc.id) ?? []);
-    const firstSent = proof.firstSentAt ? proof.firstSentAt.slice(0, 10) : null;
+    const firstSent = proof.firstSentAt ? dayOf(proof.firstSentAt) : null;
     const unconfirmed = Boolean(firstSent) && proof.views.length === 0 && addBusinessDays(firstSent!, VIEW_WITHIN_BUSINESS_DAYS) <= today;
     const client = doc.clientId ? input.clients.get(doc.clientId) : undefined;
     const payWhenPaid = isPayWhenPaid(client?.billing, doc.jobId ? input.jobs.get(doc.jobId) : null);
@@ -104,7 +105,7 @@ export function buildOverview(input: OverviewInput): Overview {
   return { today, totalOpenCents: open.reduce((s, d) => s + d.balanceCents, 0), clients: out };
 }
 
-export async function moneyOverview(today: string = new Date().toISOString().slice(0, 10)): Promise<Overview> {
+export async function moneyOverview(today: string = localDay()): Promise<Overview> {
   const db = getSupabaseAdmin();
   const { data: docs, error } = await db
     .from("documents")
