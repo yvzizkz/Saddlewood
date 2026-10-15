@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { HardHat, Home, ListChecks, Menu, MessageSquare, Wallet, type LucideIcon } from 'lucide-react'
 
+import { OnboardingFlow } from '@/components/auth/OnboardingFlow'
 import { BotProvider, useBot } from './BotProvider'
 import { Dot } from './ui'
 import { healthLine, needsYouCount } from '@/lib/bot/view'
@@ -107,6 +108,12 @@ function TabBar() {
   )
 }
 
+function OwnerOnboarding() {
+  const { home } = useBot()
+  if (!home?.me.email) return null
+  return <OnboardingFlow email={home.me.email} name={home.me.name ?? ''} role="owner" />
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter()
 
@@ -129,6 +136,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           screens (draft emails, amounts, client names) or the text of what is
           tapped. Sheets render outside this div and carry the class themselves. */}
       <div className="bot-app ph-no-capture min-h-dvh">
+        <OwnerOnboarding />
         <header className="sticky top-0 z-30 border-b border-[var(--color-stone)] bg-[var(--color-background)]/95 backdrop-blur pt-[env(safe-area-inset-top,0px)]">
           {/* 52px + the 1px rule: AskScreen pins itself under exactly this. */}
           <div className="mx-auto flex h-[52px] max-w-xl items-center justify-between px-4">

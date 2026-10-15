@@ -8,6 +8,10 @@ import { browserSupportsWebAuthn, startAuthentication, startRegistration } from 
 // page can lead with the Face ID button instead of the email field.
 export const PASSKEY_FLAG = "saddlewood_passkey";
 
+// Can be switched off via NEXT_PUBLIC_DISABLE_FACE_ID_OFFER=1 if Face ID
+// ever needs to be hidden cleanly without touching the rest of sign-in.
+export const FACE_ID_OFFER_ENABLED = process.env.NEXT_PUBLIC_DISABLE_FACE_ID_OFFER !== "1";
+
 export function passkeySupported(): boolean {
   return typeof window !== "undefined" && browserSupportsWebAuthn();
 }
@@ -26,7 +30,7 @@ const DECLINED_KEY = "saddlewood_passkey_declined";
 const ASK_AGAIN_DAYS = 30;
 
 export function shouldOfferPasskey(): boolean {
-  if (!passkeySupported() || passkeyOnThisDevice()) return false;
+  if (!FACE_ID_OFFER_ENABLED || !passkeySupported() || passkeyOnThisDevice()) return false;
   try {
     const at = Number(localStorage.getItem(DECLINED_KEY) || 0);
     return !at || Date.now() - at > ASK_AGAIN_DAYS * 86_400_000;
@@ -52,6 +56,10 @@ function remember(on: boolean) {
   }
 }
 
+export function rememberPasskeyOnThisDevice() {
+  remember(true);
+}
+
 async function json<T>(res: Response): Promise<T & { ok: boolean; error?: string }> {
   const body = (await res.json().catch(() => ({}))) as T & { ok: boolean; error?: string };
   if (!res.ok || !body.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -63,7 +71,25 @@ export async function enrollPasskey(label: string): Promise<{ id: string }> {
   const start = await json<{ options: Parameters<typeof startRegistration>[0]["optionsJSON"] }>(
     await fetch("/api/auth/passkey/register", { method: "POST" }),
   );
-  const response = await startRegistration({ optionsJSON: start.options });
+  let response;
+  try {
+    response = await startRegistration({ optionsJSON: start.options });
+  } catch (e) {
+    const err = e as Error & { code?: string };
+    // On iOS, Safari and the Home Screen app share iCloud Keychain (the passkey)
+    // but not localStorage. If this device already holds one of the user's
+    // excluded credentials, mark the device as enrolled and succeed cleanly.
+    if (
+      (start.options.excludeCredentials?.length ?? 0) > 0 &&
+      (err.name === "InvalidStateError" ||
+        err.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED" ||
+        /previously registered|already registered/i.test(err.message || ""))
+    ) {
+      remember(true);
+      return { id: start.options.excludeCredentials?.[0]?.id ?? "existing" };
+    }
+    throw e;
+  }
   const done = await json<{ id: string }>(
     await fetch("/api/auth/passkey/register", {
       method: "PUT",

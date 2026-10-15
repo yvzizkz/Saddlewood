@@ -99,8 +99,8 @@ export const challengeCookie = {
   options: {
     httpOnly: true,
     secure: ORIGIN.startsWith("https://"),
-    sameSite: "strict" as const,
-    path: "/api/auth/passkey",
+    sameSite: "lax" as const,
+    path: "/",
     maxAge: CHALLENGE_MINUTES * 60,
   },
 };

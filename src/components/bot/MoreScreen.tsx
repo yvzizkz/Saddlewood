@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { Bell, BellOff, ChevronRight, Download, LogOut, Send, Share2, ShieldCheck } from 'lucide-react'
 
+import { triggerOnboardingReplay } from '@/components/auth/OnboardingFlow'
 import { PasskeyCard } from '@/components/auth/PasskeyCard'
 import { createClient } from '@/lib/supabase/client'
 import { botApi, useBot } from './BotProvider'
@@ -364,12 +365,24 @@ export default function MoreScreen() {
     <div className="px-4 pt-6 pb-8">
       <ScreenTitle title="More" />
 
-      <Card className="flex items-center justify-between gap-3 p-4">
-        <div className="min-w-0">
-          <p className="text-[16px] font-medium text-[var(--color-charcoal)]">{home.me.name ?? 'No seat yet'}</p>
-          <p className="truncate text-[13px] text-[var(--color-charcoal-light)]">{home.me.email}</p>
+      <Card className="p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[16px] font-medium text-[var(--color-charcoal)]">{home.me.name ?? 'No seat yet'}</p>
+            <p className="truncate text-[13px] text-[var(--color-charcoal-light)]">{home.me.email}</p>
+          </div>
+          <Chip tone={owner ? 'ink' : 'quiet'}>{owner ? 'Owner' : home.me.role === 'requester' ? 'Can ask' : 'Not set up'}</Chip>
         </div>
-        <Chip tone={owner ? 'ink' : 'quiet'}>{owner ? 'Owner' : home.me.role === 'requester' ? 'Can ask' : 'Not set up'}</Chip>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button busy={leaving} onClick={signOut}>
+            <LogOut className="size-4" aria-hidden="true" /> Sign out
+          </Button>
+          {home.me.email ? (
+            <Button variant="quiet" onClick={() => triggerOnboardingReplay(home.me.email)}>
+              Welcome guide
+            </Button>
+          ) : null}
+        </div>
       </Card>
 
       <InstallCard />

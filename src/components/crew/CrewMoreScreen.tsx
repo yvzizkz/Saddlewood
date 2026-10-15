@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, BellOff, Download, LogOut } from 'lucide-react'
 
+import { triggerOnboardingReplay } from '@/components/auth/OnboardingFlow'
 import { PasskeyCard } from '@/components/auth/PasskeyCard'
 import { keyBytes, useInstall } from '@/components/bot/MoreScreen'
 import { Button, Card, Empty, ScreenTitle, SectionTitle, Segmented } from '@/components/bot/ui'
@@ -176,9 +177,14 @@ export default function CrewMoreScreen() {
         <Card className="p-4">
           <p className="text-[15px] font-medium text-[var(--color-charcoal)]">{home.me.name}</p>
           <p className="text-[13px] text-[var(--color-charcoal-light)]">{home.me.email}</p>
-          <Button className="mt-3" busy={leaving} onClick={signOut}>
-            <LogOut className="size-4" aria-hidden="true" /> {t.signOut}
-          </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button busy={leaving} onClick={signOut}>
+              <LogOut className="size-4" aria-hidden="true" /> {t.signOut}
+            </Button>
+            <Button variant="quiet" onClick={() => triggerOnboardingReplay(home.me.email)}>
+              {lang === 'es' ? 'Guía de inicio' : 'Welcome guide'}
+            </Button>
+          </div>
         </Card>
       ) : (
         <Empty>{error ?? t.loading}</Empty>

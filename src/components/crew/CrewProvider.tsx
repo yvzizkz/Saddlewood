@@ -182,8 +182,22 @@ export function CrewProvider({ children, initialLang, email }: { children: React
   const flushing = useRef(false)
   const langTouched = useRef(false)
   const t = STRINGS[lang]
-  // The next sign-in on this phone opens in the same language (login page).
-  useEffect(() => keepDeviceLang(lang), [lang])
+  // Carry through a language chosen on /login; otherwise save the seat's
+  // language on the phone so the next sign-in opens in the same language.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('saddlewood_lang')
+      if ((saved === 'en' || saved === 'es') && saved !== initialLang) {
+        langTouched.current = true
+        setLangState(saved)
+        void crewApi('/api/crew/act', { method: 'POST', body: JSON.stringify({ kind: 'prefs', lang: saved }) }).catch(() => {})
+        return
+      }
+    } catch {
+      // private mode
+    }
+    keepDeviceLang(initialLang)
+  }, [initialLang])
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'info') => {
     const id = ++toastId.current
@@ -196,7 +210,10 @@ export function CrewProvider({ children, initialLang, email }: { children: React
       const next = await crewApi<CrewHome>('/api/crew/me')
       setHome(next)
       setError(null)
-      if (!langTouched.current) setLangState(next.me.lang)
+      if (!langTouched.current) {
+        setLangState(next.me.lang)
+        keepDeviceLang(next.me.lang)
+      }
       return next
     } catch (e) {
       setError((e as Error).message)
@@ -302,6 +319,7 @@ export function CrewProvider({ children, initialLang, email }: { children: React
     (next: CrewLang) => {
       langTouched.current = true
       setLangState(next)
+      keepDeviceLang(next)
       void crewApi('/api/crew/act', { method: 'POST', body: JSON.stringify({ kind: 'prefs', lang: next }) }).catch(() => {})
     },
     [],

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { CalendarDays, Clock, Home, Menu, Users, type LucideIcon } from 'lucide-react'
 
+import { OnboardingFlow, resolveOnboardingRole } from '@/components/auth/OnboardingFlow'
 import { Dot } from '@/components/bot/ui'
 import { clock12 } from '@/lib/crew/time'
 import type { CrewLang } from '@/lib/crew/types'
@@ -97,6 +98,13 @@ function TabBar() {
   )
 }
 
+function CrewOnboarding() {
+  const { home, lang, setLang } = useCrew()
+  if (!home?.me.email) return null
+  const role = resolveOnboardingRole({ kind: 'crew', group: home.me.group, perms: home.me.perms })
+  return <OnboardingFlow email={home.me.email} name={home.me.name} role={role} lang={lang} onLangChange={setLang} />
+}
+
 export default function CrewShell({ children, lang, email }: { children: ReactNode; lang: CrewLang; email: string }) {
   const router = useRouter()
 
@@ -117,6 +125,7 @@ export default function CrewShell({ children, lang, email }: { children: ReactNo
       {/* ph-no-capture: the site's analytics must not record what is on these
           screens (hours, receipts, notes) or the text of what is tapped. */}
       <div className="bot-app ph-no-capture min-h-dvh">
+        <CrewOnboarding />
         <header className="sticky top-0 z-30 border-b border-[var(--color-stone)] bg-[var(--color-background)]/95 pt-[env(safe-area-inset-top,0px)] backdrop-blur">
           <div className="mx-auto flex h-[52px] max-w-xl items-center justify-between gap-3 px-4">
             <Link href="/app" className="flex shrink-0 items-center gap-2.5">

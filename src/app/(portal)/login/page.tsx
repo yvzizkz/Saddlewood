@@ -13,6 +13,7 @@ import {
   shouldOfferPasskey,
   signInWithPasskey,
 } from "@/lib/auth/passkeyClient";
+import { hasCompletedOnboarding } from "@/components/auth/OnboardingFlow";
 import { keepDeviceLang, readDeviceLang, type DeviceLang } from "@/lib/auth/deviceLang";
 
 type FormState =
@@ -259,10 +260,11 @@ function LoginForm() {
     }
 
     saveStep(null);
-    // Signed in. Like a bank app: offer Face ID for next time, once, before
-    // going on. The session is on the device already, so enrolling here
-    // works without another round trip through email.
-    if (shouldOfferPasskey()) {
+    // Signed in. For the phone app (/app), first-run onboarding inside /app
+    // walks through Add to Home Screen, Face ID, and the role screen in order.
+    // On the desktop portal (or once /app onboarding was already completed),
+    // offer Face ID here before redirecting.
+    if ((!appFlow || hasCompletedOnboarding(targetEmail)) && shouldOfferPasskey()) {
       setFormState("enroll");
       return;
     }
@@ -680,12 +682,16 @@ function LoginForm() {
                   type="button"
                   onClick={handlePasskey}
                   disabled={passkey === "busy"}
-                  className={`block w-full text-center hover:underline cursor-pointer disabled:opacity-50 ${appFlow ? "min-h-11 text-sm" : "pt-1 text-xs"}`}
-                  style={{ color: "var(--color-muted)" }}
+                  className={`block w-full text-center rounded-lg border px-4 font-medium transition-colors cursor-pointer disabled:opacity-50 ${appFlow ? "py-3 text-sm" : "py-2 text-xs"}`}
+                  style={{
+                    backgroundColor: "white",
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-primary)",
+                  }}
                 >
                   {passkey === "busy"
                     ? copy.verifying
-                    : say("I set up Face ID on this phone", "Ya tengo Face ID", "Sign in with a passkey")}
+                    : say("Sign in with Face ID", "Entrar con Face ID", "Sign in with Face ID / passkey")}
                 </button>
               ) : null}
             </form>
