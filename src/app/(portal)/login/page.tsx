@@ -13,6 +13,7 @@ import {
   shouldOfferPasskey,
   signInWithPasskey,
 } from "@/lib/auth/passkeyClient";
+import { keepDeviceLang, readDeviceLang, type DeviceLang } from "@/lib/auth/deviceLang";
 
 type FormState =
   | "idle"
@@ -54,6 +55,10 @@ function saveStep(s: Omit<SavedStep, "at"> | null) {
   }
 }
 
+// What the code screen says under its title. Kept as a kind, not as words, so
+// switching language on that screen changes it too.
+type Channel = "app:sent" | "app:given" | string;
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const [identifier, setIdentifier] = useState(() => searchParams.get("email") ?? searchParams.get("phone") ?? "");
@@ -61,6 +66,16 @@ function LoginForm() {
   const [sentChannel, setSentChannel] = useState("");
   const [code, setCode] = useState("");
   const [formState, setFormState] = useState<FormState>("idle");
+  const [lang, setLangState] = useState<DeviceLang>("en");
+  useEffect(() => {
+    setLangState(readDeviceLang(searchParams.get("lang")));
+  }, [searchParams]);
+  // One language at a time on the crew sign-in (Lando, 2026-10-15), chosen
+  // by the switch under the logo and kept on the device.
+  function setLang(next: DeviceLang) {
+    setLangState(next);
+    keepDeviceLang(next);
+  }
 
   // Back from a reload mid sign-in: straight to the code screen. The server
   // renders the email step (it cannot see the device), so this has to be an
@@ -94,24 +109,45 @@ function LoginForm() {
   })();
 
   // Arriving from the app (the link crew are sent): plain words, in English
-  // and Spanish, because this is the first screen a field worker sees.
+  // or Spanish, because this is the first screen a field worker sees.
   const appFlow = nextPath === "/app" || nextPath.startsWith("/app/");
+  const es = appFlow && lang === "es";
+  /** App sign-in words in the chosen language; `portal` is the owners' portal wording. */
+  const say = (en: string, esText: string, portal: string = en) => (!appFlow ? portal : es ? esText : en);
   const copy = appFlow
-    ? {
-        title: "Saddlewood",
-        lead: "Sign in with your email. · Entra con tu correo.",
-        label: "Email · Correo",
-        placeholder: "you@example.com",
-        send: "Send my code · Mándame el código",
-        sending: "Sending… · Enviando…",
-        haveCode: "I already have a code · Ya tengo un código",
-        codeTitle: "Enter your code",
-        codeLead: "We emailed you a code. · Te mandamos un código por correo.",
-        signIn: "Sign in · Entrar",
-        verifying: "Checking… · Revisando…",
-        back: "← Back · Atrás",
-        resend: "Send again · Mandar otra vez",
-      }
+    ? es
+      ? {
+          title: "Saddlewood",
+          lead: "Entra con tu correo.",
+          label: "Correo",
+          placeholder: "tu@ejemplo.com",
+          send: "Mándame el código",
+          sending: "Enviando…",
+          haveCode: "Ya tengo un código",
+          codeTitle: "Escribe tu código",
+          codeLead: "Te mandamos un código por correo.",
+          code: "Código",
+          signIn: "Entrar",
+          verifying: "Revisando…",
+          back: "← Atrás",
+          resend: "Mandar otra vez",
+        }
+      : {
+          title: "Saddlewood",
+          lead: "Sign in with your email.",
+          label: "Email",
+          placeholder: "you@example.com",
+          send: "Send my code",
+          sending: "Sending…",
+          haveCode: "I already have a code",
+          codeTitle: "Enter your code",
+          codeLead: "We emailed you a code.",
+          code: "Code",
+          signIn: "Sign in",
+          verifying: "Checking…",
+          back: "← Back",
+          resend: "Send again",
+        }
     : {
         title: "Internal Portal & Approvals",
         lead: "Sign in with your authorized phone number or company email.",
@@ -122,6 +158,7 @@ function LoginForm() {
         haveCode: "I already have a code",
         codeTitle: "Enter Verification Code",
         codeLead: "",
+        code: "Code",
         signIn: "Sign in",
         verifying: "Verifying...",
         back: "← Back",
@@ -165,17 +202,17 @@ function LoginForm() {
 
     if (failed) {
       setFormState("error");
-      setErrorMessage("Could not dispatch verification code. Try again in a minute.");
+      setErrorMessage(say("Could not send the code. Try again in a minute.", "No se pudo mandar el código. Intenta en un minuto.", "Could not dispatch verification code. Try again in a minute."));
       return;
     }
 
     // The server says the same thing for every address (it does not reveal
     // who has access), so this is worded as "if".
     const email = resJson?.email ?? (typed.includes("@") ? typed.toLowerCase() : "");
-    const channel = resJson?.phone
+    const channel: Channel = resJson?.phone
       ? `Sent by text to ${resJson.phone} and to the email on file.`
       : appFlow
-        ? `If ${typed} has a seat, the code is in that inbox now. Use the newest email. · Si ${typed} tiene acceso, el código ya está en ese correo. Usa el correo más reciente.`
+        ? "app:sent"
         : `If ${typed} has access, the code is in that inbox now. Use the newest email.`;
     setResolvedEmail(email);
     setSentChannel(channel);
@@ -189,7 +226,7 @@ function LoginForm() {
     if (formState === "verifying") return;
     const cleanCode = code.replace(/\s+/g, "");
     if (cleanCode.length < 6 || cleanCode.length > 8) {
-      setErrorMessage("Enter the verification code sent to your phone or email.");
+      setErrorMessage(say("Type the code from the email.", "Escribe el código del correo.", "Enter the verification code sent to your phone or email."));
       return;
     }
     setFormState("verifying");
@@ -211,9 +248,11 @@ function LoginForm() {
       const replaced = /expired|invalid/i.test(error.message || "");
       setErrorMessage(
         replaced
-          ? appFlow
-            ? "That code is not the newest one, or it expired. Check the latest email, or tap Send again. · Ese código no es el más reciente o venció. Revisa el correo más nuevo o toca Mandar otra vez."
-            : "That code is not the newest one, or it expired. Check the latest email, or tap Resend code."
+          ? say(
+              "That code is not the newest one, or it expired. Check the latest email, or tap Send again.",
+              "Ese código no es el más reciente o venció. Revisa el correo más nuevo o toca Mandar otra vez.",
+              "That code is not the newest one, or it expired. Check the latest email, or tap Resend code.",
+            )
           : error.message || "Invalid or expired code.",
       );
       return;
@@ -242,9 +281,11 @@ function LoginForm() {
       setFormState("enroll");
       if (!/NotAllowedError|cancel|abort/i.test(`${err.name} ${err.message}`)) {
         setErrorMessage(
-          appFlow
-            ? `Face ID did not turn on (${err.message}). You can try again from More. · No se activó Face ID. Puedes intentarlo desde Más.`
-            : `Face ID did not turn on (${err.message}). You can try again from the app's More screen.`,
+          say(
+            `Face ID did not turn on (${err.message}). You can try again from More.`,
+            `No se activó Face ID (${err.message}). Puedes intentarlo desde Más.`,
+            `Face ID did not turn on (${err.message}). You can try again from the app's More screen.`,
+          ),
         );
       }
     }
@@ -261,10 +302,10 @@ function LoginForm() {
     const typed = identifier.trim();
     if (!typed.includes("@")) {
       setFormState("error");
-      setErrorMessage(appFlow ? "Type your email first. · Escribe tu correo primero." : "Type your email first.");
+      setErrorMessage(say("Type your email first.", "Escribe tu correo primero."));
       return;
     }
-    const channel = appFlow ? "Type the code you were given. · Escribe el código que te dieron." : "Type the code you were given.";
+    const channel: Channel = appFlow ? "app:given" : "Type the code you were given.";
     setResolvedEmail(typed.toLowerCase());
     setSentChannel(channel);
     saveStep({ identifier: typed, email: typed.toLowerCase(), channel });
@@ -289,9 +330,11 @@ function LoginForm() {
       setPasskey(was);
       if (!cancelled) {
         setErrorMessage(
-          appFlow
-            ? `Face ID sign-in did not work (${msg}). Use your email instead. · No funcionó. Usa tu correo.`
-            : `Passkey sign-in did not work (${msg}). Use your email or phone instead.`,
+          say(
+            `Face ID sign-in did not work (${msg}). Use your email instead.`,
+            `No funcionó Face ID (${msg}). Usa tu correo.`,
+            `Passkey sign-in did not work (${msg}). Use your email or phone instead.`,
+          ),
         );
       }
     }
@@ -306,6 +349,15 @@ function LoginForm() {
 
   const isCodeStep = formState === "code-entry" || formState === "verifying";
   const isEnrollStep = formState === "enroll" || formState === "enrolling";
+  const channelText =
+    sentChannel === "app:sent"
+      ? say(
+          `If ${resolvedEmail || identifier} has a seat, the code is in that inbox now. Use the newest email.`,
+          `Si ${resolvedEmail || identifier} tiene acceso, el código ya está en ese correo. Usa el correo más reciente.`,
+        )
+      : sentChannel === "app:given"
+        ? say("Type the code you were given.", "Escribe el código que te dieron.")
+        : sentChannel;
 
   return (
     <div
@@ -323,21 +375,45 @@ function LoginForm() {
           />
         </div>
 
+        {appFlow ? (
+          <div className="flex justify-center mb-6" role="group" aria-label="Language / Idioma">
+            {(["en", "es"] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setLang(l)}
+                aria-pressed={lang === l}
+                lang={l}
+                className="min-h-11 px-4 text-sm cursor-pointer first:rounded-l-lg last:rounded-r-lg border"
+                style={
+                  lang === l
+                    ? { backgroundColor: "var(--color-primary)", borderColor: "var(--color-primary)", color: "white" }
+                    : { backgroundColor: "white", borderColor: "var(--color-border)", color: "var(--color-muted)" }
+                }
+              >
+                {l === "en" ? "English" : "Español"}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {isEnrollStep ? (
           <>
             <h1
               className="text-2xl text-center mb-2 font-serif"
               style={{ color: "var(--color-primary)" }}
             >
-              {appFlow ? "You're in" : "Signed in"}
+              {appFlow ? say("You're in", "Ya entraste") : "Signed in"}
             </h1>
             <p
               className="text-sm text-center mb-6 leading-relaxed"
               style={{ color: "var(--color-muted)" }}
             >
-              {appFlow
-                ? "Next time, sign in with Face ID instead of waiting for a code. · La próxima vez, entra con Face ID en vez de esperar un código."
-                : "Next time, sign in with Face ID or your fingerprint instead of waiting for a code."}
+              {say(
+                "Next time, sign in with Face ID instead of waiting for a code.",
+                "La próxima vez, entra con Face ID en vez de esperar un código.",
+                "Next time, sign in with Face ID or your fingerprint instead of waiting for a code.",
+              )}
             </p>
 
             {errorMessage && (
@@ -361,12 +437,8 @@ function LoginForm() {
               style={{ backgroundColor: "var(--color-primary)", color: "white" }}
             >
               {formState === "enrolling"
-                ? appFlow
-                  ? "Setting up… · Configurando…"
-                  : "Setting up…"
-                : appFlow
-                  ? "Turn on Face ID · Activar Face ID"
-                  : "Turn on Face ID / fingerprint"}
+                ? say("Setting up…", "Configurando…")
+                : say("Turn on Face ID", "Activar Face ID", "Turn on Face ID / fingerprint")}
             </button>
             <button
               type="button"
@@ -375,7 +447,7 @@ function LoginForm() {
               className="block w-full text-center mt-3 min-h-11 text-sm hover:underline cursor-pointer disabled:opacity-50"
               style={{ color: "var(--color-muted)" }}
             >
-              {appFlow ? "Not now · Ahora no" : "Not now"}
+              {say("Not now", "Ahora no")}
             </button>
           </>
         ) : isCodeStep ? (
@@ -390,7 +462,7 @@ function LoginForm() {
               className="text-xs text-center mb-6"
               style={{ color: "var(--color-muted)" }}
             >
-              {sentChannel || copy.codeLead || `Sent code to ${identifier}`}
+              {channelText || copy.codeLead || `Sent code to ${identifier}`}
             </p>
 
             <form
@@ -406,7 +478,7 @@ function LoginForm() {
                   className="block text-xs font-mono mb-1.5"
                   style={{ color: "var(--color-foreground)" }}
                 >
-                  Code
+                  {copy.code}
                 </label>
                 <input
                   id="code"
@@ -499,12 +571,10 @@ function LoginForm() {
                 >
                   {passkey === "busy"
                     ? copy.verifying
-                    : appFlow
-                      ? "Sign in with Face ID · Entrar con Face ID"
-                      : "Sign in with Face ID / passkey"}
+                    : say("Sign in with Face ID", "Entrar con Face ID", "Sign in with Face ID / passkey")}
                 </button>
                 <p className="text-xs text-center mt-3" style={{ color: "var(--color-muted)" }}>
-                  {appFlow ? "or with your email · o con tu correo" : "or with your email or phone"}
+                  {say("or with your email", "o con tu correo", "or with your email or phone")}
                 </p>
               </div>
             ) : null}
@@ -571,12 +641,16 @@ function LoginForm() {
                 >
                   {errorMessage ||
                     (urlError === "unauthorized"
-                      ? appFlow
-                        ? "That address does not have a seat. Ask the office. · Ese correo no tiene acceso. Pregunta en la oficina."
-                        : "You are not on the authorized staff allowlist."
-                      : appFlow
-                        ? "That link was used or has expired. Enter your email for a new code. · Ese enlace ya se usó o venció. Escribe tu correo para un código nuevo."
-                        : "Sign-in link was invalid or expired. Enter your phone or email again.")}
+                      ? say(
+                          "That address does not have a seat. Ask the office.",
+                          "Ese correo no tiene acceso. Pregunta en la oficina.",
+                          "You are not on the authorized staff allowlist.",
+                        )
+                      : say(
+                          "That link was used or has expired. Enter your email for a new code.",
+                          "Ese enlace ya se usó o venció. Escribe tu correo para un código nuevo.",
+                          "Sign-in link was invalid or expired. Enter your phone or email again.",
+                        ))}
                 </div>
               )}
 
@@ -611,9 +685,7 @@ function LoginForm() {
                 >
                   {passkey === "busy"
                     ? copy.verifying
-                    : appFlow
-                      ? "I set up Face ID on this phone · Ya tengo Face ID"
-                      : "Sign in with a passkey"}
+                    : say("I set up Face ID on this phone", "Ya tengo Face ID", "Sign in with a passkey")}
                 </button>
               ) : null}
             </form>

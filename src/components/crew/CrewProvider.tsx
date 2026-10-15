@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { BotFileRef } from '@/lib/bot/types'
 import type { CrewActInput, CrewHome, CrewLang, Geo } from '@/lib/crew/types'
 import { STRINGS, type CrewStrings } from './strings'
+import { keepDeviceLang } from '@/lib/auth/deviceLang'
 
 // One live picture of a crew member's day for every screen, and the one place
 // that talks to the server. Re-read every 30 seconds while the app is on
@@ -181,6 +182,8 @@ export function CrewProvider({ children, initialLang, email }: { children: React
   const flushing = useRef(false)
   const langTouched = useRef(false)
   const t = STRINGS[lang]
+  // The next sign-in on this phone opens in the same language (login page).
+  useEffect(() => keepDeviceLang(lang), [lang])
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'info') => {
     const id = ++toastId.current
