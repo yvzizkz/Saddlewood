@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth/passkeyClient";
 import { hasCompletedOnboarding } from "@/components/auth/OnboardingFlow";
 import { keepDeviceLang, readDeviceLang, type DeviceLang } from "@/lib/auth/deviceLang";
+import { hasInbox, loginEmail } from "@/lib/auth/username";
 
 type FormState =
   | "idle"
@@ -58,7 +59,7 @@ function saveStep(s: Omit<SavedStep, "at"> | null) {
 
 // What the code screen says under its title. Kept as a kind, not as words, so
 // switching language on that screen changes it too.
-type Channel = "app:sent" | "app:given" | string;
+type Channel = "app:sent" | "app:given" | "app:office" | string;
 const PORTAL_GIVEN = "Type your email and the code you were given.";
 
 function LoginForm() {
@@ -121,9 +122,9 @@ function LoginForm() {
     ? es
       ? {
           title: "Saddlewood",
-          lead: "Entra con tu correo.",
-          label: "Correo",
-          placeholder: "tu@ejemplo.com",
+          lead: "Entra con tu usuario o correo.",
+          label: "Usuario o correo",
+          placeholder: "angel.l o tu@ejemplo.com",
           send: "Mándame el código",
           sending: "Enviando…",
           haveCode: "Ya tengo un código",
@@ -137,9 +138,9 @@ function LoginForm() {
         }
       : {
           title: "Saddlewood",
-          lead: "Sign in with your email.",
-          label: "Email",
-          placeholder: "you@example.com",
+          lead: "Sign in with your username or email.",
+          label: "Username or email",
+          placeholder: "angel.l or you@example.com",
           send: "Send my code",
           sending: "Sending…",
           haveCode: "I already have a code",
@@ -188,6 +189,23 @@ function LoginForm() {
       setFormState("idle");
       return;
     }
+    // The app takes a username too. A username seat has no mailbox: its code
+    // comes from the office, so ask for it instead of sending anything.
+    const asEmail = appFlow ? loginEmail(typed) : "";
+    if (appFlow && !asEmail) {
+      setFormState("error");
+      setErrorMessage(say("Type your username or email.", "Escribe tu usuario o correo."));
+      return;
+    }
+    if (appFlow && !hasInbox(asEmail)) {
+      setResolvedEmail(asEmail);
+      setSentChannel("app:office");
+      saveStep({ identifier: typed, email: asEmail, channel: "app:office" });
+      setCode("");
+      setErrorMessage("");
+      setFormState("code-entry");
+      return;
+    }
 
     let failed = false;
     let resJson: { ok: boolean; email?: string; phone?: string; smsSent?: boolean } | null = null;
@@ -195,7 +213,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/send-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: identifier.trim(), next: nextPath }),
+        body: JSON.stringify({ identifier: asEmail || typed, next: nextPath }),
       });
       resJson = await res.json();
       failed = !res.ok || !resJson?.ok;
@@ -228,9 +246,10 @@ function LoginForm() {
   async function handleVerifyCode() {
     if (formState === "verifying") return;
     const cleanCode = code.replace(/\s+/g, "");
-    const targetEmail = (givenCode ? identifier.trim() : resolvedEmail || identifier.trim()).toLowerCase();
+    const typedId = givenCode ? identifier.trim() : resolvedEmail || identifier.trim();
+    const targetEmail = appFlow ? loginEmail(typedId) : typedId.toLowerCase();
     if (!targetEmail.includes("@")) {
-      setErrorMessage(say("Type your email.", "Escribe tu correo."));
+      setErrorMessage(say("Type your username or email.", "Escribe tu usuario o correo.", "Type your email."));
       return;
     }
     if (cleanCode.length < 6 || cleanCode.length > 8) {
@@ -312,7 +331,7 @@ function LoginForm() {
   function handleHaveCode() {
     const typed = identifier.trim();
     const channel: Channel = appFlow ? "app:given" : PORTAL_GIVEN;
-    setResolvedEmail(typed.includes("@") ? typed.toLowerCase() : "");
+    setResolvedEmail(appFlow ? loginEmail(typed) : typed.includes("@") ? typed.toLowerCase() : "");
     setSentChannel(channel);
     saveStep({ identifier: typed, email: typed.toLowerCase(), channel });
     setCode("");
@@ -375,7 +394,7 @@ function LoginForm() {
 
   const isCodeStep = formState === "code-entry" || formState === "verifying";
   /** A code the person already has: the code screen asks for the email too. */
-  const givenCode = sentChannel === "app:given" || sentChannel === PORTAL_GIVEN;
+  const givenCode = sentChannel === "app:given" || sentChannel === "app:office" || sentChannel === PORTAL_GIVEN;
   const isEnrollStep = formState === "enroll" || formState === "enrolling";
   const channelText =
     sentChannel === "app:sent"
@@ -384,8 +403,10 @@ function LoginForm() {
           `Si ${resolvedEmail || identifier} tiene acceso, el código ya está en ese correo. Usa el correo más reciente.`,
         )
       : sentChannel === "app:given"
-        ? say("Type your email and the code from your email.", "Escribe tu correo y el código del correo.")
-        : sentChannel;
+        ? say("Type your username or email, and your code.", "Escribe tu usuario o correo, y tu código.")
+        : sentChannel === "app:office"
+          ? say("Ask the office for your code, then type it here.", "Pide tu código a la oficina y escríbelo aquí.")
+          : sentChannel;
 
   return (
     <div
@@ -526,7 +547,7 @@ function LoginForm() {
                       borderColor: "var(--color-border)",
                       color: "var(--color-foreground)",
                     }}
-                    autoFocus={!identifier.includes("@")}
+                    autoFocus={!(appFlow ? loginEmail(identifier) : identifier.includes("@"))}
                   />
                 </div>
               ) : null}
@@ -554,7 +575,7 @@ function LoginForm() {
                     borderColor: "var(--color-border)",
                     color: "var(--color-foreground)",
                   }}
-                  autoFocus={!givenCode || identifier.includes("@")}
+                  autoFocus={!givenCode || !!(appFlow ? loginEmail(identifier) : identifier.includes("@"))}
                 />
               </div>
 
@@ -592,6 +613,7 @@ function LoginForm() {
                 >
                   {copy.back}
                 </button>
+{sentChannel === "app:office" ? null : (
                 <button
                   type="button"
                   onClick={handleSendCode}
@@ -600,6 +622,7 @@ function LoginForm() {
                 >
                   {copy.resend}
                 </button>
+                )}
               </div>
             </form>
           </>
@@ -634,7 +657,7 @@ function LoginForm() {
                     : say("Sign in with Face ID", "Entrar con Face ID", "Sign in with Face ID / passkey")}
                 </button>
                 <p className="text-xs text-center mt-3" style={{ color: "var(--color-muted)" }}>
-                  {say("or with your email", "o con tu correo", "or with your email or phone")}
+                  {say("or with your username or email", "o con tu usuario o correo", "or with your email or phone")}
                 </p>
               </div>
             ) : null}

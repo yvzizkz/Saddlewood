@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildSignInEmail } from "@/lib/auth/signInEmail";
 import { generateSignInLink, LINK_HOURS, safeNext, sendEmail, SITE_URL } from "@/lib/auth/magicLink";
 import { sendOtpMessage } from "@/lib/auth/sms";
+import { hasInbox } from "@/lib/auth/username";
 import { getPerson } from "@/lib/crew/queries";
 import { isAllowedIdentity, normalizeEmail } from "@/lib/ops/allowlist";
 
@@ -44,7 +45,9 @@ export async function POST(request: NextRequest) {
   if (raw.includes("@")) {
     const email = normalizeEmail(raw);
     const person = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? await getPerson(email).catch(() => null) : null;
-    if (person?.active) return sendToCrew(email, person.lang);
+    // A username seat has no mailbox. Making a code here would also replace
+    // the one the office read out, so nothing is made or sent.
+    if (person?.active && hasInbox(email)) return sendToCrew(email, person.lang);
   }
 
   // Unknown: the same answer as a known address, and nothing is sent.

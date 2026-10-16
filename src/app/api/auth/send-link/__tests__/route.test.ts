@@ -93,6 +93,14 @@ describe("POST /api/auth/send-link", () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
+  it("makes no code for a username seat (no mailbox; it would replace the office's code)", async () => {
+    crew.set("angel.l@crew.saddlewoodcontracting.com", { active: true, lang: "es" });
+    const res = await POST(req({ identifier: "angel.l@crew.saddlewoodcontracting.com" }) as never);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(genMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a missing email", async () => {
     const res = await POST(req({}) as never);
     expect(res.status).toBe(400);

@@ -783,7 +783,7 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
               </p>
               {isPlaceholderEmail(person.email) ? (
                 <p className="text-[13px] leading-relaxed text-[var(--color-charcoal)]">
-                  No real email behind this seat. Get a code and type it on their phone; they stay signed in there.
+                  No real email behind this seat. Their username is <span className="font-mono font-medium">{person.email.split('@')[0]}</span>. Get a code and read it to them (or type it on their phone); they stay signed in there.
                 </p>
               ) : (
                 <Button full busy={busy === 'person.invite'} onClick={() => act('person.invite')}>
@@ -796,7 +796,7 @@ export function PersonSheet({ person, onClose }: { person: CrewPerson | null; on
               {code ? (
                 <div className="rounded-xl bg-white px-3.5 py-3">
                   <p className="text-[12px] text-[var(--color-charcoal-light)]">
-                    On their phone: open the app, type their email, tap &ldquo;I already have a code&rdquo;, and enter:
+                    On their phone: open the app, tap &ldquo;I already have a code&rdquo;, type {isPlaceholderEmail(person.email) ? <>their username <span className="font-mono font-medium">{person.email.split('@')[0]}</span></> : 'their email'}, and enter:
                   </p>
                   <p className="my-1.5 font-mono text-2xl tracking-[0.2em] text-[var(--color-charcoal)]">{code.code}</p>
                   <p className="text-[12px] text-[var(--color-charcoal-light)]">Works once, for {code.hours} hours. Asking for another one cancels this one.</p>
