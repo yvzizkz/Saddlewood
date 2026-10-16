@@ -7,8 +7,9 @@ import { authorizeBillingWrite } from "@/lib/billing/access";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Mail an issued document to its client, from accounting@. Owners, or the Mac's
-// billing_send.py (src/lib/billing/access.ts).
+// Mail a document to its client, from accounting@. Owners, or the Mac's
+// billing_send.py (src/lib/billing/access.ts). A draft is issued as it goes
+// out, and stays a draft if the message does not leave.
 // The rules (preview unless confirmed, who may receive it, the copy our own
 // people get) live in src/lib/billing/deliver.ts.
 

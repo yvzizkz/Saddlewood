@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { documentForEmail, recordEvent } from "@/lib/billing/documents";
+import { documentsForEmail, recordEvent } from "@/lib/billing/documents";
 import { readMailReport, verifyMailSignature } from "@/lib/billing/mailEvents";
 
 export const runtime = "nodejs";
@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 // Where the mail service reports what became of a message we sent: delivered,
 // bounced, marked as spam. Each report becomes a line in that document's
-// proof record.
+// proof record; a message that carried a send group's documents puts the line
+// on each of them.
 //
 // The caller is the mail service, which cannot sign in. It signs every report
 // with RESEND_WEBHOOK_SECRET instead, and a report without a good signature is
@@ -40,17 +41,21 @@ export async function POST(request: NextRequest) {
   if (!report) return NextResponse.json({ ok: true, kept: false });
 
   try {
-    const documentId = await documentForEmail(report.emailId);
-    if (!documentId) return NextResponse.json({ ok: true, kept: false });
-    await recordEvent({
-      documentId,
-      kind: report.kind,
-      at: report.at,
-      actor: "mail service",
-      emailId: report.emailId,
-      dedupe: `mail:${request.headers.get("svix-id")}`,
-      detail: report.detail,
-    });
+    const documentIds = await documentsForEmail(report.emailId);
+    if (!documentIds.length) return NextResponse.json({ ok: true, kept: false });
+    const reportId = request.headers.get("svix-id");
+    for (const documentId of documentIds) {
+      await recordEvent({
+        documentId,
+        kind: report.kind,
+        at: report.at,
+        actor: "mail service",
+        emailId: report.emailId,
+        // One document: the key it always had. Several: one each, so a resent report still lands once on every one.
+        dedupe: documentIds.length === 1 ? `mail:${reportId}` : `mail:${reportId}:${documentId}`,
+        detail: report.detail,
+      });
+    }
     return NextResponse.json({ ok: true, kept: true });
   } catch (err) {
     // A failure here must be retried by the service, not swallowed.

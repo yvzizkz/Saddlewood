@@ -21,10 +21,28 @@ const OWNERS = {
 const getDocument = vi.fn();
 const clientContactEmails = vi.fn();
 const recordEvent = vi.fn();
+// Sending a draft issues it: held first, issued only once the message is out.
+const claimForSend = vi.fn();
+const releaseClaim = vi.fn();
+const issueDocument = vi.fn();
+const { DocumentError } = vi.hoisted(() => ({
+  DocumentError: class DocumentError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+    ) {
+      super(message);
+    }
+  },
+}));
 vi.mock("@/lib/billing/documents", () => ({
   getDocument: (...a: unknown[]) => getDocument(...a),
   clientContactEmails: (...a: unknown[]) => clientContactEmails(...a),
   recordEvent: (...a: unknown[]) => recordEvent(...a),
+  claimForSend: (...a: unknown[]) => claimForSend(...a),
+  releaseClaim: (...a: unknown[]) => releaseClaim(...a),
+  issueDocument: (...a: unknown[]) => issueDocument(...a),
+  DocumentError,
 }));
 
 import { POST } from "../route";
@@ -33,6 +51,8 @@ const ID = "11111111-2222-3333-4444-555555555555";
 const TOKEN = "a".repeat(32);
 const LINK = `https://saddlewoodcontracting.com/d/${"a".repeat(32)}`;
 const DOC = { id: ID, kind: "statement", number: "AFT-100526", status: "issued", token: TOKEN, clientId: "c1" };
+const HELD = "d".repeat(32);
+const DRAFT = { ...DOC, status: "draft", token: null, previewToken: "e".repeat(32) };
 const GOOD = { to: ["ap@client.com"], cc: ["marco@saddlewoodcontracting.com"], subject: "Open invoices", body: "Hi,\n\nThe statement is here:\n{link}\n\nThank you" };
 
 function call(body: unknown, id = ID) {
@@ -51,6 +71,9 @@ beforeEach(() => {
   getDocument.mockReset().mockResolvedValue(DOC);
   clientContactEmails.mockReset().mockResolvedValue(["ap@client.com"]);
   recordEvent.mockReset().mockResolvedValue(true);
+  claimForSend.mockReset().mockResolvedValue(HELD);
+  releaseClaim.mockReset().mockResolvedValue(undefined);
+  issueDocument.mockReset().mockImplementation(async (id: string) => ({ ...DRAFT, id, status: "issued", token: HELD }));
   vi.stubEnv("RESEND_API_KEY", "re_test");
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://saddlewoodcontracting.com");
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -262,14 +285,115 @@ describe("POST /api/billing/documents/[id]/send", () => {
     expect(html).toContain("&lt;script&gt;");
   });
 
-  it("only sends an issued document", async () => {
-    for (const d of [{ ...DOC, status: "draft", token: null }, { ...DOC, status: "void" }]) {
-      getDocument.mockResolvedValue(d);
-      expect((await call({ ...GOOD, confirm: true })).status).toBe(409);
-    }
+  it("never sends a void document, or one that is not there", async () => {
+    getDocument.mockResolvedValue({ ...DOC, status: "void" });
+    const res = await call({ ...GOOD, confirm: true });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("a void document cannot be sent");
     getDocument.mockResolvedValue(null);
     expect((await call({ ...GOOD, confirm: true })).status).toBe(404);
     expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("does not hold or issue an issued document again when it is resent", async () => {
+    const res = await call({ ...GOOD, confirm: true });
+    const json = await res.json();
+    expect(json.sent).toBe(true);
+    expect(json).not.toHaveProperty("issued");
+    expect(claimForSend).not.toHaveBeenCalled();
+    expect(issueDocument).not.toHaveBeenCalled();
+    expect(recordEvent.mock.calls[0][0].detail).not.toHaveProperty("issued");
+  });
+
+  describe("sending a draft issues it", () => {
+    beforeEach(() => getDocument.mockResolvedValue(DRAFT));
+
+    it("shows the message with the link still to be made, and holds nothing, until confirmed", async () => {
+      const res = await call(GOOD);
+      const json = await res.json();
+      expect(res.status).toBe(200);
+      expect(json.sent).toBe(false);
+      expect(json.preview.document).toEqual({ number: "AFT-100526", kind: "statement", link: null, issuesOnSend: true });
+      expect(json.preview.body).toContain("View statement: https://saddlewoodcontracting.com/d/(made when sent)");
+      expect(claimForSend).not.toHaveBeenCalled();
+      expect(issueDocument).not.toHaveBeenCalled();
+      expect(sendMock).not.toHaveBeenCalled();
+    });
+
+    it("holds the draft, sends it with its new link, and only then issues it with that same token", async () => {
+      const order: string[] = [];
+      claimForSend.mockImplementation(async () => (order.push("hold"), HELD));
+      sendMock.mockImplementation(async () => (order.push("send"), { data: { id: "em_9" }, error: null }));
+      issueDocument.mockImplementation(async () => (order.push("issue"), { ...DRAFT, status: "issued", token: HELD }));
+      recordEvent.mockImplementation(async () => (order.push("record"), true));
+
+      const res = await call({ ...GOOD, cc: [], confirm: true });
+      const json = await res.json();
+      expect(res.status).toBe(200);
+      expect(json).toMatchObject({ ok: true, sent: true, emailId: "em_9", recorded: true, issued: [ID], notIssued: [] });
+      expect(json.preview.document.link).toBe(`https://saddlewoodcontracting.com/d/${HELD}`);
+      // The client's message, then our copy, both before the issue.
+      expect(order).toEqual(["hold", "send", "send", "issue", "record"]);
+      expect(claimForSend).toHaveBeenCalledWith(ID);
+      expect(sendMock.mock.calls[0][0].text).toContain(`View statement: https://saddlewoodcontracting.com/d/${HELD}`);
+      expect(sendMock.mock.calls[0][0].text).not.toContain("made when sent");
+      expect(issueDocument).toHaveBeenCalledWith(ID, "lando@saddlewoodcontracting.com", expect.any(Date), { token: HELD });
+      expect(recordEvent).toHaveBeenCalledTimes(1);
+      expect(recordEvent.mock.calls[0][0]).toMatchObject({ documentId: ID, kind: "sent", emailId: "em_9", dedupe: "sent:em_9", detail: { issued: true } });
+      expect(releaseClaim).not.toHaveBeenCalled();
+    });
+
+    it("leaves it a draft when the mail service refuses: the hold is let go, nothing is issued or recorded", async () => {
+      sendMock.mockResolvedValue({ data: null, error: { message: "domain not verified" } });
+      const res = await call({ ...GOOD, confirm: true });
+      expect(res.status).toBe(502);
+      expect((await res.json()).error).toBe("the mail service refused the message; nothing was sent, and the drafts are still drafts");
+      expect(releaseClaim).toHaveBeenCalledWith(ID, HELD);
+      expect(issueDocument).not.toHaveBeenCalled();
+      expect(recordEvent).not.toHaveBeenCalled();
+    });
+
+    it("leaves it a draft when the mail service cannot be reached", async () => {
+      sendMock.mockRejectedValue(new Error("network down"));
+      const res = await call({ ...GOOD, confirm: true });
+      expect(res.status).toBe(502);
+      expect(releaseClaim).toHaveBeenCalledWith(ID, HELD);
+      expect(issueDocument).not.toHaveBeenCalled();
+    });
+
+    it("leaves it a draft when the mail key is missing, without holding it", async () => {
+      vi.stubEnv("RESEND_API_KEY", "");
+      expect((await call({ ...GOOD, confirm: true })).status).toBe(503);
+      expect(claimForSend).not.toHaveBeenCalled();
+      expect(issueDocument).not.toHaveBeenCalled();
+    });
+
+    it("refuses a second send while the first holds the draft", async () => {
+      claimForSend.mockRejectedValue(new DocumentError("this draft is being sent right now; try again in a minute", 409));
+      const res = await call({ ...GOOD, confirm: true });
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toMatch(/being sent right now/);
+      expect(sendMock).not.toHaveBeenCalled();
+    });
+
+    it("still answers sent when the message left but the issue failed, and says so", async () => {
+      issueDocument.mockRejectedValue(new Error("db down"));
+      getDocument.mockResolvedValueOnce(DRAFT).mockResolvedValueOnce({ ...DRAFT, token: HELD });
+      const res = await call({ ...GOOD, confirm: true });
+      const json = await res.json();
+      expect(res.status).toBe(200);
+      expect(json).toMatchObject({ sent: true, issued: [], notIssued: [ID] });
+      expect(json.warning).toMatch(/issue it now/);
+      expect(releaseClaim).not.toHaveBeenCalled();
+      expect(recordEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts it issued when someone pressed Issue meanwhile with the same token", async () => {
+      issueDocument.mockRejectedValue(new DocumentError("this document is not a draft, so it cannot be issued", 409));
+      getDocument.mockResolvedValueOnce(DRAFT).mockResolvedValueOnce({ ...DRAFT, status: "issued", token: HELD });
+      const json = await (await call({ ...GOOD, confirm: true })).json();
+      expect(json).toMatchObject({ sent: true, issued: [ID], notIssued: [] });
+    });
   });
 
   it("says nothing was sent when the mail service refuses, and records nothing", async () => {
