@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, type KeyboardEvent } from "react";
+import { useState, useEffect, useRef, Suspense, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -342,6 +342,26 @@ function LoginForm() {
     }
   }
 
+  // A phone with Face ID set up starts it as the sign-in screen opens, like a
+  // bank app. Once per page load, app sign-in only, and not straight after
+  // Sign out (out=1) or an error, or it would sign the person back in or loop.
+  // If iOS wants a tap first, the attempt fails quietly and the button stays.
+  // The email field takes focus (and opens the keyboard) only when Face ID is
+  // not the way in on this phone. Decided after the device check, not on mount.
+  const emailRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (passkey === "offer" || (passkey === "none" && !passkeySupported())) emailRef.current?.focus();
+  }, [passkey]);
+  const autoTried = useRef(false);
+  const signedOut = searchParams.get("out") === "1";
+  useEffect(() => {
+    if (autoTried.current || passkey !== "lead" || formState !== "idle") return;
+    if (!appFlow || signedOut || urlError) return;
+    autoTried.current = true;
+    void handlePasskey();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passkey, formState, appFlow, signedOut, urlError]);
+
   function handleBack() {
     saveStep(null);
     setFormState("idle");
@@ -559,7 +579,9 @@ function LoginForm() {
               className="text-xs text-center mb-6"
               style={{ color: "var(--color-muted)" }}
             >
-              {copy.lead}
+              {passkey === "lead" || (passkey === "busy" && passkeyOnThisDevice())
+                ? say("Welcome back.", "Bienvenido de nuevo.")
+                : copy.lead}
             </p>
 
             {passkey === "lead" || (passkey === "busy" && passkeyOnThisDevice()) ? (
@@ -615,7 +637,7 @@ function LoginForm() {
                     borderColor: "var(--color-border)",
                     color: "var(--color-foreground)",
                   }}
-                  autoFocus
+                  ref={emailRef}
                 />
               </div>
 

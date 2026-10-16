@@ -149,7 +149,8 @@ export default function CrewMoreScreen() {
       // This phone only. The default would sign the person out everywhere.
       await createClient().auth.signOut({ scope: 'local' })
     } finally {
-      window.location.href = '/login?next=/app'
+      // out=1: the sign-in screen does not start Face ID by itself right after.
+      window.location.href = '/login?next=/app&out=1'
     }
   }
 

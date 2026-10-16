@@ -10,7 +10,6 @@ import {
   forgetPasskeyOnThisDevice,
   passkeyOnThisDevice,
   passkeySupported,
-  rememberPasskeyOnThisDevice,
   removePasskey,
 } from '@/lib/auth/passkeyClient'
 
@@ -66,14 +65,7 @@ export function PasskeyCard({ lang = 'en', toast }: { lang?: 'en' | 'es'; toast?
   async function load() {
     const res = await fetch('/api/auth/passkey/register')
     const body = (await res.json().catch(() => ({}))) as { ok?: boolean; passkeys?: Passkey[] }
-    if (body.ok && body.passkeys) {
-      setList(body.passkeys)
-      const here = deviceLabel()
-      if (here && body.passkeys.some((p) => p.label === here)) {
-        rememberPasskeyOnThisDevice()
-        setState('on')
-      }
-    }
+    if (body.ok && body.passkeys) setList(body.passkeys)
   }
 
   useEffect(() => {

@@ -344,7 +344,8 @@ export default function MoreScreen() {
       // This phone only. The default would sign the person out everywhere.
       await createClient().auth.signOut({ scope: 'local' })
     } finally {
-      window.location.href = '/login?next=/app'
+      // out=1: the sign-in screen does not start Face ID by itself right after.
+      window.location.href = '/login?next=/app&out=1'
     }
   }
 
@@ -466,10 +467,7 @@ export default function MoreScreen() {
         </>
       ) : null}
 
-      <Button full className="mt-7" busy={leaving} onClick={signOut}>
-        <LogOut className="size-4" aria-hidden="true" /> Sign out
-      </Button>
-      <p className="mt-4 text-center text-[11px] text-[var(--color-charcoal-light)]">
+      <p className="mt-7 text-center text-[11px] text-[var(--color-charcoal-light)]">
         {home.bridge.reportedAt ? `Bot last reported ${ago(home.bridge.reportedAt)}` : 'The bot has not reported yet'}
       </p>
     </div>
