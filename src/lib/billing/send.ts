@@ -62,6 +62,11 @@ export function documentLink(siteUrl: string, token: string): string {
   return `${siteUrl.replace(/\/+$/, "")}/d/${token}`;
 }
 
+/** A draft's preview: the client's page under a "PREVIEW, not sent" band, never counted (supabase/migrations/0019). */
+export function previewLink(siteUrl: string, previewToken: string): string {
+  return `${siteUrl.replace(/\/+$/, "")}/d/p/${previewToken}`;
+}
+
 /**
  * The link our own people get on their copy. Opening it shows the same
  * document and writes nothing to the proof record, so a "viewed" line always
@@ -188,6 +193,8 @@ export type MessageParts = {
   body: unknown;
   /** The document's link and what its button says ("View statement"). Absent for a plain note. */
   document?: { link: string; label: string } | null;
+  /** Several documents in one message (a send group): one button each, in this order. Takes the place of `document`. */
+  documents?: { link: string; label: string }[];
   links?: MailLink[];
 };
 
@@ -214,7 +221,10 @@ export function buildMessage(parts: MessageParts): BillingMessage | { error: str
   if (!b) return { error: "body is required" };
   if (b.length > 5000) return { error: "body is too long" };
 
-  const doc = parts.document ?? null;
+  // "{link}" stands for every document's button: one for a single document, a row of them for a group.
+  const docs = parts.documents ?? (parts.document ? [parts.document] : []);
+  const doc = docs.length > 0;
+  const docButtons: MailLink[] = docs.map((d) => ({ label: d.label, url: d.link }));
   const links = parts.links ?? [];
   if (doc && !b.includes("{link}")) b += "\n\n{link}";
   if (!doc) b = b.split("{link}").join("").trim();
@@ -226,20 +236,20 @@ export function buildMessage(parts: MessageParts): BillingMessage | { error: str
     .split("{links}")
     .join(links.map((l) => `${l.label}: ${l.url}`).join("\n"))
     .split("{link}")
-    .join(doc ? `${doc.label}: ${doc.link}` : "");
+    .join(docs.map((d) => `${d.label}: ${d.link}`).join("\n"));
 
   const para = (p: string): string => {
     const only = p.trim();
     if (only === "{buttons}") {
-      return `<p style="margin:4px 0 12px">${[...(doc ? [{ label: doc.label, url: doc.link }] : []), ...links].map(button).join("")}</p>`;
+      return `<p style="margin:4px 0 12px">${[...docButtons, ...links].map(button).join("")}</p>`;
     }
-    if (only === "{link}" && doc) return `<p style="margin:4px 0 16px">${button({ label: doc.label, url: doc.link })}</p>`;
+    if (only === "{link}" && doc) return `<p style="margin:4px 0 16px">${docButtons.map(button).join("")}</p>`;
     if (only === "{links}") {
       // One row that wraps, not a stack of single buttons.
       return `<p style="margin:4px 0 12px">${links.map(button).join("")}</p>`;
     }
     let h = escapeHtml(p).replace(/\n/g, "<br>");
-    if (doc) h = h.split("{link}").join(`<a href="${escapeHtml(doc.link)}">${escapeHtml(doc.label)}</a>`);
+    if (doc) h = h.split("{link}").join(docs.map((d) => `<a href="${escapeHtml(d.link)}">${escapeHtml(d.label)}</a>`).join(" · "));
     h = h.split("{links}").join(links.map((l) => `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>`).join(" · "));
     return `<p style="margin:0 0 12px">${h}</p>`;
   };

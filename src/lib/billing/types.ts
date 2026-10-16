@@ -86,6 +86,23 @@ export type BillingDocument = {
   issuedBy: string;
   voidReason: string;
   createdAt: string;
+  /**
+   * The draft's own preview link, /d/p/<previewToken> (migration 0019). Never
+   * shown to a client. Absent where a reader does not load it.
+   */
+  previewToken?: string | null;
+  /** The send group it goes out with (0019), if any. */
+  sendGroupId?: string | null;
+  updatedAt?: string;
+};
+
+export type SendGroup = {
+  id: string;
+  name: string;
+  clientId: string | null;
+  note: string;
+  createdBy: string;
+  createdAt: string;
 };
 
 export type DocumentEventKind =
