@@ -922,11 +922,28 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
 
   const activeJobs = data.jobs.filter((j) => j.active)
   const oldJobs = data.jobs.filter((j) => !j.active)
+  // A seat that was taken away stays on record (never deleted), but under its
+  // own fold, not in among the crew, like finished jobs.
+  const seated = data.people.filter((p) => p.active)
+  const former = data.people.filter((p) => !p.active)
+  const personRow = (p: CrewAdminHome['people'][number]) => (
+    <Row key={p.email} onClick={() => show({ kind: 'person', person: p })}>
+      <span className="flex items-center justify-between gap-3">
+        <span className={`truncate text-[15px] text-[var(--color-charcoal)] ${p.active ? '' : 'opacity-50'}`}>{p.name}</span>
+        {!p.active ? <Chip tone="bad">No seat</Chip> : p.lastSeenAt ? <Chip tone="ok">In the app</Chip> : <Chip tone="warn">Not in yet</Chip>}
+      </span>
+      <span className="mt-0.5 block truncate text-[12px] text-[var(--color-charcoal-light)]">
+        {[p.groupName, p.trade, p.lang === 'es' ? 'Español' : 'English', p.email, p.lastSeenAt ? `opened ${ago(p.lastSeenAt)}` : '']
+          .filter(Boolean)
+          .join(' · ')}
+      </span>
+    </Row>
+  )
 
   return (
     <>
       <SectionTitle
-        count={data.people.filter((p) => p.active).length}
+        count={seated.length}
         action={
           <Button className="min-h-9 px-3 text-[13px]" onClick={() => show({ kind: 'person', person: null })}>
             <Plus className="size-4" aria-hidden="true" /> Person
@@ -935,25 +952,17 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
       >
         Crew
       </SectionTitle>
-      {data.people.length ? (
-        <Card className="divide-y divide-[var(--color-stone)]">
-          {data.people.map((p) => (
-            <Row key={p.email} onClick={() => show({ kind: 'person', person: p })}>
-              <span className="flex items-center justify-between gap-3">
-                <span className={`truncate text-[15px] text-[var(--color-charcoal)] ${p.active ? '' : 'opacity-50'}`}>{p.name}</span>
-                {!p.active ? <Chip tone="bad">No seat</Chip> : p.lastSeenAt ? <Chip tone="ok">In the app</Chip> : <Chip tone="warn">Not in yet</Chip>}
-              </span>
-              <span className="mt-0.5 block truncate text-[12px] text-[var(--color-charcoal-light)]">
-                {[p.groupName, p.trade, p.lang === 'es' ? 'Español' : 'English', p.email, p.lastSeenAt ? `opened ${ago(p.lastSeenAt)}` : '']
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-            </Row>
-          ))}
-        </Card>
+      {seated.length ? (
+        <Card className="divide-y divide-[var(--color-stone)]">{seated.map(personRow)}</Card>
       ) : (
         <Empty>Nobody yet. Add a person and they get a link to the app by email.</Empty>
       )}
+      {former.length ? (
+        <details className="mt-3">
+          <summary className="min-h-9 cursor-pointer text-[13px] text-[var(--color-charcoal-light)]">Former seats ({former.length})</summary>
+          <Card className="mt-1.5 divide-y divide-[var(--color-stone)]">{former.map(personRow)}</Card>
+        </details>
+      ) : null}
       <Button full className="mt-2.5" onClick={share}>
         <Share2 className="size-4" aria-hidden="true" /> Share the app link
       </Button>
