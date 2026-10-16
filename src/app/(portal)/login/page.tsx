@@ -59,6 +59,7 @@ function saveStep(s: Omit<SavedStep, "at"> | null) {
 // What the code screen says under its title. Kept as a kind, not as words, so
 // switching language on that screen changes it too.
 type Channel = "app:sent" | "app:given" | string;
+const PORTAL_GIVEN = "Type your email and the code you were given.";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -83,7 +84,8 @@ function LoginForm() {
   // effect; same pattern as NumericBottomSheet.
   useEffect(() => {
     const saved = readStep();
-    if (!saved) return;
+    // A failed link lands here with ?error: show the email step and its message, not an old code screen.
+    if (!saved || new URLSearchParams(window.location.search).has("error")) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIdentifier((v) => v || saved.identifier);
     setResolvedEmail(saved.email);
@@ -226,6 +228,11 @@ function LoginForm() {
   async function handleVerifyCode() {
     if (formState === "verifying") return;
     const cleanCode = code.replace(/\s+/g, "");
+    const targetEmail = (givenCode ? identifier.trim() : resolvedEmail || identifier.trim()).toLowerCase();
+    if (!targetEmail.includes("@")) {
+      setErrorMessage(say("Type your email.", "Escribe tu correo."));
+      return;
+    }
     if (cleanCode.length < 6 || cleanCode.length > 8) {
       setErrorMessage(say("Type the code from the email.", "Escribe el código del correo.", "Enter the verification code sent to your phone or email."));
       return;
@@ -234,7 +241,6 @@ function LoginForm() {
     setErrorMessage("");
 
     const supabase = createClient();
-    const targetEmail = resolvedEmail || identifier.trim();
 
     const { error } = await supabase.auth.verifyOtp({
       email: targetEmail,
@@ -300,15 +306,13 @@ function LoginForm() {
 
   // An owner can read a crew member their code in person ("Get a code" in
   // the app's Crew tab). No email is sent on this path.
+  // Straight to the code screen, which asks for the email next to the code.
+  // Asking for the email first sent people back to "Send my code", and a new
+  // code replaces the one they already had (Lando, 2026-10-15).
   function handleHaveCode() {
     const typed = identifier.trim();
-    if (!typed.includes("@")) {
-      setFormState("error");
-      setErrorMessage(say("Type your email first.", "Escribe tu correo primero."));
-      return;
-    }
-    const channel: Channel = appFlow ? "app:given" : "Type the code you were given.";
-    setResolvedEmail(typed.toLowerCase());
+    const channel: Channel = appFlow ? "app:given" : PORTAL_GIVEN;
+    setResolvedEmail(typed.includes("@") ? typed.toLowerCase() : "");
     setSentChannel(channel);
     saveStep({ identifier: typed, email: typed.toLowerCase(), channel });
     setCode("");
@@ -370,6 +374,8 @@ function LoginForm() {
   }
 
   const isCodeStep = formState === "code-entry" || formState === "verifying";
+  /** A code the person already has: the code screen asks for the email too. */
+  const givenCode = sentChannel === "app:given" || sentChannel === PORTAL_GIVEN;
   const isEnrollStep = formState === "enroll" || formState === "enrolling";
   const channelText =
     sentChannel === "app:sent"
@@ -378,7 +384,7 @@ function LoginForm() {
           `Si ${resolvedEmail || identifier} tiene acceso, el código ya está en ese correo. Usa el correo más reciente.`,
         )
       : sentChannel === "app:given"
-        ? say("Type the code you were given.", "Escribe el código que te dieron.")
+        ? say("Type your email and the code from your email.", "Escribe tu correo y el código del correo.")
         : sentChannel;
 
   return (
@@ -494,6 +500,36 @@ function LoginForm() {
               }}
               className="space-y-4"
             >
+              {givenCode ? (
+                <div>
+                  <label
+                    htmlFor="code-email"
+                    className="block text-xs font-mono mb-1.5"
+                    style={{ color: "var(--color-foreground)" }}
+                  >
+                    {appFlow ? copy.label : "Email"}
+                  </label>
+                  <input
+                    id="code-email"
+                    type="text"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    autoComplete="email"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder={appFlow ? copy.placeholder : "name@saddlewoodcontracting.com"}
+                    disabled={formState === "verifying"}
+                    className="w-full px-3 py-3 rounded-lg border text-base focus:outline-none transition-colors"
+                    style={{
+                      backgroundColor: "white",
+                      borderColor: "var(--color-border)",
+                      color: "var(--color-foreground)",
+                    }}
+                    autoFocus={!identifier.includes("@")}
+                  />
+                </div>
+              ) : null}
               <div>
                 <label
                   htmlFor="code"
@@ -518,7 +554,7 @@ function LoginForm() {
                     borderColor: "var(--color-border)",
                     color: "var(--color-foreground)",
                   }}
-                  autoFocus
+                  autoFocus={!givenCode || identifier.includes("@")}
                 />
               </div>
 
@@ -671,8 +707,8 @@ function LoginForm() {
                           "You are not on the authorized staff allowlist.",
                         )
                       : say(
-                          "That link was used or has expired. Enter your email for a new code.",
-                          "Ese enlace ya se usó o venció. Escribe tu correo para un código nuevo.",
+                          "That link was used, expired, or replaced by a newer email. Use the newest email, or enter your email for a new code.",
+                          "Ese enlace ya se usó, venció o lo reemplazó un correo más nuevo. Usa el correo más reciente o escribe tu correo para un código nuevo.",
                           "Sign-in link was invalid or expired. Enter your phone or email again.",
                         ))}
                 </div>
@@ -688,15 +724,6 @@ function LoginForm() {
                 }}
               >
                 {formState === "sending" ? copy.sending : copy.send}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleHaveCode}
-                className={`block w-full text-center hover:underline cursor-pointer ${appFlow ? "min-h-11 text-sm" : "pt-1 text-xs"}`}
-                style={{ color: "var(--color-muted)" }}
-              >
-                {copy.haveCode}
               </button>
 
               {passkey === "offer" || (passkey === "busy" && !passkeyOnThisDevice()) ? (
@@ -716,6 +743,20 @@ function LoginForm() {
                     : say("Sign in with Face ID", "Entrar con Face ID", "Sign in with Face ID / passkey")}
                 </button>
               ) : null}
+
+              {/* Last, set apart: the way in for a code already in hand (an
+                  email, or one the office read out), so it does not sit
+                  between the two ways to sign in. */}
+              <div className="pt-2 mt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+                <button
+                  type="button"
+                  onClick={handleHaveCode}
+                  className={`block w-full text-center hover:underline cursor-pointer ${appFlow ? "min-h-11 text-sm" : "pt-1 text-xs"}`}
+                  style={{ color: "var(--color-muted)" }}
+                >
+                  {copy.haveCode}
+                </button>
+              </div>
             </form>
           </>
         )}
