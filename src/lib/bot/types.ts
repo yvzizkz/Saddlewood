@@ -394,6 +394,8 @@ export const actionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("duty.run"), payload: z.object({ id: taskId }) }),
   // The kill switch only. Turning automatic sending back ON is not a phone tap.
   z.object({ kind: z.literal("autosend.off"), payload: z.object({}).default({}) }),
+  // The lead page's "Sync GoHighLevel": the Mac pulls the list and sends it.
+  z.object({ kind: z.literal("leads.sync"), payload: z.object({}).default({}) }),
 ]);
 export type BotActionInput = z.infer<typeof actionSchema>;
 export type BotActionKind = BotActionInput["kind"];

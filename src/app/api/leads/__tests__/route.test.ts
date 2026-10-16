@@ -1,18 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { getLeadsStateMock, updateLeadStatusMock, recordInboundLeadMock, session, sendMock } = vi.hoisted(() => ({
+const {
+  getLeadsStateMock,
+  saveLeadsStateMock,
+  updateLeadStatusMock,
+  recordInboundLeadMock,
+  createActionMock,
+  getActionMock,
+  session,
+  sendMock,
+} = vi.hoisted(() => ({
   getLeadsStateMock: vi.fn(),
+  saveLeadsStateMock: vi.fn(),
   updateLeadStatusMock: vi.fn(),
   recordInboundLeadMock: vi.fn(),
+  createActionMock: vi.fn(),
+  getActionMock: vi.fn(),
   session: { user: null as null | { email: string; app_metadata?: Record<string, unknown> } },
   sendMock: vi.fn(),
 }));
 
 vi.mock('@/lib/leads/store', () => ({
   getLeadsState: getLeadsStateMock,
+  saveLeadsState: saveLeadsStateMock,
   updateLeadStatus: updateLeadStatusMock,
   recordInboundLead: recordInboundLeadMock,
+}));
+
+vi.mock('@/lib/bot/queries', () => ({
+  createAction: createActionMock,
+  getAction: getActionMock,
 }));
 
 // Who is signed in, as far as the server client can tell. null is a visitor.
@@ -28,7 +46,7 @@ vi.mock('resend', () => ({
   },
 }));
 
-import { GET, PATCH, POST } from '../route';
+import { GET, PATCH, POST, PUT } from '../route';
 
 const AGENT_TOKEN = 'test-token-with-enough-length-1234';
 const WEBHOOK_KEY = 'webhook-key-0123456789abcdef';
@@ -59,7 +77,11 @@ describe('Leads API Routes', () => {
     recordInboundLeadMock.mockReset();
     sendMock.mockReset();
 
-    getLeadsStateMock.mockResolvedValue({
+    saveLeadsStateMock.mockReset();
+    createActionMock.mockReset();
+    getActionMock.mockReset();
+
+    getLeadsStateMock.mockResolvedValue({ syncedAt: '2026-09-27T08:36:20Z', state: {
       generated: '2026-09-27T08:36:17.414900+00:00',
       total_waiting: 496,
       fresh: 18,
@@ -92,7 +114,7 @@ describe('Leads API Routes', () => {
       backlog_list: [],
       gone_quiet: [],
       gone_quiet_total: 0,
-    });
+    } });
 
     recordInboundLeadMock.mockResolvedValue({
       phone: '4805550199',
@@ -135,11 +157,71 @@ describe('Leads API Routes', () => {
       expect(body.state.fresh_list[0].phone).toBe('2524957763');
     });
 
-    it('GET /api/leads?refresh=true triggers forceRefresh in store', async () => {
-      const req = new NextRequest('http://localhost:3000/api/leads?refresh=true', { headers: asAgent });
-      const res = await GET(req);
+    it('GET /api/leads?refresh=true asks the Mac to sync for the signed-in person', async () => {
+      session.user = { email: 'marco@saddlewoodcontracting.com' };
+      createActionMock.mockResolvedValue({ id: 41, status: 'queued' });
+      const res = await GET(new NextRequest('http://localhost:3000/api/leads?refresh=true'));
       expect(res.status).toBe(200);
-      expect(getLeadsStateMock).toHaveBeenCalledWith(true);
+      const body = await res.json();
+      expect(createActionMock).toHaveBeenCalledWith('marco@saddlewoodcontracting.com', {
+        kind: 'leads.sync',
+        payload: {},
+      });
+      expect(body.syncAction).toEqual({ id: 41, status: 'queued' });
+      expect(body.state.fresh).toBe(18);
+    });
+
+    it('GET /api/leads?refresh=true is not a door for the agent token', async () => {
+      const res = await GET(new NextRequest('http://localhost:3000/api/leads?refresh=true', { headers: asAgent }));
+      expect(res.status).toBe(400);
+      expect(createActionMock).not.toHaveBeenCalled();
+    });
+
+    it('GET /api/leads?action= reports a sync, and only a sync', async () => {
+      session.user = { email: 'marco@saddlewoodcontracting.com' };
+      getActionMock.mockResolvedValue({ id: 41, kind: 'leads.sync', status: 'done', result: 'Synced: 11 fresh' });
+      let res = await GET(new NextRequest('http://localhost:3000/api/leads?action=41'));
+      expect(res.status).toBe(200);
+      expect((await res.json()).action).toEqual({ id: 41, status: 'done', result: 'Synced: 11 fresh' });
+
+      getActionMock.mockResolvedValue({ id: 42, kind: 'draft.approve', status: 'done', result: 'Sent' });
+      res = await GET(new NextRequest('http://localhost:3000/api/leads?action=42'));
+      expect(res.status).toBe(404);
+    });
+
+    it('GET /api/leads?action= answers 401 to a visitor', async () => {
+      const res = await GET(new NextRequest('http://localhost:3000/api/leads?action=41'));
+      expect(res.status).toBe(401);
+      expect(getActionMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the Mac sends the list (PUT)', () => {
+    const put = (headers: Record<string, string>, body: unknown) =>
+      new NextRequest('http://localhost:3000/api/leads', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+      });
+    const list = { generated: '2026-10-16T09:38:00Z', fresh_list: [{ phone: '1' }], backlog_list: [] };
+
+    it('takes the list from the agent token', async () => {
+      const res = await PUT(put(asAgent, { state: list }));
+      expect(res.status).toBe(200);
+      expect(saveLeadsStateMock).toHaveBeenCalledWith(list);
+    });
+
+    it('refuses a visitor and a signed-in person', async () => {
+      expect((await PUT(put({}, { state: list }))).status).toBe(401);
+      session.user = { email: 'marco@saddlewoodcontracting.com' };
+      expect((await PUT(put({}, { state: list }))).status).toBe(401);
+      expect(saveLeadsStateMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses something that is not a list', async () => {
+      const res = await PUT(put(asAgent, { state: { generated: 'x' } }));
+      expect(res.status).toBe(400);
+      expect(saveLeadsStateMock).not.toHaveBeenCalled();
     });
 
     it('PATCH /api/leads answers 401 to a visitor and changes nothing', async () => {

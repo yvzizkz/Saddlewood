@@ -82,7 +82,7 @@ export default async function OpsPage() {
   let freshLeadsCount = 0;
   try {
     const lState = await getLeadsState();
-    freshLeadsCount = lState.fresh || 0;
+    freshLeadsCount = lState.state.fresh || 0;
   } catch {
     // fallback
   }

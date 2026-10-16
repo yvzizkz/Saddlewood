@@ -126,4 +126,5 @@ export const ACTION_LABELS: Record<string, string> = {
   "duty.delete": "removed a duty",
   "duty.run": "ran a duty now",
   "autosend.off": "stopped automatic sending",
+  "leads.sync": "synced the leads from GoHighLevel",
 };

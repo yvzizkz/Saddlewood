@@ -36,26 +36,67 @@ export default function LeadsPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchLeads = async (forceRefresh = false) => {
-    try {
-      if (forceRefresh) setRefreshing(true);
-      else setLoading(true);
+  const [syncedAt, setSyncedAt] = useState<string | null>(null);
+  const [syncNote, setSyncNote] = useState<string>('');
 
-      const url = forceRefresh ? '/api/leads?refresh=true' : '/api/leads';
-      const res = await fetch(url);
-      if (res.ok) {
-        const json = await res.json();
-        setState(json.state);
-        if (forceRefresh) showToast('Synced live from GoHighLevel! 🚀');
-      } else {
-        showToast('Failed to load leads from CRM', 'error');
-      }
+  const loadList = async (): Promise<boolean> => {
+    const res = await fetch('/api/leads', { cache: 'no-store' });
+    if (!res.ok) return false;
+    const json = await res.json();
+    setState(json.state);
+    setSyncedAt(json.state?.generated || json.syncedAt || null);
+    return true;
+  };
+
+  const fetchLeads = async () => {
+    try {
+      setLoading(true);
+      if (!(await loadList())) showToast('Could not load the leads', 'error');
     } catch (err) {
       console.error(err);
       showToast('Network error loading leads', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // The list is built on the office Mac (it reads GoHighLevel and the
+  // company's email history), so a sync asks the Mac and waits for it.
+  const syncLeads = async () => {
+    setRefreshing(true);
+    setSyncNote('Asking the office Mac to pull from GoHighLevel…');
+    try {
+      const res = await fetch('/api/leads?refresh=true', { cache: 'no-store' });
+      const json = res.ok ? await res.json() : null;
+      const id = json?.syncAction?.id;
+      if (!id) {
+        showToast(json?.error || 'Could not start a sync', 'error');
+        return;
+      }
+      const deadline = Date.now() + 90_000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2500));
+        const poll = await fetch(`/api/leads?action=${id}`, { cache: 'no-store' });
+        const a = poll.ok ? (await poll.json()).action : null;
+        if (!a) continue;
+        if (a.status === 'working') setSyncNote('The Mac is pulling from GoHighLevel…');
+        if (a.status === 'done') {
+          await loadList();
+          showToast(a.result || 'Synced from GoHighLevel');
+          return;
+        }
+        if (a.status === 'failed' || a.status === 'refused') {
+          showToast(a.result || 'The sync did not work', 'error');
+          return;
+        }
+      }
+      showToast('The office Mac did not answer. It may be asleep or offline; try again in a minute.', 'error');
+    } catch (err) {
+      console.error(err);
+      showToast('Network error during the sync', 'error');
+    } finally {
       setRefreshing(false);
+      setSyncNote('');
     }
   };
 
@@ -166,15 +207,29 @@ export default function LeadsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-start md:items-end gap-1.5">
           <button
-            onClick={() => fetchLeads(true)}
+            onClick={syncLeads}
             disabled={refreshing || loading}
             className="px-3.5 py-2 rounded-xl bg-white border border-[var(--color-stone)] hover:border-[var(--color-teal)] text-xs font-semibold text-[var(--color-charcoal)] flex items-center gap-2 shadow-2xs hover:shadow-xs transition-all disabled:opacity-50"
           >
             <RefreshCw className={`size-3.5 ${refreshing ? 'animate-spin text-[var(--color-teal)]' : ''}`} />
             <span>{refreshing ? 'Syncing GHL...' : 'Sync GoHighLevel'}</span>
           </button>
+          <p className="text-[11px] text-[var(--color-charcoal-light)] md:text-right" aria-live="polite">
+            {syncNote ||
+              (syncedAt
+                ? `Last pulled ${new Date(syncedAt).toLocaleString('en-US', {
+                    timeZone: 'America/Phoenix',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}`
+                : loading
+                ? ''
+                : 'Not pulled from GoHighLevel yet')}
+          </p>
         </div>
       </div>
 

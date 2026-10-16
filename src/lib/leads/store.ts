@@ -1,89 +1,114 @@
-import fs from 'fs';
-import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { LeadsState, LeadItem } from './types';
 
-const execAsync = promisify(exec);
+// Where the lead list lives (2026-10-16). The list is built on the Mac
+// (Saddlewood-KB bot/leads.py: GoHighLevel plus the KB's phone index), which
+// the site cannot reach. The Mac's app bridge sends the built list here
+// (PUT /api/leads with its agent token) and the site keeps it in bot_state.
+// Before this the site read the Mac's files from disk, which only worked on
+// the Mac itself: on the live site the page was always empty.
+//
+//   leads          the last list the Mac built, as leads.py wrote it
+//   leads_status   called / texted / dismissed, set from the page
+//   leads_inbound  leads that came in through the webhook since then
+//
+// None of these keys is a bot snapshot section, so the app's Home never
+// reads them (BOT_SECTION_KEYS in src/lib/bot/types.ts).
 
-const LOCAL_BOT_LEADS_PATH = '/Users/landos/dev/Saddlewood-KB/bot/leads_state.json';
-const STATUS_OVERRIDES_PATH = '/Users/landos/dev/Saddlewood-KB/bot/leads_status_overrides.json';
-const BOT_SCRIPT_PATH = '/Users/landos/dev/Saddlewood-KB/bot/leads.py';
+export type LeadStatus = 'pending' | 'called' | 'texted' | 'dismissed';
 
-function loadStatusOverrides(): Record<string, 'pending' | 'called' | 'texted' | 'dismissed'> {
-  if (fs.existsSync(STATUS_OVERRIDES_PATH)) {
-    try {
-      const data = fs.readFileSync(STATUS_OVERRIDES_PATH, 'utf-8');
-      return JSON.parse(data);
-    } catch {
-      return {};
-    }
-  }
-  return {};
+const KEY_LIST = 'leads';
+const KEY_STATUS = 'leads_status';
+const KEY_INBOUND = 'leads_inbound';
+const INBOUND_KEEP = 50;
+
+type Row = { key: string; data: unknown; updated_at: string };
+
+async function readRows(): Promise<Record<string, Row>> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from('bot_state')
+    .select('key, data, updated_at')
+    .in('key', [KEY_LIST, KEY_STATUS, KEY_INBOUND]);
+  if (error) throw new Error(`bot_state read failed: ${error.message}`);
+  const out: Record<string, Row> = {};
+  for (const r of (data ?? []) as Row[]) out[r.key] = r;
+  return out;
 }
 
-function saveStatusOverrides(overrides: Record<string, 'pending' | 'called' | 'texted' | 'dismissed'>) {
-  try {
-    fs.writeFileSync(STATUS_OVERRIDES_PATH, JSON.stringify(overrides, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Failed to save status overrides', err);
-  }
+async function writeRow(key: string, data: unknown): Promise<void> {
+  const db = getSupabaseAdmin();
+  const { error } = await db
+    .from('bot_state')
+    .upsert({ key, data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw new Error(`bot_state write failed: ${error.message}`);
 }
 
-export async function getLeadsState(forceRefresh = false): Promise<LeadsState> {
-  if (forceRefresh) {
-    try {
-      await execAsync(`python3 "${BOT_SCRIPT_PATH}" --sync`, {
-        cwd: path.dirname(BOT_SCRIPT_PATH),
-        timeout: 25000,
-      });
-    } catch (err) {
-      console.warn('Could not run leads.py --sync live, reading cache:', err);
-    }
-  }
+const asObject = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+const asList = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
-  let state: LeadsState;
+function emptyState(): LeadsState {
+  return {
+    generated: '',
+    total_waiting: 0,
+    fresh: 0,
+    backlog: 0,
+    backlog_with_history: 0,
+    with_history: 0,
+    named: 0,
+    fresh_list: [],
+    backlog_list: [],
+    gone_quiet: [],
+    gone_quiet_total: 0,
+  };
+}
 
-  if (fs.existsSync(LOCAL_BOT_LEADS_PATH)) {
-    try {
-      const raw = fs.readFileSync(LOCAL_BOT_LEADS_PATH, 'utf-8');
-      state = JSON.parse(raw);
-    } catch (err) {
-      console.error('Error parsing leads_state.json:', err);
-      state = getFallbackLeadsState();
-    }
-  } else {
-    state = getFallbackLeadsState();
-  }
-
-  // Apply overrides
-  const overrides = loadStatusOverrides();
-  const applyOverrides = (item: LeadItem) => {
-    if (overrides[item.phone]) {
-      item.callback_status = overrides[item.phone];
-    } else {
-      item.callback_status = item.callback_status || 'pending';
-    }
-    return item;
+/** The list as the Mac last sent it, with the webhook's newer leads on top. */
+export async function getLeadsState(): Promise<{ state: LeadsState; syncedAt: string | null }> {
+  const rows = await readRows();
+  const sent = asObject(rows[KEY_LIST]?.data);
+  const state: LeadsState = {
+    ...emptyState(),
+    ...(sent as Partial<LeadsState>),
+    fresh_list: asList<LeadItem>(sent.fresh_list),
+    backlog_list: asList<LeadItem>(sent.backlog_list),
+    gone_quiet: asList<LeadsState['gone_quiet'][number]>(sent.gone_quiet),
   };
 
-  if (Array.isArray(state.fresh_list)) {
-    state.fresh_list = state.fresh_list.map(applyOverrides);
-  }
-  if (Array.isArray(state.backlog_list)) {
-    state.backlog_list = state.backlog_list.map(applyOverrides);
+  // A webhook lead stays on top until the Mac's list has caught up with it.
+  const known = new Set(state.fresh_list.map((l) => l.phone));
+  const listedAt = state.generated || '';
+  const inbound = asList<LeadItem>(rows[KEY_INBOUND]?.data).filter(
+    (l) => !known.has(l.phone) && (!listedAt || (l.last_ts ?? '') > listedAt),
+  );
+  if (inbound.length) {
+    state.fresh_list = [...inbound, ...state.fresh_list];
+    state.fresh += inbound.length;
+    state.total_waiting += inbound.length;
   }
 
-  return state;
+  const overrides = asObject(rows[KEY_STATUS]?.data) as Record<string, LeadStatus>;
+  const apply = (item: LeadItem): LeadItem => ({
+    ...item,
+    callback_status: overrides[item.phone] || item.callback_status || 'pending',
+  });
+  state.fresh_list = state.fresh_list.map(apply);
+  state.backlog_list = state.backlog_list.map(apply);
+
+  return { state, syncedAt: rows[KEY_LIST]?.updated_at ?? null };
 }
 
-export async function updateLeadStatus(
-  phone: string,
-  status: 'pending' | 'called' | 'texted' | 'dismissed'
-): Promise<void> {
-  const overrides = loadStatusOverrides();
+/** What the Mac sends after it pulls from GoHighLevel. */
+export async function saveLeadsState(state: LeadsState): Promise<void> {
+  await writeRow(KEY_LIST, state);
+}
+
+export async function updateLeadStatus(phone: string, status: LeadStatus): Promise<void> {
+  const rows = await readRows();
+  const overrides = asObject(rows[KEY_STATUS]?.data);
   overrides[phone] = status;
-  saveStatusOverrides(overrides);
+  await writeRow(KEY_STATUS, overrides);
 }
 
 export async function recordInboundLead(data: {
@@ -126,43 +151,19 @@ export async function recordInboundLead(data: {
     callback_status: 'pending',
   };
 
+  // The lead is returned (and the owners emailed) even if it cannot be kept.
   try {
-    const state = await getLeadsState(false);
-    const existingIdx = state.fresh_list.findIndex((l) => l.phone === cleanPhone);
-    if (existingIdx >= 0) {
-      state.fresh_list[existingIdx] = {
-        ...state.fresh_list[existingIdx],
-        ...item,
-        unread: (state.fresh_list[existingIdx].unread || 0) + 1,
-      };
-    } else {
-      state.fresh_list.unshift(item);
-      state.fresh += 1;
-      state.total_waiting += 1;
-    }
-
-    if (fs.existsSync(LOCAL_BOT_LEADS_PATH)) {
-      fs.writeFileSync(LOCAL_BOT_LEADS_PATH, JSON.stringify(state, null, 2), 'utf-8');
-    }
+    const rows = await readRows();
+    const prior = asList<LeadItem>(rows[KEY_INBOUND]?.data);
+    const same = prior.find((l) => l.phone === cleanPhone);
+    const next = [
+      { ...item, unread: (same?.unread || 0) + 1 },
+      ...prior.filter((l) => l.phone !== cleanPhone),
+    ].slice(0, INBOUND_KEEP);
+    await writeRow(KEY_INBOUND, next);
   } catch (err) {
-    console.warn('Could not write to local leads file:', err);
+    console.warn('Could not keep the inbound lead:', err);
   }
 
   return item;
-}
-
-function getFallbackLeadsState(): LeadsState {
-  return {
-    generated: new Date().toISOString(),
-    total_waiting: 0,
-    fresh: 0,
-    backlog: 0,
-    backlog_with_history: 0,
-    with_history: 0,
-    named: 0,
-    fresh_list: [],
-    backlog_list: [],
-    gone_quiet: [],
-    gone_quiet_total: 0,
-  };
 }

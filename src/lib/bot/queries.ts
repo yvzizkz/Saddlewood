@@ -296,6 +296,13 @@ export async function listRecentActions(limit = 25): Promise<BotAction[]> {
   return ((data ?? []) as ActionRow[]).map(toAction);
 }
 
+export async function getAction(id: number): Promise<BotAction | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("bot_actions").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`bot_actions read failed: ${error.message}`);
+  return data ? toAction(data as ActionRow) : null;
+}
+
 // ---- the Mac's side --------------------------------------------------------
 
 export type ClaimedMessage = {

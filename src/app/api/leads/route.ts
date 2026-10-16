@@ -1,7 +1,9 @@
 import { timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { escapeHtml } from '@/lib/emailTemplate';
-import { getLeadsState, updateLeadStatus, recordInboundLead } from '@/lib/leads/store';
+import { createAction, getAction } from '@/lib/bot/queries';
+import { getLeadsState, saveLeadsState, updateLeadStatus, recordInboundLead } from '@/lib/leads/store';
+import type { LeadsState } from '@/lib/leads/types';
 import { authorizeOps } from '@/lib/ops/auth';
 import { Resend } from 'resend';
 
@@ -10,7 +12,10 @@ export const dynamic = 'force-dynamic';
 // Who may call this.
 //
 // GET and PATCH are the staff's lead list (/internal/leads): a signed-in
-// address on the allowlist, or the bot with its agent token.
+// address on the allowlist, or the bot with its agent token. The list itself
+// is built on the Mac (bot/leads.py) and sent here with PUT, agent token only.
+// "Sync GoHighLevel" (GET ?refresh=true) queues a leads.sync tap for the
+// Mac's app bridge; the page then follows it with GET ?action=<id>.
 //
 // POST is the door for a phone or voice provider (Twilio, Vapi, Retell, a
 // GoHighLevel workflow). A provider cannot sign in, so it carries a key in
@@ -38,20 +43,88 @@ function webhookKeyMatches(request: NextRequest): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await authorizeOps(request))) return unauthorized();
+  const who = await authorizeOps(request);
+  if (!who) return unauthorized();
 
   try {
     const { searchParams } = new URL(request.url);
-    const forceRefresh = searchParams.get('refresh') === 'true';
 
-    const state = await getLeadsState(forceRefresh);
-    return NextResponse.json({ ok: true, state });
+    // How a sync the page asked for is going.
+    const actionId = Number(searchParams.get('action'));
+    if (searchParams.has('action')) {
+      const action = Number.isInteger(actionId) && actionId > 0 ? await getAction(actionId) : null;
+      if (!action || action.kind !== 'leads.sync') {
+        return NextResponse.json({ ok: false, error: 'no such sync' }, { status: 404 });
+      }
+      return NextResponse.json({
+        ok: true,
+        action: { id: action.id, status: action.status, result: action.result },
+      });
+    }
+
+    // Ask the Mac to pull from GoHighLevel. Only a person can ask: the bridge
+    // carries a tap out for a seat it knows, never for a token.
+    let syncAction: { id: number; status: string } | null = null;
+    if (searchParams.get('refresh') === 'true') {
+      if (who.via !== 'session') {
+        return NextResponse.json({ ok: false, error: 'a sync is asked for from the page' }, { status: 400 });
+      }
+      const a = await createAction(who.actor, { kind: 'leads.sync', payload: {} });
+      syncAction = { id: a.id, status: a.status };
+    }
+
+    const { state, syncedAt } = await getLeadsState();
+    return NextResponse.json({ ok: true, state, syncedAt, syncAction });
   } catch (error) {
     console.error('Error fetching leads state:', error);
     return NextResponse.json(
       { ok: false, error: (error as Error).message },
       { status: 500 }
     );
+  }
+}
+
+const MAX_LIST_BYTES = 2_000_000;
+
+// The Mac's door: the list bot/leads.py built, sent by the app bridge.
+export async function PUT(request: NextRequest) {
+  const who = await authorizeOps(request);
+  if (!who || who.via !== 'token') return unauthorized();
+
+  const raw = await request.text();
+  if (raw.length > MAX_LIST_BYTES) {
+    return NextResponse.json({ ok: false, error: 'list too large' }, { status: 413 });
+  }
+  let body: { state?: Partial<LeadsState> };
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 });
+  }
+  const st = body?.state;
+  if (
+    !st ||
+    typeof st !== 'object' ||
+    typeof st.generated !== 'string' ||
+    !Array.isArray(st.fresh_list) ||
+    !Array.isArray(st.backlog_list)
+  ) {
+    return NextResponse.json(
+      { ok: false, error: 'state needs generated, fresh_list and backlog_list' },
+      { status: 400 }
+    );
+  }
+  try {
+    await saveLeadsState(st as LeadsState);
+    return NextResponse.json({
+      ok: true,
+      generated: st.generated,
+      fresh: st.fresh_list.length,
+      backlog: st.backlog_list.length,
+    });
+  } catch (error) {
+    console.error('Error saving leads state:', error);
+    return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
   }
 }
 
