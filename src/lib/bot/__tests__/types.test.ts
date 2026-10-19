@@ -86,6 +86,18 @@ describe("what the Mac reports", () => {
     ]);
     expect(drafts).toHaveLength(1);
     expect(drafts[0]).toMatchObject({ n: 18, held: false, blocked: null, cc: [], sendAt: null, approvers: ["Lando", "Marco"] });
+    // A one-off draft carries none of the back-office fields.
+    expect(drafts[0]).toMatchObject({ needs: null, question: null, deadline: null, batch: null });
+  });
+
+  it("keeps the back-office fields on a morning-outbox draft and shrugs off a bad one", () => {
+    const drafts = parseSection("drafts", [
+      { n: 26, subject: "RE: 7201 N Dreamy Draw", to: "m@colliers.com", status: "open", held: false, approvers: ["Lando", "Marco"],
+        needs: "answer", question: "Office decision is Marco's.", deadline: "2026-10-21", batch: "backoffice-2026-10-19" },
+      { n: 27, subject: "Re: HPM Flooring", to: "hpm@example.com", status: "open", held: false, approvers: ["Lando"], needs: "maybe" },
+    ]);
+    expect(drafts[0]).toMatchObject({ n: 26, needs: "answer", question: "Office decision is Marco's.", deadline: "2026-10-21", batch: "backoffice-2026-10-19" });
+    expect(drafts[1]).toMatchObject({ n: 27, needs: null, question: null });
   });
 
   it("falls back to an empty picture instead of throwing", () => {

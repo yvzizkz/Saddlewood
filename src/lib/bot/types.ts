@@ -62,6 +62,15 @@ const draftSchema = z.object({
   /** Why this draft can never be sent from the app (an internal recipient), or null. */
   blocked: nullableStr,
   approvers: z.array(z.string().max(80)).catch([]),
+  // Set by the Mac on the morning back-office outbox (backoffice_register.py).
+  /** "tap": approval only. "answer": `question` has to be answered before it goes. */
+  needs: z.enum(["tap", "answer"]).nullable().catch(null),
+  /** The one thing Marco (or Lando) must settle before this draft is right. */
+  question: nullableStr,
+  /** YYYY-MM-DD: the day the draft stops making sense (a promise in it breaks). */
+  deadline: nullableStr,
+  /** The run that staged it, e.g. "backoffice-2026-10-19"; null for one-off drafts. */
+  batch: nullableStr,
 });
 export type BotDraft = z.infer<typeof draftSchema>;
 
