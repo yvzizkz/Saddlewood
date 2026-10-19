@@ -356,6 +356,15 @@ export type CrewFeed = {
 
 export const MAX_ENTRY_FILES = 8;
 export const MAX_ENTRIES_PER_DAY = 80;
+/** A voice memo on the end-of-day check-in runs this long at most. */
+export const MEMO_MAX_SECONDS = 180;
+/** What a phone records: AAC in MP4 on an iPhone, Opus in WebM elsewhere. */
+export const AUDIO_TYPES = ["audio/mp4", "audio/webm", "audio/mpeg", "audio/wav", "audio/x-m4a"] as const;
+/** What a crew member may upload: photos and PDFs, and a voice memo for the end of day. */
+export const CREW_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/heic", "image/heif", "image/webp", "application/pdf", ...AUDIO_TYPES] as const;
+export function isAudioRef(f: { type?: string }): boolean {
+  return (f.type ?? "").toLowerCase().startsWith("audio/");
+}
 /** A punch saved on the phone with no signal still counts if it arrives within this long. */
 export const LATE_PUNCH_MAX_MS = 18 * 3600_000;
 /** A punch that arrives this soon after the tap is just a slow network, not a late punch. */
@@ -413,7 +422,8 @@ export const crewActSchema = z.discriminatedUnion("kind", [
     jobName: text(80),
     /** Today, or yesterday for someone who files it the next morning. */
     day: day.optional(),
-    done: z.string().trim().min(2, "say what got done").max(2000),
+    /** What got done, typed. May be empty when a voice memo (an audio file in `files`) says it; the act refuses both empty. */
+    done: text(2000),
     stuck: text(1500),
     needs: text(1500),
     asked: text(1500),
@@ -422,6 +432,8 @@ export const crewActSchema = z.discriminatedUnion("kind", [
     safety: text(1500),
     decision: text(1500),
     files,
+    /** How long the voice memo runs, when there is one. */
+    memoSeconds: z.number().int().min(1).max(MEMO_MAX_SECONDS).optional(),
     clientId,
   }),
   z.object({

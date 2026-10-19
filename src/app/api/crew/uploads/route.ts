@@ -4,17 +4,19 @@ import { z } from "zod";
 import { newFilePath, signUpload } from "@/lib/bot/queries";
 import { BOT_BUCKET, MAX_UPLOAD_BYTES } from "@/lib/bot/types";
 import { gateCrew } from "@/lib/crew/auth";
+import { CREW_UPLOAD_TYPES } from "@/lib/crew/types";
 
-// A photo from the jobsite goes straight from the phone to storage, into the
-// person's own folder of the private bucket. This hands out the one-time
-// upload URL; the receipt or progress note that follows names the path.
+// A photo from the jobsite, or a voice memo for the end of day, goes straight
+// from the phone to storage, into the person's own folder of the private
+// bucket. This hands out the one-time upload URL; the receipt, progress note
+// or end-of-day check-in that follows names the path.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const schema = z.object({
   name: z.string().trim().min(1).max(160),
-  type: z.enum(["image/jpeg", "image/png", "image/heic", "image/heif", "image/webp", "application/pdf"]),
+  type: z.enum(CREW_UPLOAD_TYPES),
   size: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
 });
 
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "Photos and PDFs up to 15 MB can be sent." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Photos, PDFs and voice memos up to 15 MB can be sent." }, { status: 400 });
   }
   try {
     const signed = await signUpload(newFilePath("u", person.email, parsed.data.name));

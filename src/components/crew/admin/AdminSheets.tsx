@@ -1050,6 +1050,10 @@ export function Photos({ files }: { files: { path: string; name: string; type: s
     <div className="flex flex-wrap gap-2">
       {files.map((f) => {
         const href = `${base}?path=${encodeURIComponent(f.path)}`
+        if (f.type.startsWith('audio/')) {
+          // A voice memo: played in place. The link behind it is a short-lived signed URL, like a photo's.
+          return <audio key={f.path} controls preload="none" src={href} className="w-full" aria-label={f.name} />
+        }
         return (
           <a key={f.path} href={href} target="_blank" rel="noreferrer" className="block size-20 overflow-hidden rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)]">
             {f.type.startsWith('image/') ? (
@@ -1094,6 +1098,9 @@ export function EntryCard({ entry, onFix }: { entry: CrewEntry; onFix?: () => vo
   const vendor = (typeof entry.bot.vendor === 'string' && entry.bot.vendor) || text('vendor')
   const botNote = typeof entry.bot.note === 'string' ? entry.bot.note : ''
   const alarm = entry.kind === 'eod' && (text('safety') || text('asked'))
+  // An end of day said instead of typed: the Mac writes the transcript into `bot` once it has listened.
+  const memo = entry.kind === 'eod' && entry.files.some((f) => f.type.startsWith('audio/'))
+  const transcript = typeof entry.bot.transcript === 'string' ? entry.bot.transcript : ''
 
   return (
     <div className="px-4 py-3.5">
@@ -1140,6 +1147,13 @@ export function EntryCard({ entry, onFix }: { entry: CrewEntry; onFix?: () => vo
             </div>
           ))}
         </dl>
+      ) : null}
+
+      {memo ? (
+        <p className="mt-1.5 text-[14px] leading-relaxed text-[var(--color-charcoal)]">
+          <span className="font-medium">Voice memo{transcript ? '' : ' (not transcribed yet)'}:</span>
+          {transcript ? <span className="whitespace-pre-wrap"> {transcript}</span> : null}
+        </p>
       ) : null}
 
       {entry.files.length ? (

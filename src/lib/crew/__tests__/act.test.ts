@@ -524,6 +524,17 @@ describe("what they send in", () => {
     expect(db.questions[0]).toMatchObject({ status: "answered", answer: "filed" });
   });
 
+  it("takes a voice memo in place of the typed end of day, and nothing in place of both", async () => {
+    expect(await crew(arnold, { kind: "eod.add", jobId: "powell", clientId: cid() }, at("14:30"))).toMatchObject({ ok: false, status: 400, error: "Say what got done today, or record a voice memo." });
+    expect(await crew(arnold, { kind: "eod.add", jobId: "powell", files: [file()], clientId: cid() }, at("14:31"))).toMatchObject({ ok: false, status: 400 }); // a photo is not a memo
+    const memo = { ...file(), name: "memo-2026-10-05.m4a", type: "audio/mp4", size: 48000 };
+    db.questions.push({ id: 91, email: ARNOLD, kind: "eod", status: "open", ref: { day: "2026-10-05" }, answer: "" });
+    expect(await crew(arnold, { kind: "eod.add", jobId: "powell", files: [file(), memo], memoSeconds: 42, clientId: cid() }, at("14:35"))).toEqual({ ok: true });
+    expect(db.entries.at(-1)).toMatchObject({ kind: "eod", body: "", data: { memo: { path: memo.path, seconds: 42 } }, files: [file(), memo] });
+    expect(db.questions.at(-1)).toMatchObject({ status: "answered", answer: "filed" }); // a memo counts as the end of day
+    expect(notify.owners).toHaveLength(0);
+  });
+
   it("takes a time fix as a request, never as a change", async () => {
     await crew(arnold, { kind: "punch.in", jobId: "powell", clientId: cid() }, at("06:00"));
     const before = JSON.stringify(db.shifts[0]);

@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { createClient } from '@/lib/supabase/client'
 import type { BotFileRef } from '@/lib/bot/types'
-import type { CrewActInput, CrewHome, CrewLang, Geo } from '@/lib/crew/types'
+import { AUDIO_TYPES, type CrewActInput, type CrewHome, type CrewLang, type Geo } from '@/lib/crew/types'
 import { STRINGS, type CrewStrings } from './strings'
 import { keepDeviceLang } from '@/lib/auth/deviceLang'
 
@@ -162,6 +162,19 @@ const UPLOADABLE = ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'imag
 export async function uploadPhoto(file: File): Promise<BotFileRef> {
   const { blob, type, name } = await shrink(file)
   if (!UPLOADABLE.includes(type)) throw new Error('unsupported')
+  const slot = await crewApi<{ bucket: string; path: string; token: string; file: BotFileRef }>('/api/crew/uploads', {
+    method: 'POST',
+    body: JSON.stringify({ name, type, size: blob.size }),
+  })
+  const supabase = createClient()
+  const { error } = await supabase.storage.from(slot.bucket).uploadToSignedUrl(slot.path, slot.token, blob, { contentType: type })
+  if (error) throw new Error(error.message)
+  return slot.file
+}
+
+/** A voice memo, as the phone recorded it (AAC in MP4 on an iPhone, Opus in WebM elsewhere). */
+export async function uploadAudio(blob: Blob, type: string, name: string): Promise<BotFileRef> {
+  if (!(AUDIO_TYPES as readonly string[]).includes(type)) throw new Error('unsupported')
   const slot = await crewApi<{ bucket: string; path: string; token: string; file: BotFileRef }>('/api/crew/uploads', {
     method: 'POST',
     body: JSON.stringify({ name, type, size: blob.size }),

@@ -202,13 +202,23 @@ describe("a crew member's door", () => {
 });
 
 describe("photos", () => {
-  it("hands out an upload slot in the person's own folder, for photos and PDFs only", async () => {
+  it("hands out an upload slot in the person's own folder, for photos, PDFs and voice memos only", async () => {
     asCrew();
     const res = await postUpload(req("/api/crew/uploads", "POST", { name: "receipt.jpg", type: "image/jpeg", size: 300000 }));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.path).toBe(`u/${await keyFor(ARNOLD)}/202610/a1b2c3d4e5f6-receipt.jpg`);
+    // A voice memo, as an iPhone (AAC in MP4) and as Chrome (Opus in WebM) record it.
+    for (const [name, type] of [
+      ["memo.m4a", "audio/mp4"],
+      ["memo.webm", "audio/webm"],
+    ]) {
+      const memo = await postUpload(req("/api/crew/uploads", "POST", { name, type, size: 48000 }));
+      expect(memo.status).toBe(200);
+      expect((await memo.json()).file).toMatchObject({ name, type, size: 48000 });
+    }
     expect((await postUpload(req("/api/crew/uploads", "POST", { name: "x.html", type: "text/html", size: 10 }))).status).toBe(400);
+    expect((await postUpload(req("/api/crew/uploads", "POST", { name: "clip.mov", type: "video/quicktime", size: 10 }))).status).toBe(400);
     expect((await postUpload(req("/api/crew/uploads", "POST", { name: "big.jpg", type: "image/jpeg", size: 99_000_000 }))).status).toBe(400);
   });
 

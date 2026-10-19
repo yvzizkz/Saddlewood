@@ -29,10 +29,17 @@ describe("what a crew member can send", () => {
     expect(ok).toMatchObject({ amount: null, paidBy: "company", vendor: "" });
   });
 
-  it("needs to hear what got done before it closes a day", () => {
-    expect(crewActSchema.safeParse({ kind: "eod.add", jobId: "p", done: " ", clientId: ID }).success).toBe(false);
+  it("takes the end of day typed, or said as a voice memo", () => {
+    // An empty "done" passes the shape; the act refuses it unless an audio file (the memo) stands in for it.
+    expect(crewActSchema.parse({ kind: "eod.add", jobId: "p", done: " ", clientId: ID })).toMatchObject({ done: "", files: [] });
     const ok = crewActSchema.parse({ kind: "eod.add", jobId: "p", done: "North wall framed", clientId: ID });
     expect(ok).toMatchObject({ stuck: "", needs: "", asked: "", safety: "", files: [] });
+    const memo = { ...file, name: "memo.m4a", type: "audio/mp4" };
+    const said = crewActSchema.parse({ kind: "eod.add", jobId: "p", files: [memo], memoSeconds: 42, clientId: ID });
+    expect(said).toMatchObject({ done: "", memoSeconds: 42 });
+    expect(said.kind === "eod.add" && said.files[0].type).toBe("audio/mp4");
+    expect(crewActSchema.safeParse({ kind: "eod.add", jobId: "p", files: [memo], memoSeconds: 181, clientId: ID }).success).toBe(false);
+    expect(crewActSchema.safeParse({ kind: "eod.add", jobId: "p", files: [memo], memoSeconds: 0, clientId: ID }).success).toBe(false);
   });
 
   it("takes a time fix only with real clock times and a reason", () => {
