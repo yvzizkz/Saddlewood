@@ -11,7 +11,7 @@ import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle } from
 import type { BotDraft, BotHome, BotLedgerItem } from '@/lib/bot/types'
 import { LANE_INFO, LANES, type Lane } from '@/lib/owner/lanes'
 import type { WaitingItem } from '@/lib/owner/waiting'
-import { ACTION_LABELS, ago, canApprove, dayTime, elapsed, firstName, greeting, healthLine, isMine, isMyLane, money, needsYouCount, personFor } from '@/lib/bot/view'
+import { ACTION_LABELS, ago, canApprove, dayTime, deadlineLabel, deadlineUrgent, elapsed, firstName, greeting, healthLine, isMine, isMyLane, money, needsYouCount, personFor } from '@/lib/bot/view'
 
 // Oversight: what is waiting on you, what the bot is doing right now, what it
 // is waiting on from other people, and whether it is alive.
@@ -50,10 +50,13 @@ function DraftRow({ draft, mine, onOpen }: { draft: BotDraft; mine: boolean; onO
           ) : draft.status === 'scheduled' ? (
             <Chip tone="ok">On a timer</Chip>
           ) : mine ? (
-            <Chip tone="warn">Needs your OK</Chip>
+            <Chip tone="warn">{draft.needs === 'answer' ? 'Answer first' : 'Needs your OK'}</Chip>
           ) : (
             <Chip>Waiting on Lando or Marco</Chip>
           )}
+          {draft.status === 'open' && deadlineLabel(draft.deadline) ? (
+            <Chip tone={deadlineUrgent(draft.deadline) ? 'bad' : undefined}>{deadlineLabel(draft.deadline)}</Chip>
+          ) : null}
           {draft.attach.length ? (
             <Chip>
               <Paperclip className="size-3" aria-hidden="true" /> {draft.attach.length}

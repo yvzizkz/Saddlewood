@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Clock, Lock, Paperclip, Send, X } from 'lucide-react'
+import { Clock, Lock, MessageSquare, Paperclip, Send, X } from 'lucide-react'
 
 import { BottomSheet } from '@/components/ui/BottomSheet'
-import { useBot } from './BotProvider'
+import { botApi, useBot } from './BotProvider'
 import { Button, Chip, INPUT } from './ui'
 import { clock12, type BotDraft } from '@/lib/bot/types'
 import { ago, canApprove, dayTime } from '@/lib/bot/view'
@@ -22,9 +22,13 @@ const FROM: Record<string, string> = {
 type Mode = 'idle' | 'confirm-send' | 'schedule' | 'confirm-cancel'
 
 export default function DraftSheet({ draft, onClose }: { draft: BotDraft | null; onClose: () => void }) {
-  const { home, act, busy } = useBot()
+  const { home, act, busy, toast } = useBot()
   const [mode, setMode] = useState<Mode>('idle')
   const [at, setAt] = useState('08:00')
+  // The answer to the question a back-office draft waits on. It goes to the
+  // bot as an Ask message ("Draft #21: …"); the Mac rewrites the draft.
+  const [answer, setAnswer] = useState('')
+  const [answering, setAnswering] = useState(false)
   const revert = useRef<number | undefined>(undefined)
 
   // The parent keys this sheet by draft number, so each draft starts idle.
@@ -53,6 +57,25 @@ export default function DraftSheet({ draft, onClose }: { draft: BotDraft | null;
     const res = await act(input, key)
     if (res.ok) onClose()
     else setMode('idle')
+  }
+
+  async function sendAnswer() {
+    const clean = answer.trim()
+    if (!draft || !clean || answering) return
+    setAnswering(true)
+    try {
+      await botApi('/api/bot/messages', {
+        method: 'POST',
+        body: JSON.stringify({ body: `Draft #${draft.n}: ${clean}`, attachments: [] }),
+      })
+      toast(`Sent. The bot is on draft #${draft.n}; the new version shows up in Drafts and in Ask in a few minutes.`, 'ok')
+      setAnswer('')
+      onClose()
+    } catch (e) {
+      toast((e as Error).message, 'bad')
+    } finally {
+      setAnswering(false)
+    }
   }
 
   return (
@@ -120,6 +143,43 @@ export default function DraftSheet({ draft, onClose }: { draft: BotDraft | null;
         {draft.body ? (
           <div className="mt-4 rounded-xl border border-[var(--color-stone)] bg-white p-4 text-[15px] leading-relaxed whitespace-pre-wrap text-[var(--color-charcoal)]">
             {draft.body}
+          </div>
+        ) : null}
+
+        {/* The one thing to settle before this draft is right. Answering here
+            sends it to the bot, which writes the draft again from the answer. */}
+        {draft.question && draft.status === 'open' && !draft.held ? (
+          <div className="mt-4 rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-charcoal-light)]">Before this goes</p>
+            <p className="mt-1 text-[15px] leading-snug text-[var(--color-charcoal)]">{draft.question}</p>
+            {mayTouch ? (
+              <>
+                <label className="sr-only" htmlFor="draft-answer">
+                  Your answer
+                </label>
+                <textarea
+                  id="draft-answer"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  placeholder="Your answer, in a sentence. “Yes” means the draft is right as written."
+                  rows={3}
+                  className={`${INPUT} mt-3`}
+                />
+                <Button
+                  variant="primary"
+                  full
+                  className="mt-2"
+                  busy={answering}
+                  disabled={!answer.trim() || !online}
+                  onClick={() => void sendAnswer()}
+                >
+                  <MessageSquare className="size-4" aria-hidden="true" /> Send answer
+                </Button>
+                <p className="mt-1.5 text-[11px] text-[var(--color-charcoal-light)]">
+                  The bot rewrites the draft from your answer and posts the new one here and in Ask. If it is right as is, approve it below.
+                </p>
+              </>
+            ) : null}
           </div>
         ) : null}
 

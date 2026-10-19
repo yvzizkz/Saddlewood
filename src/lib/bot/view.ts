@@ -54,6 +54,25 @@ export function shortDate(isoDate: string | null | undefined): string {
   });
 }
 
+/** A draft's deadline (a bare YYYY-MM-DD) as a chip: "Dies today", "By tomorrow", "By Wed 10/21", "Past its date". */
+export function deadlineLabel(deadline: string | null | undefined, now: Date = new Date()): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(deadline ?? "");
+  if (!m) return "";
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (days < 0) return "Past its date";
+  if (days === 0) return "Dies today";
+  if (days === 1) return "By tomorrow";
+  return `By ${d.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" })}`;
+}
+
+/** Whether a deadline chip should read as urgent (today or already past). */
+export function deadlineUrgent(deadline: string | null | undefined, now: Date = new Date()): boolean {
+  const label = deadlineLabel(deadline, now);
+  return label === "Dies today" || label === "Past its date";
+}
+
 export function money(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }

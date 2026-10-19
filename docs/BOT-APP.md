@@ -172,7 +172,33 @@ The Mac (agent token only):
 | POST | `/api/bot/sync` | Results, replies, snapshot sections, notifications. Safe to send twice; a malformed item is dropped and counted, not refused |
 | POST | `/api/bot/sync/upload` | One-time upload URL for a file the bot sends back |
 
+## Back-office drafts (the morning outbox)
+
+The unattended morning run on the Mac (`bin/backoffice_morning.sh`, 07:00)
+stages 10–25 replies, and `bot/backoffice_register.py` puts them in the same
+ledger as every other draft, so they show under Drafts with the same buttons
+and answer "approve N" by text. They carry four extra fields in the sync
+payload (`draftSchema`): `needs` ("tap" = approval only, "answer" = a
+question has to be settled first), `question` (the one thing to settle),
+`deadline` (YYYY-MM-DD, the day the draft stops making sense) and `batch`
+(the run that staged it, e.g. `backoffice-2026-10-19`). Home shows "Answer
+first" and a deadline chip; the sheet shows the question with an answer box.
+
+Notifications: a batch gets ONE push ("22 drafts waiting on you (back office
+10/19)") to Lando and Marco, not one per draft; a batch draft that dies today
+gets its own push, once. One-off drafts keep the per-draft push.
+
+Answering: the sheet's "Send answer" posts an ordinary Ask message of the form
+`Draft #21: <answer>`. The Mac reads that prefix (`app_bridge.answer_for_draft`):
+a bare yes marks the draft ready to approve; anything else goes to the agent,
+which writes the draft again from the answer, closes #21 as superseded and
+registers the new one with the same sender, batch and deadline. The reply
+lands in Ask with a "Review draft #N" button. Typing the same text in Ask
+does the same thing.
+
 ## Not verified yet
+
+The answer box end to end on a phone (added 2026-10-19), and everything below.
 
 Built and exercised end to end in a desktop browser at phone size against the
 real database, with a stand-in bot folder (no real email was sent). Still to do
