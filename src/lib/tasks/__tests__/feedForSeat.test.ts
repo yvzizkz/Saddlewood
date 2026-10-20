@@ -47,6 +47,23 @@ describe("feedForSeat", () => {
   });
 });
 
+describe("feedForSeat and Payables", () => {
+  const waivers = [
+    item("wvi77", { source: "billing", kind: "compliance", role: "finance", nowRole: "finance", jobKey: "8009-n-ironwood-dr", title: "Collect Sonoran's waiver for 2041", detail: "$4,250.00 · conditional progress", href: "/app/accounting/payables/bill/77", editable: false }),
+    item("wvo12", { source: "billing", kind: "compliance", role: "finance", nowRole: "finance", jobKey: "8009-n-ironwood-dr", title: "Waiver for 8009-13 (A Finer Touch)", href: "/app/money/12", editable: false }),
+  ];
+
+  it("keeps a sub's waiver (its bill amount and Payables link) from a PM, on their own job", () => {
+    const pm = feedForSeat(waivers, new Set(["8009-n-ironwood-dr"]), () => false);
+    expect(pm.map((i) => i.id)).toEqual(["wvo12"]);
+    expect(pm.some((i) => i.href.startsWith("/app/accounting/payables") || i.detail.includes("4,250"))).toBe(false);
+  });
+
+  it("leaves the owners' view as it was", () => {
+    expect(feedForSeat(waivers, null, () => false).map((i) => i.id)).toEqual(["wvi77", "wvo12"]);
+  });
+});
+
 describe("canCloseHere", () => {
   it("lets an owner close any work item and a PM only work with the PM's or field lead's seat", () => {
     expect(canCloseHere({ editable: true, role: "finance" }, true)).toBe(true);
