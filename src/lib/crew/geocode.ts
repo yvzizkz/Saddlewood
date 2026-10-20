@@ -66,10 +66,21 @@ async function getJson(url: string, headers: Record<string, string>): Promise<un
   }
 }
 
-/** Where an address is, or null when neither service could say. Never throws. */
-export async function geocodeAddress(address: string): Promise<Geocoded | null> {
-  if (address.trim().length < 5) return null; // not an address
-  const q = normalizeAddress(address);
+/**
+ * The address without its unit: "7740 E Gainey Ranch Rd #12, Scottsdale, AZ
+ * 85258" -> "7740 E Gainey Ranch Rd, Scottsdale, AZ 85258". Both services miss
+ * a condo or an apartment when the unit rides along; the building is close
+ * enough for "how far was the punch".
+ */
+export function withoutUnit(address: string): string {
+  return address
+    .replace(/\s*(?:#|\b(?:unit|apt|apartment|ste|suite)\b\.?)\s*[A-Za-z0-9-]+/i, "")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+async function lookup(q: string): Promise<Geocoded | null> {
   try {
     const hit = parseCensus(await getJson(censusUrl(q), {}));
     if (hit) return { ...hit, source: "census" };
@@ -83,4 +94,14 @@ export async function geocodeAddress(address: string): Promise<Geocoded | null> 
     // nothing found, nothing thrown
   }
   return null;
+}
+
+/** Where an address is, or null when neither service could say. Never throws. A miss is tried once more without the unit. */
+export async function geocodeAddress(address: string): Promise<Geocoded | null> {
+  if (address.trim().length < 5) return null; // not an address
+  const q = normalizeAddress(address);
+  const hit = await lookup(q);
+  if (hit) return hit;
+  const bare = withoutUnit(q);
+  return bare !== q && bare.length >= 5 ? lookup(bare) : null;
 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { censusUrl, geocodeAddress, nominatimUrl, normalizeAddress, parseCensus, parseNominatim } from "../geocode";
+import { censusUrl, geocodeAddress, nominatimUrl, normalizeAddress, parseCensus, parseNominatim, withoutUnit } from "../geocode";
 
 // The geocoders' answers, as they come back, and what is made of them. The
 // network is never touched: fetch is a stand-in that answers from fixtures.
@@ -102,5 +102,17 @@ describe("placing an address", () => {
     expect(await geocodeAddress("   ")).toBeNull();
     expect(await geocodeAddress("x")).toBeNull();
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("withoutUnit", () => {
+  it("drops a unit so a condo road can be found", () => {
+    expect(withoutUnit("7740 E Gainey Ranch Rd #12, Scottsdale, AZ 85258")).toBe("7740 E Gainey Ranch Rd, Scottsdale, AZ 85258");
+    expect(withoutUnit("2402 E Esplanade Ln #1102, Phoenix, AZ")).toBe("2402 E Esplanade Ln, Phoenix, AZ");
+    expect(withoutUnit("7425 E Gainey Ranch Unit 45, Scottsdale, AZ")).toBe("7425 E Gainey Ranch, Scottsdale, AZ");
+    expect(withoutUnit("100 Main St Suite 200, Mesa, AZ 85201")).toBe("100 Main St, Mesa, AZ 85201");
+  });
+  it("leaves an address without a unit alone", () => {
+    expect(withoutUnit("12729 W Keim Dr, Litchfield Park, AZ 85340")).toBe("12729 W Keim Dr, Litchfield Park, AZ 85340");
   });
 });
