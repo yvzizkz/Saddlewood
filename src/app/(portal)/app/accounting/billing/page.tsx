@@ -42,12 +42,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const rows = allRows.filter((r) => seesBillingJob(seat, r.jobId));
   const calendar = seat.owner ? allCalendar : allCalendar.filter((c) => clientsInView.has(c.clientId));
   const register = allRegister.filter((c) => seat.owner || (c.jobKey !== null && keys.has(c.jobKey)));
-  const waivers = allWaivers.filter((w) => seat.owner || (w.jobKey !== null && keys.has(w.jobKey)));
+  const waivers = allWaivers.filter((w) => seat.owner || (w.direction === "out" && w.jobKey !== null && keys.has(w.jobKey)));
   const coRows: TableRow[] = register.map((c) => ({
     id: c.id,
     number: c.number,
     title: c.title,
-    href: c.jobKey ? jobHref(c.jobKey, "changes") : c.documentId ? `/app/money/${c.documentId}` : null,
+    href: seat.owner && c.jobKey ? jobHref(c.jobKey, "changes") : c.documentId ? `/app/money/${c.documentId}` : null,
     job: c.job,
     status: CO_LABEL[c.status],
     requested: c.requestedOn,
@@ -89,7 +89,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     id: r.id,
     number: r.number,
     title: r.title,
-    href: r.status === "draft" ? "/app/bill" : `/app/money/${r.id}`,
+    href: r.status === "draft" ? (seat.owner ? "/app/bill" : null) : `/app/money/${r.id}`,
     kind: KIND[r.kind] ?? r.kind,
     status: r.status === "draft" ? "Draft" : "Issued",
     client: r.client,
@@ -135,7 +135,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         stats={[
           { label: "Issued", value: issued.length, kind: "count" },
           { label: "Change orders", value: cos.reduce((a, r) => a + r.totalCents, 0), kind: "money", hint: `${cos.length} issued` },
-          { label: "Drafts waiting", value: drafts.length, kind: "count", hint: drafts.length ? formatValue("money", drafts.reduce((a, r) => a + r.totalCents, 0)) : undefined, href: drafts.length ? "/app/bill" : undefined },
+          { label: "Drafts waiting", value: drafts.length, kind: "count", hint: drafts.length ? formatValue("money", drafts.reduce((a, r) => a + r.totalCents, 0)) : undefined, href: seat.owner && drafts.length ? "/app/bill" : undefined },
         ]}
         trend={d.trend}
         trendLabel="Billed"
