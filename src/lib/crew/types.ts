@@ -452,6 +452,8 @@ export type CrewAdminHome = {
   narrowed: boolean;
   /** Home Depot register names waiting for "Which job is this?" (0022); only with money.view. */
   unmatchedPurchases: UnmatchedPurchase[];
+  /** Names older than the card window (UNMATCHED_RECENT_DAYS), counted, not shown; search finds them. 0 with ?all=1. */
+  olderPurchaseNames?: number;
   /** Material requests on the jobs shown: open, and settled in the last week. */
   requests: CrewRequest[];
   /** The owners' settings as they stand (limits, who answers first, the far-from-job distance). */

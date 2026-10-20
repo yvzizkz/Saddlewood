@@ -94,34 +94,59 @@ export const purchaseLineSchema = z.object({
   description: clipped(240),
   qty: z.number().finite().min(-1_000_000).max(1_000_000).default(0),
   lineTotalCents: z.number().int().min(-50_000_000).max(50_000_000),
+  /** A field job the line is already filed under (a receipt logged in the app: source "app"). Unknown ids are ignored and the name rule applies. */
+  jobId: z.string().trim().max(60).nullable().optional(),
   meta: z.record(z.string(), z.unknown()).catch({}),
 });
 export type PurchaseLine = z.infer<typeof purchaseLineSchema>;
 
 /** A line as the site keeps it (purchases), with the job and the trade decided. */
-export type PurchaseRow = PurchaseLine & { jobKey: string; jobId: string | null; trade: Trade };
+export type PurchaseRow = Omit<PurchaseLine, "jobId"> & { jobKey: string; jobId: string | null; trade: Trade };
 
 export type AliasRule = { alias: string; jobId: string | null };
+
+/** A field job as linkLines needs it: its id and its name, so a register name that is the job's name needs no alias. */
+export type JobRef = { id: string; name: string };
 
 /** A register name that answered to no alias, as the Mac is told after a post. */
 export type UnmatchedName = { name: string; lines: number; cents: number };
 
 /**
- * Give each posted line its key, its job (from the aliases: a null job means
- * "ignore", kept as meta.ignored) and its trade. The same source key twice in
- * one post keeps the last one, so the upsert never meets a row twice.
+ * Give each posted line its key, its job and its trade. The job, in order: the
+ * line's own jobId when it names a job in `jobs` (a receipt filed from the
+ * app); the alias for its register name (a null job means "ignore", kept as
+ * meta.ignored); a register name that is a job's name or id, normalized the
+ * same way, so "6402 E Bambi Drive" never becomes a "Which job is this?"
+ * card. The same source key twice in one post keeps the last one, so the
+ * upsert never meets a row twice.
  */
-export function linkLines(lines: PurchaseLine[], aliases: AliasRule[], rules: TradeRule[]): { rows: PurchaseRow[]; linked: number; unmatched: UnmatchedName[] } {
+export function linkLines(lines: PurchaseLine[], aliases: AliasRule[], rules: TradeRule[], jobs: JobRef[] = []): { rows: PurchaseRow[]; linked: number; unmatched: UnmatchedName[] } {
   const alias = new Map(aliases.map((a) => [a.alias, a.jobId]));
+  const ids = new Set(jobs.map((j) => j.id));
+  // A job's normalized name and id -> the job. Two jobs under one name: neither is "the" job; that name waits for an alias.
+  const byName = new Map<string, string | null>();
+  const claim = (key: string, id: string) => {
+    if (!key) return;
+    const cur = byName.get(key);
+    if (cur === undefined) byName.set(key, id);
+    else if (cur !== id) byName.set(key, null);
+  };
+  for (const j of jobs) {
+    claim(normalizeJobName(j.name), j.id);
+    claim(normalizeJobName(j.id), j.id);
+  }
   const rows = new Map<string, PurchaseRow>();
   for (const line of lines) {
+    const { jobId: given, ...rest } = line;
     const jobKey = normalizeJobName(line.jobNameRaw);
     const { ignored: _was, ...meta } = line.meta;
     void _was;
-    const known = jobKey ? alias.has(jobKey) : false;
-    const jobId = known ? alias.get(jobKey) ?? null : null;
+    const direct = given && ids.has(given) ? given : null;
+    const known = !direct && jobKey ? alias.has(jobKey) : false;
+    const named = !direct && !known && jobKey ? byName.get(jobKey) || null : null;
+    const jobId = direct ?? (known ? alias.get(jobKey) ?? null : named);
     rows.set(line.sourceKey, {
-      ...line,
+      ...rest,
       jobKey,
       jobId,
       trade: tradeFor(rules, line.department, line.class),
@@ -157,6 +182,33 @@ export type UnmatchedPurchase = {
   cents: number;
   lastOn: string;
   firstOn: string;
+};
+
+/**
+ * A name is worth a card while its last purchase is within this many days of
+ * the newest purchase in the table (not of today: the history arrives in
+ * batches, and a batch of last year's receipts must not light up as new).
+ * Older names are counted, not shown; search finds them.
+ */
+export const UNMATCHED_RECENT_DAYS = 90;
+
+/** The names to ask about now, and the rest. `newestOn` null (no purchases yet) keeps everything recent. */
+export function splitUnmatched(names: UnmatchedPurchase[], newestOn: string | null): { recent: UnmatchedPurchase[]; older: UnmatchedPurchase[] } {
+  const since = newestOn ? addDays(newestOn, -UNMATCHED_RECENT_DAYS) : "";
+  const recent: UnmatchedPurchase[] = [];
+  const older: UnmatchedPurchase[] = [];
+  for (const n of names) (n.lastOn >= since ? recent : older).push(n);
+  return { recent, older };
+}
+
+/** What the screens read (listUnmatchedPurchases): the recent names, and the older ones summed into one line. */
+export type UnmatchedPurchases = {
+  names: UnmatchedPurchase[];
+  /** How many names are older than the window (0 when `names` is the whole list). */
+  older: number;
+  olderCents: number;
+  /** The newest purchase in the table, the window's anchor; null with no purchases. */
+  newestOn: string | null;
 };
 
 // ---- trips -------------------------------------------------------------------------------

@@ -117,8 +117,14 @@ days, so the whole prefix is the trip.
 - **Which job a line is** (`job_aliases`). Each register name is normalized
   once (`normalizeJobName` in `src/lib/crew/purchases.ts`: lowercased,
   accents and punctuation dropped, spaces collapsed, "#45" and "Unit 45" the
-  same; "PT  LOMA," -> "pt loma") and stored on the line as `job_key`. The
-  first time a key is seen nobody knows what it is, so the line waits. Owners,
+  same; "PT  LOMA," -> "pt loma") and stored on the line as `job_key`. A
+  line that arrives with its own `jobId` (a receipt filed in the app:
+  `source: "app"`, `sourceKey: "app:<entryId>"`) is filed under that job
+  outright when the id is a job; otherwise the alias for the name decides;
+  otherwise a name that is an active job's name or id, normalized the same
+  way ("6402 E BAMBI DRIVE" for the job 6402 E Bambi Drive), is filed with no
+  alias. Only then, the first time a key is seen nobody knows what it is, so
+  the line waits. Owners,
   and the project manager for his jobs, answer **"Which job is this?"** on the
   Crew tab's Today view (anyone with `money.view`): the raw name, trips, spend
   and the last date, a job picker, one tap. The answer is kept as an alias and
@@ -128,7 +134,13 @@ days, so the whole prefix is the trip.
   the lines carry `meta.ignored`. Two spellings of one job are two keys, each
   answered once. The names still waiting show on the owners' Home under
   Waiting on you ("Which job is this? 'PT LOMA' · 41 trips, $13,466, last
-  Aug 12", money lane; five lines, the rest folded into one).
+  Aug 12", money lane; five lines, the rest folded into one). Only names
+  whose last purchase is within 90 days of the newest purchase in the table
+  get a card (`UNMATCHED_RECENT_DAYS`, measured from the newest purchase, not
+  from today, so a batch of last year's history does not light up as new);
+  the older ones are one line, "1,100 older names from before the app; find
+  them with search", on the Crew tab and on Home. `GET /api/crew/admin?all=1`
+  still returns every name as a card.
 - **Trade** (`trade_map`): Home Depot's department and class -> framing,
   drywall, electrical, plumbing, paint, tools, rentals or general. Lookup is
   the exact (department, class), then the department alone, else general.
@@ -150,6 +162,59 @@ days, so the whole prefix is the trip.
 The site can be deployed before 0022 is applied: the Crew tab, Home and the
 money card read an empty list (or no material), and `POST /api/bot/purchases`
 answers 503 so the Mac waits.
+
+## Finding a purchase (migration 0026)
+
+Added 2026-10-19 (Lando: "a search option for owners and PM if they need to
+find a specific purchase; they should be able to ask and receive matches").
+Plain words in, trips out, with the lines that matched pointed at. Owners
+search every job; the project manager (`money.view`) only the jobs he is on,
+and that scope is the seat's (`visibleCrewJobs`), never the query string's.
+
+- **Where.** The top of the owners' Money tab (every job, any year), and
+  "Find a purchase" inside a job's Material block on Projects (that job only;
+  the project manager sees it on his jobs). Both are
+  `src/components/purchases/PurchaseSearch.tsx`: the words, a trade chip row
+  (framing, drywall, electrical, plumbing, paint, tools, rentals, general),
+  trip cards (date · store · job · total, the matched lines marked, the rest
+  behind "N more lines"), "No matches; try fewer words" when nothing hits,
+  "close matches" when only the fuzzy pass did. A mic button fills the field
+  with what was said where the browser can listen (`SpeechRecognition` /
+  `webkitSpeechRecognition`: iOS Safari and Chrome; hidden elsewhere).
+- **The words** (`parseQuery` in `src/lib/crew/purchaseSearch.ts`, pure).
+  Punctuation is dropped. A date or a month becomes the date filter: "august"
+  (this year's, or last year's when it has not come yet), "aug 12", "august
+  12 2025", "8/12", "8/12/26", "2026-08", "2026-08-12", "2025", "today",
+  "yesterday", "this week", "last week", "this month", "last month"; two dates
+  span from the earlier to the later. A run of words that is a job's name,
+  its id or one of its register aliases narrows to that job (only jobs the
+  caller may see count; a name two jobs share narrows nothing). What is left
+  is the search.
+- **The match** (`purchases_search()` in the database). `purchases.search` is
+  a generated tsvector over description, sku, register name, store, vendor,
+  department and class ('simple' config, nothing stemmed, GIN indexed); every
+  word matches as a prefix ("screw" finds "Screws"). When that finds nothing
+  the same words go by trigram similarity against the description
+  (`pg_trgm`, `word_similarity > 0.3`), so "drywal" and "ultralite" still
+  land; the answer says `took: "fuzzy"`. Trips are ranked by match then
+  date, newest first; at most 50 trips with up to 40 lines each (matched
+  lines first), and `total` says how many matched in all. `trip_key` is a
+  generated column (the source key up to its last colon, as `tripKey`).
+- **Ask the bot.** When the viewer has a bot seat (the owners' app shell),
+  the results carry an "Ask the bot" button: it posts `Find a purchase:
+  <the words>` (and the job's name when the search is scoped to one) to the
+  owner's own Ask thread, the same `POST /api/bot/messages` the Ask screen
+  makes, so the bot answers there. The Mac then asks
+  `GET /api/bot/purchases?q=` with its token and gets the same trips. A crew
+  seat (the project manager) has no seat with the bot: search only.
+- **Routes.** `GET /api/crew/purchases/search?q=<words>&job=&trade=&from=&to=`
+  (money.view; `job` must be in scope or it is 404, like the money card) and
+  `GET /api/bot/purchases?q=&job=&trade=&from=&to=&limit=` (agent token, every
+  job). Both answer `{ ok, trips: [{ tripKey, purchasedOn, store, vendor,
+  jobId, jobName, trades, totalCents, lineCount, lines: [{ description, sku,
+  qty, lineTotalCents, trade, matched }] }], total, took, filters: { from, to,
+  jobId, jobName } }`; 400 with no `q`, a bad trade or a bad date; 503 before
+  0026 is applied.
 
 ## Stages (migration 0024)
 
@@ -411,9 +476,10 @@ Owners (portal session with an owner's seat):
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/crew/admin?week=` | Everything the Crew tab shows (with `unmatchedPurchases` for anyone who sees money) |
+| GET | `/api/crew/admin?week=&all=` | Everything the Crew tab shows (with `unmatchedPurchases` and `olderPurchaseNames` for anyone who sees money; `all=1` makes every name a card) |
 | POST | `/api/crew/admin` | `{kind, ...}`; kinds in `adminActSchema` (`purchase.assign` answers "Which job is this?") |
-| GET | `/api/crew/projects/money?job=` or `?crewJob=` | One job's money and its Material block (`money.view`) |
+| GET | `/api/crew/projects/money?job=` or `?crewJob=` | One job's money and its Material block (`money.view`), with `crewJobId` |
+| GET | `/api/crew/purchases/search?q=&job=&trade=&from=&to=` | Find a purchase: trips with the matched lines (`money.view`; a project manager gets his jobs only) |
 | GET | `/api/crew/admin/export?from=&to=` | The timesheet as CSV |
 
 The Mac (agent token):
@@ -422,7 +488,8 @@ The Mac (agent token):
 |---|---|---|
 | GET | `/api/bot/crew` | The last three days, plus whatever is not filed yet, and `purchasesToday` |
 | POST | `/api/bot/crew` | Results, questions, flags, notifications. Safe to send twice |
-| POST | `/api/bot/purchases` | `{lines: [...]}`, Home Depot receipt lines, up to 2,000 a call. Safe to send twice. Answers `{ok, upserted, linked, dropped, unmatched}` |
+| POST | `/api/bot/purchases` | `{lines: [...]}`, Home Depot receipt lines (each may carry `jobId`), up to 2,000 a call. Safe to send twice. Answers `{ok, upserted, linked, dropped, unmatched}` |
+| GET | `/api/bot/purchases?q=&job=&trade=&from=&to=&limit=` | Find a purchase for an owner who asked the bot: the same `{ok, trips, total, took, filters}` as the app |
 
 ## Not built yet
 

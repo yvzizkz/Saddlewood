@@ -9,6 +9,6 @@ import JobMoneyCard from './JobMoneyCard'
 // requireSwitch("money.view") and the job scope again. Projects only renders
 // this for a viewer with money.view.
 
-export default function ProjectMoneySlot({ crewJobId, billingJobId }: { crewJobId: string; billingJobId: string | null }) {
-  return <JobMoneyCard billingJobId={billingJobId} crewJobId={crewJobId} />
+export default function ProjectMoneySlot({ crewJobId, billingJobId, jobName = '' }: { crewJobId: string; billingJobId: string | null; jobName?: string }) {
+  return <JobMoneyCard billingJobId={billingJobId} crewJobId={crewJobId} jobName={jobName} />
 }

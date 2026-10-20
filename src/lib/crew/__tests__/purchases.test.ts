@@ -9,10 +9,12 @@ import {
   purchaseLineSchema,
   purchasesForDay,
   rollTrips,
+  splitUnmatched,
   tradeFor,
   tripKey,
   type PurchaseLine,
   type PurchaseRow,
+  type UnmatchedPurchase,
 } from "../purchases";
 
 // The rules behind Home Depot purchases by job and by trade (0022), with no
@@ -152,6 +154,73 @@ describe("linkLines", () => {
     ]);
   });
 
+  const JOBS = [
+    { id: "point-loma", name: "Point Loma" },
+    { id: "bambi", name: "6402 E Bambi Drive" },
+    { id: "gainey-a", name: "Gainey" },
+    { id: "gainey-b", name: "Gainey" },
+  ];
+
+  it("files a line under its own jobId when that is a job, and falls back to the name rule when it is not", () => {
+    const { rows, linked, unmatched } = linkLines(
+      [
+        line({ source: "app", sourceKey: "app:101", jobId: "bambi", jobNameRaw: "whatever was typed", department: "PAINT", lineTotalCents: 4000 }),
+        line({ source: "app", sourceKey: "app:102", jobId: "no-such-job", jobNameRaw: "PT LOMA", lineTotalCents: 3000 }),
+        line({ source: "app", sourceKey: "app:103", jobId: "no-such-job", jobNameRaw: "Somewhere new", lineTotalCents: 2000 }),
+        line({ source: "app", sourceKey: "app:104", jobId: null, jobNameRaw: "Somewhere new", lineTotalCents: 100 }),
+      ],
+      ALIASES,
+      RULES,
+      JOBS,
+    );
+    expect(rows.map((r) => [r.sourceKey, r.jobKey, r.jobId, r.trade])).toEqual([
+      ["app:101", "whatever was typed", "bambi", "paint"],
+      ["app:102", "pt loma", "point-loma", "general"],
+      ["app:103", "somewhere new", null, "general"],
+      ["app:104", "somewhere new", null, "general"],
+    ]);
+    // The line's own jobId is a decision, not a column: the row carries the decided job only.
+    expect(Object.keys(rows[0])).not.toContain("given");
+    expect(linked).toBe(2);
+    expect(unmatched).toEqual([{ name: "Somewhere new", lines: 2, cents: 2100 }]);
+  });
+
+  it("files a register name that is a job's name or id without an alias, unless two jobs share the name", () => {
+    const { rows, linked, unmatched } = linkLines(
+      [
+        line({ sourceKey: "hd:20260812:674:0:1:1", jobNameRaw: "6402 E. BAMBI DRIVE", lineTotalCents: 5000 }),
+        line({ sourceKey: "hd:20260812:674:0:1:2", jobNameRaw: "Point Loma", lineTotalCents: 4000 }),
+        line({ sourceKey: "hd:20260812:674:0:1:3", jobNameRaw: "point-loma", lineTotalCents: 3000 }),
+        line({ sourceKey: "hd:20260812:674:0:1:4", jobNameRaw: "GAINEY", lineTotalCents: 2000 }),
+        line({ sourceKey: "hd:20260812:674:0:1:5", jobNameRaw: "6402 E Bambi", lineTotalCents: 1000 }),
+      ],
+      ALIASES,
+      RULES,
+      JOBS,
+    );
+    expect(rows.map((r) => [r.jobKey, r.jobId])).toEqual([
+      ["6402 e bambi drive", "bambi"],
+      ["point loma", "point-loma"],
+      ["point loma", "point-loma"],
+      ["gainey", null],
+      ["6402 e bambi", null],
+    ]);
+    expect(linked).toBe(3);
+    expect(unmatched).toEqual([
+      { name: "GAINEY", lines: 1, cents: 2000 },
+      { name: "6402 E Bambi", lines: 1, cents: 1000 },
+    ]);
+    // Without the jobs list nothing changes: the name rule is the aliases alone.
+    expect(linkLines([line({ sourceKey: "hd:1:1", jobNameRaw: "Point Loma" })], ALIASES, RULES).rows[0].jobId).toBeNull();
+  });
+
+  it("lets an alias decide before a job's name does", () => {
+    const { rows } = linkLines([line({ sourceKey: "hd:1:1", jobNameRaw: "Point Loma" })], [{ alias: "point loma", jobId: null }], RULES, JOBS);
+    expect(rows[0]).toMatchObject({ jobId: null, meta: { ignored: true } });
+    const moved = linkLines([line({ sourceKey: "hd:1:1", jobNameRaw: "Point Loma" })], [{ alias: "point loma", jobId: "bambi" }], RULES, JOBS);
+    expect(moved.rows[0].jobId).toBe("bambi");
+  });
+
   it("keeps the last of a source key sent twice, so the upsert never meets a row twice", () => {
     const { rows } = linkLines(
       [line({ sourceKey: "hd:20260812:674:0:6220:1", lineTotalCents: 100 }), line({ sourceKey: "hd:20260812:674:0:6220:1", lineTotalCents: 200 })],
@@ -257,5 +326,20 @@ describe("the Mac's day feed", () => {
       },
     ]);
     expect(purchasesForDay([], lows, jobs)).toEqual([]);
+  });
+});
+
+describe("splitUnmatched", () => {
+  const n = (key: string, lastOn: string): UnmatchedPurchase => ({ key, name: key, trips: 1, lines: 1, cents: 100, lastOn, firstOn: lastOn });
+
+  it("keeps a name while its last purchase is within 90 days of the newest purchase in the table", () => {
+    const names = [n("a", "2026-10-19"), n("b", "2026-07-21"), n("c", "2026-07-20"), n("d", "2025-01-01")];
+    const { recent, older } = splitUnmatched(names, "2026-10-19");
+    expect(recent.map((x) => x.key)).toEqual(["a", "b"]);
+    expect(older.map((x) => x.key)).toEqual(["c", "d"]);
+    // Measured from the newest purchase, not from today: last year's batch is not news.
+    expect(splitUnmatched(names, "2025-02-01").recent.map((x) => x.key)).toEqual(["a", "b", "c", "d"]);
+    expect(splitUnmatched(names, null).older).toEqual([]);
+    expect(splitUnmatched([], "2026-10-19")).toEqual({ recent: [], older: [] });
   });
 });

@@ -50,8 +50,10 @@ export type WaitingInput = {
   money: Overview | null;
   /** The owners' names (bot seats), so a hand-off goes back to whoever gave it. */
   owners?: string[];
-  /** Home Depot register names with no job yet (0022), biggest spend first. */
+  /** Home Depot register names with no job yet (0022), biggest spend first: the recent ones (listUnmatchedPurchases). */
   purchases?: UnmatchedPurchase[];
+  /** The names older than the card window (0026), summed: one line, never cards. */
+  olderPurchases?: { count: number; cents: number };
   /** Material requests (0023) still moving, with who is on each job and the PM limit, so only the owners' ones land here. */
   requests?: CrewRequest[];
   jobPeople?: CrewJobPerson[];
@@ -296,6 +298,20 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       title: `${plural(rest.length, "more Home Depot name needs", "more Home Depot names need")} a job`,
       detail: clip(rest.map((p) => `'${p.name || p.key}' ${dollars(p.cents)}`).join(", ")),
       href: "/app/crew?view=today",
+      at: null,
+    });
+  }
+  // The history from before the app: hundreds of names nobody will tag one by
+  // one. One line says they exist; search on Money finds any of them.
+  const older = input.olderPurchases;
+  if (older && older.count > 0) {
+    items.push({
+      key: "purchase-older",
+      lane: "money",
+      kind: "decision",
+      title: `${older.count.toLocaleString("en-US")} older Home Depot name${older.count === 1 ? "" : "s"} from before the app`,
+      detail: `${dollars(older.cents)} across them; find them with search.`,
+      href: "/app/money",
       at: null,
     });
   }

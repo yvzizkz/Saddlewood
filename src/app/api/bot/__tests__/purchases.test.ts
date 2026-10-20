@@ -13,6 +13,7 @@ const { session, db } = vi.hoisted(() => ({
   db: {
     aliases: [] as { alias: string; jobId: string | null }[],
     rules: [] as { department: string; class: string; trade: string }[],
+    jobs: [] as { id: string; name: string; active: boolean }[],
     upserted: [] as Record<string, unknown>[][],
     down: null as string | null,
   },
@@ -23,6 +24,8 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: { getUser: async () => ({ data: { user: session.email ? { id: "u1", email: session.email } : null }, error: null }) },
   }),
 }));
+
+vi.mock("@/lib/crew/queries", () => ({ listJobs: async () => db.jobs }));
 
 vi.mock("@/lib/crew/purchaseQueries", () => ({
   listAliases: async () => {
@@ -53,6 +56,7 @@ beforeEach(() => {
   session.email = null;
   db.aliases = [{ alias: "pt loma", jobId: "point-loma" }];
   db.rules = [{ department: "LUMBER", class: "", trade: "framing" }];
+  db.jobs = [];
   db.upserted = [];
   db.down = null;
   vi.stubEnv("OPS_AGENT_TOKEN", TOKEN);
@@ -118,6 +122,32 @@ describe("POST /api/bot/purchases", () => {
       ["hd:20260813:674:0:6301:1", "7425 e gainey ranch 45", null, "framing"],
     ]);
     expect(db.upserted[0][4]).toMatchObject({ vendor: "Home Depot", qty: 3, sku: "1001", meta: { line: 1 } });
+  });
+
+  it("files a line under its own jobId, or under the active job whose name was typed, with no alias", async () => {
+    db.jobs = [
+      { id: "bambi", name: "6402 E Bambi Drive", active: true },
+      { id: "old", name: "Old Job", active: false },
+    ];
+    const res = await POST(
+      req(
+        {
+          lines: [
+            { source: "app", sourceKey: "app:7", purchasedOn: "2026-10-19", jobId: "bambi", jobNameRaw: "", lineTotalCents: 1200 },
+            { ...LINE, jobNameRaw: "6402 E BAMBI DRIVE" },
+            { ...LINE, sourceKey: "hd:20260812:674:0:6220:9", jobNameRaw: "Old Job", lineTotalCents: 300 },
+          ],
+        },
+        bearer,
+      ),
+    );
+    expect(await res.json()).toEqual({ ok: true, upserted: 3, linked: 2, dropped: 0, unmatched: [{ name: "Old Job", lines: 1, cents: 300 }] });
+    expect(db.upserted[0].map((r) => [r.sourceKey, r.jobId])).toEqual([
+      ["app:7", "bambi"],
+      ["hd:20260812:674:0:6220:1", "bambi"],
+      ["hd:20260812:674:0:6220:9", null],
+    ]);
+    expect(db.upserted[0][0]).not.toHaveProperty("given");
   });
 
   it("keeps a name set aside quiet, and says when the tables are not there yet", async () => {

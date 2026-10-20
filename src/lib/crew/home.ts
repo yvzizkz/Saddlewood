@@ -24,7 +24,7 @@ import {
 } from "./queries";
 import type { Manager } from "./auth";
 import { listUnmatchedPurchases, loadPurchasesToday } from "./purchaseQueries";
-import type { PurchasesToday, UnmatchedPurchase } from "./purchases";
+import type { PurchasesToday, UnmatchedPurchases } from "./purchases";
 import { listRequests } from "./requestQueries";
 import { inScope, visibleCrewJobs } from "./scope";
 import { stageJobs } from "./stages";
@@ -37,6 +37,8 @@ import type { BillingJobRef, Capability, CrewAdminHome, CrewJobPerson, CrewEntry
 // not filed yet.
 
 const DAY_MS = 24 * 3600_000;
+/** The Crew tab opens before migration 0022 is applied: no names, nothing older. */
+const NO_UNMATCHED: UnmatchedPurchases = { names: [], older: 0, olderCents: 0, newestOn: null };
 
 function publicShift(s: CrewShiftRow): CrewShift {
   const { clientIn: _in, clientOut: _out, ...rest } = s;
@@ -117,7 +119,7 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
  * hours.view; time-fix requests and where a punch was made only with
  * hours.edit; the expense tracker's project list only with jobs.manage.
  */
-export async function adminHome(viewer: Manager, weekParam: string | null, now = new Date()): Promise<CrewAdminHome> {
+export async function adminHome(viewer: Manager, weekParam: string | null, now = new Date(), opts: { allPurchases?: boolean } = {}): Promise<CrewAdminHome> {
   const can = (p: Capability) => viewer.perms.includes(p);
   const hours = can("hours.view");
   const fixes = can("hours.edit");
@@ -142,7 +144,7 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     listJobPeople().catch(() => [] as CrewJobPerson[]),
     viewer.role === "owner" ? listBillingJobs().catch(() => [] as BillingJobRef[]) : Promise.resolve([] as BillingJobRef[]),
     // Which job is this? (0022): for anyone who sees money. The tab must open before the migration is applied, so a missing table is an empty list.
-    can("money.view") ? listUnmatchedPurchases().catch(() => [] as UnmatchedPurchase[]) : Promise.resolve([] as UnmatchedPurchase[]),
+    can("money.view") ? listUnmatchedPurchases({ all: opts.allPurchases }).catch(() => NO_UNMATCHED) : Promise.resolve(NO_UNMATCHED),
     // Material requests (0023): before the migration the table is missing, and the tab still opens.
     listRequests({ since: weekAgo }).catch(() => [] as CrewRequest[]),
     readSettings(),
@@ -176,7 +178,8 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     jobPeople: jobPeople.filter((a) => inScope(scope, a.jobId)),
     billingJobs,
     narrowed: scope !== null,
-    unmatchedPurchases,
+    unmatchedPurchases: unmatchedPurchases.names,
+    olderPurchaseNames: unmatchedPurchases.older,
     requests,
     settings,
   };

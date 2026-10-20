@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Card, Chip, Empty, ScreenTitle, SectionTitle } from "@/components/bot/ui";
 import { day, money } from "@/components/money/format";
+import PurchaseSearch from "@/components/purchases/PurchaseSearch";
 import { getViewer } from "@/lib/crew/auth";
 import { moneyOverview, type OpenDocument } from "@/lib/billing/overview";
 
@@ -36,6 +37,10 @@ export default async function MoneyScreen() {
           </Link>
         </div>
       </ScreenTitle>
+
+      {/* Find a purchase (0026): every job, any year; "Ask the bot" sends the words to Ask. */}
+      <SectionTitle>Find a purchase</SectionTitle>
+      <PurchaseSearch />
 
       <SectionTitle count={waiting.length}>Waiting on you</SectionTitle>
       {waiting.length === 0 ? (

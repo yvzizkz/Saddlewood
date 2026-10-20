@@ -32,7 +32,9 @@ export async function GET(request: NextRequest) {
   try {
     const manager = await requireManager(request);
     if (!manager) return forbidden();
-    const home = await adminHome(manager, new URL(request.url).searchParams.get("week"));
+    const params = new URL(request.url).searchParams;
+    // ?all=1: every "Which job is this?" name as a card, not only the recent ones (0026).
+    const home = params.get("all") === "1" ? await adminHome(manager, params.get("week"), new Date(), { allPurchases: true }) : await adminHome(manager, params.get("week"));
     return NextResponse.json(home, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return failure(e);

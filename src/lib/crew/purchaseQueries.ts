@@ -1,16 +1,19 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { SearchMode, SearchRow } from "./purchaseSearch";
 import {
   FLAG_LOOKBACK_DAYS,
   MATERIAL_WINDOW_DAYS,
   lowestUnitPrices,
   materialBlock,
   purchasesForDay,
+  splitUnmatched,
   type AliasRule,
   type MaterialBlock,
   type PurchaseRow,
   type PurchasesToday,
   type TradeRule,
   type UnmatchedPurchase,
+  type UnmatchedPurchases,
 } from "./purchases";
 import { addDays } from "./time";
 
@@ -148,12 +151,29 @@ export async function relinkPurchases(key: string, jobId: string | null): Promis
   return typeof data === "number" ? data : Number(data) || 0;
 }
 
-/** The names waiting for "Which job is this?", biggest spend first. */
-export async function listUnmatchedPurchases(limit = 200): Promise<UnmatchedPurchase[]> {
+/** The day of the newest purchase in the table, or null with none. */
+export async function newestPurchaseDay(): Promise<string | null> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("purchases_unmatched").select("job_key, name, trips, lines, cents, last_on, first_on").order("cents", { ascending: false }).limit(limit);
+  const { data, error } = await db.from("purchases").select("purchased_on").order("purchased_on", { ascending: false }).limit(1);
+  if (error) fail("purchases newest", error.message);
+  return ((data ?? []) as { purchased_on: string }[])[0]?.purchased_on ?? null;
+}
+
+/**
+ * The names waiting for "Which job is this?", biggest spend first: the ones
+ * whose last purchase is within UNMATCHED_RECENT_DAYS of the newest purchase
+ * in the table, and a count of the older ones (the history from before the
+ * app: search finds those). `all` returns every name as a card (the admin
+ * read's ?all=1).
+ */
+export async function listUnmatchedPurchases(opts: { all?: boolean; limit?: number } = {}): Promise<UnmatchedPurchases> {
+  const db = getSupabaseAdmin();
+  const [newestOn, { data, error }] = await Promise.all([
+    newestPurchaseDay(),
+    db.from("purchases_unmatched").select("job_key, name, trips, lines, cents, last_on, first_on").order("cents", { ascending: false }).limit(opts.limit ?? 5000),
+  ]);
   if (error) fail("purchases_unmatched list", error.message);
-  return ((data ?? []) as { job_key: string; name: string; trips: number | string; lines: number | string; cents: number | string; last_on: string; first_on: string }[]).map((r) => ({
+  const names: UnmatchedPurchase[] = ((data ?? []) as { job_key: string; name: string; trips: number | string; lines: number | string; cents: number | string; last_on: string; first_on: string }[]).map((r) => ({
     key: r.job_key,
     name: r.name,
     trips: Number(r.trips) || 0,
@@ -161,6 +181,68 @@ export async function listUnmatchedPurchases(limit = 200): Promise<UnmatchedPurc
     cents: Number(r.cents) || 0,
     lastOn: r.last_on,
     firstOn: r.first_on,
+  }));
+  if (opts.all) return { names, older: 0, olderCents: 0, newestOn };
+  const { recent, older } = splitUnmatched(names, newestOn);
+  return { names: recent, older: older.length, olderCents: older.reduce((sum, n) => sum + n.cents, 0), newestOn };
+}
+
+// ---- finding a purchase (0026) --------------------------------------------------------------
+
+type SearchDbRow = {
+  trip_key: string;
+  rank: number | string;
+  total_trips: number | string;
+  trip_cents: number | string;
+  trip_lines: number | string;
+  source_key: string;
+  purchased_on: string;
+  store: string;
+  vendor: string;
+  job_id: string | null;
+  job_name: string | null;
+  job_name_raw: string;
+  trade: string;
+  description: string;
+  sku: string;
+  qty: number | string;
+  line_total_cents: number;
+  matched: boolean;
+};
+
+/** purchases_search(): the lines of the top trips for these words, in rank order. The parsing is purchaseSearch.ts's. */
+export async function runPurchaseSearch(args: { words: string[]; mode: SearchMode; jobIds: string[] | null; trade: string; from: string | null; to: string | null; trips: number; lines: number }): Promise<SearchRow[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.rpc("purchases_search", {
+    p_words: args.words,
+    p_mode: args.mode,
+    p_jobs: args.jobIds,
+    p_trade: args.trade,
+    p_from: args.from,
+    p_to: args.to,
+    p_trips: args.trips,
+    p_lines: args.lines,
+  });
+  if (error) fail("purchases search", error.message);
+  return ((data ?? []) as SearchDbRow[]).map((r) => ({
+    tripKey: r.trip_key,
+    rank: Number(r.rank) || 0,
+    totalTrips: Number(r.total_trips) || 0,
+    tripCents: Number(r.trip_cents) || 0,
+    tripLines: Number(r.trip_lines) || 0,
+    sourceKey: r.source_key,
+    purchasedOn: r.purchased_on,
+    store: r.store,
+    vendor: r.vendor,
+    jobId: r.job_id,
+    jobName: r.job_name,
+    jobNameRaw: r.job_name_raw,
+    trade: r.trade,
+    description: r.description,
+    sku: r.sku,
+    qty: Number(r.qty) || 0,
+    lineTotalCents: r.line_total_cents,
+    matched: r.matched === true,
   }));
 }
 

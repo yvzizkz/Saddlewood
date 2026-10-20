@@ -50,7 +50,8 @@ export async function GET(request: NextRequest) {
     }
     // The card must open before migration 0022 is applied: no material, not an error.
     const material: MaterialBlock | null = crewJobId ? await loadMaterial(crewJobId, localDay()).catch(() => null) : null;
-    return NextResponse.json({ ok: true, money, material }, { headers: { "Cache-Control": "no-store" } });
+    // crewJobId rides along so the Material block can search this job (0026).
+    return NextResponse.json({ ok: true, money, material, crewJobId }, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error("job money:", err);
     return NextResponse.json({ ok: false, error: "Money is unavailable right now." }, { status: 503 });

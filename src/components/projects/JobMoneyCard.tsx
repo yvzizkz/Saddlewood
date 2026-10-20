@@ -67,19 +67,20 @@ export function JobMoneyFigures({ m }: { m: JobMoney }) {
   )
 }
 
-type Load = { state: 'loading' } | { state: 'error'; error: string } | { state: 'ok'; m: JobMoney | null; material: Material | null }
+type Load = { state: 'loading' } | { state: 'error'; error: string } | { state: 'ok'; m: JobMoney | null; material: Material | null; crewJobId: string }
 
 const NOT_LINKED = 'Money: no billing job linked yet. An owner links it on the Crew tab.'
 
-export default function JobMoneyCard({ billingJobId, crewJobId = '' }: { billingJobId: string | null; crewJobId?: string }) {
+export default function JobMoneyCard({ billingJobId, crewJobId = '', jobName = '' }: { billingJobId: string | null; crewJobId?: string; jobName?: string }) {
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!billingJobId && !crewJobId) return
     let live = true
     const query = billingJobId ? `job=${encodeURIComponent(billingJobId)}` : `crewJob=${encodeURIComponent(crewJobId)}`
-    botApi<{ ok: true; money: JobMoney | null; material: Material | null }>(`/api/crew/projects/money?${query}`)
-      .then((d) => live && setLoad({ state: 'ok', m: d.money, material: d.material }))
+    botApi<{ ok: true; money: JobMoney | null; material: Material | null; crewJobId?: string | null }>(`/api/crew/projects/money?${query}`)
+      // The field job behind a billing job comes back with the money (0026), so the Material block can search it.
+      .then((d) => live && setLoad({ state: 'ok', m: d.money, material: d.material, crewJobId: d.crewJobId || crewJobId }))
       .catch((e: Error) => live && setLoad({ state: 'error', error: e.message }))
     return () => {
       live = false
@@ -107,7 +108,7 @@ export default function JobMoneyCard({ billingJobId, crewJobId = '' }: { billing
       ) : (
         <>
           {load.m ? <JobMoneyFigures m={load.m} /> : <p className="text-[12px] text-[var(--color-charcoal-light)]">{NOT_LINKED}</p>}
-          {load.material ? <MaterialBlock m={load.material} /> : null}
+          {load.material ? <MaterialBlock m={load.material} jobId={load.crewJobId} jobName={jobName} /> : null}
         </>
       )}
     </div>
