@@ -103,6 +103,54 @@ done.
   switch, else to the owners as before. Safety reports and answers to questions also reach the
   owners. Time fixes stay owners only.
 
+## Purchases: Home Depot by job and by trade (migration 0022)
+
+Added 2026-10-19. The Mac holds the Pro Xtra purchase history (one row per
+receipt line, with the job name typed at the register, spelled however the
+cashier heard it: "POINT LOMA", "Point Loma", "PT LOMA"). It posts the lines
+to `POST /api/bot/purchases` (agent token; up to 2,000 lines a call; safe to
+send twice, each line upserts on its `sourceKey`,
+`hd:<yyyymmdd>:<store>:<register>:<transaction>:<n>`). A **trip** is the key
+up to its last colon: Home Depot transaction numbers repeat across stores and
+days, so the whole prefix is the trip.
+
+- **Which job a line is** (`job_aliases`). Each register name is normalized
+  once (`normalizeJobName` in `src/lib/crew/purchases.ts`: lowercased,
+  accents and punctuation dropped, spaces collapsed, "#45" and "Unit 45" the
+  same; "PT  LOMA," -> "pt loma") and stored on the line as `job_key`. The
+  first time a key is seen nobody knows what it is, so the line waits. Owners,
+  and the project manager for his jobs, answer **"Which job is this?"** on the
+  Crew tab's Today view (anyone with `money.view`): the raw name, trips, spend
+  and the last date, a job picker, one tap. The answer is kept as an alias and
+  every line with that key, past and future, is filed under the job
+  (`purchase.assign`, through `purchases_relink`). An owner can also
+  **Ignore** a name (a quote, a personal purchase): the alias has no job and
+  the lines carry `meta.ignored`. Two spellings of one job are two keys, each
+  answered once. The names still waiting show on the owners' Home under
+  Waiting on you ("Which job is this? 'PT LOMA' · 41 trips, $13,466, last
+  Aug 12", money lane; five lines, the rest folded into one).
+- **Trade** (`trade_map`): Home Depot's department and class -> framing,
+  drywall, electrical, plumbing, paint, tools, rentals or general. Lookup is
+  the exact (department, class), then the department alone, else general.
+  Seeded in the migration from Home Depot's names (BLDG. MATERIALS / GYPSUM is
+  drywall, LUMBER is framing, HARDWARE / HAND TOOLS and POWER TOOL ACCESSORIES
+  are tools, ...). The site only reads it for now; an owner edits it in the
+  database if a mapping is wrong.
+- **The money card's Material block** (Projects, owners and the project
+  manager where `money.view` allows): the last twelve months of Home Depot on
+  the field job, from `GET /api/crew/projects/money?job=<billing job>` (or
+  `?crewJob=<field job>` for a job with no billing job yet): spend net of
+  returns, trips, trips under $75, returns, and spend by trade. Cents on the
+  wire, formatted on the screen.
+- **The Mac's feed** (`GET /api/bot/crew`) carries `purchasesToday`: the
+  day's trips per job (lines on no job yet are grouped by their register name
+  with `jobId ""`), with `flags` for any line whose unit price is more than
+  20% above the lowest paid for the same sku in the previous 90 days.
+
+The site can be deployed before 0022 is applied: the Crew tab, Home and the
+money card read an empty list (or no material), and `POST /api/bot/purchases`
+answers 503 so the Mac waits.
+
 ## Who can do what
 
 - **Crew** are a row in `crew_people` AND `app_metadata.sw_role = "crew"` on
@@ -279,16 +327,18 @@ Owners (portal session with an owner's seat):
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/crew/admin?week=` | Everything the Crew tab shows |
-| POST | `/api/crew/admin` | `{kind, ...}`; kinds in `adminActSchema` |
+| GET | `/api/crew/admin?week=` | Everything the Crew tab shows (with `unmatchedPurchases` for anyone who sees money) |
+| POST | `/api/crew/admin` | `{kind, ...}`; kinds in `adminActSchema` (`purchase.assign` answers "Which job is this?") |
+| GET | `/api/crew/projects/money?job=` or `?crewJob=` | One job's money and its Material block (`money.view`) |
 | GET | `/api/crew/admin/export?from=&to=` | The timesheet as CSV |
 
 The Mac (agent token):
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/bot/crew` | The last three days, plus whatever is not filed yet |
+| GET | `/api/bot/crew` | The last three days, plus whatever is not filed yet, and `purchasesToday` |
 | POST | `/api/bot/crew` | Results, questions, flags, notifications. Safe to send twice |
+| POST | `/api/bot/purchases` | `{lines: [...]}`, Home Depot receipt lines, up to 2,000 a call. Safe to send twice. Answers `{ok, upserted, linked, dropped, unmatched}` |
 
 ## Not built yet
 

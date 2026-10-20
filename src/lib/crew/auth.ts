@@ -128,6 +128,8 @@ export const ACT_NEEDS: Record<AdminAct["kind"], Capability | "owner"> = {
   "pickup.update": "pickups.stage",
   "report.send": "plan.send",
   "report.answer": "owner",
+  // A member answers for a job in their scope (checked in runAdminAct); "ignore" (jobId null) stays with the owners.
+  "purchase.assign": "money.view",
 };
 
 export function mayRun(m: Manager, kind: AdminAct["kind"]): boolean {

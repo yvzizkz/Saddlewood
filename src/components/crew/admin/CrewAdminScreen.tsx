@@ -41,6 +41,7 @@ import {
   TaskAddSheet,
   TaskSheet,
 } from './AdminSheets'
+import { UnmatchedPurchases } from './PurchaseCards'
 import { CrewAdminProvider, useCrewAdmin } from './useCrewAdmin'
 
 // The Crew screens. Owners get five views, the lead (field supervisor) four:
@@ -199,6 +200,8 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
           </Card>
         </>
       ) : null}
+
+      {can('money.view') ? <UnmatchedPurchases /> : null}
 
       <SectionTitle count={onClock.length}>On the clock</SectionTitle>
       {onClock.length ? (

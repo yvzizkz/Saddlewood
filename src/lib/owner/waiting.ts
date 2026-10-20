@@ -1,6 +1,7 @@
 import type { Overview } from "@/lib/billing/overview";
 import { addDays, dayShort, localClock, localDay, localInstant, weekdayOf } from "@/lib/crew/time";
 import { firstNameOf, isReportedDone, type CrewJob, type CrewPerson, type CrewReport, type CrewTask } from "@/lib/crew/types";
+import type { UnmatchedPurchase } from "@/lib/crew/purchases";
 import { planAsk } from "@/lib/crew/plan";
 import type { Lane } from "./lanes";
 
@@ -45,7 +46,12 @@ export type WaitingInput = {
   money: Overview | null;
   /** The owners' names (bot seats), so a hand-off goes back to whoever gave it. */
   owners?: string[];
+  /** Home Depot register names with no job yet (0022), biggest spend first. */
+  purchases?: UnmatchedPurchase[];
 };
+
+/** How many "Which job is this?" names get their own line; the rest fold into one. */
+export const PURCHASE_ITEMS = 5;
 
 /** The plan is due the evening before, by 6 PM (the 30-day routine). */
 export const PLAN_DUE = "18:00";
@@ -232,6 +238,34 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
         at: d.doc.dueDate,
       });
     }
+  }
+
+  // ---- Home Depot: which job is this? ------------------------------------------------
+  // Tagging expenses is the money lane. The project manager answers the same card
+  // for his jobs on the Crew tab; what he answers leaves this list.
+  const names = [...(input.purchases ?? [])].sort((a, b) => b.cents - a.cents);
+  for (const p of names.slice(0, PURCHASE_ITEMS)) {
+    items.push({
+      key: `purchase-${p.key}`,
+      lane: "money",
+      kind: "decision",
+      title: `Which job is this? '${p.name || p.key}'`,
+      detail: `${plural(p.trips, "trip", "trips")}, ${dollars(p.cents)}, last ${dayShort(p.lastOn).replace(/^\w+, /, "")}`,
+      href: "/app/crew?view=today",
+      at: null,
+    });
+  }
+  if (names.length > PURCHASE_ITEMS) {
+    const rest = names.slice(PURCHASE_ITEMS);
+    items.push({
+      key: "purchase-more",
+      lane: "money",
+      kind: "decision",
+      title: `${plural(rest.length, "more Home Depot name needs", "more Home Depot names need")} a job`,
+      detail: clip(rest.map((p) => `'${p.name || p.key}' ${dollars(p.cents)}`).join(", ")),
+      href: "/app/crew?view=today",
+      at: null,
+    });
   }
 
   const rank = (i: WaitingItem) => (i.kind === "decision" ? 0 : i.kind === "signal" ? 1 : 2);

@@ -1,4 +1,5 @@
 import { moneyOverview } from "@/lib/billing/overview";
+import { listUnmatchedPurchases } from "@/lib/crew/purchaseQueries";
 import { listJobs, listPeople, listReports, listTasks } from "@/lib/crew/queries";
 import { addDays, localDay } from "@/lib/crew/time";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -28,13 +29,14 @@ function quiet<T>(what: string, p: Promise<T>, fallback: T): Promise<T> {
 
 export async function loadWaiting(owners: string[], now: Date = new Date()): Promise<WaitingItem[]> {
   const today = localDay(now);
-  const [people, reports, tasks, jobs, hours, money] = await Promise.all([
+  const [people, reports, tasks, jobs, hours, money, purchases] = await Promise.all([
     quiet("crew people", listPeople(), []),
     quiet("plans", listReports(addDays(today, -1)), []),
     quiet("tasks", listTasks({ closedSince: now.toISOString() }), []),
     quiet("jobs", listJobs(), []),
     quiet("hours", hoursCounts(), { timefixes: 0, reviews: 0 }),
     quiet("money", moneyOverview(today), null),
+    quiet("purchases", listUnmatchedPurchases(), []),
   ]);
-  return buildWaiting({ now, people, reports, tasks, jobs, timefixes: hours.timefixes, reviews: hours.reviews, money, owners });
+  return buildWaiting({ now, people, reports, tasks, jobs, timefixes: hours.timefixes, reviews: hours.reviews, money, owners, purchases });
 }

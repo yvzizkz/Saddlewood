@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { fileRefSchema, listOf, stored, type BotFileRef } from "@/lib/bot/types";
+import type { PurchasesToday, UnmatchedPurchase } from "./purchases";
 import { isClock, isDay } from "./time";
 
 // The crew side of the app: what a field worker sends in, what an owner does
@@ -351,6 +352,8 @@ export type CrewAdminHome = {
   billingJobs: BillingJobRef[];
   /** Set when the viewer sees only the jobs they are on (projects.mine). */
   narrowed: boolean;
+  /** Home Depot register names waiting for "Which job is this?" (0022); only with money.view. */
+  unmatchedPurchases: UnmatchedPurchase[];
 };
 
 export type CrewFeed = {
@@ -365,6 +368,8 @@ export type CrewFeed = {
   schedule: CrewScheduleItem[];
   tasks: CrewTask[];
   questions: CrewQuestion[];
+  /** `day`'s Home Depot purchases per job, with price flags (0022). */
+  purchasesToday: PurchasesToday[];
 };
 
 // ---- limits -------------------------------------------------------------------
@@ -653,6 +658,11 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     options: z.array(z.string().trim().min(1).max(60)).max(4).default([]),
   }),
   z.object({ kind: z.literal("question.cancel"), id }),
+  /**
+   * Which job a Home Depot register name is (0022): the alias is kept and every
+   * line with that name is filed. jobId null = not a job, set it aside (owners only).
+   */
+  z.object({ kind: z.literal("purchase.assign"), alias: z.string().trim().min(1, "which name?").max(120), jobId: jobId.nullable() }),
 ]);
 export type AdminAct = z.infer<typeof adminActSchema>;
 export type AdminActInput = z.input<typeof adminActSchema>;
