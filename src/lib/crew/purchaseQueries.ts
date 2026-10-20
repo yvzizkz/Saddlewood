@@ -95,16 +95,63 @@ function toDb(r: PurchaseRow, at: string) {
 
 const CHUNK = 500;
 
-/** Insert or replace by source_key. -> how many rows went in. */
+/** A line as a person left it: the trade they set (0030) and the job they put it on (0042). */
+export type ManualEdit = { source_key: string; trade: string; job_id: string | null; trade_manual: boolean; job_manual?: boolean };
+
+/**
+ * The Mac's lines with what a person set by hand put back: a manual trade
+ * stays, and a manual job stays (and is not "set aside"). Pure, for tests.
+ */
+export function keepManual(rows: PurchaseRow[], edits: ManualEdit[]): PurchaseRow[] {
+  const by = new Map(edits.map((e) => [e.source_key, e]));
+  return rows.map((r) => {
+    const e = by.get(r.sourceKey);
+    if (!e) return r;
+    const out = { ...r };
+    if (e.trade_manual) out.trade = e.trade as PurchaseRow["trade"];
+    if (e.job_manual) {
+      out.jobId = e.job_id;
+      const meta = { ...(r.meta ?? {}) };
+      delete meta.ignored;
+      out.meta = meta;
+    }
+    return out;
+  });
+}
+
+async function manualEdits(keys: string[]): Promise<ManualEdit[]> {
+  const db = getSupabaseAdmin();
+  const full = await db.from("purchases").select("source_key, trade, job_id, trade_manual, job_manual").in("source_key", keys).or("trade_manual.eq.true,job_manual.eq.true");
+  if (!full.error) return (full.data ?? []) as ManualEdit[];
+  // Before 0042 there is no job_manual: keep the manual trades.
+  const trades = await db.from("purchases").select("source_key, trade, job_id, trade_manual").in("source_key", keys).eq("trade_manual", true);
+  if (trades.error) fail("purchases manual edits", trades.error.message);
+  return (trades.data ?? []) as ManualEdit[];
+}
+
+/**
+ * Insert or replace by source_key. -> how many rows went in. Safe to send
+ * twice, and it keeps what a person set by hand (keepManual).
+ */
 export async function upsertPurchases(rows: PurchaseRow[]): Promise<number> {
   if (!rows.length) return 0;
   const db = getSupabaseAdmin();
   const at = new Date().toISOString();
   for (let i = 0; i < rows.length; i += CHUNK) {
-    const { error } = await db.from("purchases").upsert(rows.slice(i, i + CHUNK).map((r) => toDb(r, at)), { onConflict: "source_key" });
+    const chunk = rows.slice(i, i + CHUNK);
+    const kept = keepManual(chunk, await manualEdits(chunk.map((r) => r.sourceKey)));
+    const { error } = await db.from("purchases").upsert(kept.map((r) => toDb(r, at)), { onConflict: "source_key" });
     if (error) fail("purchases upsert", error.message);
   }
   return rows.length;
+}
+
+/** Put one trip, or some lines, on a job (null = no job) by hand: the alias rule for the register name is not touched. */
+export async function assignPurchases(target: { tripKey?: string; sourceKeys?: string[] }, jobId: string | null): Promise<number> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.rpc("purchases_assign", { p_source_keys: target.sourceKeys?.length ? target.sourceKeys : null, p_trip_key: target.tripKey || null, p_job: jobId });
+  if (error) fail("purchases assign", error.message);
+  return typeof data === "number" ? data : Number(data) || 0;
 }
 
 export async function listPurchases(filter: { jobId?: string; fromDay: string; toDay?: string; skus?: string[]; limit?: number }): Promise<PurchaseRow[]> {

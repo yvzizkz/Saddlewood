@@ -35,9 +35,9 @@ export type SubScorecard = {
   awardedCount: number;
   responseRatePct: number | null;
   hitRatePct: number | null;
-  openBillsCount: number;
-  openBillsCents: number;
-  heldBillsCount: number;
+  openBillsCount?: number;
+  openBillsCents?: number;
+  heldBillsCount?: number;
   punchOpenCount: number;
 };
 
@@ -63,7 +63,9 @@ export function computeSubScorecards(
   bills: { vendorName: string; balanceCents: number; status: string }[],
   openPunchByAssignee: Map<string, number>,
   today: string,
+  opts?: { includeBills?: boolean },
 ): { scorecards: SubScorecard[]; summary: ComplianceSummary } {
+  const includeBills = opts?.includeBills ?? true;
   const invitesBySub = new Map<string, { status: string }[]>();
   for (const inv of invites) {
     if (inv.status === "withdrawn") continue;
@@ -84,7 +86,9 @@ export function computeSubScorecards(
     const hitRatePct = submittedCount > 0 ? Math.round((awardedCount / submittedCount) * 100) : null;
 
     const lowerName = s.name.toLowerCase();
-    const myBills = bills.filter((b) => b.vendorName.toLowerCase() === lowerName && b.balanceCents > 0);
+    const myBills = includeBills
+      ? bills.filter((b) => b.vendorName.toLowerCase() === lowerName && b.balanceCents > 0)
+      : [];
     const openBillsCount = myBills.length;
     const openBillsCents = myBills.reduce((acc, b) => acc + b.balanceCents, 0);
     const heldBillsCount = myBills.filter((b) => b.status === "hold").length;
@@ -117,9 +121,7 @@ export function computeSubScorecards(
       awardedCount,
       responseRatePct,
       hitRatePct,
-      openBillsCount,
-      openBillsCents,
-      heldBillsCount,
+      ...(includeBills ? { openBillsCount, openBillsCents, heldBillsCount } : {}),
       punchOpenCount,
     };
   });
@@ -136,25 +138,31 @@ export function computeSubScorecards(
   return { scorecards, summary };
 }
 
-export async function loadSubScorecards(today = phoenixToday()): Promise<{ subs: Sub[]; scorecards: SubScorecard[]; summary: ComplianceSummary }> {
+export async function loadSubScorecards(
+  today = phoenixToday(),
+  opts?: { includeBills?: boolean },
+): Promise<{ subs: Sub[]; scorecards: SubScorecard[]; summary: ComplianceSummary }> {
+  const includeBills = opts?.includeBills ?? true;
   const db = getSupabaseAdmin();
   const [subs, invitesRes, payables, punchRes] = await Promise.all([
     listSubs(),
     db.from("bid_invites").select("sub_id, status").limit(5000),
-    loadPayables(today).catch(() => ({ rows: [], summary: { openCents: 0, overdueCents: 0, dueThisWeekCents: 0, holdCount: 0 } })),
-    db.from("job_punch_items").select("assignee, status").eq("status", "open").limit(2000),
+    includeBills
+      ? loadPayables(today).catch(() => ({ rows: [], summary: { openCents: 0, overdueCents: 0, dueThisWeekCents: 0, holdCount: 0 } }))
+      : Promise.resolve({ rows: [], summary: { openCents: 0, overdueCents: 0, dueThisWeekCents: 0, holdCount: 0 } }),
+    db.from("work_items").select("title, detail, location, assignee, status").eq("kind", "punch").eq("status", "open").limit(2000),
   ]);
+  if (invitesRes.error) throw new Error(`bid_invites: ${invitesRes.error.message}`);
+  if (punchRes.error) throw new Error(`work_items: ${punchRes.error.message}`);
   const openPunchByAssignee = new Map<string, number>();
-  if (!punchRes.error && punchRes.data) {
-    for (const p of punchRes.data as { assignee: string; status: string }[]) {
-      const key = (p.assignee ?? "").trim();
-      if (!key) continue;
-      openPunchByAssignee.set(key, (openPunchByAssignee.get(key) ?? 0) + 1);
-    }
+  for (const p of (punchRes.data ?? []) as { title?: string; detail?: string; location?: string; assignee?: string; status: string }[]) {
+    const key = [p.assignee, p.title, p.detail, p.location].filter(Boolean).join(" ").trim();
+    if (!key) continue;
+    openPunchByAssignee.set(key, (openPunchByAssignee.get(key) ?? 0) + 1);
   }
   const invites = ((invitesRes.data ?? []) as { sub_id: string; status: string }[]);
-  const bills = payables.rows.map((r) => ({ vendorName: r.vendorName, balanceCents: r.balanceCents, status: r.status }));
-  const { scorecards, summary } = computeSubScorecards(subs, invites, bills, openPunchByAssignee, today);
+  const bills = includeBills ? payables.rows.map((r) => ({ vendorName: r.vendorName, balanceCents: r.balanceCents, status: r.status })) : [];
+  const { scorecards, summary } = computeSubScorecards(subs, invites, bills, openPunchByAssignee, today, { includeBills });
   return { subs, scorecards, summary };
 }
 

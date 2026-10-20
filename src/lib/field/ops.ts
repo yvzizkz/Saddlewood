@@ -106,7 +106,8 @@ export function buildNormalizedReceiptPurchase(input: {
   const cents = Math.max(0, Math.round((input.amountDollars ?? 0) * 100));
   const rawTrade = (input.trade ?? "").trim().toLowerCase();
   const trade: Trade = (TRADE_SLUGS as readonly string[]).includes(rawTrade) ? (rawTrade as Trade) : "general";
-  const sourceKey = `app:entry:${input.entryId}`;
+  const tripKey = `app:entry:${input.entryId}`;
+  const sourceKey = `${tripKey}:0`;
   const vendor = input.vendor.trim() || "Home Depot";
   const description = input.note.trim() || `Field receipt (${vendor})`;
 
@@ -144,7 +145,7 @@ export function buildNormalizedReceiptPurchase(input: {
           vendor_name: `${input.personName} (Crew Reimbursement)`,
           job_id: input.billingJobId ?? null,
           crew_job_id: input.jobId || null,
-          purchase_trip_key: sourceKey,
+          purchase_trip_key: tripKey,
           trade,
           description: `Out-of-pocket field receipt: ${description}`,
           lines: [{ description, trade, qty: 1, unitCents: cents, totalCents: cents }],
@@ -244,23 +245,21 @@ export async function syncReceiptEntryToPurchases(input: Parameters<typeof build
     const db = getSupabaseAdmin();
     let billingJobId = input.billingJobId ?? null;
     if (!billingJobId && input.jobId) {
-      const { data } = await db.from("jobs").select("id").eq("crew_job_id", input.jobId).maybeSingle();
+      const { data, error: jobErr } = await db.from("jobs").select("id").eq("crew_job_id", input.jobId).maybeSingle();
+      if (jobErr) console.error("syncReceiptEntryToPurchases jobs lookup failed:", jobErr);
       billingJobId = (data as { id: string } | null)?.id ?? null;
     }
     const { purchaseRow, reimbursementBill } = buildNormalizedReceiptPurchase({ ...input, billingJobId });
-    await db.from("purchases").upsert(purchaseRow, { onConflict: "source_key" });
+    const { error: purchErr } = await db.from("purchases").upsert(purchaseRow, { onConflict: "source_key" });
+    if (purchErr) console.error("syncReceiptEntryToPurchases purchases upsert failed:", purchErr);
     if (reimbursementBill) {
-      const { data: existingBill } = await db
-        .from("bills")
-        .select("id")
-        .eq("bill_number", reimbursementBill.bill_number)
-        .maybeSingle();
-      if (!existingBill) {
-        await db.from("bills").insert(reimbursementBill);
+      const { error: billErr } = await db.from("bills").insert(reimbursementBill);
+      if (billErr && (billErr as { code?: string }).code !== "23505") {
+        console.error("syncReceiptEntryToPurchases bills insert failed:", billErr);
       }
     }
-  } catch {
-    // Non-fatal in mock/unit environments where tables are not present.
+  } catch (err) {
+    console.error("syncReceiptEntryToPurchases unexpected error:", err);
   }
 }
 
@@ -270,32 +269,38 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
     const db = getSupabaseAdmin();
     let billingJobId = input.billingJobId ?? null;
     if (!billingJobId && input.jobId) {
-      const { data } = await db.from("jobs").select("id").eq("crew_job_id", input.jobId).maybeSingle();
+      const { data, error: jobErr } = await db.from("jobs").select("id").eq("crew_job_id", input.jobId).maybeSingle();
+      if (jobErr) console.error("syncEodDirectivesAndDecisions jobs lookup failed:", jobErr);
       billingJobId = (data as { id: string } | null)?.id ?? null;
     }
     const items = extractEodWorkItems({ ...input, billingJobId });
     for (const item of items) {
-      const { data: existing } = await db
+      const { data: existing, error: selErr } = await db
         .from("work_items")
         .select("id")
         .eq("source", item.source)
         .eq("status", "open")
         .maybeSingle();
+      if (selErr) console.error("syncEodDirectivesAndDecisions work_items lookup failed:", selErr);
       if (!existing) {
-        await db.from("work_items").insert(item);
+        const { error: insErr } = await db.from("work_items").insert(item);
+        if (insErr && (insErr as { code?: string }).code !== "23505") {
+          console.error("syncEodDirectivesAndDecisions work_items insert failed:", insErr);
+        }
       }
     }
     const asked = input.asked.trim();
     if (asked.length >= 2) {
       const title = asked.slice(0, 200);
-      const { data: existingCo } = await db
+      const { data: existingCo, error: coSelErr } = await db
         .from("change_orders")
         .select("id")
         .eq("crew_job_id", input.jobId)
         .eq("title", title)
         .maybeSingle();
+      if (coSelErr) console.error("syncEodDirectivesAndDecisions change_orders lookup failed:", coSelErr);
       if (!existingCo) {
-        await db.from("change_orders").insert({
+        const { error: coInsErr } = await db.from("change_orders").insert({
           job_id: billingJobId,
           crew_job_id: input.jobId || null,
           title,
@@ -303,10 +308,13 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
           source: "directive",
           requested_by: input.createdBy,
         });
+        if (coInsErr && (coInsErr as { code?: string }).code !== "23505") {
+          console.error("syncEodDirectivesAndDecisions change_orders insert failed:", coInsErr);
+        }
       }
     }
-  } catch {
-    // Non-fatal in mock/unit environments.
+  } catch (err) {
+    console.error("syncEodDirectivesAndDecisions unexpected error:", err);
   }
 }
 
@@ -492,7 +500,7 @@ export async function loadJobFieldOps(ref: JobRef) {
     if (e.kind === "receipt") {
       const amt = typeof e.data?.amount === "number" ? e.data.amount : 0;
       const customKey = str("normalizedPurchaseKey");
-      const tripKey = customKey ? customKey.replace(/:[^:]*$/, "") : `app:entry`;
+      const tripKey = customKey ? customKey.replace(/:[^:]*$/, "") : `app:entry:${e.id}`;
       receipts.push({
         id: e.id,
         day: e.day,

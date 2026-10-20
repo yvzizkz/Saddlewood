@@ -158,11 +158,18 @@ export function nextFridayDay(today: string): string {
   return addDays(today, diff);
 }
 
+/** True when the bills tables (0031) are not in this database yet: the hub shows a notice, not an error. */
+export function missingPayables(e: unknown): boolean {
+  return /does not exist|schema cache|could not find the (table|relation)/i.test((e as { message?: string } | null)?.message ?? "");
+}
+
 export async function loadPayables(today = localDay()): Promise<{
   rows: PayableRow[];
   payments: BillPaymentItem[];
   trades: Trade[];
   fridayCutoff: string;
+  /** Migration 0031 is not applied: no bills to show, and nothing is wrong with the page. */
+  missing: boolean;
 }> {
   const db = getSupabaseAdmin();
   const [billsRes, payRes, subsRes, crewJobsRes, billingJobsRes, trades] = await Promise.all([
@@ -174,6 +181,9 @@ export async function loadPayables(today = localDay()): Promise<{
     listTrades(),
   ]);
 
+  if (missingPayables(billsRes.error) || missingPayables(payRes.error)) {
+    return { rows: [], payments: [], trades, fridayCutoff: nextFridayDay(today), missing: true };
+  }
   if (billsRes.error) throw new Error(`bills: ${billsRes.error.message}`);
   if (payRes.error) throw new Error(`bill_payments: ${payRes.error.message}`);
 
@@ -295,16 +305,18 @@ export async function loadPayables(today = localDay()): Promise<{
     };
   });
 
-  return { rows, payments, trades, fridayCutoff };
+  return { rows, payments, trades, fridayCutoff, missing: false };
 }
 
-export async function loadPayableBill(id: string): Promise<{
+export async function loadPayableBill(id: string): Promise<{ missing: true } | {
+  missing?: false;
   bill: PayableRow;
   payments: BillPaymentItem[];
   otherVendorBills: PayableRow[];
   bidPackage: { id: string; title: string; trade: string; status: string } | null;
 } | null> {
-  const { rows, payments } = await loadPayables();
+  const { rows, payments, missing } = await loadPayables();
+  if (missing) return { missing: true };
   const bill = rows.find((r) => r.id === id);
   if (!bill) return null;
 

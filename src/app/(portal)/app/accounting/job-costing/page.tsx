@@ -7,6 +7,7 @@ import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { CATEGORY_LABEL, loadJobCost, type CostLine } from "@/lib/accounting/jobCost";
 import { moneySeatForPage } from "@/lib/accounting/access";
+import PayablesMissing from "@/components/accounting/PayablesMissing";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +115,7 @@ export default async function JobCostingPage({ searchParams }: { searchParams: P
       crumbs={[{ label: "Accounting", href: "/app/accounting" }, ...d.crumbs]}
       filters={d.filters}
     >
+      {cur.payablesMissing ? <PayablesMissing /> : null}
       <KpiHeader
         label="Cost"
         value={cost}

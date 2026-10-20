@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
   const gate = await subsGate(request);
   if (gate.response) return gate.response;
   try {
-    const { subs, scorecards, summary } = await loadSubScorecards();
+    const isOwner = gate.seat.role === "owner";
+    const { subs, scorecards, summary } = await loadSubScorecards(undefined, { includeBills: isOwner });
     return NextResponse.json({
       ok: true,
       subs,

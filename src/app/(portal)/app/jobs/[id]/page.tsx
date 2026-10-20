@@ -320,7 +320,11 @@ export default async function JobPage({ params, searchParams }: { params: Promis
 
   if (tab === "subs") {
     // Sub and vendor bills are Payables: owners only.
-    const [packages, bills, { scorecards }] = await Promise.all([jobPackages(ref), owner ? jobBills(ref) : Promise.resolve([]), loadSubScorecards(today)]);
+    const [packages, bills, { scorecards }] = await Promise.all([
+      jobPackages(ref),
+      owner ? jobBills(ref) : Promise.resolve([]),
+      loadSubScorecards(today, { includeBills: owner }),
+    ]);
     const pk: TableRow[] = packages.map((p) => ({ id: p.id, title: p.title || p.trade, trade: p.trade, status: p.status, due: p.dueAt ? localDay(p.dueAt) : null, href: subsSeat ? `/app/subs/bids/${p.id}` : null }));
     const bl: TableRow[] = bills.map((b) => ({ id: b.id, number: b.billNumber, vendor: b.vendorName, trade: b.tradeLabel, status: b.statusLabel, issued: b.issuedOn, due: b.dueOn, amount: b.amountCents, open: b.balanceCents, href: `/app/accounting/payables/bill/${b.id}` }));
     const jobVendorNames = new Set(bills.map((b) => b.vendorName.toLowerCase()));
@@ -336,7 +340,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       coi: s.coiState === "ok" ? `Valid (${s.coiDaysLeft}d)` : s.coiState === "expiring_30d" ? `Expiring (${s.coiDaysLeft}d)` : s.coiState === "expired" ? "Expired" : "Missing",
       bids: `${s.submittedCount}/${s.invitedCount}`,
       awards: s.awardedCount,
-      openBills: s.openBillsCents,
+      openBills: s.openBillsCents ?? null,
       href: subsSeat ? "/app/subs" : null,
     }));
     return (

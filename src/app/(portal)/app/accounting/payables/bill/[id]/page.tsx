@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import AccountingFrame from "@/components/accounting/AccountingFrame";
 import { Card } from "@/components/bot/ui";
 import { loadPayableBill } from "@/lib/accounting/payables";
+import PayablesMissing from "@/components/accounting/PayablesMissing";
 import { hrefOf } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
@@ -27,6 +28,13 @@ export default async function PayableBillPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const detail = await loadPayableBill(id);
   if (!detail) notFound();
+  if (detail.missing) {
+    return (
+      <AccountingFrame title="Payables" crumbs={[{ label: "Accounting", href: "/app/accounting" }, { label: "Payables", href: PATH }]}>
+        <PayablesMissing />
+      </AccountingFrame>
+    );
+  }
 
   const { bill, payments, otherVendorBills, bidPackage } = detail;
 

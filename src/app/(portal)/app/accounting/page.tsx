@@ -10,6 +10,7 @@ import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { hrefOf } from "@/lib/analytics/drill";
 import { loadLabor } from "@/lib/accounting/labor";
 import { loadPayables } from "@/lib/accounting/payables";
+import PayablesMissing from "@/components/accounting/PayablesMissing";
 import { loadPurchases } from "@/lib/accounting/purchases";
 import { loadBillingCalendar, loadIssued, loadOpenReceivables } from "@/lib/accounting/receivables";
 import { moneySeatForPage, seesBillingJob, seesCrewJob } from "@/lib/accounting/access";
@@ -75,7 +76,7 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
   const [laborAll, purchasesAll, payablesAll, openAll, issuedAll, calendar] = await Promise.all([
     loadLabor(period.from, period.to, { withPay: seat.laborCost }),
     loadPurchases(period.from, period.to),
-    seat.owner ? loadPayables(today) : Promise.resolve({ rows: [], payments: [], trades: [], fridayCutoff: today }),
+    seat.owner ? loadPayables(today) : Promise.resolve({ rows: [], payments: [], trades: [], fridayCutoff: today, missing: false }),
     loadOpenReceivables(today),
     loadIssued(period.from, period.to),
     loadBillingCalendar(today),
@@ -165,6 +166,7 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
 
   return (
     <AccountingFrame sections={seat.sections} title="Overview" intro="Every money section in one place. Pick a period; each card opens its section on it." period={period}>
+      {payables.missing ? <PayablesMissing /> : null}
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {shown.map((t) => (
           <li key={t.title}>

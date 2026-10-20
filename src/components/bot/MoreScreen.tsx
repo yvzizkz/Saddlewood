@@ -7,6 +7,7 @@ import { Bell, BellOff, ChevronRight, Download, LogOut, Send, Share2, ShieldChec
 import { triggerOnboardingReplay } from '@/components/auth/OnboardingFlow'
 import { PasskeyCard } from '@/components/auth/PasskeyCard'
 import { FieldSettingsCard } from '@/components/crew/RequestCards'
+import { visibleNav, type NavViewer } from '@/components/layout/nav'
 import { createClient } from '@/lib/supabase/client'
 import { botApi, useBot } from './BotProvider'
 import { Button, Card, Chip, Empty, INPUT, ScreenTitle, SectionTitle } from './ui'
@@ -16,14 +17,22 @@ import { ago } from '@/lib/bot/view'
 // notifications, bring a teammate in, reach the rest of the portal, and the
 // one switch that stops the bot from sending on its own.
 
-const PORTAL: { href: string; label: string; note: string }[] = [
-  { href: '/app/tasks', label: 'Tasks', note: 'Everything waiting on someone, mine and the team\'s' },
+const NAV_NOTES: Record<string, string> = {
+  '/app/subs': 'The sub directory, bid packages, leveling and awards',
+  '/app/ask': 'Ask SaddleWoodBot a question or draft an action',
+  '/app/duties': 'Role checklists, daily cadence, and standing duties',
+  '/app/schedule': 'My day, week board, and two-week GC look-ahead',
+  '/app/tasks': "Everything waiting on someone, mine and the team's",
+  '/app/departments': 'Operations, estimating, field, subs, finance, and owner decisions',
+  '/internal/ops': 'SOPs, roles, what is being built',
+  '/internal/ops/calendar': 'Rhythm, milestones, deadlines',
+  '/app/policies': "Deposits, interest, change orders, approvals: the owners' rules",
+  '/internal': 'Earlier tools and prototypes kept reachable in one place',
+}
+
+const PORTAL_EXTRA: { href: string; label: string; note: string }[] = [
   { href: '/app/sales', label: 'Sales', note: 'Prospects, estimates and proposals, start to finish' },
-  { href: '/app/subs', label: 'Subs and bids', note: 'The sub directory, bid packages, leveling and awards' },
-  { href: '/app/policies', label: 'Company policies', note: 'Deposits, interest, change orders, approvals: the owners\' rules' },
   { href: '/app/policies/rights', label: 'Who decides', note: 'Roles, who holds them, and what each may approve' },
-  { href: '/internal/ops', label: 'Ops board', note: 'SOPs, roles, what is being built' },
-  { href: '/internal/ops/calendar', label: 'Calendar', note: 'Rhythm, milestones, deadlines' },
   { href: '/internal/trackers', label: 'Progress trackers', note: 'Schedules of values and invoices' },
   { href: '/internal?tab=pending', label: 'Estimates', note: 'Bids waiting for sign-off' },
   { href: '/internal/expenses', label: 'Expenses', note: 'Tag Zelle payments and receipts' },
@@ -31,6 +40,21 @@ const PORTAL: { href: string; label: string; note: string }[] = [
   { href: '/internal/proposals', label: 'Proposals', note: 'Client presentations' },
   { href: '/internal/leads', label: 'Leads', note: 'Callbacks waiting' },
 ]
+
+export function morePortalLinks(v: NavViewer = { owner: true, crewAdmin: true }): { href: string; label: string; note: string }[] {
+  const nonTab = visibleNav(v)
+    .filter((i) => !i.tab)
+    .map((i) => ({
+      href: i.href,
+      label: i.label,
+      note: NAV_NOTES[i.href] ?? i.group,
+    }))
+  if (!v.owner) return nonTab
+  const seen = new Set(nonTab.map((i) => i.href))
+  return [...nonTab, ...PORTAL_EXTRA.filter((p) => !seen.has(p.href))]
+}
+
+export const PORTAL: { href: string; label: string; note: string }[] = morePortalLinks({ owner: true, crewAdmin: true })
 
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
 
@@ -469,22 +493,26 @@ export default function MoreScreen() {
         </>
       ) : null}
 
-      {owner ? (
-        <>
-          <SectionTitle>The rest of the portal</SectionTitle>
-          <Card className="divide-y divide-[var(--color-stone)]">
-            {PORTAL.map((p) => (
-              <Link key={p.href} href={p.href} className="flex items-center justify-between gap-3 px-4 py-3 active:bg-[var(--color-cream)]">
-                <span>
-                  <span className="block text-[15px] text-[var(--color-charcoal)]">{p.label}</span>
-                  <span className="block text-[12px] text-[var(--color-charcoal-light)]">{p.note}</span>
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-[var(--color-charcoal-light)]" aria-hidden="true" />
-              </Link>
-            ))}
-          </Card>
-        </>
-      ) : null}
+      {(() => {
+        const portalLinks = morePortalLinks({ owner, crewAdmin: owner })
+        if (!portalLinks.length) return null
+        return (
+          <>
+            <SectionTitle>The rest of the portal</SectionTitle>
+            <Card className="divide-y divide-[var(--color-stone)]">
+              {portalLinks.map((p) => (
+                <Link key={p.href} href={p.href} className="flex items-center justify-between gap-3 px-4 py-3 active:bg-[var(--color-cream)]">
+                  <span>
+                    <span className="block text-[15px] text-[var(--color-charcoal)]">{p.label}</span>
+                    <span className="block text-[12px] text-[var(--color-charcoal-light)]">{p.note}</span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-[var(--color-charcoal-light)]" aria-hidden="true" />
+                </Link>
+              ))}
+            </Card>
+          </>
+        )
+      })()}
 
       <p className="mt-7 text-center text-[11px] text-[var(--color-charcoal-light)]">
         {home.bridge.reportedAt ? `Bot last reported ${ago(home.bridge.reportedAt)}` : 'The bot has not reported yet'}
