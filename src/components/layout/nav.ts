@@ -6,14 +6,15 @@
 
 import {
   Briefcase,
+  Building2,
   CalendarDays,
   ClipboardList,
   Construction,
   HardHat,
-  ListTodo,
   Home,
   Landmark,
   ListChecks,
+  ListTodo,
   Menu,
   MessageSquare,
   Settings,
@@ -54,6 +55,7 @@ export const NAV: NavItem[] = [
   { href: '/app/schedule', label: 'Schedule', icon: CalendarDays, group: 'Work', access: 'owner', also: ['/internal/ops/calendar'] },
   { href: '/app/crew', label: 'Crew', icon: HardHat, group: 'Work', tab: 4, access: 'crewAdmin' },
   { href: '/app/tasks', label: 'Tasks', icon: ListTodo, group: 'Work', access: 'owner' },
+  { href: '/app/departments', label: 'Departments', icon: Building2, group: 'Work', access: 'owner' },
   { href: '/app/subs', label: 'Subs and bids', icon: Users, group: 'Work' },
   {
     href: '/app/accounting',
