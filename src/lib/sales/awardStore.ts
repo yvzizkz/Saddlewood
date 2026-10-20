@@ -105,17 +105,47 @@ async function findClient(name: string): Promise<string | null> {
   return (data as { id: string } | null)?.id ?? null;
 }
 
-/** The billing job already tied to this opportunity, else one with the same name and address (the estimate pipeline makes those). */
-async function findJob(o: Opportunity, name: string): Promise<JobRow | null> {
+/** A name or address for ilike as an exact, case-insensitive match: % _ and \\ are literal. */
+function literal(v: string): string {
+  return v.replace(/[%_\\]/g, "\\$&");
+}
+
+/**
+ * The billing job already tied to this opportunity; else one with the same
+ * name and address, ignoring case (an empty address matches a job with none,
+ * which + Job stores as NULL); else the billing job + Job paired with a field
+ * job of this name, as long as it hasn't been awarded: Award takes that pair
+ * over instead of making a second billing job and a <slug>-2 field job.
+ */
+async function findJob(o: Opportunity, name: string, crewName: string): Promise<JobRow | null> {
   const db = getSupabaseAdmin();
   if (o.jobId) {
     const { data, error } = await db.from("jobs").select(JOB_COLS).eq("id", o.jobId).maybeSingle();
     if (error) fail("read job", error.message);
     if (data) return data as JobRow;
   }
-  const { data, error } = await db.from("jobs").select(JOB_COLS).eq("name", name).eq("address", o.address.trim()).limit(1).maybeSingle();
-  if (error) fail("find job", error.message);
-  return (data as JobRow | null) ?? null;
+  const address = o.address.trim();
+  const byName = () => db.from("jobs").select(JOB_COLS).ilike("name", literal(name));
+  const tries = address ? [byName().ilike("address", literal(address))] : [byName().is("address", null), byName().eq("address", "")];
+  for (const q of tries) {
+    const { data, error } = await q.limit(1).maybeSingle();
+    if (error) fail("find job", error.message);
+    if (data) return data as JobRow;
+  }
+  const crewId = await crewJobNamed(crewName);
+  if (!crewId) return null;
+  const { data, error } = await db.from("jobs").select(JOB_COLS).eq("crew_job_id", crewId).maybeSingle();
+  if (error) fail("find job by field job", error.message);
+  const paired = data as JobRow | null;
+  return paired && !isAwarded(paired) ? paired : null;
+}
+
+/** An active field job with this name, ignoring case. */
+async function crewJobNamed(name: string): Promise<string | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("crew_jobs").select("id").ilike("name", literal(name)).eq("active", true).limit(1).maybeSingle();
+  if (error) fail("find field job", error.message);
+  return (data as { id: string } | null)?.id ?? null;
 }
 
 function isAwarded(job: JobRow | null): boolean {
@@ -125,9 +155,7 @@ function isAwarded(job: JobRow | null): boolean {
 /** An active field job with the same name, not tied to another billing job: the crew may have made it already. */
 async function findCrewJob(name: string, billingJobId: string | null): Promise<string | null> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("crew_jobs").select("id").ilike("name", name.replace(/[%_\\]/g, "\\$&")).eq("active", true).limit(1).maybeSingle();
-  if (error) fail("find field job", error.message);
-  const id = (data as { id: string } | null)?.id ?? null;
+  const id = await crewJobNamed(name);
   if (!id) return null;
   const { data: owner, error: oErr } = await db.from("jobs").select("id").eq("crew_job_id", id).maybeSingle();
   if (oErr) fail("check field job", oErr.message);
@@ -146,7 +174,7 @@ export async function awardPreview(opportunityId: string, asked: Partial<AwardCh
   const accepted = acceptedFor(b, choices, now);
   const { values: policies } = await loadPolicies();
   const plan = planAward({ opportunity: o, proposal: b.proposal, proposalNumber: proposalNumber(o), accepted, policies, choices, today: localDay(now) });
-  const [people, clientId, found] = await Promise.all([listPeople(), findClient(plan.client.name), findJob(o, plan.job.name)]);
+  const [people, clientId, found] = await Promise.all([listPeople(), findClient(plan.client.name), findJob(o, plan.job.name, plan.crew.name)]);
   // A job of the same name and address awarded from another opportunity is not this one: a second
   // project at the same house needs its own name ("4821 E Test Dr, phase 2").
   const other = found && found.id !== o.jobId && isAwarded(found);
