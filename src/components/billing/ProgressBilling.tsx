@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/bot/ui'
 import { formatValue } from '@/lib/analytics/format'
-import { computeDraw, type ProgressLine } from '@/lib/billing/progress'
+import { computeDraw, shareOf, type ProgressLine } from '@/lib/billing/progress'
 
 type State = { lines: ProgressLine[]; retainagePct: number; openDraft: { id: string; number: string } | null; draws: number; opening: Record<string, number> }
 
@@ -37,6 +37,9 @@ export default function ProgressBilling({ jobKey }: { jobKey: string }) {
   const asked = useMemo(() => Object.fromEntries(Object.entries(pcts).filter(([, v]) => v.trim() !== '').map(([k, v]) => [k, Number(v)])), [pcts])
   const draw = useMemo(() => (state ? computeDraw(state.lines, openingMode ? {} : asked, state.retainagePct) : null), [state, asked, openingMode])
 
+  // What was billed before the app (Joist), so this total and the invoices below reconcile.
+  const before = state ? state.lines.reduce((a, l) => a + (state.opening[l.key] ? shareOf(l.scheduledCents, state.opening[l.key]) : 0), 0) : 0
+
   if (error) return <p className="rounded-2xl border border-dashed border-[var(--color-stone-mid)] p-4 text-sm text-[var(--color-charcoal-light)]">{error}</p>
   if (!state || !draw) return <p className="p-4 text-sm text-[var(--color-charcoal-light)]">Loading the schedule of values…</p>
   if (!state.lines.length) return <p className="rounded-2xl border border-dashed border-[var(--color-stone-mid)] p-4 text-sm text-[var(--color-charcoal-light)]">No schedule of values on this job. Award writes one from the accepted proposal.</p>
@@ -61,6 +64,7 @@ export default function ProgressBilling({ jobKey }: { jobKey: string }) {
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">{openingMode ? 'Billed before the app' : 'Progress billing'}</p>
         <p className="text-xs text-[var(--color-charcoal-light)]">
           Billed to date {formatValue('money', draw.lines.reduce((a, l) => a + l.billedToDateCents, 0))} of {formatValue('money', draw.contractCents)}
+          {before ? ` (${formatValue('money', before)} of it before the app)` : ''}
           {state.retainagePct ? ` · ${state.retainagePct}% retainage` : ''}
         </p>
       </div>

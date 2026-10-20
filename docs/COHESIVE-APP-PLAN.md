@@ -385,7 +385,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - pre-cover `checklists` per phase gating verify;
    - punch items;
    - directives → CO intake.
-6. ✅ (except SOV % billing) **Billing completion:** done as 0040 (`change_orders`, `lien_waivers`), `src/lib/billing/registers.ts`, the registers on Billing and the job's Changes tab, and CO, package and waiver items in the task feed. Still open: ladder config (owner question 1) and SOV % billing.
+6. ✅ (except SOV % billing) **Billing completion:** done as 0040 (`change_orders`, `lien_waivers`), `src/lib/billing/registers.ts`, the registers on Billing and the job's Changes tab, and CO, package and waiver items in the task feed. Still open: ladder config (owner question 1). SOV % billing has shipped as 0041 (`sov_progress`), with `src/lib/billing/progress*.ts` and the Job › Money progress card.
    - CO register (A2), waiver register, invoice package at cutoff (A3), ladder config (A5);
    - SOV percent-complete billing replacing the Powell tracker path (keep the tracker until it's replaced).
 7. ✅ **Subs and compliance** (agy, `a7c0957`): sub scorecard and compliance register on Subs, a frozen work order with a mobilization gate, award and thank-you emails as drafts (never sent automatically), and a Gate 0 handoff card on the job page.
