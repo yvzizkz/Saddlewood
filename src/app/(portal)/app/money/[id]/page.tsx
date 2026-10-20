@@ -26,6 +26,9 @@ const EVENT_LABEL: Record<DocumentEvent["kind"], string> = {
   downloaded: "Opened",
   portal_submitted: "Submitted in their portal",
   note: "Note",
+  accepted: "Accepted by the client",
+  selected: "Client chose",
+  signed: "Signed",
 };
 
 function eventLine(e: DocumentEvent): string {

@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { getDocumentByToken } from "@/lib/billing/documents";
 import { listExhibits, type Exhibit } from "@/lib/billing/exhibits";
+import { listEvents } from "@/lib/billing/documents";
 import { recordOpening } from "@/lib/billing/opening";
+import { proposalFromDocument } from "@/lib/sales/store";
+import { publicSignature, signaturesOf, type PublicSignature } from "@/lib/sales/signing";
+import { ProposalView } from "@/components/sales/ProposalView";
 import { DocumentView } from "../DocumentView";
 
 // The client's copy of a document we issued: /d/<token>.
@@ -49,6 +53,49 @@ export default async function DocumentPage({
   }
 
   if (!ownCopy) await recordOpening(doc, "viewed");
+
+  // A proposal from Sales (kind estimate, with its proposal frozen in the
+  // snapshot): the client chooses a package and add-ons and accepts here.
+  const proposal = proposalFromDocument(doc);
+  if (proposal) {
+    let accepted = null;
+    let signatures: PublicSignature[] = [];
+    try {
+      const events = await listEvents(doc.id);
+      const a = events.find((e) => e.kind === "accepted");
+      if (a) {
+        accepted = {
+          at: a.at,
+          name: String(a.detail.name ?? ""),
+          packageName: String(a.detail.packageName ?? ""),
+          totalCents: Number(a.detail.totalCents) || 0,
+          packageId: String(a.detail.packageId ?? ""),
+          optionIds: Array.isArray(a.detail.options) ? (a.detail.options as { id?: string }[]).map((o) => String(o.id ?? "")) : [],
+        };
+      }
+      // What the page shows of each signature: never where it was signed from.
+      signatures = signaturesOf(events).map(publicSignature);
+    } catch (err) {
+      console.error("acceptance not loaded:", err);
+    }
+    const s = doc.snapshot;
+    return (
+      <ProposalView
+        proposal={proposal}
+        mode={ownCopy ? "preview" : "client"}
+        token={doc.token ?? undefined}
+        meta={{
+          number: doc.number,
+          date: s.date ?? doc.issuedAt,
+          preparedFor: { name: s.billTo?.name ?? "", attention: s.billTo?.attention },
+          project: { name: s.job?.name ?? doc.title, address: s.job?.address },
+          accepted,
+          signatures,
+          void: doc.status === "void",
+        }}
+      />
+    );
+  }
 
   // The original invoice and the waiver for each line, when we have put them
   // here. A failure to load them must not keep the client from the document.

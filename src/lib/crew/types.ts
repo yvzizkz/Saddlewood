@@ -50,6 +50,10 @@ export const CAPABILITIES = [
   { key: "money.prepare", area: "money", label: "Start or revise an invoice or change order draft (never sends)" },
   { key: "money.request", area: "money", label: "Ask an owner to approve and send a prepared document" },
   { key: "estimate.view", area: "money", label: "See their jobs' estimate totals (read only)" },
+  // Sales (0025): the pipeline and the estimate builder. Sending and
+  // countersigning also need the owners to allow it in Sales > Settings.
+  { key: "sales.view", area: "sales", label: "Sales: work the pipeline and build estimates" },
+  { key: "sales.send", area: "sales", label: "Send proposals and countersign them, when Sales settings allow it" },
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number]["key"];
 export const CAPABILITY_KEYS = CAPABILITIES.map((c) => c.key) as Capability[];
@@ -59,6 +63,7 @@ export function normalizePerms(perms: readonly string[]): Capability[] {
   const set = new Set(perms.filter((p): p is Capability => (CAPABILITY_KEYS as string[]).includes(p)));
   if (CAPABILITIES.some((c) => c.area === "crew" && c.key !== "crew.view" && set.has(c.key))) set.add("crew.view");
   if (set.has("hours.edit")) set.add("hours.view");
+  if (set.has("sales.send")) set.add("sales.view");
   return CAPABILITY_KEYS.filter((k) => set.has(k));
 }
 

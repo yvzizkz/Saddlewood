@@ -128,7 +128,12 @@ export type DocumentEventKind =
   | "viewed"
   | "downloaded"
   | "portal_submitted"
-  | "note";
+  | "note"
+  // A client's answer on a proposal link (0025).
+  | "accepted"
+  | "selected"
+  // A signature on a proposal, the client's or ours (0025; src/lib/sales/signing.ts).
+  | "signed";
 
 export type DocumentEvent = {
   id: number;

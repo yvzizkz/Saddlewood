@@ -370,6 +370,11 @@ export function CrewProvider({ children, initialLang, email }: { children: React
   )
 }
 
+/** The crew app's context when this screen sits in it, else null. */
+export function useCrewOptional(): Ctx | null {
+  return useContext(CrewContext)
+}
+
 export function useCrew(): Ctx {
   const ctx = useContext(CrewContext)
   if (!ctx) throw new Error('useCrew must be used inside <CrewProvider>')

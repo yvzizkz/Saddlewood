@@ -175,6 +175,7 @@ const EN = {
 
   // pickups (runners)
   tabCrew: 'Crew',
+  tabSales: 'Sales',
   pickups: 'Pickups',
   pickupFor: (job: string) => `for ${job}`,
   orderRef: (ref: string) => `Order ${ref}`,
@@ -246,6 +247,19 @@ const EN = {
   photoFailed: 'That photo did not upload. Try again.',
   uploading: 'Uploading…',
   remove: 'Remove',
+
+  // a lead from the field
+  referTitle: 'Refer a job',
+  referWhy: 'Someone asked about work? A neighbor, the client, someone on site. Send it to the office.',
+  referOpen: 'Send a lead',
+  referWhat: 'What do they want done?',
+  referWhatHint: 'A patio cover, the next bathroom, a garage conversion…',
+  referName: 'Their name',
+  referPhone: 'Their phone',
+  referAddress: 'Address',
+  referNote: 'Anything else',
+  referSend: 'Send to the office',
+  referSent: (n: string) => `Sent. The office has it (${n}).`,
 }
 
 type Strings = typeof EN
@@ -411,6 +425,7 @@ const ES: Strings = {
   donePhotoHint: 'Terminado quiere decir que se puede revisar: agrega una foto del trabajo terminado.',
 
   tabCrew: 'Equipo',
+  tabSales: 'Ventas',
   pickups: 'Recoger material',
   pickupFor: (job) => `para ${job}`,
   orderRef: (ref) => `Orden ${ref}`,
@@ -479,6 +494,18 @@ const ES: Strings = {
   photoFailed: 'Esa foto no se subió. Intenta de nuevo.',
   uploading: 'Subiendo…',
   remove: 'Quitar',
+
+  referTitle: 'Recomendar un trabajo',
+  referWhy: '¿Alguien preguntó por un trabajo? Un vecino, el cliente, alguien en la obra. Mándalo a la oficina.',
+  referOpen: 'Mandar un cliente',
+  referWhat: '¿Qué quieren que se haga?',
+  referWhatHint: 'Un techo de patio, el otro baño, convertir el garaje…',
+  referName: 'Su nombre',
+  referPhone: 'Su teléfono',
+  referAddress: 'Dirección',
+  referNote: 'Algo más',
+  referSend: 'Mandar a la oficina',
+  referSent: (n: string) => `Enviado. La oficina lo tiene (${n}).`,
 }
 
 export const STRINGS: Record<CrewLang, Strings> = { en: EN, es: ES }

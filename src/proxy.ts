@@ -56,6 +56,18 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // 0b. Sales: staff, the agent token, or a crew seat whose group has Sales on.
+  // Signed out (and not the token) stops here; which seat may do what is the
+  // route's call (src/lib/sales/access.ts).
+  if (pathname.startsWith("/api/sales")) {
+    const authHeader = request.headers.get("authorization");
+    const token = !!(authHeader && process.env.OPS_AGENT_TOKEN && authHeader === `Bearer ${process.env.OPS_AGENT_TOKEN}`);
+    if (!token && (!user || !(isAllowed || isCrew))) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    return supabaseResponse;
+  }
+
   // 1. Guarded API routes
   // Not in this list, on purpose: /api/proposals, /api/contracts, /api/leads.
   // Part of each is for someone who cannot sign in (a client's proposal or
