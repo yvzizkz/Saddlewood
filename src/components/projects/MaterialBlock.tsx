@@ -2,11 +2,13 @@
 
 import { Chip } from '@/components/bot/ui'
 import { day, money } from '@/components/money/format'
+import PurchaseSearch from '@/components/purchases/PurchaseSearch'
 import type { MaterialBlock as Material } from '@/lib/crew/purchases'
 
 // The Material block of a job's money card (0022): the last twelve months of
 // Home Depot on this field job, from /api/crew/projects/money. Read only.
-// Cents come from the server; this only formats them.
+// Cents come from the server; this only formats them. With the field job
+// known, "Find a purchase" (0026) searches this job, any year.
 
 const TRADE_LABEL: Record<string, string> = {
   framing: 'Framing',
@@ -19,9 +21,15 @@ const TRADE_LABEL: Record<string, string> = {
   general: 'General',
 }
 
-export default function MaterialBlock({ m }: { m: Material }) {
+export default function MaterialBlock({ m, jobId = '', jobName = '' }: { m: Material; jobId?: string; jobName?: string }) {
+  const search = jobId ? <PurchaseSearch jobId={jobId} jobName={jobName} open={false} /> : null
   if (!m.trips) {
-    return <p className="mt-3 text-[12px] text-[var(--color-charcoal-light)]">Material: no Home Depot trips on this job in the last 12 months.</p>
+    return (
+      <div className="mt-3">
+        <p className="text-[12px] text-[var(--color-charcoal-light)]">Material: no Home Depot trips on this job in the last 12 months.</p>
+        {search}
+      </div>
+    )
   }
   return (
     <div className="mt-3">
@@ -60,6 +68,7 @@ export default function MaterialBlock({ m }: { m: Material }) {
       <p className="mt-1 text-[11px] text-[var(--color-charcoal-light)]">
         {m.lastOn ? `Last trip ${day(m.lastOn)}. ` : ''}Spent is net of returns.
       </p>
+      {search}
     </div>
   )
 }

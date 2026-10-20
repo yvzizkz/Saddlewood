@@ -99,7 +99,7 @@ function Project({ p, money, day, can, onChange }: { p: ProjectCard; money: bool
       <p className="mt-1 text-[12px] text-[var(--color-charcoal-light)]">
         {p.people.length ? p.people.map((x) => `${x.name} (${ROLE[x.role] ?? x.role})`).join(' · ') : 'Nobody assigned to this job yet.'}
       </p>
-      {money ? <ProjectMoneySlot crewJobId={p.id} billingJobId={p.billingJobId} /> : null}
+      {money ? <ProjectMoneySlot crewJobId={p.id} billingJobId={p.billingJobId} jobName={p.name} /> : null}
     </Card>
   )
 }

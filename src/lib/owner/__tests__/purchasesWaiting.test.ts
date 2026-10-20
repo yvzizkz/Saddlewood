@@ -13,8 +13,8 @@ function name(over: Partial<UnmatchedPurchase> & { key: string }): UnmatchedPurc
   return { name: over.key.toUpperCase(), trips: 1, lines: 1, cents: 1000, lastOn: "2026-08-12", firstOn: "2026-08-12", ...over };
 }
 
-function input(purchases?: UnmatchedPurchase[]): WaitingInput {
-  return { now: NOW, people: [], reports: [], tasks: [], jobs: [], timefixes: 0, reviews: 0, money: null, purchases };
+function input(purchases?: UnmatchedPurchase[], olderPurchases?: WaitingInput["olderPurchases"]): WaitingInput {
+  return { now: NOW, people: [], reports: [], tasks: [], jobs: [], timefixes: 0, reviews: 0, money: null, purchases, olderPurchases };
 }
 
 describe("Which job is this? on Home", () => {
@@ -50,5 +50,21 @@ describe("Which job is this? on Home", () => {
     expect(items[PURCHASE_ITEMS]).toMatchObject({ key: "purchase-more", lane: "money", title: "2 more Home Depot names need a job", detail: "'NAME 1' $2, 'NAME 0' $1" });
     expect(buildWaiting(input([]))).toEqual([]);
     expect(buildWaiting(input())).toEqual([]);
+  });
+
+  it("sums the names from before the app into one line, never cards (0026)", () => {
+    const items = buildWaiting(input([name({ key: "pt loma", name: "PT LOMA", cents: 1346600, trips: 41 })], { count: 1100, cents: 12345600 }));
+    expect(items).toHaveLength(2);
+    expect(items[1]).toEqual({
+      key: "purchase-older",
+      lane: "money",
+      kind: "decision",
+      title: "1,100 older Home Depot names from before the app",
+      detail: "$123,456 across them; find them with search.",
+      href: "/app/money",
+      at: null,
+    });
+    expect(buildWaiting(input([], { count: 1, cents: 500 }))[0].title).toBe("1 older Home Depot name from before the app");
+    expect(buildWaiting(input([], { count: 0, cents: 0 }))).toEqual([]);
   });
 });

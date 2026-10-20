@@ -19,8 +19,23 @@ export function UnmatchedPurchases() {
   const { data, run, isOwner } = useCrewAdmin()
   const [busy, setBusy] = useState<string | null>(null)
   const names = data?.unmatchedPurchases ?? []
-  if (!data || !names.length) return null
+  const older = data?.olderPurchaseNames ?? 0
+  if (!data || (!names.length && !older)) return null
   const jobs = data.jobs.filter((j) => j.active)
+  // The history from before the app (0026): one line, not a thousand cards; search on Money finds any of them.
+  const olderLine = older ? (
+    <p className="mt-2 text-[12px] text-[var(--color-charcoal-light)]">
+      {older.toLocaleString('en-US')} older name{older === 1 ? '' : 's'} from before the app; find them with search.
+    </p>
+  ) : null
+  if (!names.length) {
+    return (
+      <>
+        <SectionTitle>Which job is this?</SectionTitle>
+        {olderLine}
+      </>
+    )
+  }
 
   async function answer(p: UnmatchedPurchase, jobId: string | null) {
     setBusy(p.key)
@@ -69,6 +84,7 @@ export function UnmatchedPurchases() {
           )
         })}
       </Card>
+      {olderLine}
     </>
   )
 }
