@@ -113,8 +113,8 @@ test.describe("Owner: the owner's week", () => {
     // 390px phone check: Duties (/app/duties) is listed in /app/more and opens (T43).
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/app/more", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("link", { name: "Roles and duties" })).toBeVisible();
-    await page.getByRole("link", { name: "Roles and duties" }).click();
+    await expect(page.getByRole("link", { name: /^Duties\b/ })).toBeVisible();
+    await page.getByRole("link", { name: /^Duties\b/ }).click();
     await expect(page).toHaveURL(/\/app\/duties$/);
   });
 });
