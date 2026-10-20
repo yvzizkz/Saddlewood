@@ -23,6 +23,15 @@ if [[ "${1:-}" == "--reset" ]]; then
   run -c "drop schema if exists public cascade; create schema public; grant usage on schema public to postgres, anon, authenticated, service_role; grant all on schema public to postgres, service_role;"
 fi
 
+# The hosted project grants every new table, sequence and function in public to
+# the API roles by default, and the migrations narrow that where they mean to
+# (e.g. 0012 revokes, then grants service_role only what it uses). Newer local
+# stacks no longer do, so set the hosted defaults first, or schema.sql's
+# tables would be unreadable even to the service role.
+run -c "alter default privileges for role postgres in schema public grant all on tables to anon, authenticated, service_role;
+        alter default privileges for role postgres in schema public grant all on sequences to anon, authenticated, service_role;
+        alter default privileges for role postgres in schema public grant all on functions to anon, authenticated, service_role;"
+
 echo "schema.sql"
 run < supabase/schema.sql
 for f in supabase/migrations/*.sql; do

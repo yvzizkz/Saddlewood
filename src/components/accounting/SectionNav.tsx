@@ -6,6 +6,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { useEffect, useRef } from 'react'
 
 import { ACCOUNTING_SECTIONS } from '@/components/layout/nav'
 
@@ -18,8 +19,13 @@ export default function SectionNav() {
     if (v) keep.set(k, v)
   }
   const q = keep.toString()
+  // On a phone the row scrolls: bring the current section into view.
+  const nav = useRef<HTMLElement>(null)
+  useEffect(() => {
+    nav.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'center' })
+  }, [pathname])
   return (
-    <nav aria-label="Accounting sections" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+    <nav ref={nav} aria-label="Accounting sections" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
       <ul className="flex w-max gap-1 rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-1">
         {ACCOUNTING_SECTIONS.map((s) => {
           const on = s.href === '/app/accounting' ? pathname === s.href : pathname === s.href || pathname.startsWith(s.href + '/')

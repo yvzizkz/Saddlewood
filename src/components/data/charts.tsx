@@ -229,7 +229,8 @@ export function BreakdownBars({ slices, kind, noun }: { slices: ChartSlice[]; ki
 }
 
 export function Sparkline({ values, width = 96, height = 28 }: { values: number[]; width?: number; height?: number }) {
-  if (values.length < 2) return null
+  // Two points say nothing about a trend (a Tuesday's week to date).
+  if (values.length < 3) return null
   const max = Math.max(...values, 1)
   const pts = values.map((v, i) => `${((width - 4) * i) / (values.length - 1) + 2},${height - 3 - ((height - 6) * v) / max}`)
   return (
