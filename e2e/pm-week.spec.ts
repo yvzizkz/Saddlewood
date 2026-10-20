@@ -158,8 +158,7 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
       await expect(whose.getByRole("link", { name: /^My jobs \(/ })).toBeVisible();
       await expect(whose.getByRole("link", { name: /Everyone/ })).toHaveCount(0);
 
-      await page.getByRole("searchbox", { name: "Search" }).fill(taskTitle);
-      await expect(page.getByRole("table")).toContainText(taskTitle);
+      await expect(page.getByRole("row").filter({ hasText: taskTitle })).toHaveCount(1);
 
       const handoffRow = page.locator("li", { hasText: taskTitle }).first();
       await expect(handoffRow).toBeVisible();
@@ -170,7 +169,8 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
       expect((await waitDone).status()).toBe(200);
       taskId = null;
 
-      await expect(page.getByRole("table")).toHaveCount(0);
+      await expect(page.locator("li", { hasText: taskTitle })).toHaveCount(0);
+      await expect(page.getByRole("row").filter({ hasText: taskTitle })).toHaveCount(0);
     } finally {
       if (taskId !== null) {
         await page.request.patch("/api/tasks", { data: { id: taskId, status: "dropped" } });

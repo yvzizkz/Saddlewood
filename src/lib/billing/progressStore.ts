@@ -158,9 +158,37 @@ export async function setOpening(billingJobId: string, pcts: Record<string, numb
   }
   const db = getSupabaseAdmin();
   const { data } = await db.from("jobs").select("billing").eq("id", billingJobId).maybeSingle();
-  const billing = { ...(((data as { billing?: Record<string, unknown> } | null)?.billing) ?? {}), sovOpening: clean, sovOpeningBy: by, sovOpeningAt: new Date().toISOString(), pmReport: null };
+  const billing = { ...(((data as { billing?: Record<string, unknown> } | null)?.billing) ?? {}), sovOpening: clean, sovOpeningBy: by, sovOpeningAt: new Date().toISOString() };
   const { error } = await db.from("jobs").update({ billing }).eq("id", billingJobId);
   if (error) throw new Error(`jobs update: ${error.message}`);
+}
+
+/** Clear the PM's percent-complete report on a job (owners only). */
+export async function clearReport(billingJobId: string): Promise<void> {
+  const db = getSupabaseAdmin();
+  const { data } = await db.from("jobs").select("billing").eq("id", billingJobId).maybeSingle();
+  if (!data) throw new ProgressError("No such job.", 404);
+  const billing = { ...(((data as { billing?: Record<string, unknown> }).billing) ?? {}) };
+  delete billing.pmReport;
+  const { error } = await db.from("jobs").update({ billing }).eq("id", billingJobId);
+  if (error) throw new Error(`jobs update: ${error.message}`);
+}
+
+/** Set the billing cutoff day (1–31, or null for 1st & 15th) on a job's client (owners only). */
+export async function setClientCutoff(billingJobId: string, cutoffDay: number | null): Promise<void> {
+  if (cutoffDay !== null && (!Number.isInteger(cutoffDay) || cutoffDay < 1 || cutoffDay > 31)) {
+    throw new ProgressError("Cutoff day must be 1 to 31.", 400);
+  }
+  const db = getSupabaseAdmin();
+  const { data: job } = await db.from("jobs").select("client_id").eq("id", billingJobId).maybeSingle();
+  const clientId = (job as { client_id?: string | null } | null)?.client_id;
+  if (!clientId) throw new ProgressError("This job has no client.", 400);
+  const { data: client } = await db.from("clients").select("billing").eq("id", clientId).maybeSingle();
+  const billing = { ...(((client as { billing?: Record<string, unknown> } | null)?.billing) ?? {}) };
+  if (cutoffDay === null) delete billing.cutoffDay;
+  else billing.cutoffDay = cutoffDay;
+  const { error } = await db.from("clients").update({ billing }).eq("id", clientId);
+  if (error) throw new Error(`clients update: ${error.message}`);
 }
 
 /** Preview a draw: the same math the draft will use. */

@@ -4,7 +4,7 @@
 
 import { readFileSync } from "node:fs";
 
-import { cents, expect, hours, test } from "./support/env";
+import { cents, cutoffInDays, expect, hours, test } from "./support/env";
 
 const JOB = "8009-n-ironwood-dr";
 
@@ -17,11 +17,21 @@ test.describe("Finance: the AFT billing week", () => {
     await expect(aft).toContainText("Conditional waiver");
     await expect(aft).toContainText("% complete by");
     // The same dates are in Tasks: the PM's % complete and Finance's package.
-    await page.goto("/app/tasks?view=all");
-    const table = page.locator('[data-table="tasks-all"]');
-    await table.getByRole("searchbox").fill("A Finer Touch");
-    await expect(table.getByRole("row").filter({ hasText: "% complete and photos for A Finer Touch" })).toHaveCount(1);
-    await expect(table.getByRole("row").filter({ hasText: "Invoice package for A Finer Touch" })).toHaveCount(1);
+    // Set AFT's cutoff 3 days ahead of today so this check holds on every day of the month.
+    try {
+      await page.request.post(`/api/jobs/${JOB}/progress`, {
+        data: { action: "cutoff", cutoffDay: cutoffInDays(3) },
+      });
+      await page.goto("/app/tasks?view=all");
+      const table = page.locator('[data-table="tasks-all"]');
+      await table.getByRole("searchbox").fill("A Finer Touch");
+      await expect(table.getByRole("row").filter({ hasText: "% complete and photos for A Finer Touch" })).toHaveCount(1);
+      await expect(table.getByRole("row").filter({ hasText: "Invoice package for A Finer Touch" })).toHaveCount(1);
+    } finally {
+      await page.request.post(`/api/jobs/${JOB}/progress`, {
+        data: { action: "cutoff", cutoffDay: 23 },
+      });
+    }
   });
 
   test("a change in the field goes from request to price to signed to billed, and Finance is told to bill it", async ({ owner: page }) => {

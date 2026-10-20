@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { jobForWrite, workSeat } from "@/lib/jobs/access";
 import { loadPeople } from "@/lib/roles/store";
-import { createDrawDraft, loadProgress, previewDraw, ProgressError, saveReport, setOpening } from "@/lib/billing/progressStore";
+import { createDrawDraft, clearReport, loadProgress, previewDraw, ProgressError, saveReport, setClientCutoff, setOpening } from "@/lib/billing/progressStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const found = await billingJob((await params).id);
   if (found instanceof NextResponse) return found;
   const { seat, job } = found;
-  const body = (await request.json().catch(() => null)) as { action?: string; pcts?: Record<string, number>; note?: string } | null;
+  const body = (await request.json().catch(() => null)) as { action?: string; pcts?: Record<string, number>; note?: string; cutoffDay?: number | null } | null;
   const pcts = body?.pcts && typeof body.pcts === "object" ? body.pcts : {};
   try {
     if (body?.action === "preview") return NextResponse.json({ ok: true, draw: previewDraw(await loadProgress(job), pcts) });
@@ -60,6 +60,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     if (body?.action === "opening") {
       await setOpening(job, pcts, owner.email);
+      return NextResponse.json({ ok: true });
+    }
+    if (body?.action === "clearReport") {
+      await clearReport(job);
+      return NextResponse.json({ ok: true });
+    }
+    if (body?.action === "cutoff") {
+      await setClientCutoff(job, body.cutoffDay ?? null);
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ ok: false, error: "Which action: preview, draw or opening?" }, { status: 400 });

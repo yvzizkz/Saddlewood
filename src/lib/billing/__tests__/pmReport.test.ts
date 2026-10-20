@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { nextCutoff, previousCutoff, reportedThisCycle } from "@/lib/accounting/receivables";
+import { businessDaysBefore, nextCutoff, previousCutoff, reportedThisCycle } from "@/lib/accounting/receivables";
+import { addDays } from "@/lib/crew/time";
 import { checkReport, type ProgressLine } from "../progress";
 
 // The PM's percent complete for a billing cycle: the same rules as a draw, and
@@ -41,5 +42,16 @@ describe("billing cycles", () => {
     expect(reportedThisCycle("2026-09-24", day, 23)).toBe(true);
     expect(reportedThisCycle("2026-09-23", day, 23)).toBe(false);
     expect(reportedThisCycle(null, day, 23)).toBe(false);
+  });
+
+  it("keeps a cutoff 3 days ahead of today inside the 7-day prep window and current cycle on every day of the year", () => {
+    for (let i = 0; i < 365; i++) {
+      const today = addDays("2026-01-01", i);
+      const cutoffDay = Number(addDays(today, 3).slice(8, 10));
+      const day = nextCutoff(today, cutoffDay);
+      const prepOn = businessDaysBefore(day, 3);
+      expect(prepOn <= addDays(today, 7), today).toBe(true);
+      expect(reportedThisCycle(today, day, cutoffDay), today).toBe(true);
+    }
   });
 });

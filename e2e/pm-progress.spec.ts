@@ -1,6 +1,6 @@
 import { expect, test as base, type Page } from "@playwright/test";
 
-import { cents, OWNER, PM, signIn } from "./support/env";
+import { cents, cutoffInDays, OWNER, PM, signIn } from "./support/env";
 
 // Scenario 8b / PM progress report (docs/SCENARIOS.md): Eli sends % complete
 // from the job's Money tab before cutoff; the "% complete and photos" task
@@ -42,9 +42,13 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
     };
 
     try {
-      // Ensure clean baseline (no prior pmReport on 9146) before checking Tasks.
+      // Ensure clean baseline (no prior pmReport on 9146) and set Schifferer's
+      // cutoff 3 days ahead of today so the task is always within the 7-day prep window.
       await ownerPage.request.post(`/api/jobs/${BELLEVUE}/progress`, {
-        data: { action: "opening", pcts: initialState.opening },
+        data: { action: "clearReport" },
+      });
+      await ownerPage.request.post(`/api/jobs/${BELLEVUE}/progress`, {
+        data: { action: "cutoff", cutoffDay: cutoffInDays(3) },
       });
 
       // 1. Before reporting, '% complete and photos for Schifferer Built LLC (Synthetic)' is in PM's Tasks.
@@ -95,7 +99,10 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
       ).toHaveCount(0);
     } finally {
       await ownerPage.request.post(`/api/jobs/${BELLEVUE}/progress`, {
-        data: { action: "opening", pcts: initialState.opening },
+        data: { action: "clearReport" },
+      });
+      await ownerPage.request.post(`/api/jobs/${BELLEVUE}/progress`, {
+        data: { action: "cutoff", cutoffDay: 20 },
       });
     }
   });
@@ -108,6 +115,21 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
     let createdDocId: string | null = null;
 
     try {
+      const priorRes = await ownerPage.request.get(`/api/jobs/${POWELL}/progress`);
+      if (priorRes.ok()) {
+        const prior = (await priorRes.json()) as { openDraft?: { id: string } | null };
+        if (prior.openDraft?.id) {
+          await ownerPage.request.post(`/api/billing/documents/${prior.openDraft.id}/issue`, {
+            data: {},
+          });
+          await ownerPage.request.post(`/api/billing/documents/${prior.openDraft.id}/void`, {
+            data: { reason: "e2e cleanup" },
+          });
+        }
+      }
+      await ownerPage.request.post(`/api/jobs/${POWELL}/progress`, {
+        data: { action: "clearReport" },
+      });
       const openRes = await ownerPage.request.post(`/api/jobs/${POWELL}/progress`, {
         data: { action: "opening", pcts: powellOpening },
       });
@@ -183,6 +205,9 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
           data: { reason: "e2e cleanup" },
         });
       }
+      await ownerPage.request.post(`/api/jobs/${POWELL}/progress`, {
+        data: { action: "clearReport" },
+      });
       await ownerPage.request.post(`/api/jobs/${POWELL}/progress`, {
         data: { action: "opening", pcts: powellOpening },
       });

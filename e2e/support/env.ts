@@ -79,3 +79,16 @@ export function hours(text: string | null | undefined): number | null {
   const m = text.replace(/[^0-9.]/g, "");
   return m ? Number(m) : null;
 }
+
+/** Day-of-month `days` ahead of Phoenix today, so a client's cutoff is always within the 7-day prep window regardless of what day the suite runs. */
+export function cutoffInDays(days = 3): number {
+  const phoenixToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Phoenix",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const d = new Date(`${phoenixToday}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.getUTCDate();
+}
