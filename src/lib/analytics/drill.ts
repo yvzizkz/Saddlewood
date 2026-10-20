@@ -33,6 +33,8 @@ export type DrillSpec<T> = {
   dims: Dim<T>[];
   value: (row: T) => number;
   dayOf: (row: T) => string | null;
+  /** Params every link keeps, e.g. { tab: "labor" } when a section sits inside a job page. */
+  fixed?: Record<string, string>;
 };
 
 export type Crumb = { label: string; href: string };
@@ -77,7 +79,7 @@ export function drill<T>(
   searchParams: Params,
   opts: { previousRows?: readonly T[]; limit?: number } = {},
 ): DrillResult<T> {
-  const base: Record<string, string> = { ...periodParams(period) };
+  const base: Record<string, string> = { ...(spec.fixed ?? {}), ...periodParams(period) };
 
   // Filters in the order the dims are declared, so the breadcrumb reads the same
   // way whichever slice was tapped first.

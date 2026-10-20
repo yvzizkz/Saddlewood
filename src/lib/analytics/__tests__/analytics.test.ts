@@ -172,3 +172,19 @@ describe("drill", () => {
     expect(d.breakdown.slices[0].href).toBeNull();
   });
 });
+
+describe("drill inside another page", () => {
+  it("keeps the fixed params on every link", () => {
+    const spec: DrillSpec<{ day: string; t: string; v: number }> = {
+      path: "/app/jobs/8009",
+      title: "Labor",
+      dims: [{ key: "trade", label: "Trade", plural: "trades", of: (r) => ({ key: r.t, label: r.t }) }],
+      value: (r) => r.v,
+      dayOf: (r) => r.day,
+      fixed: { tab: "labor" },
+    };
+    const d = drill(spec, [{ day: "2026-10-20", t: "framing", v: 1 }], resolvePeriod({ p: "wtd" }, TODAY), {});
+    expect(d.crumbs[0].href).toBe("/app/jobs/8009?tab=labor&p=wtd");
+    expect(d.byOptions[0].href).toContain("tab=labor");
+  });
+});

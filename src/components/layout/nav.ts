@@ -49,7 +49,7 @@ export const ACCOUNTING_SECTIONS: { href: string; label: string; short: string }
 export const NAV: NavItem[] = [
   { href: '/app', label: 'Home', icon: Home, group: 'Work', tab: 1 },
   { href: '/app/sales', label: 'Sales', icon: TrendingUp, group: 'Work', tab: 2 },
-  { href: '/app/projects', label: 'Jobs', icon: Briefcase, group: 'Work', tab: 3, also: ['/app/jobs'] },
+  { href: '/app/jobs', label: 'Jobs', icon: Briefcase, group: 'Work', tab: 3, access: 'owner', also: ['/app/projects'] },
   { href: '/app/crew', label: 'Crew', icon: HardHat, group: 'Work', tab: 4, access: 'crewAdmin' },
   { href: '/app/subs', label: 'Subs and bids', icon: Users, group: 'Work' },
   {
