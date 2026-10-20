@@ -178,13 +178,18 @@ export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<Purchase
   const decoded = decodeURIComponent(keyOrSourceKey);
   const tk = computeTripKey(decoded);
 
-  // Match either exact trip_key or exact source_key
+  // Match either exact trip_key (decoded or derived from source_key) or exact source_key
+  const tripCandidates = Array.from(new Set([decoded, tk].filter(Boolean)));
   const [byTripRes, crewJobsRes, billingJobsRes, trades, billRes] = await Promise.all([
-    db.from("purchases").select("*").or(`trip_key.eq.${tk},source_key.eq.${decoded}`).order("source_key", { ascending: true }),
+    db
+      .from("purchases")
+      .select("*")
+      .or(`trip_key.eq.${decoded},trip_key.eq.${tk},source_key.eq.${decoded}`)
+      .order("source_key", { ascending: true }),
     db.from("crew_jobs").select("id,name,active").order("name"),
     db.from("jobs").select("id,name,crew_job_id"),
     listTrades(),
-    db.from("bills").select("id,bill_number,status,amount_cents").eq("purchase_trip_key", tk).maybeSingle(),
+    db.from("bills").select("id,bill_number,status,amount_cents").in("purchase_trip_key", tripCandidates).limit(1).maybeSingle(),
   ]);
 
   if (byTripRes.error || !byTripRes.data?.length) return null;

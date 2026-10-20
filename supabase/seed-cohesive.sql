@@ -1755,4 +1755,231 @@ values
     'seed-cohesive'
   );
 
+-- ---------------------------------------------------------------------------
+-- 10. Sub Contacts, Bid Invites/Responses & Sales Opportunities (`0025`, `0028`)
+-- ---------------------------------------------------------------------------
+
+insert into public.sub_contacts (id, sub_id, name, email, phone, role, is_primary, active)
+values
+  ('d1000001-0000-4000-8000-000000000001', 'd0000001-0000-4000-8000-000000000001', 'Hector Medina', 'bids.medina@example.com', '555-0201', 'Chief Estimator', true, true),
+  ('d1000001-0000-4000-8000-000000000002', 'd0000001-0000-4000-8000-000000000002', 'ryan.mega', 'ap.megaelectric@example.com', '555-0202', 'PM / Estimator', true, true),
+  ('d1000001-0000-4000-8000-000000000003', 'd0000001-0000-4000-8000-000000000003', 'Luis Sonoran', 'estimating.sonoran@example.com', '555-0203', 'Operations', true, true),
+  ('d1000001-0000-4000-8000-000000000004', 'd0000001-0000-4000-8000-000000000004', 'Gabe Desert', 'office.gbdpaint@example.com', '555-0204', 'Owner', true, true),
+  ('d1000001-0000-4000-8000-000000000005', 'd0000001-0000-4000-8000-000000000005', 'Arturo Diaz', 'ad.concrete@example.com', '555-0205', 'Estimator', true, true)
+on conflict (id) do update
+  set name = excluded.name,
+      email = excluded.email,
+      is_primary = excluded.is_primary,
+      active = excluded.active;
+
+-- Bid invites on Package e0000001-0000-4000-8000-000000000001 (Bellevue Insulation, awarded)
+insert into public.bid_invites (
+  id, package_id, sub_id, contact_name, contact_email, token, status, sent_at, viewed_at, level_add_cents, level_note, created_by
+)
+values
+  (
+    'e1000001-0000-4000-8000-000000000001',
+    'e0000001-0000-4000-8000-000000000001',
+    'd0000001-0000-4000-8000-000000000001',
+    'Hector Medina',
+    'bids.medina@example.com',
+    'seed_token_bellevue_medina_0001',
+    'awarded',
+    now() - interval '28 days',
+    now() - interval '27 days',
+    0,
+    '',
+    'seed-cohesive'
+  ),
+  (
+    'e1000001-0000-4000-8000-000000000002',
+    'e0000001-0000-4000-8000-000000000001',
+    'd0000001-0000-4000-8000-000000000003',
+    'Luis Sonoran',
+    'estimating.sonoran@example.com',
+    'seed_token_bellevue_sonoran_0002',
+    'not_awarded',
+    now() - interval '28 days',
+    now() - interval '27 days',
+    120000,
+    'Excluded mineral wool safing at top-of-wall',
+    'seed-cohesive'
+  )
+on conflict (id) do update
+  set status = excluded.status,
+      level_add_cents = excluded.level_add_cents,
+      level_note = excluded.level_note;
+
+update public.bid_packages
+set awarded_invite_id = 'e1000001-0000-4000-8000-000000000001'
+where id = 'e0000001-0000-4000-8000-000000000001';
+
+insert into public.bid_responses (
+  invite_id, revision, lines, total_cents, inclusions, exclusions, start_on, duration, valid_days, deviations, note, signer_name, signer_title, signature, consent, fingerprint
+)
+values
+  (
+    'e1000001-0000-4000-8000-000000000001',
+    1,
+    '[{"lineId": "r19-walls", "cents": 2040000, "note": ""}, {"lineId": "shaft-sound", "cents": 910000, "note": ""}]'::jsonb,
+    2950000,
+    'All R-19 kraft/unfaced batts, sound attenuation mineral wool, and acoustical caulk.',
+    'Spray foam at roof deck.',
+    current_date - 14,
+    '10 working days',
+    45,
+    '',
+    'Includes lift rental.',
+    'Hector Medina',
+    'Chief Estimator',
+    '{"method": "type", "typed": "Hector Medina", "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}'::jsonb,
+    'I confirm this bid on behalf of Medina Pro Drywall LLC.',
+    'fp_seed_bellevue_medina_rev1_2950000'
+  ),
+  (
+    'e1000001-0000-4000-8000-000000000002',
+    1,
+    '[{"lineId": "r19-walls", "cents": 2010000, "note": ""}, {"lineId": "shaft-sound", "cents": 890000, "note": ""}]'::jsonb,
+    2900000,
+    'R-19 and shaft sound batts.',
+    'Top-of-wall fire safing.',
+    current_date - 12,
+    '12 working days',
+    30,
+    'Excludes top-of-wall safing',
+    '',
+    'Luis Sonoran',
+    'Operations',
+    '{"method": "type", "typed": "Luis Sonoran", "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}'::jsonb,
+    'I confirm this bid on behalf of Sonoran Thermal Insulation LLC.',
+    'fp_seed_bellevue_sonoran_rev1_2900000'
+  )
+on conflict (invite_id, revision) do nothing;
+
+-- Sales Opportunities (`sales_opportunities`) for Sales department & Sales week
+insert into public.sales_opportunities (
+  id, number, title, stage, kind, source, contact, address, client_id, job_id,
+  value_cents, probability, owner, next_step, next_step_on, bid_due, notes, tags, created_by
+)
+values
+  (
+    'c2000001-0000-4000-8000-000000008009',
+    '26-0001',
+    'Jury Residence — Workout Room & Home Theater Addition',
+    'won',
+    'addition',
+    'repeat',
+    '{"name": "Brad & Sarah Jury", "company": "A Finer Touch Construction (Synth)", "phone": "480-555-0101", "email": "ap.aft.synth@example.com"}'::jsonb,
+    '8009 N Ironwood Dr, Paradise Valley, AZ 85253',
+    'c0000001-0000-4000-8000-000000000001',
+    'b0000001-0000-4000-8000-000000008009',
+    11850000,
+    100,
+    'Marco',
+    'In production',
+    null,
+    null,
+    'Awarded framing, insulation, and Level 5 drywall package.',
+    array['aft', 'paradise-valley'],
+    'seed-cohesive'
+  ),
+  (
+    'c2000001-0000-4000-8000-000000009146',
+    '26-0002',
+    'Bellevue University AC938 — Franklin Hall TI Framing & Drywall',
+    'won',
+    'commercial_ti',
+    'bid_invite',
+    '{"name": "Kurt Schifferer", "company": "Schifferer Commercial Builders (Synth)", "phone": "602-555-0144", "email": "kurt.schifferer.synth@example.com"}'::jsonb,
+    '9146 W Hutton Dr, Peoria, AZ 85382',
+    'c0000001-0000-4000-8000-000000000002',
+    'b0000001-0000-4000-8000-000000009146',
+    21000000,
+    100,
+    'Marco',
+    'In production',
+    null,
+    null,
+    'Commercial TI metal stud framing, acoustic insulation, and Type X drywall.',
+    array['commercial', 'peoria'],
+    'seed-cohesive'
+  ),
+  (
+    'c2000001-0000-4000-8000-000000007120',
+    '26-0003',
+    'Kierland Commons Suite 210 — Dental Studio TI Framing & Acoustic Ceilings',
+    'proposal_sent',
+    'commercial_ti',
+    'referral',
+    '{"name": "Dr. Elena Vance", "company": "Vance Dental Studio (Synth)", "phone": "480-555-0192", "email": "elena.vance.synth@example.com"}'::jsonb,
+    '7120 E Kierland Blvd, Scottsdale, AZ 85254',
+    null,
+    null,
+    6850000,
+    55,
+    'Marco',
+    'Follow up on revision 1 acoustic soffit option',
+    current_date - 6, -- 6 days overdue -> triggers >5d follow-up escalation!
+    current_date + 4,
+    'Referred by AFT project manager; proposal sent last week.',
+    array['dental-ti', 'scottsdale'],
+    'seed-cohesive'
+  ),
+  (
+    'c2000001-0000-4000-8000-000000005410',
+    '26-0004',
+    'Silverleaf Lot 18 — Guest Casita Framing & Smooth Drywall',
+    'estimating',
+    'custom_home',
+    'call',
+    '{"name": "grant.hale", "company": "Hale Custom Homes (Synth)", "phone": "480-555-0177", "email": "grant.hale.synth@example.com"}'::jsonb,
+    '5410 E Thompson Peak Pkwy, Scottsdale, AZ 85255',
+    null,
+    null,
+    9400000,
+    40,
+    'Marco',
+    'Complete structural wood + steel beam takeoff from S-sheets',
+    current_date + 1,
+    current_date + 5,
+    'Architectural + structural plans uploaded; pricing framing + drywall.',
+    array['custom-home', 'silverleaf'],
+    'seed-cohesive'
+  )
+on conflict (id) do update
+  set title = excluded.title,
+      stage = excluded.stage,
+      source = excluded.source,
+      value_cents = excluded.value_cents,
+      next_step = excluded.next_step,
+      next_step_on = excluded.next_step_on,
+      job_id = excluded.job_id,
+      updated_at = now();
+
+select setval(
+  'public.sales_opportunity_seq',
+  greatest(20, coalesce((select max(substring(number from '-(\d+)$')::bigint) from public.sales_opportunities), 20)),
+  true
+);
+
+insert into public.work_items (
+  kind, title, detail, location, role, assignee, job_id, crew_job_id, due_on, escalate_days, status, source, href, created_by
+)
+values (
+  'follow_up',
+  'Follow up on Proposal · Kierland Commons Suite 210 (26-0003)',
+  'No follow-up in 6 days (SOP-005 5-business-day cadence); escalates to Owner decisions.',
+  '7120 E Kierland Blvd, Scottsdale, AZ 85254',
+  'sales',
+  '',
+  null,
+  null,
+  current_date - 6,
+  5,
+  'open',
+  'seed:sales:followup:26-0003',
+  '/app/sales/c2000001-0000-4000-8000-000000007120',
+  'seed-cohesive'
+);
+
 commit;

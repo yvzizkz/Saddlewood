@@ -52,11 +52,17 @@ export async function PATCH(request: NextRequest) {
     const jobKey = typeof body.jobKey === "string" ? body.jobKey.trim() : "";
     const tripKey = typeof body.tripKey === "string" ? body.tripKey.trim() : "";
     const sourceKeys = Array.isArray(body.sourceKeys) ? body.sourceKeys.map(String).filter(Boolean) : [];
+    const clearAlias = body.clearAlias === true;
 
     let moved = 0;
     if (jobKey) {
-      await upsertAlias(jobKey, jobId, actor);
-      moved += await relinkPurchases(jobKey, jobId);
+      if (clearAlias) {
+        await db.from("job_aliases").delete().eq("alias", jobKey);
+        await db.from("purchases").update({ job_id: null, meta: {}, updated_at: new Date().toISOString() }).eq("job_key", jobKey);
+      } else {
+        await upsertAlias(jobKey, jobId, actor);
+        moved += await relinkPurchases(jobKey, jobId);
+      }
     }
     if (tripKey || sourceKeys.length) {
       let q = db.from("purchases").update({ job_id: jobId, updated_at: new Date().toISOString() });

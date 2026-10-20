@@ -170,7 +170,7 @@ export async function POST(req: Request) {
         crew_job_id: ref.crewId,
         due_on: dueOn,
         escalate_days: 2,
-        source: "field",
+        source: "",
         href: `/app/jobs/${encodeURIComponent(ref.key)}?tab=log`,
         created_by: viewer.email,
       })
@@ -239,8 +239,8 @@ export async function PATCH(req: Request) {
       .from("work_items")
       .update({
         status,
-        completed_at: status === "open" ? null : new Date().toISOString(),
-        completed_by: status === "open" ? "" : viewer.email,
+        done_at: status === "open" ? null : new Date().toISOString(),
+        done_by: status === "open" ? "" : viewer.email,
       })
       .eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

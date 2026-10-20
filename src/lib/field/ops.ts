@@ -250,14 +250,21 @@ export async function syncReceiptEntryToPurchases(input: Parameters<typeof build
     const { purchaseRow, reimbursementBill } = buildNormalizedReceiptPurchase({ ...input, billingJobId });
     await db.from("purchases").upsert(purchaseRow, { onConflict: "source_key" });
     if (reimbursementBill) {
-      await db.from("bills").upsert(reimbursementBill, { onConflict: "bill_number,vendor_name", ignoreDuplicates: true });
+      const { data: existingBill } = await db
+        .from("bills")
+        .select("id")
+        .eq("bill_number", reimbursementBill.bill_number)
+        .maybeSingle();
+      if (!existingBill) {
+        await db.from("bills").insert(reimbursementBill);
+      }
     }
   } catch {
     // Non-fatal in mock/unit environments where tables are not present.
   }
 }
 
-/** Writes directive (`co_price`) and `ASK:` (`decision`) rows from an EOD log into `work_items`. Never throws to caller. */
+/** Writes directive (`co_price`) and `ASK:` (`decision`) rows from an EOD log into `work_items` and `change_orders`. Never throws to caller. */
 export async function syncEodDirectivesAndDecisions(input: Parameters<typeof extractEodWorkItems>[0]): Promise<void> {
   try {
     const db = getSupabaseAdmin();
@@ -276,6 +283,26 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
         .maybeSingle();
       if (!existing) {
         await db.from("work_items").insert(item);
+      }
+    }
+    const asked = input.asked.trim();
+    if (asked.length >= 2) {
+      const title = asked.slice(0, 200);
+      const { data: existingCo } = await db
+        .from("change_orders")
+        .select("id")
+        .eq("crew_job_id", input.jobId)
+        .eq("title", title)
+        .maybeSingle();
+      if (!existingCo) {
+        await db.from("change_orders").insert({
+          job_id: billingJobId,
+          crew_job_id: input.jobId || null,
+          title,
+          detail: `Directive captured on ${input.day} EOD log (#${input.entryId}).`,
+          source: "directive",
+          requested_by: input.createdBy,
+        });
       }
     }
   } catch {
