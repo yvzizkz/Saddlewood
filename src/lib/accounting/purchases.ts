@@ -249,6 +249,7 @@ export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<Purchase
     vendor: first.vendor,
     store: first.store,
     orderRef: first.orderRef,
+    jobId: first.rawJobId,
     rawJobId: first.rawJobId,
     billingJobId: first.billingJobId,
     jobName: first.job,

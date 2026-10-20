@@ -327,7 +327,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       coi: s.coiState === "ok" ? `Valid (${s.coiDaysLeft}d)` : s.coiState === "expiring_30d" ? `Expiring (${s.coiDaysLeft}d)` : s.coiState === "expired" ? "Expired" : "Missing",
       bids: `${s.submittedCount}/${s.invitedCount}`,
       awards: s.awardedCount,
-      openBills: s.openBillsCents,
+      openBills: s.openBillsCents ?? null,
       href: "/app/subs",
     }));
     return (
