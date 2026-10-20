@@ -45,6 +45,7 @@ describe("schedule feed helpers", () => {
         saleNumber: "P-011",
         contractCents: 2840000,
         active: true,
+      status: "active",
         awarded: true,
         pm: ["Jorge"],
       },
