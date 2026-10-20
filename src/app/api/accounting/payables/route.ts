@@ -8,10 +8,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: NextRequest) {
-  const viewer = await getViewer(request);
+  const viewer = await getViewer();
   if (!(await viewerIsOwner(viewer))) {
     return NextResponse.json({ ok: false, error: "owner access required" }, { status: 403 });
   }
+  const actor = "email" in viewer && typeof viewer.email === "string" ? viewer.email : "owner";
 
   let body: Record<string, unknown>;
   try {
@@ -60,7 +61,7 @@ export async function PATCH(request: NextRequest) {
       method,
       reference,
       waiver_type: waiverType,
-      notes: `Recorded by ${viewer?.email ?? "owner"}`,
+      notes: `Recorded by ${actor}`,
     });
     if (payErr) return NextResponse.json({ ok: false, error: payErr.message }, { status: 500 });
 

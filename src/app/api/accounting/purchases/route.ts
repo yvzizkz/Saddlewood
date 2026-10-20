@@ -9,10 +9,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: NextRequest) {
-  const viewer = await getViewer(request);
+  const viewer = await getViewer();
   if (!(await viewerIsOwner(viewer))) {
     return NextResponse.json({ ok: false, error: "owner access required" }, { status: 403 });
   }
+  const actor = "email" in viewer && typeof viewer.email === "string" ? viewer.email : "owner";
 
   let body: Record<string, unknown>;
   try {
@@ -54,7 +55,7 @@ export async function PATCH(request: NextRequest) {
 
     let moved = 0;
     if (jobKey) {
-      await upsertAlias(jobKey, jobId, viewer?.email || "owner");
+      await upsertAlias(jobKey, jobId, actor);
       moved += await relinkPurchases(jobKey, jobId);
     }
     if (tripKey || sourceKeys.length) {
