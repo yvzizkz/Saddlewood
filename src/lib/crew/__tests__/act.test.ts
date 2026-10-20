@@ -11,7 +11,7 @@ const KEY = "0123456789abcdef";
 
 type Row = Record<string, unknown> & { id: number };
 
-const { db, notify, auth, mail } = vi.hoisted(() => {
+const { db, notify, auth, mail, geocoder } = vi.hoisted(() => {
   const db = {
     people: new Map<string, Record<string, unknown>>(),
     groups: new Map<string, Record<string, unknown>>(),
@@ -36,8 +36,17 @@ const { db, notify, auth, mail } = vi.hoisted(() => {
     },
     auth: { users: [] as { id: string; email: string; app_metadata: Record<string, unknown>; banned?: string }[] },
     mail: { sent: [] as { to: string; subject: string; text: string }[], links: [] as string[] },
+    // The geocoders, stood in for: what they answer, and what they were asked.
+    geocoder: { answer: null as { lat: number; lng: number; source: "census" | "nominatim" } | null, asked: [] as string[] },
   };
 });
+
+vi.mock("../geocode", () => ({
+  geocodeAddress: async (address: string) => {
+    geocoder.asked.push(address);
+    return geocoder.answer;
+  },
+}));
 
 vi.mock("../queries", () => {
   const next = () => ++db.seq;
@@ -357,6 +366,8 @@ beforeEach(() => {
   auth.users.length = 0;
   mail.sent.length = 0;
   mail.links.length = 0;
+  geocoder.answer = null;
+  geocoder.asked.length = 0;
   db.people.set(ARNOLD, arnold);
   db.people.set(BETO, beto);
   db.jobs.set("powell", { id: "powell", name: "Powell Residence", address: "", note: "", active: true });
@@ -768,6 +779,80 @@ describe("what an owner can do", () => {
     expect(await admin({ kind: "job.add", name: "bellevue heights" }, at("09:00"))).toMatchObject({ ok: false, status: 409 });
     expect(await admin({ kind: "job.add", name: "Old Job" }, at("09:00"))).toMatchObject({ ok: true });
     expect(db.jobs.get("old-job")?.active).toBe(true);
+  });
+});
+
+describe("where a job is on the map", () => {
+  const KEIM = { lat: 33.61094, lng: -112.33481, source: "census" as const };
+
+  it("places a new job from its address, and keeps who placed it and when", async () => {
+    geocoder.answer = KEIM;
+    expect(await admin({ kind: "job.add", name: "Keim Dr", address: "12729 W Keim Dr, Glendale" }, at("09:00"))).toEqual({ ok: true });
+    expect(geocoder.asked).toEqual(["12729 W Keim Dr, Glendale"]);
+    expect(db.jobs.get("keim-dr")?.geo).toEqual({ lat: 33.61094, lng: -112.33481, source: "census", at: at("09:00").toISOString() });
+  });
+
+  it("saves the job whether or not it could be placed, and never asks without an address", async () => {
+    expect(await admin({ kind: "job.add", name: "Keim Dr", address: "12729 W Keim Dr" }, at("09:00"))).toEqual({ ok: true });
+    expect(db.jobs.get("keim-dr")).toMatchObject({ name: "Keim Dr", address: "12729 W Keim Dr", geo: null });
+    expect(await admin({ kind: "job.add", name: "No Address" }, at("09:00"))).toEqual({ ok: true });
+    expect(geocoder.asked).toEqual(["12729 W Keim Dr"]);
+  });
+
+  it("places a job again when its address changes, and forgets the old point when it is cleared or not found", async () => {
+    geocoder.answer = KEIM;
+    await admin({ kind: "job.update", id: "powell", address: "12729 W Keim Dr, Glendale" }, at("09:00"));
+    expect(db.jobs.get("powell")).toMatchObject({ address: "12729 W Keim Dr, Glendale", geo: { lat: 33.61094 } });
+    // The same address, saved again with a new note: not asked twice.
+    await admin({ kind: "job.update", id: "powell", address: "12729 W Keim Dr, Glendale", note: "Gate 4411" }, at("09:05"));
+    expect(geocoder.asked).toHaveLength(1);
+    // A new address the geocoders cannot find: the old point must not stand for it.
+    geocoder.answer = null;
+    await admin({ kind: "job.update", id: "powell", address: "1 Nowhere Ln" }, at("09:10"));
+    expect(db.jobs.get("powell")).toMatchObject({ address: "1 Nowhere Ln", geo: null });
+    expect(geocoder.asked).toEqual(["12729 W Keim Dr, Glendale", "1 Nowhere Ln"]);
+    // Cleared: nothing to ask, and nothing left on the row.
+    geocoder.answer = KEIM;
+    await admin({ kind: "job.update", id: "powell", address: "" }, at("09:15"));
+    expect(db.jobs.get("powell")).toMatchObject({ address: "", geo: null });
+    expect(geocoder.asked).toHaveLength(2);
+  });
+
+  it("finds one job on the map on request, and says when it could not", async () => {
+    db.jobs.get("powell")!.address = "4201 N 7th St, Phoenix";
+    expect(await admin({ kind: "job.geocode", id: "north-lane" }, at("09:00"))).toMatchObject({ ok: false, status: 400 });
+    geocoder.answer = null;
+    expect(await admin({ kind: "job.geocode", id: "powell" }, at("09:00"))).toMatchObject({ ok: true, set: 0, note: "Could not find Powell Residence on the map. Check the address." });
+    geocoder.answer = KEIM;
+    expect(await admin({ kind: "job.geocode", id: "powell" }, at("09:00"))).toMatchObject({ ok: true, set: 1, note: "Powell Residence is on the map." });
+    expect(db.jobs.get("powell")?.geo).toMatchObject({ lat: 33.61094, source: "census" });
+    expect(await admin({ kind: "job.geocode", id: "gone" }, at("09:00"))).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("places every active job with an address that is not on the map yet", async () => {
+    db.jobs.get("powell")!.address = "4201 N 7th St, Phoenix";
+    db.jobs.get("north-lane")!.address = "1 North Ln";
+    db.jobs.get("north-lane")!.geo = { lat: 1, lng: 2, source: "owner", at: "x" };
+    db.jobs.get("old-job")!.address = "Old address";
+    geocoder.answer = KEIM;
+    expect(await admin({ kind: "job.geocode" }, at("09:00"))).toMatchObject({ ok: true, set: 1, note: "1 of 1 job on the map." });
+    // Only Powell: North Lane is placed already, Old Job is finished.
+    expect(geocoder.asked).toEqual(["4201 N 7th St, Phoenix"]);
+    expect(await admin({ kind: "job.geocode" }, at("09:00"))).toMatchObject({ ok: true, set: 0, note: "Every job with an address is on the map already." });
+  });
+
+  it("is the jobs switch, and a narrowed manager places only their own", async () => {
+    expect(mayRun({ role: "member", email: ARNOLD, name: "Arnold", perms: ["jobs.promise"] }, "job.geocode")).toBe(false);
+    expect(mayRun({ role: "member", email: ARNOLD, name: "Arnold", perms: ["jobs.manage"] }, "job.geocode")).toBe(true);
+    db.jobs.get("powell")!.address = "4201 N 7th St, Phoenix";
+    db.jobs.get("north-lane")!.address = "1 North Ln";
+    db.people.set(ARNOLD, { ...arnold, perms: ["jobs.manage", "projects.mine"] });
+    db.jobPeople = [{ jobId: "north-lane", email: ARNOLD, role: "pm" }];
+    const mine = { role: "member" as const, email: ARNOLD, name: "Arnold", perms: ["jobs.manage", "projects.mine"] };
+    geocoder.answer = KEIM;
+    expect(await runAdminAct(mine, adminActSchema.parse({ kind: "job.geocode", id: "powell" }), at("09:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(await runAdminAct(mine, adminActSchema.parse({ kind: "job.geocode" }), at("09:00"))).toMatchObject({ ok: true, set: 1 });
+    expect(geocoder.asked).toEqual(["1 North Ln"]);
   });
 });
 

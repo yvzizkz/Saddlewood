@@ -9,6 +9,7 @@ import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle, Segme
 import ProjectsView from '@/components/projects/ProjectsView'
 import { useCrew } from '@/components/crew/CrewProvider'
 import { ago } from '@/lib/bot/view'
+import { farLabels } from '@/lib/crew/geo'
 import { buildPlan, planAsk, taskStatusWord } from '@/lib/crew/plan'
 import { addDays, clock12, clockText, dayLabel, dayShort, hoursText, localDay, localInstant, weekDays, weekStart, workedMinutes } from '@/lib/crew/time'
 import {
@@ -84,6 +85,19 @@ function Row({ children, onClick }: { children: React.ReactNode; onClick?: () =>
     <button type="button" onClick={onClick} className="block w-full px-4 py-3 text-left active:bg-[var(--color-cream)]">
       {children}
     </button>
+  )
+}
+
+/** "In 2.1 mi from the job", "Out 3.4 mi from the job": only when a punch was far. Nothing when it was near or unknown. */
+function FarChips({ shift }: { shift: Pick<CrewShift, 'fromJobM'> }) {
+  return (
+    <>
+      {farLabels(shift.fromJobM).map((label) => (
+        <Chip key={label} tone="bad">
+          {label}
+        </Chip>
+      ))}
+    </>
   )
 }
 
@@ -198,9 +212,12 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
                 </span>
                 <span className="shrink-0 font-mono text-[13px] text-[var(--color-charcoal)]">{hoursText(workedMinutes(s, now))}</span>
               </span>
-              <span className="mt-0.5 block pl-4 text-[12px] text-[var(--color-charcoal-light)]">
-                {s.jobName} · since {clock12(s.startedAt)}
-                {s.day !== data.day ? ` (${dayShort(s.day)})` : ''}
+              <span className="mt-0.5 flex flex-wrap items-center gap-1.5 pl-4 text-[12px] text-[var(--color-charcoal-light)]">
+                <span>
+                  {s.jobName} · since {clock12(s.startedAt)}
+                  {s.day !== data.day ? ` (${dayShort(s.day)})` : ''}
+                </span>
+                <FarChips shift={s} />
               </span>
             </Row>
           ))}
@@ -244,8 +261,11 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
                     <span className="truncate text-[15px] text-[var(--color-charcoal)]">{nameOf(s.email)}</span>
                     <span className="shrink-0 font-mono text-[13px] text-[var(--color-charcoal)]">{hoursText(workedMinutes(s))}</span>
                   </span>
-                  <span className="mt-0.5 block text-[12px] text-[var(--color-charcoal-light)]">
-                    {s.jobName} · {clock12(s.startedAt)} – {clock12(s.endedAt)}
+                  <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12px] text-[var(--color-charcoal-light)]">
+                    <span>
+                      {s.jobName} · {clock12(s.startedAt)} – {clock12(s.endedAt)}
+                    </span>
+                    <FarChips shift={s} />
                   </span>
                 </Row>
               ))}
@@ -862,6 +882,7 @@ function HoursView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
                           {s.jobName}
                           {s.endedAt && s.breakMin ? ` · ${s.breakMin} min break` : ''}
                           {s.review ? <Chip tone="warn">{s.review}</Chip> : null}
+                          <FarChips shift={s} />
                           {s.edits.length ? <Chip tone="quiet">Changed by {s.edits[s.edits.length - 1].by}</Chip> : null}
                           {s.source === 'office' ? <Chip tone="quiet">Entered by the office</Chip> : null}
                         </span>

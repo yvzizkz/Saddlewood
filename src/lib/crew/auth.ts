@@ -107,6 +107,7 @@ export const ACT_NEEDS: Record<AdminAct["kind"], Capability | "owner"> = {
   "group.save": "owner",
   "group.delete": "owner",
   "job.add": "jobs.manage",
+  "job.geocode": "jobs.manage",
   "job.update": "jobs.promise",
   "job.people": "owner",
   "job.link": "owner",

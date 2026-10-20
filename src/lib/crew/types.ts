@@ -116,7 +116,12 @@ export type CrewJob = {
   /** The date we promised the client, and what. */
   promised: string | null;
   promiseNote: string;
+  /** Where the job is on the map (0021), from its address; null until placed. Punches are measured against it. */
+  geo: { lat: number; lng: number } | null;
 };
+
+/** How crew_jobs.geo is stored: who placed it and when, beside the point. */
+export type CrewJobGeo = { lat: number; lng: number; source: "census" | "nominatim" | "owner"; at: string };
 
 /** Who is on a job, and as what (0018). Any row counts for projects.mine. */
 export const JOB_ROLES = ["pm", "supervisor", "crew"] as const;
@@ -152,7 +157,17 @@ export type CrewShift = {
   review: string;
   status: "ok" | "void";
   edits: ShiftEdit[];
+  /**
+   * Meters from each punch to the job's address (src/lib/crew/geo.ts): null
+   * when the punch or the job has no location, or the phone's fix was too
+   * loose to trust. For the owners, the supervisor and the Mac only; the
+   * worker's own screens get an OwnShift, which never carries it.
+   */
+  fromJobM: { in: number | null; out: number | null };
 };
+
+/** A shift as the person who worked it sees it: never how far their punch was from the job. */
+export type OwnShift = Omit<CrewShift, "fromJobM">;
 
 export const ENTRY_KINDS = ["receipt", "progress", "eod", "note", "timefix"] as const;
 export type CrewEntryKind = (typeof ENTRY_KINDS)[number];
@@ -296,9 +311,9 @@ export type CrewHome = {
   me: { email: string; name: string; lang: CrewLang; group: string; perms: Capability[] };
   jobs: CrewJob[];
   /** The shift this person is on right now, if any. */
-  shift: CrewShift | null;
+  shift: OwnShift | null;
   /** This week's and last week's shifts, oldest first. */
-  shifts: CrewShift[];
+  shifts: OwnShift[];
   schedule: CrewScheduleItem[];
   tasks: CrewTask[];
   questions: CrewQuestion[];
@@ -528,6 +543,8 @@ export const adminActSchema = z.discriminatedUnion("kind", [
     promised: day.or(z.literal("")).optional(),
     promiseNote: z.string().trim().max(200).optional(),
   }),
+  /** Place a job on the map from its address, or every active job not placed yet when no id is given. */
+  z.object({ kind: z.literal("job.geocode"), id: jobId.optional() }),
   /** Who is on a job (0018): the whole list, replaced. Owners only. */
   z.object({
     kind: z.literal("job.people"),

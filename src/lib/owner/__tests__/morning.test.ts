@@ -116,3 +116,59 @@ describe("the 7 AM push", () => {
     expect(buildMorning(input({ day: "2026-10-18" }))).toEqual([]);
   });
 });
+
+describe("late from the field, folded into the 7 AM push", () => {
+  const late = (over: Partial<MorningInput["late"] extends (infer T)[] | undefined ? T : never>) => ({
+    day: "2026-10-12",
+    id: 1,
+    who: "Arnold",
+    job: "12729 W Keim Dr",
+    text: "no clock-in by 7:30",
+    at: "2026-10-12T14:31:00Z",
+    ...over,
+  });
+  const quiet = { reports: [{ id: 1, day: DAY } as MorningInput["reports"][number]] };
+
+  it("tells an owner what came in late yesterday, after the rest of the day", () => {
+    const notes = buildMorning(input({ ...quiet, late: [late({})] }));
+    expect(noteFor(notes, MARCO)?.body).toBe("Nobody is on the schedule today. · Late from the field: Arnold · 12729 W Keim Dr: no clock-in by 7:30");
+    expect(noteFor(notes, LANDO)?.body).toContain("Late from the field");
+  });
+
+  it("names the first and counts the rest, within the push's length", () => {
+    const notes = buildMorning(
+      input({
+        ...quiet,
+        late: [late({}), late({ id: 2, who: "Marcus", text: "clocked out at 4:10, given afterwards" }), late({ id: 3, who: "Beto", text: "end of day at 9 PM" })],
+      }),
+    );
+    const body = noteFor(notes, MARCO)?.body ?? "";
+    expect(body).toContain("Late from the field: Arnold · 12729 W Keim Dr: no clock-in by 7:30 (+2 more)");
+    expect(body).not.toContain("Marcus");
+    expect(body.length).toBeLessThanOrEqual(240);
+  });
+
+  it("reaches back to Saturday on a Monday, and no further", () => {
+    const monday = "2026-10-19";
+    const notes = buildMorning(input({ ...quiet, day: monday, late: [late({ day: "2026-10-16", id: 1, who: "Friday" }), late({ day: "2026-10-17", id: 2, who: "Saturday" })] }));
+    expect(noteFor(notes, MARCO)?.body).toContain("Late from the field: Saturday");
+    expect(noteFor(notes, MARCO)?.body).not.toContain("Friday");
+    // Today's and tomorrow's are not yesterday's.
+    const none = buildMorning(input({ ...quiet, late: [late({ day: DAY }), late({ day: "2026-10-14", id: 2 })] }));
+    expect(noteFor(none, MARCO)?.body).toBe("Nobody is on the schedule today.");
+  });
+
+  it("gives the supervisor the same, and a project manager only their jobs' by name", () => {
+    const all = buildMorning(input({ late: [late({})] }));
+    expect(noteFor(all, ELI)?.body).toBe("Nobody is on the schedule today. · Late from the field: Arnold · 12729 W Keim Dr: no clock-in by 7:30");
+    const pmPeople = PEOPLE.map((p) => (p.email === ELI ? { ...p, perms: [...p.perms, "projects.mine"] } : p)) as MorningInput["people"];
+    const narrowed = (jobs: MorningInput["jobs"], items: NonNullable<MorningInput["late"]>) =>
+      noteFor(buildMorning(input({ people: pmPeople, jobPeople: [{ jobId: "keim", email: ELI, role: "pm" }], jobs, late: items })), ELI)?.body ?? "";
+    expect(narrowed([{ id: "keim", name: "12729 W Keim Dr" }], [late({})])).toContain("Late from the field: Arnold");
+    expect(narrowed([{ id: "keim", name: "12729 W Keim Dr" }], [late({ job: "6402 E Bambi Drive" })])).not.toContain("Late from the field");
+    // The Mac may name the job by its id too.
+    expect(narrowed([], [late({ job: "keim" })])).toContain("Late from the field: Arnold · keim");
+    // An owner is never narrowed.
+    expect(noteFor(buildMorning(input({ people: pmPeople, jobPeople: [{ jobId: "keim", email: ELI, role: "pm" }], late: [late({ job: "6402 E Bambi Drive" })] })), MARCO)?.body).toContain("Bambi");
+  });
+});

@@ -9,7 +9,7 @@ const ARNOLD = "arnold@example.com";
 const DAY = "2026-10-13";
 const NOW = new Date("2026-10-13T15:00:00Z");
 
-const job = (id: string, over: Partial<CrewJob> = {}): CrewJob => ({ id, name: id, address: "", note: "", active: true, promised: null, promiseNote: "", ...over });
+const job = (id: string, over: Partial<CrewJob> = {}): CrewJob => ({ id, name: id, address: "", note: "", active: true, promised: null, promiseNote: "", geo: null, ...over });
 const task = (over: Partial<CrewTask>): CrewTask => ({
   id: 1, email: ARNOLD, title: "Hang the ceiling", detail: "", jobId: "keim", jobName: "Keim", due: null, status: "open", doneNote: "", files: [], closedAt: null,
   priority: null, reportedAt: null, verifiedAt: null, verifiedBy: "", sentBack: 0, createdBy: "Eli", createdAt: "2026-10-10T15:00:00Z", ...over,

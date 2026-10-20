@@ -1,7 +1,7 @@
-import type { BotPeople } from "@/lib/bot/types";
-import { dayShort, clockText, weekdayOf } from "@/lib/crew/time";
-import { inScope, scopeFrom } from "@/lib/crew/scope";
-import { firstNameOf, isReportedDone, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
+import type { BotCrewLateItem, BotPeople } from "@/lib/bot/types";
+import { addDays, dayShort, clockText, weekdayOf } from "@/lib/crew/time";
+import { inScope, scopeFrom, type JobScope } from "@/lib/crew/scope";
+import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
 import { lanesOf } from "./lanes";
 import type { WaitingItem } from "./waiting";
 
@@ -26,6 +26,10 @@ export type MorningInput = {
   bids: number;
   /** Who is on each job (0018): a project manager (projects.mine) hears only about theirs. */
   jobPeople?: CrewJobPerson[];
+  /** Late from the field, as the Mac reports it (bot_state crewLate): yesterday's is folded in. */
+  late?: BotCrewLateItem[];
+  /** The jobs by id and name, to tell whose a late item is (it names the job, not the id). */
+  jobs?: Pick<CrewJob, "id" | "name">[];
 };
 
 function plural(n: number, one: string, many: string): string {
@@ -47,6 +51,26 @@ function crewLine(day: string, schedule: CrewScheduleItem[]): string {
   const people = new Set(today.map((s) => s.email)).size;
   const jobs = new Set(today.map((s) => s.jobId)).size;
   return `${plural(people, "person", "people")} on ${plural(jobs, "job", "jobs")} today.`;
+}
+
+/**
+ * What came in late from the field over the two days before `day` (yesterday,
+ * or Saturday and Sunday for a Monday), narrowed to the jobs in `scope`. A late
+ * item names its job; the id is looked up by that name, or taken as given.
+ */
+function recentLate(input: MorningInput, scope: JobScope): BotCrewLateItem[] {
+  const { day } = input;
+  const from = addDays(day, -2);
+  const idOf = (name: string) => input.jobs?.find((j) => j.name.toLowerCase() === name.trim().toLowerCase())?.id ?? name;
+  return (input.late ?? []).filter((l) => l.day >= from && l.day < day && (scope === null || inScope(scope, idOf(l.job))));
+}
+
+/** "Late from the field: Arnold · 12729 W Keim Dr: no clock-in by 7:30 (+1 more)" */
+function lateClause(items: BotCrewLateItem[]): string {
+  if (!items.length) return "";
+  const [first] = items;
+  const head = `Late from the field: ${[first.who, first.job].filter(Boolean).join(" · ")}: ${first.text}`.replace(/:\s*$/, "");
+  return items.length > 1 ? `${head} (+${items.length - 1} more)` : head;
 }
 
 export function buildMorning(input: MorningInput): MorningNote[] {
@@ -77,6 +101,7 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     if (supervisors.length && lanes.includes("decisions") && !input.reports.some((r) => r.day === day)) {
       parts.push(`No plan from ${supervisors.length === 1 ? firstNameOf(supervisors[0].name) : "the supervisor"} for today.`);
     }
+    parts.push(lateClause(recentLate(input, null)));
     notes.push({
       email,
       title: counts.length ? `Your day: ${counts.join(", ")}` : "Your day: nothing waiting on you",
@@ -105,6 +130,7 @@ export function buildMorning(input: MorningInput): MorningNote[] {
       toCheck ? `${plural(toCheck, "task", "tasks")} to check` : "",
       dueToday ? `${plural(dueToday, "task", "tasks")} due today` : "",
       mineToday ? `${plural(mineToday, "hand-off", "hand-offs")} due from you` : "",
+      lateClause(recentLate(input, scope)),
     ].filter(Boolean);
     notes.push(crewNote(p, { en: "Your day", es: "Tu día" }, { en: lines.join(" · "), es: lines.join(" · ") }, "/app/crew", tag));
   }

@@ -100,6 +100,23 @@ describe("what the Mac reports", () => {
     expect(drafts[1]).toMatchObject({ n: 27, needs: null, question: null });
   });
 
+  it("keeps the field's late list, clipped, and drops an item with no day or id", () => {
+    const late = parseSection("crewLate", {
+      items: [
+        { day: "2026-10-18", id: 4, who: "Arnold Mujica", job: "12729 W Keim Dr", text: "x".repeat(400), at: "2026-10-18T14:31:00Z" },
+        { day: "2026-10-18", id: 5, who: "y".repeat(100), job: 7, text: "end of day at 9 PM" },
+        { day: "yesterday", id: 6, who: "Beto" },
+        { day: "2026-10-18", who: "Beto" },
+        "junk",
+      ],
+    });
+    expect(late.items.map((i) => i.id)).toEqual([4, 5]);
+    expect(late.items[0].text).toHaveLength(300);
+    expect(late.items[1]).toEqual({ day: "2026-10-18", id: 5, who: "y".repeat(80), job: "", text: "end of day at 9 PM", at: "" });
+    expect(parseSection("crewLate", "nope")).toEqual({ items: [] });
+    expect(parseSection("crewLate", { items: "nope" })).toEqual({ items: [] });
+  });
+
   it("falls back to an empty picture instead of throwing", () => {
     expect(parseSection("drafts", "nope")).toEqual([]);
     expect(parseSection("health", null).problems).toEqual({});

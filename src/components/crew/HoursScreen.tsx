@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import { Button, Card, Chip, Empty, ScreenTitle, SectionTitle, Segmented } from '@/components/bot/ui'
 import { addDays, clock12, dayLabel, hoursText, weekDays, weekStart, workedMinutes } from '@/lib/crew/time'
-import type { CrewShift } from '@/lib/crew/types'
+import type { OwnShift } from '@/lib/crew/types'
 import { useCrew } from './CrewProvider'
 import { FixTimeSheet } from './CrewSheets'
 import { entryLine, entryStatus } from './TodayScreen'
@@ -15,7 +15,7 @@ import { entryLine, entryStatus } from './TodayScreen'
 export default function HoursScreen() {
   const { home, error, t, lang } = useCrew()
   const [which, setWhich] = useState<'this' | 'last'>('this')
-  const [fix, setFix] = useState<{ shift: CrewShift | null } | null>(null)
+  const [fix, setFix] = useState<{ shift: OwnShift | null } | null>(null)
   const [sheetKey, setSheetKey] = useState(0)
 
   if (!home) {
@@ -33,7 +33,7 @@ export default function HoursScreen() {
   const total = inWeek.reduce((sum, s) => sum + workedMinutes(s), 0)
   const fixes = home.entries.filter((e) => e.kind === 'timefix')
 
-  function openFix(shift: CrewShift | null) {
+  function openFix(shift: OwnShift | null) {
     setSheetKey((k) => k + 1)
     setFix({ shift })
   }

@@ -18,13 +18,14 @@ import {
   listUnfiledEntries,
   listUnseenAnswers,
   openShift,
+  withJobDistance,
   type CrewPersonRow,
   type CrewShiftRow,
 } from "./queries";
 import type { Manager } from "./auth";
 import { inScope, visibleCrewJobs } from "./scope";
 import { addDays, isDay, localDay, weekStart } from "./time";
-import type { BillingJobRef, Capability, CrewAdminHome, CrewJobPerson, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift } from "./types";
+import type { BillingJobRef, Capability, CrewAdminHome, CrewJobPerson, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift, OwnShift } from "./types";
 
 // What each side gets in one read. A crew member gets only what is theirs; an
 // owner gets everyone's; the Mac gets the last few days plus whatever it has
@@ -36,6 +37,13 @@ function publicShift(s: CrewShiftRow): CrewShift {
   const { clientIn: _in, clientOut: _out, ...rest } = s;
   void _in;
   void _out;
+  return rest;
+}
+
+/** A shift for the person who worked it: how far the punch was from the job is the owners' to see, never theirs. */
+function ownShift(s: CrewShiftRow): OwnShift {
+  const { fromJobM: _far, ...rest } = publicShift(s);
+  void _far;
   return rest;
 }
 
@@ -75,11 +83,11 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
     day,
     me: { email, name: person.name, lang: person.lang, group: person.group, perms: person.perms },
     jobs: jobs.filter((j) => j.active).map((j) => (mine.has(j.id) ? j : { ...j, note: "" })),
-    shift: open ? publicShift(open) : null,
+    shift: open ? ownShift(open) : null,
     // A shift left open since before last week still has to show.
     shifts: byId([...(open ? [open] : []), ...shifts])
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
-      .map(publicShift),
+      .map(ownShift),
     schedule,
     tasks,
     // A question nobody answered in four days is no longer worth a card at the
@@ -142,7 +150,8 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     people: people.map((p) => publicPerson(p, viewer.role === "owner")),
     jobs,
     suggestedJobs: suggested.filter((n) => !names.has(n.toLowerCase())),
-    shifts: mine(byId([...weekShifts, ...recentShifts, ...open]))
+    // Where a punch was made is hours.edit; how far it was from the job is for everyone with the tab.
+    shifts: withJobDistance(mine(byId([...weekShifts, ...recentShifts, ...open])), allJobs)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
       .map((s) => (fixes ? publicShift(s) : { ...publicShift(s), startGeo: null, endGeo: null, edits: [] })),
     entries: fixes ? entries : entries.filter((e) => e.kind !== "timefix"),
@@ -212,7 +221,7 @@ export async function crewFeed(now = new Date()): Promise<CrewFeed> {
     day,
     people: people.map((p) => publicPerson(p)),
     jobs,
-    shifts: byId([...shifts, ...open])
+    shifts: withJobDistance(byId([...shifts, ...open]), jobs)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
       .map(publicShift),
     entries,

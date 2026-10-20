@@ -53,10 +53,12 @@ export function buildHome(input: {
 }): BotHome {
   const now = input.now ?? new Date();
   // The owner's allowlist mirror and Joist's unsent list are for the Bill
-  // screen's own door (/api/billing/bill), not for Home.
-  const { people, outboundAllow: _allow, joistRecent: _recent, ...rest } = input.sections;
+  // screen's own door (/api/billing/bill), not for Home; the field's late
+  // list is for the 7 AM push (src/lib/owner/morning.ts).
+  const { people, outboundAllow: _allow, joistRecent: _recent, crewLate: _late, ...rest } = input.sections;
   void _allow;
   void _recent;
+  void _late;
   const me = whoIs(input.email, people);
   const online = !!input.bridge.seenAt && now.getTime() - Date.parse(input.bridge.seenAt) < ONLINE_WITHIN_MS;
 
@@ -107,10 +109,11 @@ export function buildHome(input: {
   // Everyone else starts from an empty picture and is given only what is
   // theirs. Built from nothing, not by removing things: a section added later
   // stays hidden until someone decides a requester may see it.
-  const { people: _none, outboundAllow: _noAllow, joistRecent: _noRecent, ...empty } = emptySections();
+  const { people: _none, outboundAllow: _noAllow, joistRecent: _noRecent, crewLate: _noLate, ...empty } = emptySections();
   void _none;
   void _noAllow;
   void _noRecent;
+  void _noLate;
   const mine = {
     ...empty,
     drafts: me.name ? rest.drafts.filter((d) => d.requestedBy === me.name) : [],
