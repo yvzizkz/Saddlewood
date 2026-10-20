@@ -12,8 +12,9 @@ import { Toggle } from './builder/fields'
 // Email an issued proposal from the app: the link, the PDF, or both. It always
 // goes through a preview first, showing the exact sender, recipients, words
 // and files, and only then offers Send (wording approved is not send
-// approved). An outside address the owner has not allowed is refused by the
-// server; the preview says which and shows the owner's command to allow it.
+// approved). Addresses not on the owner's allowlist are named in the preview
+// (a typo shows before Send); under the "allowlist only" Sales setting the
+// server refuses them instead, with the owner's command to allow one.
 
 export type EmailDefaults = { subject: string; body: string; link: boolean; attachPdf: boolean; fromName: string; fromAddress: string }
 
@@ -27,6 +28,8 @@ type Preview = {
   text: string
   attachments?: { filename: string; bytes: number }[]
   refused?: { address: string; reason: string; addCommand?: string }[]
+  /** Going out although not on the owner's allowlist (Sales setting "anyone you address"). */
+  unlisted?: string[]
 }
 
 const EMAIL = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/
@@ -125,7 +128,7 @@ export function EmailProposalSheet({
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) {
         // A refusal may still carry the preview (which address, and why).
-        if (j.preview || j.refused) setPreview({ from: j.from ?? '', to: j.to ?? to, cc: j.cc ?? cc, staffCopyTo: j.staffCopyTo ?? [], subject: j.subject ?? subject, text: j.text ?? '', attachments: j.attachments, refused: j.refused })
+        if (j.preview || j.refused) setPreview({ from: j.from ?? '', to: j.to ?? to, cc: j.cc ?? cc, staffCopyTo: j.staffCopyTo ?? [], subject: j.subject ?? subject, text: j.text ?? '', attachments: j.attachments, refused: j.refused, unlisted: j.unlisted ?? [] })
         throw new Error(j.error || `could not ${confirm ? 'send' : 'preview'} (${res.status})`)
       }
       if (confirm) {
@@ -212,6 +215,11 @@ export function EmailProposalSheet({
               ) : link ? (
                 <p className="flex items-center gap-1.5 text-[13px]">
                   <Link2 className="size-3.5" aria-hidden="true" /> Link only
+                </p>
+              ) : null}
+              {preview.unlisted?.length ? (
+                <p className="rounded-lg bg-white px-3 py-2 text-[13px] text-[var(--color-charcoal)]">
+                  New address{preview.unlisted.length === 1 ? '' : 'es'}, not on the allowlist: <strong>{preview.unlisted.join(', ')}</strong>. Check the spelling; it goes out when you press Send.
                 </p>
               ) : null}
               {refused.length ? (
