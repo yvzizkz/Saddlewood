@@ -26,6 +26,7 @@ import type { Manager } from "./auth";
 import { listUnmatchedPurchases, loadPurchasesToday } from "./purchaseQueries";
 import type { PurchasesToday, UnmatchedPurchase } from "./purchases";
 import { inScope, visibleCrewJobs } from "./scope";
+import { stageJobs } from "./stages";
 import { addDays, isDay, localDay, weekStart } from "./time";
 import type { BillingJobRef, Capability, CrewAdminHome, CrewJobPerson, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift, OwnShift } from "./types";
 
@@ -152,7 +153,7 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     groups,
     week,
     people: people.map((p) => publicPerson(p, viewer.role === "owner")),
-    jobs,
+    jobs: await stageJobs(jobs, day),
     suggestedJobs: suggested.filter((n) => !names.has(n.toLowerCase())),
     // Where a punch was made is hours.edit; how far it was from the job is for everyone with the tab.
     shifts: withJobDistance(mine(byId([...weekShifts, ...recentShifts, ...open])), allJobs)
@@ -227,7 +228,8 @@ export async function crewFeed(now = new Date()): Promise<CrewFeed> {
     now: now.toISOString(),
     day,
     people: people.map((p) => publicPerson(p)),
-    jobs,
+    // Each job with its phases and stage, so the brief can say where a job is.
+    jobs: await stageJobs(jobs, day),
     shifts: withJobDistance(byId([...shifts, ...open]), jobs)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
       .map(publicShift),

@@ -151,6 +151,50 @@ The site can be deployed before 0022 is applied: the Crew tab, Home and the
 money card read an empty list (or no material), and `POST /api/bot/purchases`
 answers 503 so the Mac waits.
 
+## Stages (migration 0024)
+
+Added 2026-10-19 (Lando's call): every job can carry a list of phases, and its
+**stage** is read off that list every time, never stored: the first phase
+nobody has verified. A phase is verified by a person (the project manager on
+their jobs, an owner anywhere), never on a worker's word. The client does not
+see the stage yet.
+
+- **Phases** (`crew_job_phases`): one row per phase in order under its job,
+  with a trade (`framing`, `drywall`, or whatever was typed), optional planned
+  dates, and who verified it and when. Two templates start a list
+  (`PHASE_TEMPLATES` in `src/lib/crew/phases.ts`): framing = layout, walls,
+  roof and ceiling, backing, inspection; drywall = hang, tape, texture, punch.
+  They only start it: Marco edits a job's list in the app.
+- **The stage** (`stageOf`): `{ id, name, trade, ord, of, sinceDay, day,
+  plannedFrom, plannedTo, plannedDays, behind, complete }`, or null for a job
+  with no phases; `name: "complete"` once every phase is verified. `sinceDay`
+  is the Phoenix day the previous phase was verified, or the job's first shift
+  day on the first phase, or null; `day` counts calendar days from it with
+  sinceDay as day 1. `behind` means planned_to has passed and the phase is not
+  verified. Verifying out of order is allowed; the stage is still the first gap.
+- **Who may do what** (`ACT_NEEDS` / `mayRun`, then the job in `runAdminAct`):
+  the list (`job.phases.set`, `job.phases.template`) needs jobs.manage, or
+  projects.mine on that job; a check (`phase.verify`, and `phase.unverify`,
+  which needs a reason) needs tasks.verify on the job, owners anywhere; the
+  dates (`phase.plan`) need jobs.promise, jobs.manage or projects.mine.
+  Setting the list replaces the unverified phases and **never deletes a
+  verified one**: each must still be on the list, by name and in the order it
+  was checked, or the whole change is refused with why.
+- **Where it shows**: the owners' job sheet (Team > Jobs > a job, "Stage") and
+  each Projects card: the strip left to right, done ones ticked, the current
+  one with "day N" and red with "behind"; Verify on the current phase (any
+  phase can be tapped to verify or unverify it); "Add phases" when the job has
+  none (Framing / Drywall / Both / write your own); "Edit phases" for the
+  names, order and dates of unverified ones. Job rows on the Crew tab show the
+  stage in small text after the name ("· hang, day 3", red when behind). The
+  worker's screens carry nothing of it.
+- **The Mac** reads it: the jobs in `GET /api/bot/crew` carry `phases` and
+  `stage`, so the evening brief can say "6402 E Bambi: hang, day 3 of 4,
+  behind" (`stage.day`, `stage.plannedDays`, `stage.behind`). It has no door
+  to change a phase.
+- The site can be deployed before the migration: jobs read with no phases and
+  no stage until 0024 is applied, and the phase acts fail until then.
+
 ## Who can do what
 
 - **Crew** are a row in `crew_people` AND `app_metadata.sw_role = "crew"` on

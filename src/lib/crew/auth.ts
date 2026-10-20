@@ -111,6 +111,12 @@ export const ACT_NEEDS: Record<AdminAct["kind"], Capability | "owner"> = {
   "job.update": "jobs.promise",
   "job.people": "owner",
   "job.link": "owner",
+  // The job's phases (0024): the jobs switch, or a project manager on their own jobs (mayRun).
+  "job.phases.set": "jobs.manage",
+  "job.phases.template": "jobs.manage",
+  "phase.verify": "tasks.verify",
+  "phase.unverify": "tasks.verify",
+  "phase.plan": "jobs.promise",
   "schedule.set": "schedule.edit",
   "schedule.remove": "schedule.edit",
   "schedule.copy": "schedule.edit",
@@ -138,6 +144,10 @@ export function mayRun(m: Manager, kind: AdminAct["kind"]): boolean {
   if (need === "owner") return false;
   // Keeping a job current is either switch.
   if (kind === "job.update") return m.perms.includes("jobs.promise") || m.perms.includes("jobs.manage");
+  // A job's phases: the jobs switch, or a project manager (projects.mine) on
+  // the jobs they are on; runAdminAct refuses any other job for them.
+  if (kind === "job.phases.set" || kind === "job.phases.template") return m.perms.includes("jobs.manage") || m.perms.includes("projects.mine");
+  if (kind === "phase.plan") return m.perms.includes("jobs.promise") || m.perms.includes("jobs.manage") || m.perms.includes("projects.mine");
   return m.perms.includes(need);
 }
 

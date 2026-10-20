@@ -23,6 +23,7 @@ const { db, notify, auth, mail, geocoder } = vi.hoisted(() => {
     questions: [] as Row[],
     pickups: [] as Row[],
     reports: [] as Row[],
+    phases: [] as Row[],
     jobPeople: [] as { jobId: string; email: string; role: string }[],
     billing: [] as { id: string; name: string; client: string; prefix: string; crewJobId: string | null }[],
     seq: 0,
@@ -91,6 +92,28 @@ vi.mock("../queries", () => {
       Object.assign(row, patch);
       return row;
     },
+    listJobPhases: async (f: { jobId?: string } = {}) => db.phases.filter((p) => !f.jobId || p.jobId === f.jobId).sort((a, b) => (a.ord as number) - (b.ord as number)),
+    getJobPhase: async (id: number) => db.phases.find((p) => p.id === id) ?? null,
+    insertJobPhases: async (rows: Record<string, unknown>[]) =>
+      rows.map((r) => {
+        const row = { id: next(), verifiedAt: null, verifiedBy: "", note: "", ...r };
+        db.phases.push(row);
+        return row;
+      }),
+    patchJobPhase: async (id: number, patch: Record<string, unknown>, only?: { verified?: boolean }) => {
+      const row = db.phases.find((p) => p.id === id && (only?.verified === undefined || !!p.verifiedAt === only.verified));
+      if (!row) return null;
+      const map: Record<string, string> = { planned_from: "plannedFrom", planned_to: "plannedTo", verified_at: "verifiedAt", verified_by: "verifiedBy" };
+      for (const [k, v] of Object.entries(patch)) row[map[k] ?? k] = v;
+      return row;
+    },
+    replaceJobPhases: async (jobId: string, keep: { id: number; ord: number; trade: string; plannedFrom: string | null; plannedTo: string | null }[], add: Record<string, unknown>[]) => {
+      db.phases = db.phases.filter((p) => p.jobId !== jobId || p.verifiedAt);
+      for (const k of keep) Object.assign(db.phases.find((p) => p.id === k.id)!, { ord: k.ord, trade: k.trade, plannedFrom: k.plannedFrom, plannedTo: k.plannedTo });
+      for (const a of add) db.phases.push({ id: next(), verifiedAt: null, verifiedBy: "", note: "", ...a });
+      return db.phases.filter((p) => p.jobId === jobId).sort((a, b) => (a.ord as number) - (b.ord as number));
+    },
+    firstShiftDays: async () => ({}),
     getShift: async (id: number) => db.shifts.find((s) => s.id === id) ?? null,
     openShift: async (email: string) => open(email),
     lastShift: async (email: string) =>
@@ -357,6 +380,7 @@ beforeEach(() => {
   db.groups.set("crew", { id: "crew", name: "Crew", perms: ["clock", "receipts"], builtin: true });
   db.groups.set("lead", { id: "lead", name: "Supervisor", perms: [], builtin: true });
   for (const k of ["shifts", "entries", "schedule", "tasks", "questions", "pickups", "reports"] as const) db[k].length = 0;
+  db.phases = [];
   db.jobPeople = [];
   db.billing = [];
   db.seq = 0;
@@ -1118,5 +1142,115 @@ describe("owners: who is on a job, and its billing job", () => {
     expect(await admin({ kind: "job.link", id: "powell", billingJobId: "22222222-2222-4222-8222-222222222222" }, at("09:01"))).toMatchObject({ ok: false, status: 409 });
     expect(await admin({ kind: "job.link", id: "powell", billingJobId: "" }, at("09:02"))).toMatchObject({ ok: true });
     expect(db.billing[0].crewJobId).toBeNull();
+  });
+});
+
+// ---- the stage of a job (0024) ------------------------------------------------------
+
+describe("a job's phases and its stage", () => {
+  const names = (jobId = "powell") =>
+    db.phases
+      .filter((p) => p.jobId === jobId)
+      .sort((a, b) => (a.ord as number) - (b.ord as number))
+      .map((p) => `${p.ord}:${p.name}${p.verifiedAt ? "*" : ""}`);
+
+  it("starts a job from a template, after whatever it had", async () => {
+    expect(await admin({ kind: "job.phases.template", jobId: "powell", template: "framing" }, at("09:00"))).toMatchObject({ ok: true, note: "5 framing phases on Powell Residence." });
+    expect(names()).toEqual(["1:layout", "2:walls", "3:roof and ceiling", "4:backing", "5:inspection"]);
+    expect(db.phases[0]).toMatchObject({ trade: "framing", createdBy: "Lando", plannedFrom: null, plannedTo: null });
+    expect(await admin({ kind: "job.phases.template", jobId: "powell", template: "drywall" }, at("09:01"))).toMatchObject({ ok: true, note: "4 drywall phases on Powell Residence, after the ones it had." });
+    expect(names()).toEqual(["1:layout", "2:walls", "3:roof and ceiling", "4:backing", "5:inspection", "6:hang", "7:tape", "8:texture", "9:punch"]);
+    expect(await admin({ kind: "job.phases.template", jobId: "nope", template: "both" }, at("09:02"))).toMatchObject({ ok: false, status: 404 });
+    expect(names("north-lane")).toEqual([]);
+  });
+
+  it("sets the list, keeping a verified phase where it is and never dropping it", async () => {
+    await admin({ kind: "job.phases.template", jobId: "powell", template: "drywall" }, at("09:00"));
+    const hang = db.phases.find((p) => p.name === "hang")!;
+    expect(await admin({ kind: "phase.verify", id: hang.id, note: "Looked at it with Eli" }, at("16:00"))).toMatchObject({ ok: true, note: "hang: verified." });
+    expect(hang).toMatchObject({ verifiedBy: "Lando", verifiedAt: at("16:00").toISOString() });
+    expect(hang.note).toContain("Verified by Lando");
+    expect(hang.note).toContain("Looked at it with Eli");
+    // Tape goes, sand comes in with a plan, hang stays as it was checked.
+    const set = { kind: "job.phases.set" as const, jobId: "powell" };
+    expect(
+      await admin({ ...set, phases: [{ name: "hang" }, { name: "sand", plannedFrom: "2026-10-06", plannedTo: "2026-10-07" }, { name: "texture" }, { name: "punch" }] }, at("16:01")),
+    ).toMatchObject({ ok: true, note: "4 phases on Powell Residence." });
+    expect(names()).toEqual(["1:hang*", "2:sand", "3:texture", "4:punch"]);
+    expect(db.phases.find((p) => p.name === "hang")).toBe(hang);
+    expect(db.phases.find((p) => p.name === "sand")).toMatchObject({ plannedFrom: "2026-10-06", plannedTo: "2026-10-07", createdBy: "Lando" });
+    // Without hang: refused, and nothing changes.
+    expect(await admin({ ...set, phases: [{ name: "sand" }] }, at("16:02"))).toMatchObject({
+      ok: false,
+      status: 409,
+      error: '"hang" is verified and cannot be dropped. Unverify it first, or keep it on the list.',
+    });
+    expect(names()).toEqual(["1:hang*", "2:sand", "3:texture", "4:punch"]);
+    // A plan that ends before it starts.
+    expect(await admin({ ...set, phases: [{ name: "hang" }, { name: "sand", plannedFrom: "2026-10-08", plannedTo: "2026-10-07" }] }, at("16:03"))).toMatchObject({ ok: false, status: 400 });
+    // Written by hand, with trades.
+    expect(await admin({ ...set, phases: [{ name: "hang" }, { name: "demo", trade: "demo" }] }, at("16:04"))).toMatchObject({ ok: true, note: "2 phases on Powell Residence." });
+    expect(names()).toEqual(["1:hang*", "2:demo"]);
+    expect(await admin({ ...set, phases: [] }, at("16:05"))).toMatchObject({ ok: false, status: 409 });
+    expect(await admin({ kind: "job.phases.set", jobId: "nope", phases: [] }, at("16:06"))).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("verifies once, unverifies only with a reason, and plans dates", async () => {
+    await admin({ kind: "job.phases.template", jobId: "powell", template: "drywall" }, at("09:00"));
+    const tape = db.phases.find((p) => p.name === "tape")!;
+    expect(await admin({ kind: "phase.verify", id: tape.id }, at("16:00"))).toMatchObject({ ok: true });
+    expect(await admin({ kind: "phase.verify", id: tape.id }, at("16:01"))).toMatchObject({ ok: false, status: 409, error: "Lando already verified it." });
+    expect(() => adminActSchema.parse({ kind: "phase.unverify", id: tape.id, note: "" })).toThrow();
+    expect(await admin({ kind: "phase.unverify", id: tape.id, note: "Cracks at the corners" }, at("16:02"))).toMatchObject({ ok: true, note: "tape is open again." });
+    expect(tape).toMatchObject({ verifiedAt: null, verifiedBy: "" });
+    expect(tape.note).toContain("Unverified by Lando");
+    expect(tape.note).toContain("Cracks at the corners");
+    expect(await admin({ kind: "phase.unverify", id: tape.id, note: "again" }, at("16:03"))).toMatchObject({ ok: false, status: 409 });
+    expect(await admin({ kind: "phase.plan", id: tape.id, plannedFrom: "2026-10-07", plannedTo: "2026-10-06" }, at("16:04"))).toMatchObject({ ok: false, status: 400 });
+    expect(await admin({ kind: "phase.plan", id: tape.id, plannedFrom: "2026-10-06", plannedTo: "2026-10-07" }, at("16:04"))).toMatchObject({ ok: true });
+    expect(tape).toMatchObject({ plannedFrom: "2026-10-06", plannedTo: "2026-10-07" });
+    expect(await admin({ kind: "phase.plan", id: tape.id, plannedFrom: "", plannedTo: "" }, at("16:05"))).toMatchObject({ ok: true });
+    expect(tape).toMatchObject({ plannedFrom: null, plannedTo: null });
+    expect(await admin({ kind: "phase.verify", id: 999 }, at("16:06"))).toMatchObject({ ok: false, status: 404 });
+    expect(await admin({ kind: "phase.plan", id: 999, plannedFrom: "", plannedTo: "" }, at("16:06"))).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("is the jobs switch or a project manager on their own jobs; checking one off is the check-work switch", () => {
+    const m = (perms: string[]) => ({ role: "member" as const, email: ELI, name: "Eli Lugo", perms: normalizePerms(perms) });
+    expect(mayRun(m(["jobs.manage"]), "job.phases.set")).toBe(true);
+    expect(mayRun(m(["projects.mine"]), "job.phases.set")).toBe(true);
+    expect(mayRun(m(["projects.mine"]), "job.phases.template")).toBe(true);
+    expect(mayRun(m(["jobs.promise"]), "job.phases.set")).toBe(false);
+    expect(mayRun(m(["tasks.verify"]), "phase.verify")).toBe(true);
+    expect(mayRun(m(["tasks.verify"]), "phase.unverify")).toBe(true);
+    expect(mayRun(m(["projects.mine", "jobs.manage"]), "phase.verify")).toBe(false);
+    expect(mayRun(m(["jobs.promise"]), "phase.plan")).toBe(true);
+    expect(mayRun(m(["projects.mine"]), "phase.plan")).toBe(true);
+    expect(mayRun(m(["tasks.verify"]), "phase.plan")).toBe(false);
+    expect(mayRun({ ...m([]), role: "owner" }, "phase.verify")).toBe(true);
+    expect(mayRun({ ...m([]), role: "owner" }, "job.phases.set")).toBe(true);
+  });
+
+  it("keeps a project manager to the jobs they are on, by job and by phase", async () => {
+    const PM = normalizePerms([...LEAD_PERMS, "projects.view", "projects.mine"]);
+    db.people.set(ELI, { ...eli, perms: PM });
+    db.jobPeople = [{ jobId: "powell", email: ELI, role: "pm" }];
+    const pm = (input: AdminActInput, now: Date) => runAdminAct({ role: "member", email: ELI, name: "Eli Lugo", perms: PM }, adminActSchema.parse(input), now);
+    expect(await pm({ kind: "job.phases.template", jobId: "powell", template: "drywall" }, at("09:00"))).toMatchObject({ ok: true });
+    expect(await pm({ kind: "job.phases.template", jobId: "north-lane", template: "drywall" }, at("09:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(await pm({ kind: "job.phases.set", jobId: "north-lane", phases: [{ name: "hang" }] }, at("09:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(names("north-lane")).toEqual([]);
+    // A phase named by id on a job they are not on.
+    await admin({ kind: "job.phases.template", jobId: "north-lane", template: "framing" }, at("09:01"));
+    const theirs = db.phases.find((p) => p.jobId === "north-lane")!;
+    const mine = db.phases.find((p) => p.jobId === "powell")!;
+    expect(await pm({ kind: "phase.verify", id: theirs.id }, at("16:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(await pm({ kind: "phase.unverify", id: theirs.id, note: "not yet" }, at("16:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(await pm({ kind: "phase.plan", id: theirs.id, plannedFrom: "2026-10-06", plannedTo: "2026-10-07" }, at("16:00"))).toMatchObject({ ok: false, status: 403 });
+    expect(theirs).toMatchObject({ verifiedAt: null, plannedFrom: null });
+    expect(await pm({ kind: "phase.verify", id: mine.id, note: "" }, at("16:00"))).toMatchObject({ ok: true });
+    expect(mine).toMatchObject({ verifiedBy: "Eli Lugo" });
+    expect(await pm({ kind: "phase.unverify", id: mine.id, note: "not yet" }, at("16:01"))).toMatchObject({ ok: true });
+    expect(await pm({ kind: "phase.plan", id: mine.id, plannedFrom: "2026-10-06", plannedTo: "2026-10-07" }, at("16:02"))).toMatchObject({ ok: true });
   });
 });

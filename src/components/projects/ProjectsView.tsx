@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, Dot, Empty, SectionTitle, type Tone } from '@/components/bot/ui'
+import { StageStrip, postPhaseAct } from '@/components/crew/admin/StageStrip'
 import type { ProjectCard, ProjectsView as Data, ProjectTone } from '@/lib/crew/projects'
 import { planAsk } from '@/lib/crew/plan'
 import { dayShort } from '@/lib/crew/time'
@@ -22,7 +23,7 @@ function promiseLine(p: ProjectCard): string {
   return `Promised ${when}${p.promiseNote ? `: ${p.promiseNote}` : ''}`
 }
 
-function Project({ p, money }: { p: ProjectCard; money: boolean }) {
+function Project({ p, money, day, can, onChange }: { p: ProjectCard; money: boolean; day: string; can: Data['can']; onChange: () => void }) {
   const promise = promiseLine(p)
   return (
     <Card className="p-4">
@@ -37,6 +38,22 @@ function Project({ p, money }: { p: ProjectCard; money: boolean }) {
         </Chip>
       </div>
       {promise ? <p className="mt-2 text-[13px] text-[var(--color-charcoal)]">{promise}</p> : null}
+
+      <div className="mt-3">
+        <StageStrip
+          jobId={p.id}
+          jobName={p.name}
+          phases={p.phases}
+          stage={p.stage}
+          today={day}
+          can={{ verify: can.verify, edit: can.phases, plan: can.plan }}
+          act={async (input) => {
+            const res = await postPhaseAct(input)
+            if (res.ok) onChange()
+            return res
+          }}
+        />
+      </div>
 
       <dl className="mt-3 grid grid-cols-4 gap-2 text-center">
         {[
@@ -121,7 +138,7 @@ export default function ProjectsView() {
     <div className="space-y-3">
       {data.narrowed ? <p className="text-[13px] text-[var(--color-charcoal-light)]">The jobs you are on.</p> : null}
       {data.projects.length ? (
-        data.projects.map((p) => <Project key={p.id} p={p} money={data.money} />)
+        data.projects.map((p) => <Project key={p.id} p={p} money={data.money} day={data.day} can={data.can} onChange={load} />)
       ) : (
         <Empty>{data.narrowed ? 'You are not on any job yet. Marco or Lando can add you to one.' : 'No active jobs.'}</Empty>
       )}

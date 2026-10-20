@@ -129,6 +129,53 @@ export type CrewJob = {
 /** How crew_jobs.geo is stored: who placed it and when, beside the point. */
 export type CrewJobGeo = { lat: number; lng: number; source: "census" | "nominatim" | "owner"; at: string };
 
+/** One phase of a job (0024), in order under it. Verified by a person, never on a worker's word. */
+export type CrewJobPhase = {
+  id: number;
+  jobId: string;
+  /** 1-based position in the job's list. */
+  ord: number;
+  name: string;
+  /** 'framing' | 'drywall' | '' (or whatever was typed). */
+  trade: string;
+  plannedFrom: string | null;
+  plannedTo: string | null;
+  verifiedBy: string;
+  verifiedAt: string | null;
+  /** What was said when it was verified or unverified, newest last. */
+  note: string;
+  createdBy: string;
+};
+
+/**
+ * Where a job is, from its phases (src/lib/crew/phases.ts stageOf): the first
+ * phase nobody has verified, or "complete" once every one is. null when the
+ * job has no phases.
+ */
+export type JobStage = {
+  /** The phase's id, or null for "complete". */
+  id: number | null;
+  name: string;
+  trade: string;
+  /** Position of the current phase and how many there are ("2 of 5"). */
+  ord: number;
+  of: number;
+  /** The Phoenix day the previous phase was verified, or the job's first shift day, or null. */
+  sinceDay: string | null;
+  /** Days on this phase counting sinceDay as day 1; null without a sinceDay. */
+  day: number | null;
+  plannedFrom: string | null;
+  plannedTo: string | null;
+  /** Length of the plan in days when both dates are set. */
+  plannedDays: number | null;
+  /** planned_to has passed and the phase is not verified. */
+  behind: boolean;
+  complete: boolean;
+};
+
+/** A job as the owners, the project manager and the Mac read it: with its phases and stage. The worker's jobs never carry these. */
+export type CrewJobStaged = CrewJob & { phases: CrewJobPhase[]; stage: JobStage | null };
+
 /** Who is on a job, and as what (0018). Any row counts for projects.mine. */
 export const JOB_ROLES = ["pm", "supervisor", "crew"] as const;
 export type CrewJobRole = (typeof JOB_ROLES)[number];
@@ -340,7 +387,8 @@ export type CrewAdminHome = {
   /** Monday of the week the Hours view is showing. */
   week: string;
   people: CrewPerson[];
-  jobs: CrewJob[];
+  /** Every job with its phases and stage (0024). */
+  jobs: CrewJobStaged[];
   /** Project names the expense tracker already uses that are not jobs here yet. */
   suggestedJobs: string[];
   shifts: CrewShift[];
@@ -366,7 +414,8 @@ export type CrewFeed = {
   now: string;
   day: string;
   people: CrewPerson[];
-  jobs: CrewJob[];
+  /** With each job's phases and stage, so the brief can say "6402 E Bambi: hang, day 3 of 4, behind". */
+  jobs: CrewJobStaged[];
   shifts: CrewShift[];
   /** `urls` lines up with `files`, and is only filled for entries the Mac has not filed yet. */
   entries: (CrewEntry & { urls: (string | null)[] })[];
@@ -563,6 +612,34 @@ export const adminActSchema = z.discriminatedUnion("kind", [
   }),
   /** The billing job (public.jobs) this field job is, or "" for none. Owners only. */
   z.object({ kind: z.literal("job.link"), id: jobId, billingJobId: z.string().uuid().or(z.literal("")) }),
+  /**
+   * The job's phases (0024), the whole list in order. Unverified phases are
+   * replaced by it; verified ones stay where they are and must all still be
+   * on it (matched by name), or nothing changes. jobs.manage, or projects.mine
+   * on that job.
+   */
+  z.object({
+    kind: z.literal("job.phases.set"),
+    jobId,
+    phases: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1, "name the phase").max(60),
+          trade: text(20),
+          plannedFrom: day.or(z.literal("")).default(""),
+          plannedTo: day.or(z.literal("")).default(""),
+        }),
+      )
+      .max(40),
+  }),
+  /** Append a template's phases after whatever the job already has. */
+  z.object({ kind: z.literal("job.phases.template"), jobId, template: z.enum(["framing", "drywall", "both"]) }),
+  /** Checked it: the phase is done. tasks.verify on that job, owners anywhere. */
+  z.object({ kind: z.literal("phase.verify"), id, note: text(300) }),
+  /** Take a check back, with why. */
+  z.object({ kind: z.literal("phase.unverify"), id, note: z.string().trim().min(3, "say why").max(300) }),
+  /** When the phase is expected to run; "" clears a date. */
+  z.object({ kind: z.literal("phase.plan"), id, plannedFrom: day.or(z.literal("")).default(""), plannedTo: day.or(z.literal("")).default("") }),
   z.object({
     kind: z.literal("schedule.set"),
     day,

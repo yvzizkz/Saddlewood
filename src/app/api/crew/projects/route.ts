@@ -4,6 +4,7 @@ import { requireSwitch } from "@/lib/crew/auth";
 import { buildProjects, type ProjectsView } from "@/lib/crew/projects";
 import { listBillingJobs, listJobPeople, listJobs, listPeople, listReports, listSchedule, listTasks } from "@/lib/crew/queries";
 import { isNarrowed, scopeFrom } from "@/lib/crew/scope";
+import { stageJobs } from "@/lib/crew/stages";
 import { addDays, localDay } from "@/lib/crew/time";
 
 // The Projects screen's read (projects.view). An owner sees every job; a
@@ -30,15 +31,23 @@ export async function GET(request: NextRequest) {
     ]);
     const scope = scopeFrom(viewer, jobPeople);
     const billing = Object.fromEntries(billingJobs.filter((b) => b.crewJobId).map((b) => [b.crewJobId as string, b.id]));
+    const has = (p: string) => viewer.perms.includes(p as (typeof viewer.perms)[number]);
+    const mine = viewer.role === "member" && has("projects.mine");
     const view: ProjectsView = {
       ok: true,
       narrowed: isNarrowed(viewer),
-      money: viewer.perms.includes("money.view"),
+      money: has("money.view"),
+      // What the viewer may do to a job's phases; the server checks it again on each act (mayRun, runAdminAct).
+      can: {
+        verify: has("tasks.verify"),
+        phases: viewer.role === "owner" || has("jobs.manage") || mine,
+        plan: has("jobs.promise") || has("jobs.manage") || mine,
+      },
       ...buildProjects({
         day,
         now,
         scope,
-        jobs,
+        jobs: await stageJobs(jobs, day),
         people,
         jobPeople,
         schedule,

@@ -42,6 +42,7 @@ import {
   TaskSheet,
 } from './AdminSheets'
 import { UnmatchedPurchases } from './PurchaseCards'
+import { StageWord } from './StageStrip'
 import { CrewAdminProvider, useCrewAdmin } from './useCrewAdmin'
 
 // The Crew screens. Owners get five views, the lead (field supervisor) four:
@@ -523,7 +524,10 @@ function ScheduleView({ data, show }: { data: CrewAdminHome; show: (o: Open) => 
             return (
               <Row key={j.id} onClick={editJobs ? () => show({ kind: 'job', job: j }) : undefined}>
                 <span className="flex items-center justify-between gap-3">
-                  <span className="truncate text-[15px] text-[var(--color-charcoal)]">{j.name}</span>
+                  <span className="truncate text-[15px] text-[var(--color-charcoal)]">
+                    {j.name}
+                    <StageWord stage={j.stage} />
+                  </span>
                   {j.promised ? <Chip tone={late ? 'bad' : soon ? 'warn' : 'quiet'}>{dayShort(j.promised)}</Chip> : <Chip tone="quiet">No date</Chip>}
                 </span>
                 <span className="mt-0.5 block truncate text-[12px] text-[var(--color-charcoal-light)]">{j.promiseNote || 'Tap to add what we promised the client and by when.'}</span>
@@ -1039,7 +1043,10 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
         <Card className="divide-y divide-[var(--color-stone)]">
           {activeJobs.map((j) => (
             <Row key={j.id} onClick={() => show({ kind: 'job', job: j })}>
-              <span className="block text-[15px] text-[var(--color-charcoal)]">{j.name}</span>
+              <span className="block text-[15px] text-[var(--color-charcoal)]">
+                {j.name}
+                <StageWord stage={j.stage} />
+              </span>
               <span className="mt-0.5 block truncate text-[12px] text-[var(--color-charcoal-light)]">{j.address || 'No address yet'}</span>
               {(() => {
                 const on = data.jobPeople.filter((a) => a.jobId === j.id).map((a) => firstNameOf(data.people.find((p) => p.email === a.email)?.name ?? a.email))
