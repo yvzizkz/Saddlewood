@@ -91,6 +91,7 @@ type DbBillRow = {
   payment_terms: string;
   approved_by: string;
   approved_at: string | null;
+  description: string;
   note: string;
 };
 
