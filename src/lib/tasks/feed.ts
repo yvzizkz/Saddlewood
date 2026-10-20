@@ -21,6 +21,7 @@ import type { Lane } from "@/lib/owner/lanes";
 import { loadPayables } from "@/lib/accounting/payables";
 import { loadBillingCalendar } from "@/lib/accounting/receivables";
 import { loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
+import { loadMissingDailyLogs } from "@/lib/field/ops";
 import { jobHref, jobKeyOf, type JobRef } from "@/lib/jobs/hub";
 import { escalationOf, ROLE_INFO, seatHolder, type Person, type Role, type Seat } from "@/lib/roles/seats";
 
@@ -238,6 +239,11 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
       editable: false,
     });
   }
+
+  // Missing 6:00 PM daily log (SOP-006 App C): any job with crew shifts today
+  // and no `eod` entry yet sits on `field_lead`.
+  const missingLogs = await loadMissingDailyLogs(refs, today);
+  out.push(...missingLogs);
 
   return out;
 }

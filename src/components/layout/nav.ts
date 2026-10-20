@@ -51,6 +51,7 @@ export const NAV: NavItem[] = [
   { href: '/app', label: 'Home', icon: Home, group: 'Work', tab: 1 },
   { href: '/app/sales', label: 'Sales', icon: TrendingUp, group: 'Work', tab: 2 },
   { href: '/app/jobs', label: 'Jobs', icon: Briefcase, group: 'Work', tab: 3, access: 'owner', also: ['/app/projects'] },
+  { href: '/app/schedule', label: 'Schedule', icon: CalendarDays, group: 'Work', access: 'owner', also: ['/internal/ops/calendar'] },
   { href: '/app/crew', label: 'Crew', icon: HardHat, group: 'Work', tab: 4, access: 'crewAdmin' },
   { href: '/app/tasks', label: 'Tasks', icon: ListTodo, group: 'Work', access: 'owner' },
   { href: '/app/subs', label: 'Subs and bids', icon: Users, group: 'Work' },
@@ -67,7 +68,6 @@ export const NAV: NavItem[] = [
   { href: '/app/ask', label: 'Ask the bot', icon: MessageSquare, group: 'Office' },
   { href: '/app/duties', label: 'Duties', icon: ListChecks, group: 'Office' },
   { href: '/internal/ops', label: 'Ops board', icon: ClipboardList, group: 'Office', access: 'owner' },
-  { href: '/internal/ops/calendar', label: 'Calendar', icon: CalendarDays, group: 'Office', access: 'owner' },
   { href: '/app/policies', label: 'Settings', icon: Settings, group: 'Office', also: ['/app/sales/settings'] },
   // The batch-2 prototypes and the pipeline estimates stay where they are
   // (KB APP-CLEANUP, batch 2 on hold); they are reached from one place.

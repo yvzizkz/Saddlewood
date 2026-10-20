@@ -1386,4 +1386,373 @@ values
   ('b0000001-0000-4000-8000-000000008009', 'prelim_notice', 'Arizona 20-day preliminary notice served', current_date - 40, 'Served on AFT 123 Jury Residence', now() - interval '40 days', 'Ilene', 'seed-cohesive')
 on conflict (job_id, kind) where kind not in ('permit', 'custom') do nothing;
 
+-- ---------------------------------------------------------------------------
+-- 9. Phase 2: Crew Schedule, Job Phases, Schedule Items, Checklists, EOD Logs, Field Receipts & Punch
+-- ---------------------------------------------------------------------------
+
+-- Crew schedule assignments (`crew_schedule`) across this week & next week
+delete from public.crew_schedule where created_by = 'seed-cohesive';
+insert into public.crew_schedule (day, email, job_id, job_name, start_time, note, priority, ack, created_by)
+values
+  (current_date, 'mateo.mujica.synth@example.com', '9146-w-hutton-dr', '9146 W Hutton Dr (Bellevue AC938)', '06:30', 'Franklin Hall East Classroom metal stud framing & shaft wall', 1, 'ok', 'seed-cohesive'),
+  (current_date, 'arnoldo.mujica.synth@example.com', '9146-w-hutton-dr', '9146 W Hutton Dr (Bellevue AC938)', '06:30', 'Franklin Hall East Classroom metal stud framing', 1, 'ok', 'seed-cohesive'),
+  (current_date, 'filiberto.villegas.synth@example.com', '8009-n-ironwood-dr', '8009 N Ironwood Dr (Jury AFT 123)', '07:00', 'Theater acoustic floating soffit framing & backing (CO-3)', 2, 'ok', 'seed-cohesive'),
+  (current_date, 'juan.torres.synth@example.com', '6402-e-bambi-drive', '6402 E Bambi Drive (Woodward)', '07:00', 'Master bath & hallway 5/8 Type X hang', 2, 'ok', 'seed-cohesive'),
+  (current_date, 'david.morales.synth@example.com', '6402-e-bambi-drive', '6402 E Bambi Drive (Woodward)', '07:00', 'Master bath & hallway fire tape & corner bead', 2, 'ok', 'seed-cohesive'),
+  (current_date, 'jesus.mendoza.synth@example.com', '3526-emerson-street', '3526 Emerson Street (Powell)', '07:30', 'Casita & gallery Level 4 prime & satin finish coat', 3, 'ok', 'seed-cohesive'),
+  (current_date + 1, 'mateo.mujica.synth@example.com', '9146-w-hutton-dr', '9146 W Hutton Dr (Bellevue AC938)', '06:30', 'Pre-cover framing walk & firestop backing', 1, 'ok', 'seed-cohesive'),
+  (current_date + 1, 'carlos.habana.synth@example.com', '8009-n-ironwood-dr', '8009 N Ironwood Dr (Jury AFT 123)', '07:00', 'Gallery & Great Room Level 5 skim coat', 2, '', 'seed-cohesive'),
+  (current_date + 2, 'mateo.mujica.synth@example.com', '4125-e-camelback-rd', '4125 E Camelback Rd (Carder AFT 129)', '07:00', 'Kitchen structural header & bearing wall framing', 2, '', 'seed-cohesive'),
+  (current_date + 3, 'juan.torres.synth@example.com', '9146-w-hutton-dr', '9146 W Hutton Dr (Bellevue AC938)', '06:30', 'Classroom 5/8 XP Hi-Abuse board hang after insulation sign-off', 2, '', 'seed-cohesive')
+on conflict (day, email, job_id) do update
+  set start_time = excluded.start_time,
+      note = excluded.note,
+      priority = excluded.priority,
+      ack = excluded.ack;
+
+-- Job phases (`crew_job_phases`) for timeline & quality gates
+delete from public.checklists where created_by = 'seed-cohesive';
+delete from public.crew_job_phases where created_by = 'seed-cohesive';
+
+insert into public.crew_job_phases (job_id, ord, name, trade, planned_from, planned_to, verified_by, verified_at, note, created_by)
+values
+  ('9146-w-hutton-dr', 1, 'Layout & Top Track', 'framing', current_date - 14, current_date - 7, 'Eli Ramirez', now() - interval '7 days', 'Verified layout with Schifferer super', 'seed-cohesive'),
+  ('9146-w-hutton-dr', 2, 'Structural Studs & 2-Hr Shaft Wall', 'framing', current_date - 6, current_date + 1, '', null, 'In progress — pre-cover checklist open on Classroom 102', 'seed-cohesive'),
+  ('9146-w-hutton-dr', 3, 'Sound & Thermal Batt Insulation', 'insulation', current_date + 2, current_date + 5, '', null, 'Sonoran Thermal scheduled after framing pre-cover', 'seed-cohesive'),
+  ('9146-w-hutton-dr', 4, 'Hang 5/8 XP Hi-Abuse Drywall', 'drywall', current_date + 6, current_date + 12, '', null, '', 'seed-cohesive'),
+  ('8009-n-ironwood-dr', 1, 'Structural Framing & Sheathing', 'framing', current_date - 35, current_date - 20, 'Eli Ramirez', now() - interval '20 days', 'Verified & passed framing inspection', 'seed-cohesive'),
+  ('8009-n-ironwood-dr', 2, 'Hang & Tape', 'drywall', current_date - 19, current_date - 5, 'Eli Ramirez', now() - interval '5 days', 'Verified pre-board & pre-tape', 'seed-cohesive'),
+  ('8009-n-ironwood-dr', 3, 'Level 5 Skim & Theater Soffit (CO-3)', 'drywall', current_date - 4, current_date + 3, '', null, 'Gallery skim 85% complete; Theater floating soffit framing today', 'seed-cohesive'),
+  ('6402-e-bambi-drive', 1, 'Addition Framing & Backing', 'framing', current_date - 21, current_date - 8, 'Eli Ramirez', now() - interval '8 days', 'Verified all bath backing', 'seed-cohesive'),
+  ('6402-e-bambi-drive', 2, 'Drywall Hang & Fire Tape', 'drywall', current_date - 7, current_date + 2, '', null, 'Active hang & tape in master suite', 'seed-cohesive'),
+  ('3526-emerson-street', 1, 'Framing & Drywall', 'drywall', current_date - 45, current_date - 15, 'Marco', now() - interval '15 days', 'Verified complete', 'seed-cohesive'),
+  ('3526-emerson-street', 2, 'Interior Prime, Finish Paint & Trim', 'paint', current_date - 14, current_date + 4, '', null, 'Casita & main gallery finish coat in progress', 'seed-cohesive');
+
+-- Schedule items (`schedule_items`: inspections, site visits, deliveries, meetings, sub mobilizations)
+delete from public.schedule_items where created_by = 'seed-cohesive';
+insert into public.schedule_items (
+  kind, title, detail, job_id, crew_job_id, sub_id, start_day, end_day, start_time, role, who, status, created_by
+)
+values
+  (
+    'inspection',
+    'City of Phoenix — 2-Hr Shaft Wall & Framing Pre-Cover Inspection',
+    'Inspector meeting at Franklin Hall East entrance; requires signed pre-cover checklist.',
+    'b0000001-0000-4000-8000-000000009146',
+    '9146-w-hutton-dr',
+    null,
+    current_date + 1,
+    current_date + 1,
+    '09:30',
+    'pm',
+    'Eli Ramirez',
+    'scheduled',
+    'seed-cohesive'
+  ),
+  (
+    'delivery',
+    'Arizona Building Supply — 110 Sheets 5/8 XP Hi-Abuse Drywall Boom Drop',
+    'Boom truck staging on Hutton Dr north gate; runner & forklift on site.',
+    'b0000001-0000-4000-8000-000000009146',
+    '9146-w-hutton-dr',
+    null,
+    current_date,
+    current_date,
+    '07:00',
+    'field_lead',
+    'Mateo Mujica',
+    'done',
+    'seed-cohesive'
+  ),
+  (
+    'sub_mobilization',
+    'Sonoran Thermal Insulation — Classroom R-19 & Sound Batt Mobilization',
+    '4-man insulation crew mobilizing to Franklin Hall (contingent on COI renewal).',
+    'b0000001-0000-4000-8000-000000009146',
+    '9146-w-hutton-dr',
+    'd0000001-0000-4000-8000-000000000003',
+    current_date + 2,
+    current_date + 5,
+    '07:00',
+    'pm',
+    'Eli Ramirez',
+    'scheduled',
+    'seed-cohesive'
+  ),
+  (
+    'site_visit',
+    'AFT Super + Marco — Jury Residence Theater Soffit & Level 5 Light Check',
+    'Walk CO-3 floating soffit framing and raking-light check on Gallery Level 5 walls.',
+    'b0000001-0000-4000-8000-000000008009',
+    '8009-n-ironwood-dr',
+    null,
+    current_date + 1,
+    current_date + 1,
+    '14:00',
+    'decisions',
+    'Marco',
+    'scheduled',
+    'seed-cohesive'
+  ),
+  (
+    'inspection',
+    'Town of Paradise Valley — Drywall Nail/Screw Inspection',
+    'Master Suite & Addition firewall screw pattern inspection before tape.',
+    'b0000001-0000-4000-8000-000000006402',
+    '6402-e-bambi-drive',
+    null,
+    current_date,
+    current_date,
+    '11:00',
+    'pm',
+    'Eli Ramirez',
+    'scheduled',
+    'seed-cohesive'
+  ),
+  (
+    'meeting',
+    'Powell Weekly Owner Selection & SOV Progress Walk',
+    'Review Draw #8 progress and casita cabinet/trim paint sheen with Mark & Heather Powell.',
+    'b0000001-0000-4000-8000-000000003526',
+    '3526-emerson-street',
+    null,
+    current_date + 3,
+    current_date + 3,
+    '10:00',
+    'decisions',
+    'Marco',
+    'scheduled',
+    'seed-cohesive'
+  );
+
+-- Pre-cover & phase quality checklists (`checklists`, SOP-009 quality gate)
+insert into public.checklists (
+  job_id, phase_id, stage, location_label, items, status, note, completed_by, completed_at, created_by
+)
+select
+  '9146-w-hutton-dr',
+  p.id,
+  'pre_cover',
+  'Franklin Hall Classroom 102 — North/South & 2-Hr Shaft Wall (Both Faces)',
+  '[{"key":"studs_backing","label":"Stud spacing, heavy-gauge door bucks & TV/cabinet backing verified","checked":true,"note":"16 OC 20-ga verified"},{"key":"mep_clearance","label":"MEP rough-in plates, nail guards & acoustic putty pads installed","checked":true,"note":""},{"key":"firestop","label":"Top-of-wall fire caulk & 2-hr shaft liner clips inspected","checked":false,"note":"Waiting on East corridor penetration sleeve"},{"key":"both_faces_photo","label":"Photos captured of both wall faces with room label visible","checked":false,"note":"North face photographed; South face pending"}]'::jsonb,
+  'open',
+  'Blocks verifying Structural Studs & 2-Hr Shaft Wall until firestop sleeve & south face photo are checked.',
+  '',
+  null,
+  'seed-cohesive'
+from public.crew_job_phases p
+where p.job_id = '9146-w-hutton-dr' and p.ord = 2
+limit 1;
+
+insert into public.checklists (
+  job_id, phase_id, stage, location_label, items, status, note, completed_by, completed_at, created_by
+)
+select
+  '8009-n-ironwood-dr',
+  p.id,
+  'pre_paint',
+  'Main Gallery & Theater Entry — Level 5 Skim Raking-Light Check (Both Faces)',
+  '[{"key":"skim_holiday","label":"Zero holidays, lap marks or pinholes under 500W raking light","checked":true,"note":"Checked with Carlos"},{"key":"corner_bead","label":"Trim-Tex tear-away L-bead & reveal beads laser-straight","checked":true,"note":""},{"key":"sanded_dusted","label":"Walls vacuum-sanded and wiped ready for PVA primer","checked":true,"note":""},{"key":"both_faces_photo","label":"Photos captured of both wall faces with room label visible","checked":true,"note":"Uploaded in EOD log"}]'::jsonb,
+  'passed',
+  'Gallery walls passed raking-light check; Theater soffit framing in progress.',
+  'Eli Ramirez',
+  now() - interval '3 hours',
+  'seed-cohesive'
+from public.crew_job_phases p
+where p.job_id = '8009-n-ironwood-dr' and p.ord = 3
+limit 1;
+
+-- Structured Daily Logs (`crew_entries` kind='eod') & Field Receipts (`kind='receipt'`)
+delete from public.crew_entries where client_id like 'seed-cohesive-%';
+insert into public.crew_entries (
+  email, kind, day, job_id, job_name, body, data, files, status, decided_by, client_id
+)
+values
+  (
+    'mateo.mujica.synth@example.com',
+    'eod',
+    current_date,
+    '9146-w-hutton-dr',
+    '9146 W Hutton Dr (Bellevue AC938)',
+    'Framed 85 LF of 20-ga 3-5/8 classroom partitions in Franklin Hall 102–104 and set HM door frames.',
+    '{"weather":"Sunny 88°F","crewCount":3,"tradesOnSite":"Framing, Electrical","deliveries":"Arizona Building Supply delivered 110 sheets 5/8 XP Hi-Abuse","visits":"Schifferer assistant super walked shaft wall layout","inspections":"Pre-cover framing inspection scheduled tomorrow 9:30 AM","asked":"Schifferer asked to add 24 LF of 16-ga projector backing in Lecture Hall 101","decision":"ASK: Confirm whether Lecture Hall 101 backing is billed on T&M or folded into CO-1","stuck":"East corridor MEP sleeve still open on Classroom 102 shaft wall","needs":"","safety":"All scissor lift harnesses and toe-boards checked"}'::jsonb,
+    '[{"name":"bellevue-102-north-wall.jpg","path":"u/mateo/bellevue-102-north.jpg","type":"image/jpeg","size":184200},{"name":"bellevue-102-south-wall.jpg","path":"u/mateo/bellevue-102-south.jpg","type":"image/jpeg","size":179400},{"name":"bellevue-delivery-drop.jpg","path":"u/mateo/bellevue-drop.jpg","type":"image/jpeg","size":210000}]'::jsonb,
+    'filed',
+    'Eli Ramirez',
+    'seed-cohesive-eod-9146-today'
+  ),
+  (
+    'filiberto.villegas.synth@example.com',
+    'eod',
+    current_date,
+    '8009-n-ironwood-dr',
+    '8009 N Ironwood Dr (Jury AFT 123)',
+    'Completed Theater floating acoustic soffit framing and LED cove backing per CO-3.',
+    '{"weather":"Clear 87°F","crewCount":2,"tradesOnSite":"Framing, Drywall, Low-Voltage","deliveries":"None","visits":"AFT project manager checked theater soffit height","inspections":"Ready for AFT walk tomorrow at 2:00 PM","asked":"","decision":"","stuck":"","needs":"","safety":"No incidents"}'::jsonb,
+    '[{"name":"jury-theater-soffit-1.jpg","path":"u/filiberto/jury-soffit-1.jpg","type":"image/jpeg","size":165000},{"name":"jury-theater-soffit-2.jpg","path":"u/filiberto/jury-soffit-2.jpg","type":"image/jpeg","size":172000},{"name":"jury-gallery-level5.jpg","path":"u/filiberto/jury-gallery.jpg","type":"image/jpeg","size":191000}]'::jsonb,
+    'filed',
+    'Eli Ramirez',
+    'seed-cohesive-eod-8009-today'
+  ),
+  (
+    'juan.torres.synth@example.com',
+    'receipt',
+    current_date,
+    '6402-e-bambi-drive',
+    '6402 E Bambi Drive (Woodward)',
+    '2 boxes 1-5/8 coarse drywall screws + fiberglass mesh tape (paid out of pocket)',
+    '{"amount":84.50,"vendor":"Home Depot","paidBy":"me","trade":"drywall","normalizedPurchaseKey":"app:seed:receipt-6402-1"}'::jsonb,
+    '[{"name":"hd-receipt-6402.jpg","path":"u/juan/hd-receipt-6402.jpg","type":"image/jpeg","size":94000}]'::jsonb,
+    'approved',
+    'Eli Ramirez',
+    'seed-cohesive-receipt-6402-1'
+  );
+
+-- Normalized app receipt in `purchases` + worker reimbursement in `bills`
+insert into public.purchases (
+  source, source_key, purchased_on, vendor, store, order_ref,
+  job_name_raw, job_key, job_id, trade, trade_manual,
+  department, class, sku, description, qty, line_total_cents, meta
+)
+values (
+  'app',
+  'app:seed:receipt-6402-1',
+  current_date,
+  'Home Depot',
+  'Field Receipt (App)',
+  'REC-6402-1',
+  '6402 E Bambi Drive (Woodward)',
+  '6402 e bambi drive woodward',
+  '6402-e-bambi-drive',
+  'drywall',
+  true,
+  'BLDG. MATERIALS',
+  'GYPSUM',
+  'FIELD-REC',
+  '2 boxes 1-5/8 coarse drywall screws + fiberglass mesh tape (paid out of pocket)',
+  1,
+  8450,
+  '{"runner":"Juan Torres","paidBy":"me","clientId":"seed-cohesive-receipt-6402-1"}'::jsonb
+)
+on conflict (source_key) do nothing;
+
+insert into public.bills (
+  id, bill_number, kind, vendor_name, sub_id, job_id, crew_job_id, bid_package_id, purchase_trip_key,
+  trade, description, lines, issued_on, due_on, amount_cents, retainage_cents,
+  status, waiver_status, payment_terms, approved_by, approved_at, note, created_by
+)
+values (
+  'f1000001-0000-4000-8000-000000000011',
+  'REIMB-6402-1',
+  'reimbursement',
+  'Juan Torres (Crew Reimbursement)',
+  null,
+  'b0000001-0000-4000-8000-000000006402',
+  '6402-e-bambi-drive',
+  null,
+  'app:seed:receipt-6402',
+  'drywall',
+  'Out-of-pocket field receipt: 2 boxes 1-5/8 drywall screws + mesh tape',
+  '[{"description":"2 boxes 1-5/8 coarse drywall screws + fiberglass mesh tape","trade":"drywall","qty":1,"unitCents":8450,"totalCents":8450}]'::jsonb,
+  current_date,
+  current_date + 3,
+  8450,
+  0,
+  'open',
+  'not_required',
+  'friday_run',
+  'Eli Ramirez',
+  now() - interval '1 hour',
+  'Normalized from field receipt app:seed:receipt-6402-1 (paidBy=me).',
+  'seed-cohesive'
+)
+on conflict (id) do nothing;
+
+-- Punch items, CO intake & Decision items in `work_items`
+delete from public.work_items where created_by = 'seed-cohesive';
+insert into public.work_items (
+  kind, title, detail, location, role, assignee, job_id, crew_job_id, due_on, escalate_days, status, source, href, created_by
+)
+values
+  (
+    'punch',
+    'Touch up Level 5 skim coat holiday at East gallery clerestory window return',
+    'Marked with blue tape during raking-light walk; skim & sand before primer.',
+    'Gallery — East Clerestory Window Return',
+    'field_lead',
+    'carlos.habana.synth@example.com',
+    'b0000001-0000-4000-8000-000000008009',
+    '8009-n-ironwood-dr',
+    current_date + 1,
+    1,
+    'open',
+    'seed:punch:8009:1',
+    '/app/jobs/8009-n-ironwood-dr?tab=log',
+    'seed-cohesive'
+  ),
+  (
+    'punch',
+    'Install firestop putty pad & acoustic sealant at Classroom 102 East shaft sleeve',
+    'Required to pass pre-cover checklist before tomorrow 9:30 AM inspection.',
+    'Franklin Hall Classroom 102 — East Shaft Wall',
+    'field_lead',
+    'mateo.mujica.synth@example.com',
+    'b0000001-0000-4000-8000-000000009146',
+    '9146-w-hutton-dr',
+    current_date,
+    1,
+    'open',
+    'seed:punch:9146:1',
+    '/app/jobs/9146-w-hutton-dr?tab=log',
+    'seed-cohesive'
+  ),
+  (
+    'punch',
+    'Caulk & spray 2nd finish coat on Casita south pocket door casing',
+    'Owner walk item ahead of Draw #8 closeout.',
+    'Casita — South Pocket Door Casing',
+    'field_lead',
+    'jesus.mendoza.synth@example.com',
+    'b0000001-0000-4000-8000-000000003526',
+    '3526-emerson-street',
+    current_date + 2,
+    1,
+    'open',
+    'seed:punch:3526:1',
+    '/app/jobs/3526-emerson-street?tab=log',
+    'seed-cohesive'
+  ),
+  (
+    'co_price',
+    'CO awaiting price · 9146 W Hutton Dr: Add 24 LF of 16-ga projector backing in Lecture Hall 101',
+    'Captured from Mateo Mujica EOD directive (Schifferer super request). Price before Friday cutoff.',
+    'Lecture Hall 101 — North Wall',
+    'sales',
+    '',
+    'b0000001-0000-4000-8000-000000009146',
+    '9146-w-hutton-dr',
+    current_date - 3,
+    2,
+    'open',
+    'seed:eod:asked:9146',
+    '/app/jobs/9146-w-hutton-dr?tab=changes',
+    'seed-cohesive'
+  ),
+  (
+    'decision',
+    'ASK · 9146 W Hutton Dr: Confirm whether Lecture Hall 101 backing is T&M or folded into CO-1',
+    'Rule? Logged from Mateo EOD check-in.',
+    'Lecture Hall 101',
+    'decisions',
+    '',
+    'b0000001-0000-4000-8000-000000009146',
+    '9146-w-hutton-dr',
+    current_date,
+    1,
+    'open',
+    'seed:eod:decision:9146',
+    '/app/jobs/9146-w-hutton-dr?tab=log',
+    'seed-cohesive'
+  );
+
 commit;

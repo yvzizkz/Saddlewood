@@ -21,6 +21,17 @@ import { KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
 import { NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
 import { CO_LABEL, loadChangeOrders } from "@/lib/billing/registers";
+import { EDITABLE_SCHEDULE_KINDS, loadScheduleFeed, SCHEDULE_KIND_LABEL } from "@/lib/schedule/feed";
+import { NewScheduleItem, ScheduleStatusButton } from "@/components/schedule/ScheduleActions";
+import { loadJobFieldOps } from "@/lib/field/ops";
+import {
+  ChecklistCard,
+  NewChecklistForm,
+  NewDailyLogForm,
+  NewFieldReceiptForm,
+  NewPunchForm,
+  PunchStatusButton,
+} from "@/components/field/FieldOpsActions";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +43,8 @@ type SP = Record<string, string | string[] | undefined>;
 
 const TABS: JobTab[] = [
   { key: "overview", label: "Overview" },
+  { key: "schedule", label: "Schedule" },
+  { key: "log", label: "Log and QA" },
   { key: "money", label: "Money" },
   { key: "labor", label: "Labor" },
   { key: "purchases", label: "Purchases" },
@@ -345,6 +358,241 @@ export default async function JobPage({ params, searchParams }: { params: Promis
           rowHrefKey="href"
           initialSort={{ key: "late", dir: "desc" }}
           empty="Nothing open on this job."
+        />
+      </JobFrame>
+    );
+  }
+
+  if (tab === "schedule") {
+    const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
+    const allSched = await loadScheduleFeed(refs, today);
+    const jobSched = allSched.filter((i) => i.jobKey === ref.key || (!i.jobKey && i.client && i.client === ref.client));
+    const table: TableRow[] = jobSched.map((i) => ({
+      id: i.id,
+      day: i.startDay,
+      time: i.startTime ? clockText(i.startTime) : "All day",
+      title: i.title,
+      detail: i.detail,
+      kind: i.kindLabel || SCHEDULE_KIND_LABEL[i.kind],
+      who: i.who || seatHolder(i.role, seats, people).name,
+      status: i.status,
+      href: i.href,
+    }));
+    const editableItems = jobSched.filter((i) => i.editable && i.itemId);
+    return (
+      <JobFrame {...frame} actions={<Link className="text-sm underline" href={hrefOf("/app/schedule", { job: ref.key })}>Open in Schedule</Link>}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <NewScheduleItem
+            job={ref.key}
+            defaultDay={today}
+            jobs={[{ value: ref.key, label: ref.name }]}
+            roles={ROLES.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
+            kinds={EDITABLE_SCHEDULE_KINDS}
+          />
+          <Link className="text-xs underline text-[var(--color-charcoal-light)]" href={hrefOf("/app/schedule", { view: "lookahead", job: ref.key })}>
+            Wednesday two-week look-ahead draft →
+          </Link>
+        </div>
+
+        <Card className="p-4">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Job timeline · phases & promised completion</p>
+          {crew.phases.length ? (
+            <ol className="divide-y divide-[var(--color-stone)]">
+              {crew.phases.map((ph) => (
+                <li key={ph.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <div>
+                    <span className="font-medium text-[var(--color-charcoal)]">{ph.name}</span>
+                    {ph.trade ? <span className="ml-2 text-xs text-[var(--color-charcoal-light)]">{ph.trade}</span> : null}
+                  </div>
+                  <span className="text-xs text-[var(--color-charcoal-light)]">
+                    {ph.verified_at
+                      ? `Verified ${formatValue("date", ph.verified_at)}`
+                      : ph.planned_from || ph.planned_to
+                        ? `${ph.planned_from ? formatValue("date", ph.planned_from) : "start"} → ${ph.planned_to ? formatValue("date", ph.planned_to) : "end"}`
+                        : "Unscheduled"}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-[var(--color-charcoal-light)]">No phases defined yet.</p>
+          )}
+        </Card>
+
+        {editableItems.length ? (
+          <Card className="p-4">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Scheduled inspections, visits, deliveries & sub mobilizations</p>
+            <ul className="divide-y divide-[var(--color-stone)]">
+              {editableItems.map((it) => (
+                <li key={it.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <div>
+                    <p className="font-medium text-[var(--color-charcoal)]">
+                      {formatValue("date", it.startDay)} · {it.title}
+                    </p>
+                    <p className="text-xs text-[var(--color-charcoal-light)]">
+                      {[it.kindLabel, it.startTime ? clockText(it.startTime) : null, it.detail].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <ScheduleStatusButton id={it.itemId!} status={it.status} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
+
+        <DataTable
+          rows={table}
+          columns={[
+            { key: "day", header: "Date", kind: "date" },
+            { key: "time", header: "Time", kind: "text", phone: "hide" },
+            { key: "title", header: "Event", kind: "text", hrefKey: "href", subKey: "detail", phone: "title" },
+            { key: "kind", header: "Type", kind: "text", filter: true },
+            { key: "who", header: "With", kind: "text", filter: true },
+            { key: "status", header: "Status", kind: "text", filter: true, phone: "value" },
+          ]}
+          searchKeys={["title", "detail", "kind", "who", "status"]}
+          name={`${ref.key}-schedule`}
+          rowHrefKey="href"
+          initialSort={{ key: "day", dir: "asc" }}
+          empty="Nothing on this job's schedule yet."
+        />
+      </JobFrame>
+    );
+  }
+
+  if (tab === "log") {
+    const field = await loadJobFieldOps(ref);
+    const logRows: TableRow[] = field.logs.map((l) => ({
+      id: String(l.id),
+      day: l.day,
+      author: l.author,
+      summary: l.body,
+      meta: [
+        l.weather,
+        l.crewCount ? `${l.crewCount} on site` : "",
+        l.tradesOnSite,
+        l.inspections ? `Inspection: ${l.inspections}` : "",
+        l.deliveries ? `Delivery: ${l.deliveries}` : "",
+        l.visits ? `Visit: ${l.visits}` : "",
+        l.asked ? `Directive: ${l.asked}` : "",
+        l.decision ? `ASK: ${l.decision}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      photos: l.photoCount,
+    }));
+    const receiptRows: TableRow[] = field.receipts.map((r) => ({
+      id: String(r.id),
+      day: r.day,
+      vendor: r.vendor,
+      description: r.description,
+      trade: r.trade,
+      paidBy: r.paidBy,
+      amount: r.amountCents,
+      href: r.tripHref,
+    }));
+
+    return (
+      <JobFrame {...frame}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <NewDailyLogForm jobKey={ref.key} today={today} />
+            <NewChecklistForm jobKey={ref.key} phases={field.phases} />
+            <NewPunchForm jobKey={ref.key} />
+            <NewFieldReceiptForm jobKey={ref.key} today={today} />
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${field.closeoutReady ? "bg-[#e7f4ea] text-[#1f6a3b]" : "bg-[#fdf3dc] text-[#8a6100]"}`}>
+            {field.closeoutReady
+              ? "Closeout gate: 0 open punch · 0 open checklists"
+              : `${field.openChecklistCount} open quality gate${field.openChecklistCount === 1 ? "" : "s"} · ${field.openPunchCount} open punch`}
+          </span>
+        </div>
+
+        <Card className="p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">
+              Pre-cover & phase quality checklists (SOP-009 · gates phase verification)
+            </p>
+            <span className="text-xs text-[var(--color-charcoal-light)]">
+              {field.checklists.filter((c) => c.status === "passed").length} of {field.checklists.length} passed
+            </span>
+          </div>
+          {field.checklists.length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {field.checklists.map((c) => (
+                <ChecklistCard key={c.id} checklist={c} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--color-charcoal-light)]">
+              No quality checklists on this job yet. Add a pre-cover or pre-tape gate above.
+            </p>
+          )}
+        </Card>
+
+        <Card className="p-4">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">
+            Punch list by room & wall face
+          </p>
+          {field.punch.length ? (
+            <ul className="divide-y divide-[var(--color-stone)]">
+              {field.punch.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                  <div>
+                    <p className={p.status !== "open" ? "text-[var(--color-charcoal-light)] line-through" : "font-medium text-[var(--color-charcoal)]"}>
+                      <span className="mr-2 rounded bg-[var(--color-background)] px-2 py-0.5 text-xs font-medium text-[var(--color-charcoal)]">
+                        {p.location}
+                      </span>
+                      {p.title}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--color-charcoal-light)]">
+                      {[p.detail, `With ${p.assignee}`, p.dueOn ? `Due ${formatValue("date", p.dueOn)}` : null].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <PunchStatusButton id={p.id} status={p.status} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-[var(--color-charcoal-light)]">Zero punch items on this job.</p>
+          )}
+        </Card>
+
+        <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">
+          Daily logs & field notes (SOP-006 App C)
+        </p>
+        <DataTable
+          rows={logRows}
+          columns={[
+            { key: "day", header: "Date", kind: "date" },
+            { key: "author", header: "By", kind: "text", filter: true },
+            { key: "summary", header: "Work performed & conditions", kind: "text", subKey: "meta", phone: "title" },
+            { key: "photos", header: "Photos", kind: "count", total: true, phone: "value" },
+          ]}
+          searchKeys={["author", "summary", "meta"]}
+          name={`${ref.key}-daily-logs`}
+          initialSort={{ key: "day", dir: "desc" }}
+          empty="No daily logs filed on this job yet."
+        />
+
+        <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">
+          Field receipts (normalized into Purchases & Payables)
+        </p>
+        <DataTable
+          rows={receiptRows}
+          columns={[
+            { key: "day", header: "Date", kind: "date" },
+            { key: "vendor", header: "Vendor", kind: "text", filter: true },
+            { key: "description", header: "Items", kind: "text", hrefKey: "href", phone: "title" },
+            { key: "trade", header: "Trade", kind: "text", filter: true },
+            { key: "paidBy", header: "Paid by", kind: "text", filter: true },
+            { key: "amount", header: "Amount", kind: "money", total: true, phone: "value" },
+          ]}
+          searchKeys={["vendor", "description", "trade", "paidBy"]}
+          name={`${ref.key}-field-receipts`}
+          rowHrefKey="href"
+          initialSort={{ key: "day", dir: "desc" }}
+          empty="No field receipts logged on this job."
         />
       </JobFrame>
     );
