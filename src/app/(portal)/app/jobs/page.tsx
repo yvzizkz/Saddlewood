@@ -8,8 +8,8 @@ import { drill, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import { CATEGORY_LABEL, loadJobCost, type CostLine } from "@/lib/accounting/jobCost";
 import { loadOpenReceivables } from "@/lib/accounting/receivables";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { localDay } from "@/lib/crew/time";
+import { seesJob, workSeat } from "@/lib/jobs/access";
 import { jobHref, listJobRefs, type JobRef } from "@/lib/jobs/hub";
 
 export const dynamic = "force-dynamic";
@@ -17,24 +17,35 @@ export const dynamic = "force-dynamic";
 // Every job, the hub everything else hangs off. The header shows where the
 // money went in the period (by job, client, PM, kind of cost); the table is
 // one row per job with its contract, billing, cost and margin, and opens the
-// job page.
+// job page. A project manager sees their own jobs, and of the cost only what
+// their seat may (jobs/access.ts): materials, labor dollars and sub bills by
+// policy, margin only when cost and margin are on.
 
 const PATH = "/app/jobs";
 type SP = Record<string, string | string[] | undefined>;
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await workSeat();
+  if (!seat) redirect("/app");
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
   const today = localDay();
 
-  const [refs, cost, prev, open] = await Promise.all([
+  const [allRefs, allCost, allPrev, allOpen] = await Promise.all([
     listJobRefs(),
     loadJobCost(period.from, period.to),
     loadJobCost(period.previous.from, period.previous.to),
     loadOpenReceivables(today),
   ]);
+  const refs = allRefs.filter((r) => seesJob(seat, r));
+  // The kinds of cost this seat sees: all of it with margin on; else materials, and labor when labor cost is on.
+  const kinds = new Set<CostLine["category"]>(seat.margin ? ["labor", "materials", "subs"] : seat.laborCost ? ["labor", "materials"] : ["materials"]);
+  const inView = (l: CostLine) => seat.owner || (kinds.has(l.category) && refs.some((r) => r.billingId === l.jobKey || `crew:${r.crewId}` === l.jobKey));
+  const cost = { lines: allCost.lines.filter(inView), jobs: allCost.jobs };
+  const prev = { lines: allPrev.lines.filter(inView) };
+  const open = { rows: seat.owner ? allOpen.rows : allOpen.rows.filter((o) => refs.some((r) => r.billingId === o.jobId)) };
+  const costLabel = seat.margin ? "Cost on jobs" : seat.laborCost ? "Labor and materials" : "Materials on jobs";
   // Cost lines are keyed by billing id or "crew:<id>"; find each one's job.
   const refOf = (key: string): JobRef | undefined => refs.find((r) => r.billingId === key || `crew:${r.crewId}` === key);
 
@@ -60,7 +71,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const totals = new Map(cost.jobs.map((j) => [j.jobKey, j]));
   const rows: TableRow[] = refs.map((r) => {
     const t = totals.get(r.billingId ?? "") ?? totals.get(`crew:${r.crewId}`);
-    const c = t ? t.laborCents + t.materialsCents + t.subsCents : 0;
+    const c = t ? (kinds.has("labor") ? t.laborCents : 0) + t.materialsCents + (kinds.has("subs") ? t.subsCents : 0) : 0;
     const owed = r.billingId ? open.rows.filter((o) => o.jobId === r.billingId) : [];
     return {
       id: r.key,
@@ -84,8 +95,8 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     { key: "pm", header: "PM", kind: "text", filter: true },
     { key: "contract", header: "Contract", kind: "money", total: true, phone: "hide" },
     { key: "billed", header: "Billed (period)", kind: "money", total: true },
-    { key: "cost", header: "Cost (period)", kind: "money", total: true, phone: "hide" },
-    { key: "margin", header: "Margin", kind: "money", total: true, phone: "hide" },
+    { key: "cost", header: seat.margin ? "Cost (period)" : `${costLabel.replace(" on jobs", "")} (period)`, kind: "money", total: true, phone: "hide" },
+    ...(seat.margin ? [{ key: "margin", header: "Margin", kind: "money", total: true, phone: "hide" } as Column] : []),
     { key: "open", header: "Owed now", kind: "money", total: true, phone: "value" },
     { key: "late", header: "Late invoices", kind: "count", phone: "hide" },
   ];
@@ -98,7 +109,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         <h1 className="text-[var(--color-charcoal)]" style={{ fontFamily: "var(--font-fraunces)" }}>
           Jobs
         </h1>
-        <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">Every job, and everything on it: money, labor, materials, subs, changes, documents and crew.</p>
+        <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">{seat.owner ? "Every job" : "Your jobs"}, and everything on it: money, labor, materials, subs, changes, documents and crew.</p>
       </header>
       <div className="mb-4">
         <PeriodPicker period={period} compareLabel={period.previous.label} />
@@ -110,7 +121,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       ) : null}
       <div className="space-y-4">
         <KpiHeader
-          label="Cost on jobs"
+          label={costLabel}
           value={d.total}
           kind="money"
           change={d.change}

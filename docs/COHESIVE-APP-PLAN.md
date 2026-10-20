@@ -371,7 +371,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - `decision_rights` rows (role, action, limit) in Company policies;
    - roles and seats (who holds PM, Finance, Sales admin, Field lead), with cover for empty seats;
    - existing limits (`requests.pmLimitCents`, award limits) read from it.
-3. ✅ **One task system** (§6.5): `work_items` (0033), `src/lib/tasks/feed.ts`, `/app/tasks`, and a Tasks tab on each job page. Still to do: the 7 AM push and Home reading the feed, and PM seats creating and closing items (step 10).
+3. ✅ **One task system** (§6.5): `work_items` (0033), `src/lib/tasks/feed.ts`, `/app/tasks`, and a Tasks tab on each job page. PM seats now open their own jobs and Tasks (`src/lib/jobs/access.ts`): they hand work to the PM or field lead, close it, record a change, and run the log and punch; money stays read only, and labor dollars, margin and sub bills follow policy. Still to do: the 7 AM push and Home reading the feed, and PM writes on the Schedule.
    - `work_items` migration + `src/lib/tasks/feed.ts` over `crew_tasks`, ops cards, bot waiting-on, watches, purchase cards and request approvals;
    - views Mine / My team / Per job / Per department;
    - escalation by service level;

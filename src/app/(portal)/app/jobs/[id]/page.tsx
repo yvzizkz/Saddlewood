@@ -10,15 +10,16 @@ import { formatValue } from "@/lib/analytics/format";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import type { LaborRow } from "@/lib/accounting/labor";
 import type { PurchaseItemRow } from "@/lib/accounting/purchases";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { clockText, localClock, localDay } from "@/lib/crew/time";
 import { getJobRef, jobHref } from "@/lib/jobs/hub";
+import { PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
+import { subsSeatForPage } from "@/lib/subs/access";
 import { jobBills, jobCrew, jobLabor, jobMoney, jobPackages, jobPurchases, jobWatches } from "@/lib/jobs/jobData";
 import { listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
-import { NewTask } from "@/components/tasks/TaskActions";
+import { canCloseHere, feedForSeat, isMine, KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
+import { CloseTask, NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
 import ProgressBilling from "@/components/billing/ProgressBilling";
 import { CO_LABEL, loadChangeOrders } from "@/lib/billing/registers";
@@ -40,6 +41,9 @@ export const dynamic = "force-dynamic";
 // The job page: the hub every record hangs off. Each tab is an app section
 // narrowed to this job (Labor is Payroll for this job, Money is Receivables
 // and Billing for it, and so on), so the numbers here and there always agree.
+// A project manager opens the jobs they are on (jobs/access.ts): they run the
+// log, punch, tasks and changes from here; money is read only, and labor
+// dollars, margin and sub bills show only as their seat allows.
 
 type SP = Record<string, string | string[] | undefined>;
 
@@ -60,10 +64,12 @@ const TABS: JobTab[] = [
 const KIND: Record<string, string> = { invoice: "Invoice", change_order: "Change order", statement: "Statement" };
 
 export default async function JobPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
-  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const seat = await workSeat();
+  if (!seat) redirect("/app");
+  const owner = seat.owner;
+  const [{ id }, sp, subsSeat] = await Promise.all([params, searchParams, subsSeatForPage()]);
   const ref = await getJobRef(id);
-  if (!ref) notFound();
+  if (!ref || !seesJob(seat, ref)) notFound();
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const tab = TABS.some((t) => t.key === one("tab")) ? (one("tab") as string) : "overview";
   const base = jobHref(ref.key);
@@ -79,7 +85,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   const closed = !ref.active;
 
   const stages: Stage[] = [
-    { key: "sale", label: ref.saleNumber ? `Sale ${ref.saleNumber}` : "Sale", state: ref.saleId || ref.awarded ? "done" : "next", href: ref.saleId ? `/app/sales/${ref.saleId}` : undefined },
+    { key: "sale", label: ref.saleNumber ? `Sale ${ref.saleNumber}` : "Sale", state: ref.saleId || ref.awarded ? "done" : "next", href: ref.saleId && owner ? `/app/sales/${ref.saleId}` : undefined },
     { key: "award", label: "Award", state: ref.awarded || ref.contractCents ? "done" : "next" },
     { key: "build", label: built ? "Built" : "Build", state: built || closed ? "done" : ref.crewId ? "now" : "next", href: `${base}?tab=crew` },
     { key: "billing", label: "Billing", state: closed ? "done" : issued.length ? "now" : "next", href: `${base}?tab=money` },
@@ -97,7 +103,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     count: t.key === "money" ? money.open.length : t.key === "changes" ? money.issued.filter((d) => d.kind === "change_order").length : undefined,
   }));
   const crumbs = [
-    { label: "Jobs", href: "/app/jobs" },
+    { label: owner ? "Jobs" : "My jobs", href: "/app/jobs" },
     { label: ref.name, href: base },
     ...(tab === "overview" ? [] : [{ label: TABS.find((t) => t.key === tab)!.label, href: `${base}?tab=${tab}` }]),
   ];
@@ -124,7 +130,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         dayOf: (r) => r.day,
       };
       const d = drill(spec, rows.filter((r) => inRange(r.day, period.from, period.to)), period, sp, { previousRows: rows.filter((r) => inRange(r.day, period.previous.from, period.previous.to)) });
-      const cost = d.rows.reduce((a, r) => a + (r.costCents ?? 0), 0);
+      const cost = seat.laborCost ? d.rows.reduce((a, r) => a + (r.costCents ?? 0), 0) : null;
       const table: TableRow[] = d.rows.map((r) => ({
         id: r.id,
         day: r.day,
@@ -132,7 +138,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         trade: r.tradeLabel,
         span: `${clockText(localClock(r.startedAt))} – ${r.endedAt ? clockText(localClock(r.endedAt)) : "on the clock"}`,
         minutes: r.minutes,
-        cost: r.costCents,
+        cost: seat.laborCost ? r.costCents : null,
         href: `/app/accounting/payroll/entry/${r.id}`,
       }));
       const columns: Column[] = [
@@ -141,11 +147,11 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         { key: "trade", header: "Trade", kind: "text", filter: true },
         { key: "span", header: "Clock", kind: "text", phone: "hide" },
         { key: "minutes", header: "Hours", kind: "hours", total: true, phone: "value" },
-        { key: "cost", header: "Labor cost", kind: "money", total: true },
+        ...(seat.laborCost ? [{ key: "cost", header: "Labor cost", kind: "money", total: true } as Column] : []),
       ];
       return (
         <JobFrame {...frame} period={period} filters={d.filters} actions={<Link className="text-sm underline" href={hrefOf("/app/accounting/payroll", { p: period.key, job: ref.crewId ?? undefined })}>Open in Payroll</Link>}>
-          <KpiHeader label="Labor hours" value={d.total} kind="hours" change={d.change} compareLabel={period.previous.label} stats={[{ label: "Labor cost", value: cost, kind: "money" }, { label: "People", value: new Set(d.rows.map((r) => r.email)).size, kind: "count" }]} trend={d.trend} breakdown={d.breakdown} byOptions={d.byOptions} />
+          <KpiHeader label="Labor hours" value={d.total} kind="hours" change={d.change} compareLabel={period.previous.label} stats={[...(cost !== null ? [{ label: "Labor cost", value: cost, kind: "money" as const }] : []), { label: "People", value: new Set(d.rows.map((r) => r.email)).size, kind: "count" }]} trend={d.trend} breakdown={d.breakdown} byOptions={d.byOptions} />
           <DataTable rows={table} columns={columns} searchKeys={["person", "trade"]} name={`${ref.key}-labor-${period.key}`} rowHrefKey="href" initialSort={{ key: "day", dir: "desc" }} empty="No time on this job in the period." />
         </JobFrame>
       );
@@ -163,7 +169,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       dayOf: (r) => r.purchasedOn,
     };
     const d = drill(spec, rows.filter((r) => inRange(r.purchasedOn, period.from, period.to)), period, sp, { previousRows: rows.filter((r) => inRange(r.purchasedOn, period.previous.from, period.previous.to)) });
-    const table: TableRow[] = d.rows.map((r) => ({ id: r.id, day: r.purchasedOn, what: r.description, vendor: r.vendor, trade: r.tradeLabel, qty: r.qty, cents: r.lineTotalCents, href: `/app/accounting/purchases/trip/${encodeURIComponent(r.tripKey)}` }));
+    const table: TableRow[] = d.rows.map((r) => ({ id: r.id, day: r.purchasedOn, what: r.description, vendor: r.vendor, trade: r.tradeLabel, qty: r.qty, cents: r.lineTotalCents, href: owner ? `/app/accounting/purchases/trip/${encodeURIComponent(r.tripKey)}` : null }));
     const columns: Column[] = [
       { key: "what", header: "Item", kind: "text", hrefKey: "href", phone: "title" },
       { key: "day", header: "Date", kind: "date" },
@@ -214,7 +220,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                       {[CO_LABEL[c.status], c.amountCents !== null ? formatValue("money", c.amountCents) : null, c.ageDays !== null ? `${c.ageDays} day${c.ageDays === 1 ? "" : "s"} since asked` : null].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  <ChangeOrderStep id={c.registerId!} status={c.status} />
+                  {owner ? <ChangeOrderStep id={c.registerId!} status={c.status} /> : null}
                 </li>
               ))}
             </ul>
@@ -248,7 +254,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       id: d.id,
       number: d.number,
       title: d.title,
-      href: d.status === "draft" ? "/app/bill" : `/app/money/${d.id}`,
+      href: d.status === "draft" ? (owner ? "/app/bill" : null) : `/app/money/${d.id}`,
       kind: KIND[d.kind] ?? d.kind,
       status: d.status === "draft" ? "Draft" : openBy.has(d.id) ? openBy.get(d.id)!.standing : "Paid",
       day: d.day,
@@ -270,7 +276,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const payments: TableRow[] = money.collected.map((c) => ({ id: c.id, day: c.receivedOn, number: c.number, method: c.method, reference: c.reference, amount: c.amountCents, fee: c.feeCents || null, href: c.documentId ? `/app/money/${c.documentId}` : null }));
     return (
       <JobFrame {...frame}>
-        {tab === "money" && ref.billingId ? <ProgressBilling jobKey={ref.key} /> : null}
+        {tab === "money" && ref.billingId && owner ? <ProgressBilling jobKey={ref.key} /> : null}
         {tab === "money" ? (
           <dl className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {[
@@ -313,8 +319,9 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   }
 
   if (tab === "subs") {
-    const [packages, bills, { scorecards }] = await Promise.all([jobPackages(ref), jobBills(ref), loadSubScorecards(today)]);
-    const pk: TableRow[] = packages.map((p) => ({ id: p.id, title: p.title || p.trade, trade: p.trade, status: p.status, due: p.dueAt ? localDay(p.dueAt) : null, href: `/app/subs/bids/${p.id}` }));
+    // Sub and vendor bills are Payables: owners only.
+    const [packages, bills, { scorecards }] = await Promise.all([jobPackages(ref), owner ? jobBills(ref) : Promise.resolve([]), loadSubScorecards(today)]);
+    const pk: TableRow[] = packages.map((p) => ({ id: p.id, title: p.title || p.trade, trade: p.trade, status: p.status, due: p.dueAt ? localDay(p.dueAt) : null, href: subsSeat ? `/app/subs/bids/${p.id}` : null }));
     const bl: TableRow[] = bills.map((b) => ({ id: b.id, number: b.billNumber, vendor: b.vendorName, trade: b.tradeLabel, status: b.statusLabel, issued: b.issuedOn, due: b.dueOn, amount: b.amountCents, open: b.balanceCents, href: `/app/accounting/payables/bill/${b.id}` }));
     const jobVendorNames = new Set(bills.map((b) => b.vendorName.toLowerCase()));
     const jobTrades = new Set([...packages.map((p) => p.trade.toLowerCase()), ...bills.map((b) => b.trade.toLowerCase())]);
@@ -330,23 +337,24 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       bids: `${s.submittedCount}/${s.invitedCount}`,
       awards: s.awardedCount,
       openBills: s.openBillsCents,
-      href: "/app/subs",
+      href: subsSeat ? "/app/subs" : null,
     }));
     return (
-      <JobFrame {...frame} actions={<Link className="text-sm underline" href="/app/subs">Open in Subs & Bids</Link>}>
+      <JobFrame {...frame} actions={subsSeat ? <Link className="text-sm underline" href="/app/subs">Open in Subs & Bids</Link> : undefined}>
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Bid packages</p>
         <DataTable rows={pk} columns={[{ key: "title", header: "Package", kind: "text", hrefKey: "href", phone: "title" }, { key: "trade", header: "Trade", kind: "text", filter: true }, { key: "status", header: "Status", kind: "text", filter: true, phone: "value" }, { key: "due", header: "Bids due", kind: "date" }]} searchKeys={["title", "trade"]} name={`${ref.key}-packages`} rowHrefKey="href" empty="No bid packages on this job." />
-        <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Sub and vendor bills</p>
-        <DataTable rows={bl} columns={[{ key: "number", header: "Bill", kind: "text", hrefKey: "href", phone: "title" }, { key: "vendor", header: "From", kind: "text", filter: true }, { key: "trade", header: "Trade", kind: "text", filter: true }, { key: "status", header: "Status", kind: "text", filter: true }, { key: "issued", header: "Issued", kind: "date", phone: "hide" }, { key: "due", header: "Due", kind: "date" }, { key: "amount", header: "Amount", kind: "money", total: true, phone: "hide" }, { key: "open", header: "Open", kind: "money", total: true, phone: "value" }]} searchKeys={["number", "vendor", "trade", "status"]} name={`${ref.key}-bills`} rowHrefKey="href" initialSort={{ key: "issued", dir: "desc" }} empty="No bills on this job." />
+        {owner ? <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Sub and vendor bills</p> : null}
+        {owner ? <DataTable rows={bl} columns={[{ key: "number", header: "Bill", kind: "text", hrefKey: "href", phone: "title" }, { key: "vendor", header: "From", kind: "text", filter: true }, { key: "trade", header: "Trade", kind: "text", filter: true }, { key: "status", header: "Status", kind: "text", filter: true }, { key: "issued", header: "Issued", kind: "date", phone: "hide" }, { key: "due", header: "Due", kind: "date" }, { key: "amount", header: "Amount", kind: "money", total: true, phone: "hide" }, { key: "open", header: "Open", kind: "money", total: true, phone: "value" }]} searchKeys={["number", "vendor", "trade", "status"]} name={`${ref.key}-bills`} rowHrefKey="href" initialSort={{ key: "issued", dir: "desc" }} empty="No bills on this job." /> : null}
         <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Sub compliance & scorecard (SOP-008)</p>
-        <DataTable rows={scRows} columns={[{ key: "name", header: "Sub", kind: "text", hrefKey: "href", phone: "title" }, { key: "trades", header: "Trades", kind: "text", phone: "hide" }, { key: "gate", header: "Mobilization gate", kind: "text", filter: true, phone: "value" }, { key: "coi", header: "COI", kind: "text", filter: true }, { key: "bids", header: "Bids / Invited", kind: "text", phone: "hide" }, { key: "awards", header: "Awards", kind: "count", phone: "hide" }, { key: "openBills", header: "Open AP", kind: "money", total: true }]} searchKeys={["name", "trades", "gate", "coi"]} name={`${ref.key}-sub-scorecard`} rowHrefKey="href" empty="No subs in directory." />
+        <DataTable rows={scRows} columns={[{ key: "name", header: "Sub", kind: "text", hrefKey: "href", phone: "title" }, { key: "trades", header: "Trades", kind: "text", phone: "hide" }, { key: "gate", header: "Mobilization gate", kind: "text", filter: true, phone: "value" }, { key: "coi", header: "COI", kind: "text", filter: true }, { key: "bids", header: "Bids / Invited", kind: "text", phone: "hide" }, { key: "awards", header: "Awards", kind: "count", phone: "hide" }, ...(owner ? [{ key: "openBills", header: "Open AP", kind: "money", total: true } as Column] : [])]} searchKeys={["name", "trades", "gate", "coi"]} name={`${ref.key}-sub-scorecard`} rowHrefKey="href" empty="No subs in directory." />
       </JobFrame>
     );
   }
 
   if (tab === "tasks") {
     const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
-    const items = (await loadFeed(refs, seats, today)).filter((i) => i.jobKey === ref.key);
+    const items = feedForSeat(await loadFeed(refs, seats, today), owner ? null : new Set([ref.key]), (i) => isMine(i, seat.email, seats, people)).filter((i) => i.jobKey === ref.key);
+    const closable = items.filter((i) => canCloseHere(i, owner));
     const table: TableRow[] = items.map((i) => ({
       id: i.id,
       title: i.title,
@@ -361,10 +369,28 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       <JobFrame {...frame}>
         <NewTask
           job={ref.key}
-          roles={ROLES.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
+          roles={(owner ? ROLES : PM_ROLES).map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
           jobs={[{ value: ref.key, label: ref.name }]}
           kinds={Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label }))}
         />
+        {closable.length ? (
+          <Card className="p-4">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Handed out on this job</p>
+            <ul className="divide-y divide-[var(--color-stone)]">
+              {closable.map((i) => (
+                <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--color-charcoal)]">{i.title}</p>
+                    <p className="text-xs text-[var(--color-charcoal-light)]">
+                      {[ROLE_INFO[i.nowRole].label, i.assignee ? (people.find((p) => p.email === i.assignee)?.name ?? i.assignee) : seatHolder(i.nowRole, seats, people).name, i.dueOn ? `due ${formatValue("date", i.dueOn)}` : null].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <CloseTask id={Number(i.id.slice(1))} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
         <DataTable
           rows={table}
           columns={[
@@ -401,7 +427,8 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     }));
     const editableItems = jobSched.filter((i) => i.editable && i.itemId);
     return (
-      <JobFrame {...frame} actions={<Link className="text-sm underline" href={hrefOf("/app/schedule", { job: ref.key })}>Open in Schedule</Link>}>
+      <JobFrame {...frame} actions={owner ? <Link className="text-sm underline" href={hrefOf("/app/schedule", { job: ref.key })}>Open in Schedule</Link> : undefined}>
+        {owner ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <NewScheduleItem
             job={ref.key}
@@ -414,6 +441,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             Wednesday two-week look-ahead draft →
           </Link>
         </div>
+        ) : null}
 
         <Card className="p-4">
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Job timeline · phases & promised completion</p>
@@ -454,7 +482,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                       {[it.kindLabel, it.startTime ? clockText(it.startTime) : null, it.detail].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  <ScheduleStatusButton id={it.itemId!} status={it.status} />
+                  {owner ? <ScheduleStatusButton id={it.itemId!} status={it.status} /> : null}
                 </li>
               ))}
             </ul>
@@ -510,7 +538,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       trade: r.trade,
       paidBy: r.paidBy,
       amount: r.amountCents,
-      href: r.tripHref,
+      href: owner ? r.tripHref : null,
     }));
 
     return (
@@ -621,7 +649,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
 
   if (tab === "crew") {
     return (
-      <JobFrame {...frame} actions={<Link className="text-sm underline" href="/app/crew?view=projects">Open the field view</Link>}>
+      <JobFrame {...frame} actions={owner ? <Link className="text-sm underline" href="/app/crew?view=projects">Open the field view</Link> : undefined}>
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="p-4">
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">People on this job</p>
@@ -663,7 +691,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   }
 
   // Overview.
-  const [labor, purchases, bills] = await Promise.all([jobLabor(ref, "2020-01-01", today), jobPurchases(ref, "2020-01-01", today), jobBills(ref)]);
+  const [labor, purchases, bills] = await Promise.all([jobLabor(ref, "2020-01-01", today), jobPurchases(ref, "2020-01-01", today), seat.margin ? jobBills(ref) : Promise.resolve([])]);
   const laborCost = labor.reduce((a, r) => a + (r.costCents ?? 0), 0);
   const materials = purchases.reduce((a, r) => a + r.lineTotalCents, 0);
   const subs = bills.filter((b) => !b.purchaseTripKey).reduce((a, b) => a + b.amountCents, 0);
@@ -687,8 +715,8 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         {tile("Billed", billed, "money", `${base}?tab=money`)}
         {tile("Collected", collected, "money", `${base}?tab=money`)}
         {tile("Open", open, "money", `${base}?tab=money`, money.open.some((o) => (o.daysLate ?? 0) > 0) ? "some past due" : undefined)}
-        {tile("Cost to date", cost, "money", hrefOf("/app/accounting/job-costing", { p: "custom", from: "2020-01-01", to: today, job: ref.billingId ?? `crew:${ref.crewId}`, by: "category" }))}
-        {tile("Margin", billed - cost, "money", undefined, billed ? `${Math.round(((billed - cost) / billed) * 100)}% of billed` : undefined)}
+        {seat.margin ? tile("Cost to date", cost, "money", hrefOf("/app/accounting/job-costing", { p: "custom", from: "2020-01-01", to: today, job: ref.billingId ?? `crew:${ref.crewId}`, by: "category" })) : null}
+        {seat.margin ? tile("Margin", billed - cost, "money", undefined, billed ? `${Math.round(((billed - cost) / billed) * 100)}% of billed` : undefined) : null}
         {tile("Labor this week", hoursWeek, "hours", `${base}?tab=labor&p=wtd`)}
         {tile("Materials", materials, "money", `${base}?tab=purchases&p=ytd`)}
       </div>
@@ -738,7 +766,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         <Card className="p-4">
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Where things are</p>
           <ul className="space-y-2 text-sm">
-            {ref.saleId ? (
+            {ref.saleId && owner ? (
               <li>
                 <Link className="underline underline-offset-2" href={`/app/sales/${ref.saleId}`}>The sale ({ref.saleNumber}): estimates, proposal, award</Link>
               </li>
@@ -747,7 +775,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
               <Link className="underline underline-offset-2" href={`${base}?tab=money`}>Invoices, change orders and payments</Link>
             </li>
             <li>
-              <Link className="underline underline-offset-2" href={`${base}?tab=subs`}>Bid packages and sub bills</Link>
+              <Link className="underline underline-offset-2" href={`${base}?tab=subs`}>{owner ? "Bid packages and sub bills" : "Bid packages and subs"}</Link>
             </li>
             <li>
               <Link className="underline underline-offset-2" href={`${base}?tab=crew`}>People and phases</Link>
