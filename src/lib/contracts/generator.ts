@@ -61,8 +61,8 @@ export function generateContractText(
 
 ### PARTIES & PROJECT
 This Agreement is entered into by and between:
-* **Contractor:** Saddlewood Contracting LLC ("Saddlewood")
-  ROC License: ROC338944 / ROC338945 · Phone: (602) 218-1191 · Email: info@saddlewoodcontracting.com
+* **Contractor:** Saddlewood Contracting, LLC ("Saddlewood")
+  ROC License: ROC #305762 · Phone: (480) 999-6100 · Email: info@saddlewoodcontracting.com
   Principal Address: Phoenix, AZ
 * **Client / Owner:** ${clientName} (${clientEntity}) ("Client")
   Billing Contact: ${clientName} · Address: ${projectAddress}
@@ -157,8 +157,8 @@ The parties have executed this Agreement as of the date first written above.
 **SADDLEWOOD CONTRACTING LLC**
 
 By: _________________________________________  
-Name: Marco Ochoa  
-Title: Managing Member / Qualifier  
+Name: Marco Cravioto  
+Title: ________________________  
 Date: ________________________  
 
 
