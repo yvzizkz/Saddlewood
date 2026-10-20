@@ -56,10 +56,12 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // 0b. Sales: staff, the agent token, or a crew seat whose group has Sales on.
-  // Signed out (and not the token) stops here; which seat may do what is the
-  // route's call (src/lib/sales/access.ts).
-  if (pathname.startsWith("/api/sales")) {
+  // 0b. Sales, and subs and bids: staff, the agent token, or a crew seat whose
+  // group has the switch on. Signed out (and not the token) stops here; which
+  // seat may do what is the route's call (src/lib/sales/access.ts,
+  // src/lib/subs/access.ts). A sub's own link (/b/<token>) is not here: it
+  // checks its token itself.
+  if (pathname.startsWith("/api/sales") || pathname.startsWith("/api/subs") || pathname.startsWith("/api/bids")) {
     const authHeader = request.headers.get("authorization");
     const token = !!(authHeader && process.env.OPS_AGENT_TOKEN && authHeader === `Bearer ${process.env.OPS_AGENT_TOKEN}`);
     if (!token && (!user || !(isAllowed || isCrew))) {

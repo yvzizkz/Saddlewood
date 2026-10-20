@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronRight, Plus } from 'lucide-react'
+import { Check, ChevronRight, HardHat, Plus } from 'lucide-react'
 
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, INPUT } from '@/components/bot/ui'
 import { watchDue, type JobWatch } from '@/lib/sales/award'
 import type { AwardedJob } from '@/lib/sales/awardStore'
+import { NewPackageSheet } from '@/components/subs/NewPackageSheet'
 import { shortDay, usd } from '../format'
 
 // The job a won opportunity became: the contract, links to its money and its
@@ -25,6 +26,7 @@ export function JobPaperwork({ opportunityId, job, today, canEdit, onChange, toa
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
   const [due, setDue] = useState('')
+  const [bidOut, setBidOut] = useState(false)
 
   async function post(body: unknown, key: number | 'add') {
     setBusy(key)
@@ -69,7 +71,13 @@ export function JobPaperwork({ opportunityId, job, today, canEdit, onChange, toa
             Field job <ChevronRight className="size-4" aria-hidden="true" />
           </Link>
         ) : null}
+        {canEdit ? (
+          <button type="button" onClick={() => setBidOut(true)} className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--color-stone)] bg-white px-3 text-sm text-[var(--color-teal)]">
+            Get sub bids <HardHat className="size-4" aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
+      {canEdit ? <NewPackageSheet open={bidOut} onClose={() => setBidOut(false)} target={{ jobId: job.jobId, opportunityId, name: job.name }} toast={toast} /> : null}
 
       {job.watches.length || canEdit ? (
         <div className="mt-3 border-t border-[var(--color-stone)] pt-3">

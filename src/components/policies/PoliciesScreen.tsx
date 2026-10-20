@@ -28,6 +28,7 @@ function shown(def: PolicyDef, v: unknown): string {
   if (c.type === 'percent') return `${v}%`
   if (c.type === 'days') return `${v} days`
   if (c.type === 'years') return `${v} ${Number(v) === 1 ? 'year' : 'years'}`
+  if (c.type === 'count') return `${v} ${c.unit}`
   return c.options.find((o) => o.value === v)?.label ?? String(v)
 }
 
@@ -76,7 +77,7 @@ function Control({ def, value, canEdit, onSave }: { def: PolicyDef; value: unkno
           label={def.label}
           value={now}
           prefix={isMoney ? '$' : undefined}
-          suffix={c.type === 'percent' ? '%' : c.type === 'days' ? 'days' : c.type === 'years' ? 'years' : undefined}
+          suffix={c.type === 'percent' ? '%' : c.type === 'days' ? 'days' : c.type === 'years' ? 'years' : c.type === 'count' ? c.unit : undefined}
           max={isMoney ? 1_000_000 : c.max}
           onChange={(n) => canEdit && setDraft(n)}
           className="min-w-0 flex-1"
