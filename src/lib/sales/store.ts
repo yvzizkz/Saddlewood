@@ -840,37 +840,3 @@ export async function proposalRecord(documentId: string) {
   return { doc, proposal, events, signatures: signaturesOf(events) };
 }
 
-/** Won: the job it becomes (public.jobs), linked both ways. */
-export async function openJob(opportunityId: string, actor: string): Promise<{ jobId: string; created: boolean }> {
-  const o = await getOpportunity(opportunityId);
-  if (!o) throw new SalesError("not found", 404);
-  if (o.jobId) return { jobId: o.jobId, created: false };
-  if (o.stage !== "won") throw new SalesError("mark it won first", 409);
-  const db = getSupabaseAdmin();
-  const { data: same, error: findErr } = await db.from("jobs").select("id").eq("name", o.title).eq("address", o.address || "").maybeSingle();
-  if (findErr) fail("find job", findErr.message);
-  let jobId = (same as { id: string } | null)?.id ?? null;
-  const created = !jobId;
-  if (!jobId) {
-    const { data, error } = await db
-      .from("jobs")
-      .insert({
-        name: o.title,
-        address: o.address || null,
-        client_name: o.contact.company?.trim() || o.contact.name || null,
-        client_email: o.contact.email || null,
-        client_phone: o.contact.phone || null,
-        project_type: o.kind,
-        client_id: o.clientId,
-        status: "active",
-      })
-      .select("id")
-      .single();
-    if (error) fail("create job", error.message);
-    jobId = (data as { id: string }).id;
-  }
-  const { error } = await db.from("sales_opportunities").update({ job_id: jobId }).eq("id", o.id);
-  if (error) fail("link job", error.message);
-  await addEvent(o.id, "job", actor, "", { jobId, created });
-  return { jobId: jobId!, created };
-}

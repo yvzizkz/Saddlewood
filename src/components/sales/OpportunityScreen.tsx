@@ -9,6 +9,7 @@ import { useSalesToast } from './useSalesToast'
 import { Button, Card, Chip, Field, INPUT, SectionTitle } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { probabilityOf } from '@/lib/sales/pipeline'
+import type { AwardedJob } from '@/lib/sales/awardStore'
 import type { SalesSeat } from '@/lib/sales/seat'
 import { DEFAULT_SETTINGS, type SignatureFont } from '@/lib/sales/settings'
 import { LOST_REASONS, OPEN_STAGES, STAGE_KEYS, stageInfo, type IssuedProposal, type Opportunity, type SalesEstimate, type SalesEvent, type Stage } from '@/lib/sales/types'
@@ -17,6 +18,8 @@ import { ago, shortDay, stamp, todayPhoenix, usd } from './format'
 import { CountersignSheet } from './pipeline/CountersignSheet'
 import { DetailsSheet } from './pipeline/DetailsSheet'
 import { contactLine, dialable, kindLabel, lostLabel, needsCountersign, nextMonday, plusDays, proofChip, signatureChips, sourceLabel } from './pipeline/labels'
+import { AwardSheet } from './pipeline/AwardSheet'
+import { JobPaperwork } from './pipeline/JobPaperwork'
 import { NewEstimateSheet } from './pipeline/NewEstimateSheet'
 import { Timeline } from './pipeline/Timeline'
 
@@ -31,6 +34,8 @@ type Detail = {
   events: SalesEvent[]
   estimates: Omit<SalesEstimate, 'body'>[]
   proposals: IssuedProposal[]
+  /** The job it became, once awarded (or opened before Award existed). */
+  job?: AwardedJob | null
   /** What this person may do here (absent from an older server: nothing). */
   can?: Can
   me?: { name: string; email: string }
@@ -258,7 +263,7 @@ export default function OpportunityScreen({ id }: { id: string }) {
   const [d, setD] = useState<Detail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [sheet, setSheet] = useState<null | 'details' | 'estimate' | 'lost' | 'log'>(null)
+  const [sheet, setSheet] = useState<null | 'details' | 'estimate' | 'lost' | 'log' | 'award'>(null)
   const [logKind, setLogKind] = useState<LogKind>('note')
   const [logText, setLogText] = useState('')
   const [lostReason, setLostReason] = useState<string>('price')
@@ -339,19 +344,6 @@ export default function OpportunityScreen({ id }: { id: string }) {
     }
   }
 
-  async function openJob() {
-    setBusy('job')
-    try {
-      const r = await botApi<{ jobId: string; created: boolean }>(`/api/sales/${id}/job`, { method: 'POST' })
-      toast(r.created ? 'Job opened' : 'Linked to the existing job', 'ok')
-      await load()
-    } catch (e) {
-      toast((e as Error).message, 'bad')
-    } finally {
-      setBusy(null)
-    }
-  }
-
   if (error && !d) {
     return (
       <div className="px-4 pt-5">
@@ -377,7 +369,8 @@ export default function OpportunityScreen({ id }: { id: string }) {
   const o = d.opportunity
   const latest = d.proposals.find((p) => p.status === 'issued') ?? null
   const latestEstimate = d.estimates.find((e) => e.status !== 'archived') ?? null
-  const value = latest?.accepted?.totalCents ?? latest?.totalCents ?? latestEstimate?.sellCents ?? o.valueCents
+  const contract = d.job?.award ? d.job.contractCents : null
+  const value = contract ?? latest?.accepted?.totalCents ?? latest?.totalCents ?? latestEstimate?.sellCents ?? o.valueCents
   const open = stageInfo(o.stage).open
   const nextChanged = next.step !== o.nextStep || (next.on || null) !== (o.nextStepOn ?? null)
   const versions = d.estimates
@@ -406,7 +399,7 @@ export default function OpportunityScreen({ id }: { id: string }) {
               {value > 0 ? usd(value, { whole: true }) : '—'}
             </p>
             <p className="text-xs text-[var(--color-charcoal-light)]">
-              {latest?.accepted ? 'accepted' : latest ? 'proposal sent' : latestEstimate ? 'estimate' : 'rough guess'} · {open ? `${probabilityOf(o)}% likely` : stageInfo(o.stage).label}
+              {contract !== null ? 'contract' : latest?.accepted ? 'accepted' : latest ? 'proposal sent' : latestEstimate ? 'estimate' : 'rough guess'} · {open ? `${probabilityOf(o)}% likely` : stageInfo(o.stage).label}
             </p>
           </div>
           <Button variant="quiet" onClick={() => setSheet('details')}>
@@ -445,23 +438,30 @@ export default function OpportunityScreen({ id }: { id: string }) {
               Reopen
             </Button>
           </div>
-          {o.stage === 'won' && !o.jobId ? (
+          {o.stage === 'won' && !d.job?.award ? (
             <div className="mt-3 border-t border-[var(--color-stone)] pt-3">
               <p className="mb-2 text-sm text-[var(--color-charcoal)]">
-                {latest?.accepted ? `Accepted by ${latest.accepted.name}.` : 'Won.'} Open the job so the crew, billing and job cost can use it.
+                {latest?.accepted ? `Accepted by ${latest.accepted.name}.` : 'Won.'} Award it: the client, the billing and field job, the contract and its schedule of values, the deposit
+                invoice and the paperwork to watch, in one step.
               </p>
               {can.openJob ? (
-                <Button variant="primary" full busy={busy === 'job'} onClick={openJob}>
-                  <Briefcase className="size-4" aria-hidden="true" /> Open the job
+                <Button variant="primary" full onClick={() => setSheet('award')}>
+                  <Briefcase className="size-4" aria-hidden="true" /> Award the job
                 </Button>
               ) : (
-                <p className="text-xs text-[var(--color-charcoal-light)]">An owner opens the job.</p>
+                <p className="text-xs text-[var(--color-charcoal-light)]">An owner awards the job.</p>
               )}
             </div>
           ) : null}
-          {o.jobId ? <p className="mt-2 text-xs text-[var(--color-charcoal-light)]">Job opened.</p> : null}
         </Card>
       )}
+
+      {d.job ? (
+        <>
+          <SectionTitle>The job</SectionTitle>
+          <JobPaperwork opportunityId={id} job={d.job} today={today} canEdit={can.openJob} onChange={load} toast={toast} />
+        </>
+      ) : null}
 
       {/* What happens next, and when. */}
       {open ? (
@@ -577,6 +577,19 @@ export default function OpportunityScreen({ id }: { id: string }) {
             toast('Saved', 'ok')
             load()
           }}
+        />
+      ) : null}
+
+      {can.openJob ? (
+        <AwardSheet
+          opportunityId={id}
+          open={sheet === 'award'}
+          onClose={() => setSheet(null)}
+          onDone={() => {
+            setSheet(null)
+            void load()
+          }}
+          toast={toast}
         />
       ) : null}
 

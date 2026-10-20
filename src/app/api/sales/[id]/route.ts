@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { isId } from "@/lib/billing/http";
 import { authorizeSales, salesError } from "@/lib/sales/access";
+import { awardedJob } from "@/lib/sales/awardStore";
 import { getOpportunityDetail, updateOpportunity, type OpportunityPatch } from "@/lib/sales/store";
 import { opportunityPatchSchema } from "@/lib/sales/validate";
 
@@ -17,9 +18,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const detail = await getOpportunityDetail(id);
     if (!detail) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
     const s = gate.settings;
+    // The job it became, with the paperwork it owes; a failed read leaves it out, never the screen.
+    const job = detail.opportunity.jobId
+      ? await awardedJob(detail.opportunity.jobId).catch((e) => {
+          console.error("[sales] awarded job:", (e as Error).message);
+          return null;
+        })
+      : null;
     return NextResponse.json({
       ok: true,
       ...detail,
+      job,
       // What this person may do here, and the defaults the send and sign sheets start from.
       can: gate.seat.can,
       me: { name: gate.seat.name, email: gate.seat.role === "agent" ? "" : gate.seat.email },

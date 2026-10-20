@@ -13,7 +13,7 @@ import { SalesError } from "./store";
 //   person      a signed-in person, never the token (editing estimates)
 //   send        issue a proposal (it becomes a client link) and email it
 //   sign        countersign for Saddlewood
-//   openJob     open the job a won proposal becomes (owners)
+//   openJob     award the job a won proposal becomes, and keep its paperwork (owners)
 //   editSettings  change Sales settings (owners)
 //
 // Issuing is guarded because a link sent is a price given: "Nothing goes to a
