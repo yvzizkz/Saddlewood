@@ -6,15 +6,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // days before, never from the day itself.
 
 type Row = Record<string, unknown>;
+type InCall = { col: string; keys: unknown[]; cols: string };
 
-const { db } = vi.hoisted(() => ({ db: { rows: [] as Row[], calls: [] as string[] } }));
+const { db } = vi.hoisted(() => ({
+  db: {
+    rows: [] as Row[],
+    calls: [] as string[],
+    inCalls: [] as InCall[],
+    upserted: [] as Row[],
+    failJobManual: false,
+  },
+}));
 
 function from(table: string) {
   const filters: ((r: Row) => boolean)[] = [];
   const asked: string[] = [table];
+  let selectedCols = "";
   let limit = Infinity;
   const b = {
-    select: () => b,
+    select(cols = "") {
+      selectedCols = cols;
+      return b;
+    },
     gte(col: string, v: string) {
       asked.push(`${col}>=${v}`);
       filters.push((r) => (r[col] as string) >= v);
@@ -30,9 +43,16 @@ function from(table: string) {
       filters.push((r) => r[col] === v);
       return b;
     },
+    or(expr: string) {
+      asked.push(`or(${expr})`);
+      filters.push((r) => Boolean(r.trade_manual || r.job_manual));
+      return b;
+    },
     in(col: string, vs: unknown[]) {
       asked.push(`${col} in ${vs.join(",")}`);
-      filters.push((r) => vs.includes(r[col]));
+      db.inCalls.push({ col, keys: [...vs], cols: selectedCols });
+      const set = new Set(vs);
+      filters.push((r) => set.has(r[col]));
       return b;
     },
     order: () => b,
@@ -40,8 +60,16 @@ function from(table: string) {
       limit = n;
       return b;
     },
-    then(resolve: (v: { data: Row[]; error: null }) => void) {
+    async upsert(rows: Row[]) {
+      db.upserted.push(...rows);
+      return { error: null };
+    },
+    then(resolve: (v: { data: Row[] | null; error: { message: string } | null }) => void) {
       db.calls.push(asked.join(" "));
+      if (db.failJobManual && selectedCols.includes("job_manual")) {
+        resolve({ data: null, error: { message: "column purchases.job_manual does not exist" } });
+        return;
+      }
       resolve({ data: db.rows.filter((r) => filters.every((f) => f(r))).slice(0, limit), error: null });
     },
   };
@@ -50,7 +78,8 @@ function from(table: string) {
 
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({ from }) }));
 
-import { loadMaterial, loadPurchasesToday } from "../purchaseQueries";
+import { MANUAL_KEY_BATCH, loadMaterial, loadPurchasesToday, upsertPurchases } from "../purchaseQueries";
+import type { PurchaseRow } from "../purchases";
 
 function row(over: Partial<Row> & { source_key: string; purchased_on: string }): Row {
   return {
@@ -76,6 +105,9 @@ function row(over: Partial<Row> & { source_key: string; purchased_on: string }):
 beforeEach(() => {
   db.rows = [];
   db.calls = [];
+  db.inCalls = [];
+  db.upserted = [];
+  db.failJobManual = false;
 });
 
 describe("loadMaterial", () => {
@@ -115,5 +147,88 @@ describe("loadPurchasesToday", () => {
   it("asks nothing more on a day with no purchases", async () => {
     expect(await loadPurchasesToday("2026-08-12", [])).toEqual([]);
     expect(db.calls).toHaveLength(1);
+  });
+});
+
+function purchaseRow(i: number): PurchaseRow {
+  return {
+    source: "hd",
+    sourceKey: `hd:20260812:674:0:6220:${i}`,
+    purchasedOn: "2026-08-12",
+    vendor: "Home Depot",
+    store: "674",
+    orderRef: "6220",
+    jobNameRaw: "PT LOMA",
+    jobKey: "pt loma",
+    jobId: "point-loma",
+    trade: "framing",
+    department: "LUMBER",
+    class: "",
+    sku: "1001",
+    description: "2x4 stud",
+    qty: 1,
+    lineTotalCents: 1000,
+    meta: { ignored: true },
+  };
+}
+
+describe("upsertPurchases manualEdits batching", () => {
+  it("sub-chunks .in('source_key', ...) to at most MANUAL_KEY_BATCH for >500 keys and keeps manual edits across sub-chunks", async () => {
+    const incoming = Array.from({ length: 550 }, (_, i) => purchaseRow(i));
+    db.rows = [
+      row({ source_key: incoming[5].sourceKey, purchased_on: "2026-08-12", trade: "drywall", trade_manual: true, job_manual: false }),
+      row({ source_key: incoming[150].sourceKey, purchased_on: "2026-08-12", job_id: "emerson", trade_manual: false, job_manual: true }),
+      row({ source_key: incoming[250].sourceKey, purchased_on: "2026-08-12", trade: "insulation", job_id: "gainey", trade_manual: true, job_manual: true }),
+      row({ source_key: incoming[520].sourceKey, purchased_on: "2026-08-12", trade: "trim", trade_manual: true, job_manual: false }),
+    ];
+
+    const count = await upsertPurchases(incoming);
+    expect(count).toBe(550);
+
+    const sourceKeyCalls = db.inCalls.filter((c) => c.col === "source_key");
+    expect(sourceKeyCalls.length).toBe(Math.ceil(550 / MANUAL_KEY_BATCH));
+    for (const call of sourceKeyCalls) {
+      expect(call.keys.length).toBeGreaterThan(0);
+      expect(call.keys.length).toBeLessThanOrEqual(MANUAL_KEY_BATCH);
+    }
+
+    const union = new Set(sourceKeyCalls.flatMap((c) => c.keys as string[]));
+    expect(union).toEqual(new Set(incoming.map((r) => r.sourceKey)));
+
+    const byKey = new Map(db.upserted.map((r) => [r.source_key as string, r]));
+    expect(byKey.get(incoming[5].sourceKey)).toMatchObject({ trade: "drywall", job_id: "point-loma" });
+    expect(byKey.get(incoming[150].sourceKey)).toMatchObject({ trade: "framing", job_id: "emerson", meta: {} });
+    expect(byKey.get(incoming[250].sourceKey)).toMatchObject({ trade: "insulation", job_id: "gainey", meta: {} });
+    expect(byKey.get(incoming[520].sourceKey)).toMatchObject({ trade: "trim", job_id: "point-loma" });
+    expect(byKey.get(incoming[350].sourceKey)).toMatchObject({ trade: "framing", job_id: "point-loma" });
+  });
+
+  it("enforces the same MANUAL_KEY_BATCH limit on the pre-0042 fallback query and preserves manual trades", async () => {
+    db.failJobManual = true;
+    const incoming = Array.from({ length: 550 }, (_, i) => purchaseRow(i));
+    db.rows = [
+      row({ source_key: incoming[12].sourceKey, purchased_on: "2026-08-12", trade: "drywall", trade_manual: true }),
+      row({ source_key: incoming[220].sourceKey, purchased_on: "2026-08-12", trade: "insulation", trade_manual: true }),
+      row({ source_key: incoming[530].sourceKey, purchased_on: "2026-08-12", trade: "trim", trade_manual: true }),
+    ];
+
+    const count = await upsertPurchases(incoming);
+    expect(count).toBe(550);
+
+    const sourceKeyCalls = db.inCalls.filter((c) => c.col === "source_key");
+    for (const call of sourceKeyCalls) {
+      expect(call.keys.length).toBeGreaterThan(0);
+      expect(call.keys.length).toBeLessThanOrEqual(MANUAL_KEY_BATCH);
+    }
+
+    const fallbackCalls = sourceKeyCalls.filter((c) => !c.cols.includes("job_manual"));
+    expect(fallbackCalls.length).toBe(Math.ceil(550 / MANUAL_KEY_BATCH));
+    const fallbackUnion = new Set(fallbackCalls.flatMap((c) => c.keys as string[]));
+    expect(fallbackUnion).toEqual(new Set(incoming.map((r) => r.sourceKey)));
+
+    const byKey = new Map(db.upserted.map((r) => [r.source_key as string, r]));
+    expect(byKey.get(incoming[12].sourceKey)).toMatchObject({ trade: "drywall" });
+    expect(byKey.get(incoming[220].sourceKey)).toMatchObject({ trade: "insulation" });
+    expect(byKey.get(incoming[530].sourceKey)).toMatchObject({ trade: "trim" });
   });
 });
