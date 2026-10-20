@@ -9,7 +9,7 @@ import { listExhibits } from "@/lib/billing/exhibits";
 import { paidByDocument, paymentsForDocument } from "@/lib/billing/payments";
 import { describeDevice, summarizeProof } from "@/lib/billing/proof";
 import type { DocumentEvent } from "@/lib/billing/types";
-import { getViewer } from "@/lib/crew/auth";
+import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +52,7 @@ function eventLine(e: DocumentEvent): string {
 }
 
 export default async function MoneyDocument({ params }: { params: Promise<{ id: string }> }) {
-  if ((await getViewer()).kind !== "staff") redirect("/app");
+  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const doc = await getDocument(id);

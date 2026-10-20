@@ -49,10 +49,12 @@ export const CAPABILITIES = [
   { key: "hours.edit", area: "crew", label: "Fix hours, decide time fixes, payroll export" },
   { key: "projects.view", area: "projects", label: "Projects: every job's status, promises, what is stuck, the plans" },
   { key: "projects.mine", area: "projects", label: "Only the jobs they are assigned to (every list, every alert)" },
-  { key: "money.view", area: "money", label: "See each job's contract, billed, paid, owed and past due (read only)" },
-  { key: "money.prepare", area: "money", label: "Start or revise an invoice or change order draft (never sends)" },
-  { key: "money.request", area: "money", label: "Ask an owner to approve and send a prepared document" },
-  { key: "estimate.view", area: "money", label: "See their jobs' estimate totals (read only)" },
+  { key: "money.view", area: "money", label: "See each job's contract, billed, paid, owed and past due, and say which job a purchase was for" },
+  // Planned (APP-PERMISSIONS-PLAN phase 2) and not read by anything yet: kept so
+  // a group that has them keeps them, hidden from the group editor until built.
+  { key: "money.prepare", area: "money", label: "Start or revise an invoice or change order draft (never sends)", planned: true },
+  { key: "money.request", area: "money", label: "Ask an owner to approve and send a prepared document", planned: true },
+  { key: "estimate.view", area: "money", label: "See their jobs' estimate totals (read only)", planned: true },
   // Sales (0025): the pipeline and the estimate builder. Sending and
   // countersigning also need the owners to allow it in Sales > Settings.
   { key: "sales.view", area: "sales", label: "Sales: work the pipeline and build estimates" },

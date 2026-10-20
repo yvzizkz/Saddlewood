@@ -132,9 +132,10 @@ export function bidFingerprintInput(p: { packageId: string; addenda: number; lin
 export type AwardCheck = { ok: true; warnings: string[] } | { ok: false; reason: string };
 
 /**
- * Who may award (SOP-008 stage 5): the PM, an approved sub inside budget, up
- * to the PM limit in Company policies; anything else an owner. An owner may
- * award past the rules; what they pass over is shown, not hidden.
+ * Who may award (SOP-008 stage 5): the PM (or office staff), an approved sub
+ * inside budget, up to the PM limit in Company policies; anything else an
+ * owner. An owner may award past the rules; what they pass over is shown,
+ * not hidden.
  */
 export function canAward(
   role: "owner" | "staff" | "member",
@@ -150,8 +151,11 @@ export function canAward(
   if (a.budgetCents > 0 && a.leveledCents > a.budgetCents) warnings.push("the leveled price is over our budget");
   if (a.leveledCents > limit) warnings.push(`it is over ${dollars(limit)}`);
   if (a.packageCents >= minFrom && a.bids < minBids) warnings.push(`it has ${a.bids} ${a.bids === 1 ? "bid" : "bids"}; the rule is ${minBids}`);
-  if (role === "owner" || role === "staff") return { ok: true, warnings };
-  if (!canAwardSwitch) return { ok: false, reason: "An owner awards this." };
+  // Only an owner goes past the rules. Office staff who are not owners award
+  // as a PM with the award switch does (Sales, billing and Policies keep the
+  // same line).
+  if (role === "owner") return { ok: true, warnings };
+  if (role !== "staff" && !canAwardSwitch) return { ok: false, reason: "An owner awards this." };
   const blocking = warnings.filter((w) => !w.startsWith("it has"));
   if (blocking.length) return { ok: false, reason: `An owner awards this: ${blocking.join("; ")}.` };
   return { ok: true, warnings };

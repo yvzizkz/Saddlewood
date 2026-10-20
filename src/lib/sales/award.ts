@@ -26,6 +26,8 @@ export type AwardRecord = {
   acceptedBy: string;
   awardedAt: string;
   awardedBy: string;
+  /** The deposit invoice Award drafted, when it drafted one. */
+  depositId?: string | null;
 };
 
 export const WATCH_KINDS = ["agreement", "deposit", "prelim_notice", "coi_gc", "permit", "custom"] as const;
@@ -181,6 +183,7 @@ export function planAward(input: {
     const lines: DocumentLine[] = [{ description: `Deposit: ${pct}% of the contract (${money(contractCents)})`, amountCents: depCents }];
     const special = policies["policy.deposit.specialOrders"] !== false;
     deposit = {
+      // The first number on a new job; awardStore takes the next free one when the job already has invoices.
       number: `${prefix}-01`,
       totalCents: depCents,
       snapshot: {

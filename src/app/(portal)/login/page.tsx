@@ -16,6 +16,7 @@ import {
 import { hasCompletedOnboarding } from "@/components/auth/OnboardingFlow";
 import { keepDeviceLang, readDeviceLang, type DeviceLang } from "@/lib/auth/deviceLang";
 import { hasInbox, loginEmail } from "@/lib/auth/username";
+import { STAFF_HOME } from '@/lib/auth/landing'
 
 type FormState =
   | "idle"
@@ -109,7 +110,7 @@ function LoginForm() {
   const nextPath = (() => {
     const n = searchParams.get("next") ?? "";
     // A path on this site only. Browsers read "\" as "/", so "/\evil.com" is out too.
-    return n.startsWith("/") && !n.startsWith("//") && !n.includes("\\") ? n : "/internal/ops";
+    return n.startsWith("/") && !n.startsWith("//") && !n.includes("\\") ? n : STAFF_HOME;
   })();
 
   // Arriving from the app (the link crew are sent): plain words, in English

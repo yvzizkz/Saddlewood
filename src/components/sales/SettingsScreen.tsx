@@ -318,7 +318,10 @@ export default function SettingsScreen({ canEdit: canEditProp }: { canEdit: bool
           </button>
         </Section>
 
-        <Section title="Default payment schedule" hint="What a new residential estimate starts with. Framing packages bill twice a month instead.">
+        <Section
+          title="Default payment schedule"
+          hint="What a new residential estimate starts with. Framing packages bill twice a month instead. A step named Deposit… takes the deposit in Company policies, and the other steps share the rest in these proportions."
+        >
           <ul className="space-y-1.5">
             {s.proposal.schedule.map((step, i) => (
               <li key={i} className="flex items-center gap-2">

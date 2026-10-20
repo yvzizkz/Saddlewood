@@ -22,7 +22,7 @@ function req(body: unknown) {
 beforeEach(() => {
   genMock.mockReset();
   sendMock.mockReset();
-  genMock.mockResolvedValue({ email: "x", link: "https://saddlewoodcontracting.com/auth/confirm?token_hash=abc&type=magiclink&next=%2Finternal%2Fops", code: "12345678", next: "/internal/ops" });
+  genMock.mockResolvedValue({ email: "x", link: "https://saddlewoodcontracting.com/auth/confirm?token_hash=abc&type=magiclink&next=%2Finternal%2Fops", code: "12345678", next: "/app" });
   sendMock.mockResolvedValue({ id: "re_1" });
   crew.clear();
   vi.stubEnv("OPS_ALLOWED_EMAILS", "marco@saddlewoodcontracting.com");
@@ -36,7 +36,7 @@ describe("POST /api/auth/send-link", () => {
   it("emails an allowlisted address a link and a code", async () => {
     const res = await POST(req({ email: "Marco@SaddlewoodContracting.com" }) as never);
     expect(res.status).toBe(200);
-    expect(genMock).toHaveBeenCalledWith("marco@saddlewoodcontracting.com", "/internal/ops");
+    expect(genMock).toHaveBeenCalledWith("marco@saddlewoodcontracting.com", "/app");
     expect(sendMock).toHaveBeenCalledTimes(1);
     const msg = sendMock.mock.calls[0][0];
     expect(msg.to).toBe("marco@saddlewoodcontracting.com");
@@ -75,7 +75,7 @@ describe("POST /api/auth/send-link", () => {
 
   it("emails a crew member their code, in their language, with a link that lands in the app", async () => {
     crew.set("beto@example.com", { active: true, lang: "es" });
-    const res = await POST(req({ identifier: " Beto@Example.com ", next: "/internal/ops" }) as never);
+    const res = await POST(req({ identifier: " Beto@Example.com ", next: "/app" }) as never);
     expect(await res.json()).toEqual({ ok: true });
     expect(genMock).toHaveBeenCalledWith("beto@example.com", "/app");
     const msg = sendMock.mock.calls[0][0];
@@ -109,6 +109,6 @@ describe("POST /api/auth/send-link", () => {
   it("never sends a person off-site after sign-in", async () => {
     vi.stubEnv("OPS_ALLOWED_EMAILS", "ilene8a@gmail.com");
     await POST(req({ email: "ilene8a@gmail.com", next: "https://evil.example/x" }) as never);
-    expect(genMock).toHaveBeenCalledWith("ilene8a@gmail.com", "/internal/ops");
+    expect(genMock).toHaveBeenCalledWith("ilene8a@gmail.com", "/app");
   });
 });

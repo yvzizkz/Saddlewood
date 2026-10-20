@@ -1424,7 +1424,7 @@ export function GroupSheet({ group, onClose }: { group: CrewGroup | null; onClos
       {AREAS.map(({ area, title, hint }) => (
         <Group key={area} label={title}>
           <div className="rounded-xl border border-[var(--color-stone-mid)] bg-white">
-            {CAPABILITIES.filter((c) => c.area === area).map((c) => {
+            {CAPABILITIES.filter((c) => c.area === area && !("planned" in c && c.planned)).map((c) => {
               const on = perms.includes(c.key)
               return (
                 <label key={c.key} className="flex min-h-12 items-center justify-between gap-3 border-b border-[var(--color-stone)] px-3 py-2 last:border-b-0">

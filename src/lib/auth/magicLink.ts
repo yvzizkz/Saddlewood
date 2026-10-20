@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { STAFF_HOME } from "./landing";
 
 // One-tap sign-in for the internal portal, without Supabase's mailer.
 //
@@ -17,7 +18,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://saddlewoodcontracting.com";
 
-export const DEFAULT_NEXT = "/internal/ops";
+export const DEFAULT_NEXT = STAFF_HOME;
 
 export const LINK_HOURS = 24;
 

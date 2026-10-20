@@ -83,3 +83,11 @@ describe("terms follow the policies", () => {
     }
   });
 });
+
+describe("the plan deadline", () => {
+  it("is any clock time in Company policies, the same as the field setting", () => {
+    expect(parsePolicyValue("crew.planDue", "17:45")).toBe("17:45");
+    expect(parsePolicyValue("crew.planDue", "24:00")).toBeNull();
+    expect(readPolicies({ "crew.planDue": "17:45" })["crew.planDue"]).toBe("17:45");
+  });
+});

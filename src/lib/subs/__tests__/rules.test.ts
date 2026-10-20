@@ -139,6 +139,9 @@ describe("onboarding and the award", () => {
     expect(canAward("member", true, { ...base, subStatus: "onboarding" }, POLICY_DEFAULTS)).toMatchObject({ ok: false });
     // Too few bids is a warning the PM may pass over, and is kept with the award.
     expect(canAward("member", true, { ...base, bids: 1 }, POLICY_DEFAULTS)).toEqual({ ok: true, warnings: ["it has 1 bid; the rule is 3"] });
+    // Office staff who are not owners keep to the PM's rules.
+    expect(canAward("staff", false, base, POLICY_DEFAULTS)).toEqual({ ok: true, warnings: [] });
+    expect(canAward("staff", false, { ...base, leveledCents: 2_000_000, budgetCents: 3_000_000 }, POLICY_DEFAULTS)).toMatchObject({ ok: false, reason: expect.stringMatching(/An owner awards this/) });
     // An owner may award past every rule; what they pass over is named.
     expect(canAward("owner", false, { ...base, subStatus: "prospect", leveledCents: 2_000_000 }, POLICY_DEFAULTS)).toMatchObject({ ok: true, warnings: expect.arrayContaining(["the sub is not approved yet", "the leveled price is over our budget"]) });
     expect(canAward("member", true, { ...base, leveledCents: 1_200_000, budgetCents: 1_500_000 }, { ...POLICY_DEFAULTS, "policy.subs.pmAwardLimitCents": 2_000_000 })).toMatchObject({ ok: true });

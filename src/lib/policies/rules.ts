@@ -15,6 +15,7 @@ export type PolicyControl =
   | { type: "days"; max: number }
   | { type: "years"; max: number }
   | { type: "count"; max: number; unit: string }
+  | { type: "time" }
   | { type: "choice"; options: { value: string; label: string }[] };
 
 export type PolicyDef = {
@@ -55,7 +56,7 @@ export const DECISIONS: DecisionDef[] = [
     recommendation: "Yes under $10,000. Above it, the Award step generates the full agreement for signature.",
     why: "SOP-007 already requires the full agreement only over $10,000. The signed proposal carries the scope, price, exclusions, terms and an e-signature record tied to the exact proposal. On GC jobs their subcontract governs either way. Counsel should confirm the proposal's terms cover Arizona's residential contract content (ARS 32-1158).",
     sources: "SOP-007 §1 (full agreement over $10,000); app spec §6 (acceptance creates a contract draft).",
-    liveIn: "",
+    liveIn: "Award: whether a won job needs the full agreement before it starts (a paperwork watch).",
     laterIn: "The Award step (L1–L2) reads both to decide whether to generate the agreement.",
     policies: [
       { key: "policy.contract.proposalIsContract", label: "A signed proposal is the contract on smaller jobs", recommended: true, control: yesNo },
@@ -163,7 +164,7 @@ export const DECISIONS: DecisionDef[] = [
     sources: "SOP-006 (daily log by 5 pm) vs the app's nightly plan (by 6 PM).",
     liveIn: "Waiting on you and the 7 AM push flag a late plan from it; the Crew tab's on-time record counts against it.",
     laterIn: "",
-    policies: [{ key: "crew.planDue", label: "The plan is due by", recommended: "18:00", control: { type: "choice", options: ["16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "20:00"].map((v) => ({ value: v, label: clockLabel(v) })) } }],
+    policies: [{ key: "crew.planDue", label: "The plan is due by", recommended: "18:00", control: { type: "time" } }],
   },
   {
     id: "deposit",
@@ -172,7 +173,7 @@ export const DECISIONS: DecisionDef[] = [
     recommendation: "10% at signing, plus all special-order materials before ordering; refunded on cancellation less costs incurred and 10%.",
     why: "SOP-007's own cancellation term. A non-refundable deposit is harder to defend if a homeowner cancels early, and the costs-plus-10% term already covers our exposure. Counsel to confirm with the residential template.",
     sources: "SOP-007 §1 (cancellation: costs plus 10%) vs bot/contract.py (deposit non-refundable).",
-    liveIn: "The default proposal terms (Sales), and the Mac's contract generator (bot/contract.py).",
+    liveIn: "The default proposal terms and the deposit step of the proposal schedule (Sales), Award\'s deposit invoice, and the Mac\'s contract generator (bot/contract.py).",
     laterIn: "The deposit invoice the Award step drafts (L2).",
     policies: [
       { key: "policy.deposit.pct", label: "Deposit at signing", recommended: 10, control: { type: "percent", max: 100 } },
@@ -238,12 +239,6 @@ export const DECISIONS: DecisionDef[] = [
   },
 ];
 
-export function clockLabel(hhmm: string): string {
-  const [h, m] = hhmm.split(":").map(Number);
-  const hr = ((h + 11) % 12) + 1;
-  return `${hr}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-}
-
 export const POLICY_DEFS: PolicyDef[] = DECISIONS.flatMap((d) => d.policies);
 
 /** The keys this module stores itself; the rest (requests.*, crew.*) are field settings (src/lib/crew/settingsRules.ts). */
@@ -275,6 +270,8 @@ export function parsePolicyValue(key: string, value: unknown): boolean | number 
       return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= c.max ? value : null;
     case "choice":
       return typeof value === "string" && c.options.some((o) => o.value === value) ? value : null;
+    case "time":
+      return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : null;
   }
 }
 

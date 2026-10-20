@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle2, Clock, Lock, RotateCcw } from 'lucide-react'
 
-import { Button, Card, Chip, ScreenTitle } from '@/components/bot/ui'
+import { Button, Card, Chip, INPUT, ScreenTitle } from '@/components/bot/ui'
 import { NumberField, Pill, Toggle } from '@/components/sales/builder/fields'
 import { useSalesToast } from '@/components/sales/useSalesToast'
 import { stamp } from '@/components/sales/format'
+import { planDueLabel } from '@/lib/crew/settingsRules'
 import { DECISIONS, policyMoney, type DecisionDef, type PolicyDef, type Policies } from '@/lib/policies/rules'
 
 // The owners' decisions for running a job after it is won: each with what we
@@ -29,7 +30,27 @@ function shown(def: PolicyDef, v: unknown): string {
   if (c.type === 'days') return `${v} days`
   if (c.type === 'years') return `${v} ${Number(v) === 1 ? 'year' : 'years'}`
   if (c.type === 'count') return `${v} ${c.unit}`
+  if (c.type === 'time') return planDueLabel(String(v))
   return c.options.find((o) => o.value === v)?.label ?? String(v)
+}
+
+function TimeControl({ def, value, canEdit, busy, onSave }: { def: PolicyDef; value: string; canEdit: boolean; busy: boolean; onSave: (v: unknown) => Promise<void> }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const now = draft ?? value
+  return (
+    <div className="py-2">
+      <p className="mb-1.5 text-sm text-[var(--color-charcoal)]">{def.label}</p>
+      <div className="flex gap-2">
+        <input className={`${INPUT} min-w-0 flex-1`} type="time" step={900} aria-label={def.label} value={now} disabled={!canEdit} onChange={(e) => setDraft(e.target.value)} />
+        {canEdit ? (
+          <Button variant="primary" busy={busy} disabled={draft === null || draft === value || !/^\d{2}:\d{2}$/.test(draft)} onClick={() => void onSave(draft).then(() => setDraft(null))}>
+            Save
+          </Button>
+        ) : null}
+      </div>
+      {def.hint ? <p className="mt-1 text-xs text-[var(--color-charcoal-light)]">{def.hint}</p> : null}
+    </div>
+  )
 }
 
 function Control({ def, value, canEdit, onSave }: { def: PolicyDef; value: unknown; canEdit: boolean; onSave: (v: unknown) => Promise<void> }) {
@@ -64,6 +85,7 @@ function Control({ def, value, canEdit, onSave }: { def: PolicyDef; value: unkno
       </div>
     )
   }
+  if (c.type === 'time') return <TimeControl def={def} value={String(value)} canEdit={canEdit} busy={busy} onSave={save} />
   // Numbers: dollars, percent, days, years.
   const isMoney = c.type === 'money'
   const current = isMoney ? Number(value) / 100 : Number(value)

@@ -157,6 +157,18 @@ export function mayRun(m: Manager, kind: AdminAct["kind"]): boolean {
   return m.perms.includes(need);
 }
 
+/**
+ * For a page the owners alone use (Money, Bill, the owners' Crew screen): the
+ * signed-in staff member is an owner seat. Their APIs already ask the same
+ * (requireOwner); a page that let any allowlisted person in would show what
+ * the API refuses.
+ */
+export async function viewerIsOwner(v: Viewer): Promise<boolean> {
+  if (v.kind !== "staff") return false;
+  const { sections } = await readState();
+  return whoIs(v.email, sections.people).role === "owner";
+}
+
 export type Viewer =
   | { kind: "anonymous" }
   | { kind: "staff"; email: string }
