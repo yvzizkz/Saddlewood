@@ -1080,7 +1080,7 @@ function BillingLink({ job }: { job: CrewJob }) {
         <p className="text-sm text-[var(--color-charcoal-light)]">No billing jobs yet. They come from Money.</p>
       )}
       <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
-        Links this job&apos;s field work to its contract and invoices, so Projects can show both.
+        Links this job&apos;s field work to its contract and invoices, so the Jobs tab can show both.
       </p>
       <Problem text={problem} />
       {pick !== current ? (
@@ -1375,7 +1375,7 @@ export function PickupSheet({ pickup, onClose }: { pickup: CrewPickup; onClose: 
 const AREAS: { area: (typeof CAPABILITIES)[number]['area']; title: string; hint: string }[] = [
   { area: 'own', title: 'Their own day', hint: 'Progress photos, the end of day, notes, tasks and the schedule are always on.' },
   { area: 'crew', title: 'The Crew tab', hint: 'Any of these opens the Crew tab for them inside their app.' },
-  { area: 'projects', title: 'Projects', hint: 'For someone running several jobs. "Only the jobs they are assigned to" needs people on each job (Jobs, then a job).' },
+  { area: 'projects', title: 'Jobs', hint: 'For someone running several jobs. "Only the jobs they are assigned to" needs people on each job (Team, Jobs, then a job).' },
   { area: 'money', title: 'Money', hint: 'Read only unless the owners say otherwise. Sending, payments and pay rates always stay with the owners.' },
   { area: 'sales', title: 'Sales', hint: 'The pipeline and estimates. Sending and countersigning also need the owners to allow it in Sales settings.' },
   { area: 'subs', title: 'Subs and bids', hint: 'Bidding work out to subs. Bigger awards, and any sub not yet approved, stay with the owners (Company policies).' },

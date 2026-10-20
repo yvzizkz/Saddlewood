@@ -26,7 +26,7 @@ const { db, notify, auth, mail, geocoder } = vi.hoisted(() => {
     phases: [] as Row[],
     requests: [] as Row[],
     jobPeople: [] as { jobId: string; email: string; role: string }[],
-    billing: [] as { id: string; name: string; client: string; prefix: string; crewJobId: string | null }[],
+    billing: [] as { id: string; name: string; client: string; prefix: string; crewJobId: string | null; address?: string }[],
     seq: 0,
   };
   return {
@@ -236,6 +236,16 @@ vi.mock("../queries", () => {
       for (const b of db.billing) if (b.crewJobId === crewJobId) b.crewJobId = null;
       if (target) target.crewJobId = crewJobId;
       return "ok";
+    },
+    pairBillingJob: async (job: { id: string; name: string; address: string }) => {
+      if (db.billing.some((b) => b.crewJobId === job.id)) return "had";
+      const same = db.billing.find((b) => !b.crewJobId && (b.name.toLowerCase() === job.name.toLowerCase() || (!!job.address && b.address === job.address)));
+      if (same) {
+        same.crewJobId = job.id;
+        return "linked";
+      }
+      db.billing.push({ id: `b-${job.id}`, name: job.name, client: "", prefix: "", address: job.address, crewJobId: job.id });
+      return "made";
     },
     getPickup: async (id: number) => db.pickups.find((p) => p.id === id) ?? null,
     listPickups: async () => db.pickups,
@@ -845,6 +855,14 @@ describe("what an owner can do", () => {
     expect(await admin({ kind: "job.add", name: "bellevue heights" }, at("09:00"))).toMatchObject({ ok: false, status: 409 });
     expect(await admin({ kind: "job.add", name: "Old Job" }, at("09:00"))).toMatchObject({ ok: true });
     expect(db.jobs.get("old-job")?.active).toBe(true);
+  });
+
+  it("gives a new job its billing half: links an unlinked one by name or address, else makes one", async () => {
+    db.billing.push({ id: "jury-uuid", name: "Jury Residence (AFT 123)", client: "AFT", prefix: "8009", address: "8009 N Ironwood Dr, Paradise Valley, AZ 85253", crewJobId: null });
+    expect(await admin({ kind: "job.add", name: "8009 N Ironwood", address: "8009 N Ironwood Dr, Paradise Valley, AZ 85253" }, at("09:00"))).toEqual({ ok: true });
+    expect(db.billing.find((b) => b.id === "jury-uuid")?.crewJobId).toBe("8009-n-ironwood");
+    expect(await admin({ kind: "job.add", name: "Hutton Dr" }, at("09:00"))).toEqual({ ok: true });
+    expect(db.billing.find((b) => b.crewJobId === "hutton-dr")).toMatchObject({ name: "Hutton Dr" });
   });
 });
 

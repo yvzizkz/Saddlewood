@@ -36,6 +36,7 @@ import {
   insertShift,
   insertTasks,
   linkBillingJob,
+  pairBillingJob,
   listJobPhases,
   listJobs,
   listPeople,
@@ -443,7 +444,12 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         if (job) {
           if (scope !== null) await setJobPeople(job.id, [{ email: owner.email, role: "pm" }], owner.name);
           if (act.address.trim()) await placeJob(job.id, act.address, nowDate);
-          return ok();
+          // Its billing half too, so the job shows its money and Award has a job (pairBillingJob).
+          const pair = await pairBillingJob(job).catch((e: Error) => {
+            console.error("[crew/admin] pair billing job:", e.message);
+            return "failed" as const;
+          });
+          return pair === "taken" || pair === "failed" ? ok("Job added. Its money side could not be set up: link it from the job.") : ok();
         }
         const taken = await getJob(id);
         if (taken && taken.name.toLowerCase() === act.name.toLowerCase()) {

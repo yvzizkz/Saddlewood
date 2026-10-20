@@ -1220,7 +1220,7 @@ function Screen() {
   // The tabs follow the switches: an owner sees all of them.
   const options: { value: View; label: string; count?: number }[] = [
     { value: 'today', label: 'Today', count: needs },
-    ...(can('projects.view') ? [{ value: 'projects' as const, label: 'Projects' }] : []),
+    ...(can('projects.view') ? [{ value: 'projects' as const, label: 'Jobs' }] : []),
     { value: 'schedule', label: 'Schedule' },
     ...(can('pickups.stage') && !isOwner ? [{ value: 'runner' as const, label: 'Runner', count: pickupProblems }] : []),
     { value: 'plan', label: 'Plan', count: can('plan.send') && !isOwner && planDue && new Date().getHours() >= 15 ? 1 : 0 },
