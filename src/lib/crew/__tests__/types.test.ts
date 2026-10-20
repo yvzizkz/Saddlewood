@@ -70,6 +70,12 @@ describe("what an owner can send", () => {
     });
   });
 
+  it("places one job on the map, or all of them", () => {
+    expect(adminActSchema.parse({ kind: "job.geocode", id: "powell" })).toEqual({ kind: "job.geocode", id: "powell" });
+    expect(adminActSchema.parse({ kind: "job.geocode" })).toEqual({ kind: "job.geocode" });
+    expect(adminActSchema.safeParse({ kind: "job.geocode", id: "" }).success).toBe(false);
+  });
+
   it("will not change a shift without a reason", () => {
     expect(adminActSchema.safeParse({ kind: "shift.edit", id: 4, end: "14:30", why: "" }).success).toBe(false);
     expect(adminActSchema.safeParse({ kind: "shift.edit", id: 4, end: "14:30", why: "forgot to clock out" }).success).toBe(true);

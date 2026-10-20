@@ -22,7 +22,8 @@ import type {
   Geo,
   ShiftEdit,
 } from "./types";
-import { JOB_ROLES, normalizePerms, type BillingJobRef, type CrewJobPerson, type CrewJobRole } from "./types";
+import { fromJobOf } from "./geo";
+import { JOB_ROLES, normalizePerms, type BillingJobRef, type CrewJobGeo, type CrewJobPerson, type CrewJobRole } from "./types";
 
 // Every read and write of the crew tables. Service-role client only, after the
 // route has decided who is asking (src/lib/crew/auth.ts). The tables carry RLS
@@ -300,12 +301,22 @@ export async function linkBillingJob(crewJobId: string, billingJobId: string | n
 
 // ---- jobs ---------------------------------------------------------------------
 
-type JobRow = { id: string; name: string; address: string; note: string; active: boolean; promised?: string | null; promise_note?: string };
+type JobRow = { id: string; name: string; address: string; note: string; active: boolean; promised?: string | null; promise_note?: string; geo?: unknown };
 
-const JOB_COLS = "id, name, address, note, active, promised, promise_note";
+const JOB_COLS = "id, name, address, note, active, promised, promise_note, geo";
 
 function toJob(r: JobRow): CrewJob {
-  return { id: r.id, name: r.name, address: r.address, note: r.note, active: r.active, promised: r.promised ?? null, promiseNote: r.promise_note ?? "" };
+  const geo = asGeo(r.geo);
+  return {
+    id: r.id,
+    name: r.name,
+    address: r.address,
+    note: r.note,
+    active: r.active,
+    promised: r.promised ?? null,
+    promiseNote: r.promise_note ?? "",
+    geo: geo ? { lat: geo.lat, lng: geo.lng } : null,
+  };
 }
 
 export async function listJobs(): Promise<CrewJob[]> {
@@ -355,7 +366,7 @@ export async function insertJob(job: {
 
 export async function patchJob(
   id: string,
-  patch: Partial<{ name: string; address: string; note: string; active: boolean; promised: string | null; promise_note: string }>,
+  patch: Partial<{ name: string; address: string; note: string; active: boolean; promised: string | null; promise_note: string; geo: CrewJobGeo | null }>,
 ): Promise<CrewJob | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
@@ -411,9 +422,17 @@ function toShift(r: ShiftRow): CrewShiftRow {
     review: r.review,
     status: r.status === "void" ? "void" : "ok",
     edits: Array.isArray(r.edits) ? (r.edits as ShiftEdit[]) : [],
+    // Figured against the job once the jobs are in hand (withJobDistance); a row alone does not know where its job is.
+    fromJobM: { in: null, out: null },
     clientIn: r.client_in,
     clientOut: r.client_out,
   };
+}
+
+/** The same shifts with each punch measured against its job's place on the map (null where either side is unknown). */
+export function withJobDistance<T extends Pick<CrewShift, "jobId" | "startGeo" | "endGeo" | "fromJobM">>(shifts: T[], jobs: Pick<CrewJob, "id" | "geo">[]): T[] {
+  const where = new Map(jobs.map((j) => [j.id, j.geo]));
+  return shifts.map((s) => ({ ...s, fromJobM: fromJobOf(s, where.get(s.jobId)) }));
 }
 
 export async function getShift(id: number): Promise<CrewShiftRow | null> {

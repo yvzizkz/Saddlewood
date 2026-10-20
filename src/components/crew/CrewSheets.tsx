@@ -6,7 +6,7 @@ import { MapPin, Mic } from 'lucide-react'
 import { Button, Chip, Field, INPUT, Segmented } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { addDays, clock12, dayLabel, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
-import { OTHER_JOB, parseAmount, type CrewHome, type CrewPickup, type CrewShift, type CrewTask, type Geo } from '@/lib/crew/types'
+import { OTHER_JOB, parseAmount, type CrewHome, type CrewPickup, type CrewTask, type Geo, type OwnShift } from '@/lib/crew/types'
 import { locate, newClientId, useCrew } from './CrewProvider'
 import { PhotoStrip, usePhotos } from './Photos'
 import { useVoiceMemo, VoiceMemoChip, VoiceMemoPanel } from './VoiceMemo'
@@ -681,7 +681,7 @@ export function CantSheet({ id, onClose }: { id: number; onClose: () => void }) 
   )
 }
 
-export function FixTimeSheet({ shift, onClose }: { shift: CrewShift | null; onClose: () => void }) {
+export function FixTimeSheet({ shift, onClose }: { shift: OwnShift | null; onClose: () => void }) {
   const { home, t, act, toast, lang } = useCrew()
   const cid = useRef(newClientId())
   const today = home?.day ?? ''

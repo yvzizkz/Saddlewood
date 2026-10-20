@@ -6,6 +6,7 @@ import { Copy, Mail, Share2 } from 'lucide-react'
 import { Button, Chip, Field, INPUT, Segmented } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { ago } from '@/lib/bot/view'
+import { isFar, milesText } from '@/lib/crew/geo'
 import { priorityLabel, taskStatusWord } from '@/lib/crew/plan'
 import { addDays, clock12, clockText, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
 import {
@@ -396,6 +397,12 @@ function mapLink(geo: { lat: number; lng: number }): string {
   return `https://www.google.com/maps/search/?api=1&query=${geo.lat},${geo.lng}`
 }
 
+/** " · 0.1 mi from the job", red past half a mile. Nothing when the punch or the job has no place on the map. */
+function FromJob({ m }: { m: number | null }) {
+  if (m === null) return null
+  return <span style={isFar(m) ? { color: '#9a2a1f', fontWeight: 500 } : undefined}>{` · ${milesText(m)} from the job`}</span>
+}
+
 export function ShiftSheet({ shift, onClose }: { shift: CrewShift; onClose: () => void }) {
   const { data, run, nameOf } = useCrewAdmin()
   const [start, setStart] = useState(localClock(shift.startedAt))
@@ -460,6 +467,7 @@ export function ShiftSheet({ shift, onClose }: { shift: CrewShift; onClose: () =
             )
           </>
         ) : null}
+        <FromJob m={shift.fromJobM.in} />
         {shift.endedAt ? (
           <>
             {' · '}Out: {HOW[shift.endSource ?? 'app'] ?? shift.endSource}
@@ -473,6 +481,7 @@ export function ShiftSheet({ shift, onClose }: { shift: CrewShift; onClose: () =
                 )
               </>
             ) : null}
+            <FromJob m={shift.fromJobM.out} />
           </>
         ) : null}
       </p>
@@ -874,6 +883,15 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
     else setProblem(res.text)
   }
 
+  /** Place the job from its saved address, so a punch far from it shows. */
+  async function findOnMap() {
+    if (!job) return
+    setBusy('geo')
+    const res = await run({ kind: 'job.geocode', id: job.id })
+    setBusy(null)
+    if (!res.ok) setProblem(res.text)
+  }
+
   return (
     <AdminSheet title={job ? job.name : 'Add a job'} onClose={onClose}>
       {!manage ? null : (
@@ -893,6 +911,14 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
       <Field label="Address" hint="Gives the crew a Directions button.">
         <input className={INPUT} value={address} maxLength={200} autoComplete="off" onChange={(e) => setAddress(e.target.value)} />
       </Field>
+      {job && manage && !job.geo && job.address.trim() && address.trim() === job.address.trim() ? (
+        <div className="-mt-2 flex flex-wrap items-center gap-2 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
+          <span>Not on the map yet, so a punch far from it cannot show.</span>
+          <Button className="min-h-9 px-3 text-[13px]" busy={busy === 'geo'} onClick={findOnMap}>
+            Find on the map
+          </Button>
+        </div>
+      ) : null}
       <Field label="Site note" hint="Gate code, parking, who the super is. Only people scheduled or clocked in there see it.">
         <textarea className={AREA} value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
       </Field>

@@ -4,6 +4,7 @@ import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { ActResult } from "./act";
 import type { Manager } from "./auth";
+import { geocodeAddress } from "./geocode";
 import { MSG } from "./messages";
 import { notifyCrew, notifyOwners } from "./notify";
 import { buildPlan } from "./plan";
@@ -60,7 +61,7 @@ type Owner = Pick<Manager, "email" | "name"> & { role?: Manager["role"]; perms?:
 // tasks, time corrections, questions. Every change to someone's time keeps
 // what the row said before and who changed it.
 
-export type AdminResult = ActResult | { ok: true; note?: string; code?: string; link?: string; hours?: number };
+export type AdminResult = ActResult | { ok: true; note?: string; code?: string; link?: string; hours?: number; set?: number };
 
 const ok = (note?: string): ActResult => ({ ok: true, ...(note ? { note } : {}) });
 const bad = (status: number, error: string): ActResult => ({ ok: false, status, error });
@@ -149,6 +150,22 @@ async function overlapNote(email: string, day: string, span: { start: number; en
   return hit
     ? `That overlaps another shift (${hit.jobName}, ${clock12(hit.startedAt)} to ${hit.endedAt ? clock12(hit.endedAt) : "now"}). Change that one first.`
     : null;
+}
+
+/**
+ * Put a job on the map from its address and keep the point on the row (0021).
+ * Nothing found, or a service down, leaves it null; the save it follows has
+ * already happened, so nothing here can block it. -> whether it was placed
+ */
+async function placeJob(id: string, address: string, nowDate: Date): Promise<boolean> {
+  try {
+    const hit = address.trim() ? await geocodeAddress(address) : null;
+    await patchJob(id, { geo: hit ? { lat: hit.lat, lng: hit.lng, source: hit.source, at: nowDate.toISOString() } : null });
+    return !!hit;
+  } catch (e) {
+    console.error("[crew/admin] place job:", (e as Error).message);
+    return false;
+  }
 }
 
 /** A job from the list, or the "not on the list" job with the name the person typed. */
@@ -260,6 +277,8 @@ async function jobsOfAct(act: AdminAct): Promise<(string | null | undefined)[] |
     case "job.people":
     case "job.link":
       return [act.id];
+    case "job.geocode":
+      return act.id ? [act.id] : null;
     case "schedule.set":
     case "shift.add":
       return [act.jobId];
@@ -392,12 +411,15 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         });
         if (job) {
           if (scope !== null) await setJobPeople(job.id, [{ email: owner.email, role: "pm" }], owner.name);
+          if (act.address.trim()) await placeJob(job.id, act.address, nowDate);
           return ok();
         }
         const taken = await getJob(id);
         if (taken && taken.name.toLowerCase() === act.name.toLowerCase()) {
           if (taken.active) return bad(409, "That job is already on the list.");
-          await patchJob(id, { active: true, address: act.address || taken.address, note: act.note || taken.note });
+          const address = act.address || taken.address;
+          await patchJob(id, { active: true, address, note: act.note || taken.note });
+          if (address.trim() && (address !== taken.address || !taken.geo)) await placeJob(id, address, nowDate);
           return ok("That job was archived. It is back on the list.");
         }
       }
@@ -412,12 +434,44 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       if (owner.role === "member" && !owner.perms?.includes("jobs.manage") && (rest.name !== undefined || rest.active !== undefined)) {
         return bad(403, "Renaming or closing a job needs the jobs switch. Marco or Lando can turn it on.");
       }
+      // A new address is placed again (and one never placed, placed): the old point must not stand for it.
+      let place = false;
+      if (rest.address !== undefined) {
+        const before = await getJob(id);
+        place = rest.address !== (before?.address ?? "") || (!!rest.address.trim() && !before?.geo);
+      }
       const job = await patchJob(id, {
         ...rest,
         ...(promised !== undefined ? { promised: promised || null } : {}),
         ...(promiseNote !== undefined ? { promise_note: promiseNote } : {}),
       });
-      return job ? ok() : bad(404, "That job is not on the list.");
+      if (!job) return bad(404, "That job is not on the list.");
+      if (place && rest.address !== undefined) await placeJob(job.id, rest.address, nowDate);
+      return ok();
+    }
+
+    case "job.geocode": {
+      let targets: { id: string; name: string; address: string }[];
+      if (act.id) {
+        const job = await getJob(act.id);
+        if (!job) return bad(404, "That job is not on the list.");
+        if (!job.address.trim()) return bad(400, "Give the job an address first.");
+        targets = [job];
+      } else {
+        targets = (await listJobs()).filter((j) => j.active && !j.geo && j.address.trim() && inScope(scope, j.id));
+      }
+      // One at a time: Nominatim asks for no more than one call a second.
+      let set = 0;
+      for (const job of targets) if (await placeJob(job.id, job.address, nowDate)) set++;
+      if (act.id) {
+        return set ? { ok: true, set, note: `${targets[0].name} is on the map.` } : { ok: true, set, note: `Could not find ${targets[0].name} on the map. Check the address.` };
+      }
+      const missed = targets.length - set;
+      return {
+        ok: true,
+        set,
+        note: targets.length ? `${set} of ${targets.length} ${targets.length === 1 ? "job" : "jobs"} on the map.${missed ? ` ${missed} not found: check the address.` : ""}` : "Every job with an address is on the map already.",
+      };
     }
 
     case "job.people": {

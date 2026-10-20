@@ -69,7 +69,7 @@ function task(over: Partial<CrewTask>): CrewTask {
 }
 
 function job(over: Partial<CrewJob>): CrewJob {
-  return { id: "keim", name: "12729 W Keim Dr", address: "", note: "", active: true, promised: null, promiseNote: "", ...over };
+  return { id: "keim", name: "12729 W Keim Dr", address: "", note: "", active: true, promised: null, promiseNote: "", geo: null, ...over };
 }
 
 function report(over: Partial<CrewReport>): CrewReport {
