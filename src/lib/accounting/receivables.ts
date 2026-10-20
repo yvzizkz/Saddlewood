@@ -225,7 +225,19 @@ export async function loadIssued(fromDay: string, toDay: string): Promise<Issued
     }));
 }
 
-export type CutoffRow = { client: string; clientId: string; day: string; label: string; prepOn: string; delivery: string; attachments: string[]; openJobs: number };
+export type CutoffRow = {
+  client: string;
+  clientId: string;
+  day: string;
+  label: string;
+  prepOn: string;
+  delivery: string;
+  attachments: string[];
+  openJobs: number;
+  /** Open jobs billed by percent complete (a schedule of values), and how many have the PM's report for this cycle. */
+  sovJobs: number;
+  reported: number;
+};
 
 /**
  * The next billing date per client: their cutoff day (AFT the 23rd, Schifferer
@@ -234,17 +246,18 @@ export type CutoffRow = { client: string; clientId: string; day: string; label: 
  */
 export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow[]> {
   const db = getSupabaseAdmin();
-  const [clients, jobs] = await Promise.all([db.from("clients").select("id,name,billing"), db.from("jobs").select("id,client_id,status")]);
+  const [clients, jobs] = await Promise.all([db.from("clients").select("id,name,billing"), db.from("jobs").select("id,client_id,status,billing")]);
   if (clients.error) throw new Error(`clients: ${clients.error.message}`);
   const open = new Map<string, number>();
-  for (const j of (jobs.data ?? []) as { client_id: string | null; status: string | null }[]) {
-    if (j.client_id && j.status !== "closed" && j.status !== "lost") open.set(j.client_id, (open.get(j.client_id) ?? 0) + 1);
-  }
+  type J = { client_id: string | null; status: string | null; billing: { sov?: unknown[]; pmReport?: { day?: string } } | null };
+  const openJobs = ((jobs.data ?? []) as J[]).filter((j) => j.client_id && j.status !== "closed" && j.status !== "lost");
+  for (const j of openJobs) open.set(j.client_id!, (open.get(j.client_id!) ?? 0) + 1);
   const out: CutoffRow[] = [];
   for (const c of (clients.data ?? []) as { id: string; name: string; billing: BillingProfile | null }[]) {
     if (!open.get(c.id)) continue;
     const b = c.billing ?? {};
     const day = nextCutoff(today, b.cutoffDay);
+    const sov = openJobs.filter((j) => j.client_id === c.id && (j.billing?.sov?.length ?? 0) > 0);
     out.push({
       client: c.name,
       clientId: c.id,
@@ -254,6 +267,8 @@ export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow
       delivery: b.delivery === "portal" ? `Upload to ${b.portalName || "their portal"}` : "Email",
       attachments: (b.attachments ?? []).map((a) => ATTACHMENT_LABEL[a] ?? a),
       openJobs: open.get(c.id) ?? 0,
+      sovJobs: sov.length,
+      reported: sov.filter((j) => reportedThisCycle(j.billing?.pmReport?.day, day, b.cutoffDay)).length,
     });
   }
   return out.sort((a, b) => a.day.localeCompare(b.day));
@@ -290,6 +305,27 @@ export function nextCutoff(today: string, cutoffDay?: number): string {
     }
   }
   return today;
+}
+
+/** The cutoff before this one: the cycle a PM's report counts for runs from the day after it to `day`. */
+export function previousCutoff(day: string, cutoffDay?: number): string {
+  const [y, m] = day.split("-").map(Number);
+  const days = cutoffDay ? [cutoffDay] : [1, 15];
+  let best = "";
+  for (const step of [1, 0]) {
+    const yy = m - step < 1 ? y - 1 : y;
+    const mm = ((m - step + 11) % 12) + 1;
+    for (const d of days) {
+      const c = clampDay(yy, mm, d);
+      if (c < day && c > best) best = c;
+    }
+  }
+  return best;
+}
+
+/** Whether a report sent on `reportDay` is the one for the cycle that bills on `day`. */
+export function reportedThisCycle(reportDay: string | null | undefined, day: string, cutoffDay?: number): boolean {
+  return !!reportDay && reportDay > previousCutoff(day, cutoffDay) && reportDay <= day;
 }
 
 export function businessDaysBefore(day: string, n: number): string {

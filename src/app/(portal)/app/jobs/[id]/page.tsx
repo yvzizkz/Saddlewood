@@ -276,7 +276,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const payments: TableRow[] = money.collected.map((c) => ({ id: c.id, day: c.receivedOn, number: c.number, method: c.method, reference: c.reference, amount: c.amountCents, fee: c.feeCents || null, href: c.documentId ? `/app/money/${c.documentId}` : null }));
     return (
       <JobFrame {...frame}>
-        {tab === "money" && ref.billingId && owner ? <ProgressBilling jobKey={ref.key} /> : null}
+        {tab === "money" && ref.billingId ? <ProgressBilling jobKey={ref.key} mode={owner ? "owner" : "report"} /> : null}
         {tab === "money" ? (
           <dl className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {[

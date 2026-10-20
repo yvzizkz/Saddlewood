@@ -90,3 +90,19 @@ export function drawInvoiceLines(d: Draw): { description: string; amountCents: n
   if (d.retainageCents > 0) lines.push({ description: `Retainage held (${d.retainagePct}%)`, amountCents: -d.retainageCents });
   return lines;
 }
+
+/**
+ * The PM's percent complete for the billing cycle (SOP-006 Gate 3), sent from
+ * the job page before the client's cutoff. It bills nothing: the owners'
+ * progress billing opens with it filled in.
+ */
+export type PmReport = { pcts: Record<string, number>; note: string; by: string; byName: string; at: string; day: string };
+
+/** What is wrong with a report, if anything: the same rules as a draw (0 to 100, never below billed), on lines that exist. */
+export function checkReport(lines: ProgressLine[], asked: Record<string, number>): string[] {
+  const keys = Object.keys(asked);
+  if (!keys.length) return ["Put a percent complete on at least one line."];
+  const unknown = keys.filter((k) => !lines.some((l) => l.key === k));
+  if (unknown.length) return [`No line ${unknown.join(", ")} on this job.`];
+  return computeDraw(lines, asked, 0).errors;
+}

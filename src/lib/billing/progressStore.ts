@@ -7,7 +7,7 @@ import { localDay } from "@/lib/crew/time";
 import type { SovLine } from "@/lib/sales/award";
 import { createDraft, usedNumbers } from "./documents";
 import { nextNumber } from "./numbering";
-import { computeDraw, drawInvoiceLines, shareOf, type Draw, type ProgressLine } from "./progress";
+import { checkReport, computeDraw, drawInvoiceLines, shareOf, type Draw, type PmReport, type ProgressLine } from "./progress";
 import type { BillingProfile } from "./types";
 
 /**
@@ -46,6 +46,8 @@ export type ProgressState = {
   /** Draws made in the app; the opening percents can only be set before the first. */
   draws: number;
   opening: Record<string, number>;
+  /** The PM's percent complete sent since the last draw, if any: the next draw opens with it. */
+  report: PmReport | null;
 };
 
 export async function loadProgress(billingJobId: string): Promise<ProgressState> {
@@ -54,21 +56,24 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
   if (error) throw new Error(`jobs: ${error.message}`);
   if (!job) throw new ProgressError("No such job.", 404);
   const j = job as JobRow;
-  const billing = (j.billing ?? {}) as { sov?: (SovLine | Record<string, unknown>)[]; retainagePct?: number; sovOpening?: Record<string, number> };
+  const billing = (j.billing ?? {}) as { sov?: (SovLine | Record<string, unknown>)[]; retainagePct?: number; sovOpening?: Record<string, number>; pmReport?: PmReport };
   const [client, cos, rows] = await Promise.all([
     j.client_id ? db.from("clients").select("billing").eq("id", j.client_id).maybeSingle() : Promise.resolve({ data: null }),
     db.from("change_orders").select("id,number,title,amount_cents,status").eq("job_id", j.id).in("status", ["signed", "billed"]),
-    db.from("sov_progress").select("line_key,pct_to_date,amount_cents,document_id,documents!inner(id,number,status)").eq("job_id", j.id),
+    db.from("sov_progress").select("line_key,pct_to_date,amount_cents,document_id,documents!inner(id,number,status,created_at)").eq("job_id", j.id),
   ]);
 
   // What standing draws billed per line, and the latest percent on each.
-  type R = { line_key: string; pct_to_date: number | string; amount_cents: number; document_id: string; documents: { id: string; number: string; status: string } | { id: string; number: string; status: string }[] };
+  type Doc = { id: string; number: string; status: string; created_at: string };
+  type R = { line_key: string; pct_to_date: number | string; amount_cents: number; document_id: string; documents: Doc | Doc[] };
   const billed = new Map<string, { cents: number; pct: number }>();
   let openDraft: ProgressState["openDraft"] = null;
   const drawDocs = new Set<string>();
+  let lastDrawAt = 0;
   for (const r of (rows.data ?? []) as R[]) {
     const doc = Array.isArray(r.documents) ? r.documents[0] : r.documents;
     if (!doc || doc.status === "void") continue;
+    lastDrawAt = Math.max(lastDrawAt, Date.parse(doc.created_at) || 0);
     if (doc.status === "draft") openDraft = { id: doc.id, number: doc.number };
     drawDocs.add(doc.id);
     const b = billed.get(r.line_key) ?? { cents: 0, pct: 0 };
@@ -117,7 +122,26 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
     openDraft,
     draws: drawDocs.size,
     opening,
+    // A report a draw has already used is spent.
+    report: billing.pmReport?.at && Date.parse(billing.pmReport.at) > lastDrawAt ? billing.pmReport : null,
   };
+}
+
+/** Save the PM's percent complete for this cycle on the job (the latest one stands). Bills nothing. */
+export async function saveReport(billingJobId: string, pcts: Record<string, number>, note: string, by: { email: string; name: string }): Promise<PmReport> {
+  const state = await loadProgress(billingJobId);
+  const asked: Record<string, number> = {};
+  for (const [k, v] of Object.entries(pcts)) asked[k] = Number(v);
+  const errors = checkReport(state.lines, asked);
+  if (errors.length) throw new ProgressError(errors.join(" "), 400);
+  const at = new Date().toISOString();
+  const report: PmReport = { pcts: asked, note: note.trim().slice(0, 1000), by: by.email, byName: by.name, at, day: localDay(at) };
+  const db = getSupabaseAdmin();
+  const { data } = await db.from("jobs").select("billing").eq("id", billingJobId).maybeSingle();
+  const billing = { ...(((data as { billing?: Record<string, unknown> } | null)?.billing) ?? {}), pmReport: report };
+  const { error } = await db.from("jobs").update({ billing }).eq("id", billingJobId);
+  if (error) throw new Error(`jobs update: ${error.message}`);
+  return report;
 }
 
 /** Set what was billed before the app, per line, once, before the first draw in the app. */
