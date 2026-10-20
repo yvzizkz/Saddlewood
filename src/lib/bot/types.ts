@@ -31,6 +31,10 @@ export type BotPeople = z.infer<typeof peopleSchema>;
 const str = (max = 4000) => z.string().max(max).catch("");
 const nullableStr = z.string().max(400).nullable().catch(null);
 
+// Text the Mac sends is stored, not judged: trim it to what a row may hold
+// and drop NUL bytes (Postgres text cannot store them) instead of refusing it.
+export const stored = (max: number) => z.string().transform((v) => v.replace(/\u0000/g, "").slice(0, max));
+
 const healthSchema = z.object({
   problems: z.record(z.string(), z.string()).catch({}),
   downSince: nullableStr,
@@ -214,6 +218,22 @@ const joistRecentSchema = z.object({
 });
 export type JoistRecent = z.infer<typeof joistRecentSchema>;
 
+// Late from the field (Saddlewood-KB bot/crew.py): someone scheduled who had
+// not clocked in, a clock-out given afterwards, an end of day that came late.
+// The Mac keeps the list; the 7 AM push folds yesterday's in for the owners
+// and the supervisor (src/lib/owner/morning.ts). Strings are clipped, not refused.
+const crewLateItemSchema = z.object({
+  /** The day it happened, YYYY-MM-DD. */
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  id: z.number().int(),
+  who: stored(80).catch(""),
+  job: stored(80).catch(""),
+  text: stored(300).catch(""),
+  at: str(40),
+});
+export type BotCrewLateItem = z.infer<typeof crewLateItemSchema>;
+export type BotCrewLate = { items: BotCrewLateItem[] };
+
 /** Keep every element that parses; drop the ones that do not. */
 export function listOf<T>(schema: z.ZodType<T>) {
   return z
@@ -252,6 +272,7 @@ export const sectionSchemas = {
   activity: listOf(activitySchema),
   outboundAllow: allowMirrorSchema.nullable().catch(null),
   joistRecent: listOf(joistRecentSchema),
+  crewLate: z.object({ items: listOf(crewLateItemSchema) }).catch({ items: [] }),
 } as const;
 
 export type BotSectionKey = keyof typeof sectionSchemas;
@@ -272,6 +293,7 @@ export type BotSections = {
   activity: BotActivity[];
   outboundAllow: AllowMirror | null;
   joistRecent: JoistRecent[];
+  crewLate: BotCrewLate;
 };
 
 export function emptySections(): BotSections {
@@ -290,6 +312,7 @@ export function emptySections(): BotSections {
     activity: [],
     outboundAllow: null,
     joistRecent: [],
+    crewLate: { items: [] },
   };
 }
 
@@ -470,9 +493,7 @@ export type BotAction = {
 
 // ---- what the Mac posts back -----------------------------------------------
 
-// Text the Mac sends is stored, not judged: trim it to what a row may hold
-// and drop NUL bytes (Postgres text cannot store them) instead of refusing it.
-export const stored = (max: number) => z.string().transform((v) => v.replace(/\u0000/g, "").slice(0, max));
+// `stored` (what the Mac sends is trimmed, not refused) is defined up with the sections.
 
 const syncActionSchema = z.object({
   id: z.number().int(),
@@ -560,7 +581,7 @@ export type BotHome = {
   now: string;
   me: BotMe;
   bridge: { seenAt: string | null; online: boolean; reportedAt: string | null };
-  sections: Omit<BotSections, "people" | "outboundAllow" | "joistRecent">;
+  sections: Omit<BotSections, "people" | "outboundAllow" | "joistRecent" | "crewLate">;
   /** One seat per person (info@ and lando@ are both Lando): who a to-do or an invite can go to. */
   team: { email: string; name: string }[];
   /** Every address with a seat -> the person's name, for showing who owns what. */

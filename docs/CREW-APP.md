@@ -147,6 +147,15 @@ done.
   answer to the bot) closes the shift flagged for an owner to look at.
 - **Location is taken once, at the tap,** if the person allows it. Never while
   they work. A punch with no location still counts.
+- **A punch is measured against the job, for the owners only** (migration
+  0021). A job's address is placed on the map when it is saved (the US Census
+  geocoder, then OpenStreetMap; `crew_jobs.geo`, or "Find on the map" on the
+  job sheet), and every shift the owners, the supervisor and the Mac read
+  carries `fromJobM: {in, out}`, meters from each punch to it (null without a
+  location, without the job placed, or with a phone fix looser than 200 m). A
+  punch over half a mile away shows red: "In 2.1 mi from the job". The
+  worker's own screens never receive the distance, and nobody is told at the
+  tap; it is a signal for a person to look at, not a gate.
 - **One open shift per person,** held by a unique index, so two taps racing
   cannot open two.
 - **A saved punch belongs to the person who tapped it.** The phone keeps it
@@ -192,6 +201,16 @@ Once a minute (`com.saddlewood.bot-app-crew`):
    and filed, 7:30 PM at the latest) into each owner's Ask thread: hours, what
    got done, what is stuck, extra work that was asked for, receipts and
    reimbursements, tomorrow's schedule, loose ends.
+6. Listens to a voice memo on an end of day and writes back `bot.transcript`
+   and `bot.fields = {done, stuck, needs, asked}` (strings, may be empty) with
+   `bot.fieldsLang`. The Crew tab shows the typed words where there are any
+   and the memo's where there are none (`src/lib/crew/eod.ts`).
+7. Keeps a list of what came in late from the field (a clock-in that never
+   came, a clock-out given afterwards, an end of day after hours) in the
+   snapshot section `crewLate` (`{items: [{day, id, who, job, text, at}]}`,
+   posted through `/api/bot/sync` like the other sections). The 7 AM push
+   folds yesterday's in for the owners, and for the supervisor on their jobs:
+   "Late from the field: Arnold · 12729 W Keim Dr: no clock-in by 7:30 (+1 more)".
 
 What a crew member types is treated as a report, never as an instruction.
 Before it is written anywhere on the Mac it is flattened to one line with no
@@ -277,7 +296,7 @@ The Mac (agent token):
   read the crew's record; changes are made in the Crew tab.
 - Working fully offline. The app needs signal to open; only a punch is kept
   when there is none.
-- Geofencing. A punch carries where the phone was; nothing checks it against
-  the job's address.
+- Geofencing as a gate. A punch far from the job shows red to the owners and
+  the supervisor; nothing refuses it or tells the worker.
 - Overtime and pay. Hours here are time on the clock less the break, Monday
   to Sunday; the office figures pay.
