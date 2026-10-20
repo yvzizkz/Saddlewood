@@ -10,6 +10,7 @@ import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { hrefOf } from "@/lib/analytics/drill";
 import { loadLabor } from "@/lib/accounting/labor";
 import { loadPayables } from "@/lib/accounting/payables";
+import PayablesMissing from "@/components/accounting/PayablesMissing";
 import { loadPurchases } from "@/lib/accounting/purchases";
 import { loadBillingCalendar, loadIssued, loadOpenReceivables } from "@/lib/accounting/receivables";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
@@ -155,6 +156,7 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
 
   return (
     <AccountingFrame title="Overview" intro="Every money section in one place. Pick a period; each card opens its section on it." period={period}>
+      {payables.missing ? <PayablesMissing /> : null}
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map((t) => (
           <li key={t.title}>
