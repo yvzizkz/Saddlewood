@@ -6,14 +6,17 @@ import { botApi } from '@/components/bot/BotProvider'
 import { Button, Chip, Dot } from '@/components/bot/ui'
 import { day, money } from '@/components/money/format'
 import type { JobMoney } from '@/lib/billing/jobMoney'
+import type { JobHistory } from '@/lib/crew/jobHistory'
 import type { MaterialBlock as Material } from '@/lib/crew/purchases'
+import HistoryBlock from './HistoryBlock'
 import MaterialBlock from './MaterialBlock'
 
 // One job's money on the Projects screen (money.view): contract, billed, paid,
 // owed and past due, read only, and the Material block (Home Depot, 0022).
 // The numbers come from /api/crew/projects/money, which checks the switch and
 // the job assignment and answers only for this job. Nothing here can change
-// money. A field job with no billing job yet still gets its material.
+// money. A field job with no billing job yet still gets its material, and
+// this year from Joist and Buildertrend (0050) when the Mac has sent it.
 
 export function JobMoneyFigures({ m }: { m: JobMoney }) {
   const late = m.open.filter((o) => (o.daysLate ?? 0) >= 1)
@@ -67,7 +70,11 @@ export function JobMoneyFigures({ m }: { m: JobMoney }) {
   )
 }
 
-type Load = { state: 'loading' } | { state: 'error'; error: string } | { state: 'ok'; m: JobMoney | null; material: Material | null; crewJobId: string }
+type History = JobHistory & { readAt?: string }
+type Load =
+  | { state: 'loading' }
+  | { state: 'error'; error: string }
+  | { state: 'ok'; m: JobMoney | null; material: Material | null; history: History | null; crewJobId: string }
 
 const NOT_LINKED = 'Money: no billing job linked yet. An owner links it on the Crew tab.'
 
@@ -78,9 +85,9 @@ export default function JobMoneyCard({ billingJobId, crewJobId = '', jobName = '
     if (!billingJobId && !crewJobId) return
     let live = true
     const query = billingJobId ? `job=${encodeURIComponent(billingJobId)}` : `crewJob=${encodeURIComponent(crewJobId)}`
-    botApi<{ ok: true; money: JobMoney | null; material: Material | null; crewJobId?: string | null }>(`/api/crew/projects/money?${query}`)
+    botApi<{ ok: true; money: JobMoney | null; material: Material | null; history?: History | null; crewJobId?: string | null }>(`/api/crew/projects/money?${query}`)
       // The field job behind a billing job comes back with the money (0026), so the Material block can search it.
-      .then((d) => live && setLoad({ state: 'ok', m: d.money, material: d.material, crewJobId: d.crewJobId || crewJobId }))
+      .then((d) => live && setLoad({ state: 'ok', m: d.money, material: d.material, history: d.history ?? null, crewJobId: d.crewJobId || crewJobId }))
       .catch((e: Error) => live && setLoad({ state: 'error', error: e.message }))
     return () => {
       live = false
@@ -108,6 +115,7 @@ export default function JobMoneyCard({ billingJobId, crewJobId = '', jobName = '
       ) : (
         <>
           {load.m ? <JobMoneyFigures m={load.m} /> : <p className="text-[12px] text-[var(--color-charcoal-light)]">{NOT_LINKED}</p>}
+          {load.history ? <HistoryBlock h={load.history} /> : null}
           {load.material ? <MaterialBlock m={load.material} jobId={load.crewJobId} jobName={jobName} /> : null}
         </>
       )}

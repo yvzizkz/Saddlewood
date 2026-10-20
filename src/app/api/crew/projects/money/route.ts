@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type { JobMoney } from "@/lib/billing/jobMoney";
 import { loadJobMoney } from "@/lib/billing/jobMoneyLoad";
 import { requireSwitch } from "@/lib/crew/auth";
+import type { JobHistory } from "@/lib/crew/jobHistory";
+import { loadHistory } from "@/lib/crew/jobHistoryQueries";
 import { crewJobOfBillingJob, loadMaterial } from "@/lib/crew/purchaseQueries";
 import type { MaterialBlock } from "@/lib/crew/purchases";
 import { getJob } from "@/lib/crew/queries";
@@ -18,6 +20,9 @@ import { localDay } from "@/lib/crew/time";
 //
 //   ?job=<billing job uuid>     money + material (through jobs.crew_job_id)
 //   ?crewJob=<field job id>     material only, for a field job with no billing job yet
+//
+// Both also carry `history`: this year on the field job from Joist and
+// Buildertrend (0050), or null.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,9 +54,12 @@ export async function GET(request: NextRequest) {
       crewJobId = crewJob;
     }
     // The card must open before migration 0022 is applied: no material, not an error.
-    const material: MaterialBlock | null = crewJobId ? await loadMaterial(crewJobId, localDay()).catch(() => null) : null;
+    // The same for the year from Joist and Buildertrend before 0050: none, not an error.
+    const [material, history]: [MaterialBlock | null, (JobHistory & { readAt: string }) | null] = crewJobId
+      ? await Promise.all([loadMaterial(crewJobId, localDay()).catch(() => null), loadHistory(crewJobId).catch(() => null)])
+      : [null, null];
     // crewJobId rides along so the Material block can search this job (0026).
-    return NextResponse.json({ ok: true, money, material, crewJobId }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ ok: true, money, material, history, crewJobId }, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error("job money:", err);
     return NextResponse.json({ ok: false, error: "Money is unavailable right now." }, { status: 503 });
