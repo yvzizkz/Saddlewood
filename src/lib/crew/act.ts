@@ -34,6 +34,7 @@ import {
   OTHER_JOB,
   firstNameOf,
   hasPerm,
+  isAudioRef,
   parseAmount,
   type Capability,
   type CrewAct,
@@ -262,6 +263,9 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       if (day !== today && day !== addDays(today, -1)) return bad(400, say(lang, MSG.eodDay));
       const job = await resolveJob(act.jobId, act.jobName);
       if (!job) return bad(400, say(lang, MSG.jobGone));
+      // Typed, or said: a voice memo (an audio file) stands in for the typed answer.
+      const memo = act.files.find(isAudioRef) ?? null;
+      if (act.done.length < 2 && !memo) return bad(400, say(lang, MSG.eodNeedDone));
       const res = await addEntry(person, nowDate, {
         kind: "eod",
         day,
@@ -276,6 +280,7 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
           visits: act.visits,
           safety: act.safety,
           decision: act.decision,
+          ...(memo ? { memo: { path: memo.path, seconds: act.memoSeconds ?? null } } : {}),
         },
         files: act.files,
         clientId: act.clientId,

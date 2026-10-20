@@ -39,6 +39,7 @@ export const MSG = {
   notYours: { en: "That photo could not be attached. Take it again.", es: "No se pudo adjuntar esa foto. Tómala de nuevo." },
   needNoteOrPhoto: { en: "Add a note or a photo.", es: "Agrega una nota o una foto." },
   eodDay: { en: "The end of day can be sent for today or yesterday.", es: "El fin del día se puede mandar de hoy o de ayer." },
+  eodNeedDone: { en: "Say what got done today, or record a voice memo.", es: "Escribe qué se hizo hoy, o graba una nota de voz." },
   fixDay: { en: "A time fix can go back 14 days.", es: "Una corrección de horas puede ser de hasta 14 días atrás." },
   fixOrder: { en: "The end time has to be after the start time.", es: "La hora de salida tiene que ser después de la entrada." },
   noShift: { en: "That shift could not be found.", es: "No se encontró ese turno." },

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { MapPin } from 'lucide-react'
+import { MapPin, Mic } from 'lucide-react'
 
 import { Button, Chip, Field, INPUT, Segmented } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
@@ -9,6 +9,7 @@ import { addDays, clock12, dayLabel, hoursText, localClock, workedMinutes } from
 import { OTHER_JOB, parseAmount, type CrewHome, type CrewPickup, type CrewShift, type CrewTask, type Geo } from '@/lib/crew/types'
 import { locate, newClientId, useCrew } from './CrewProvider'
 import { PhotoStrip, usePhotos } from './Photos'
+import { useVoiceMemo, VoiceMemoChip, VoiceMemoPanel } from './VoiceMemo'
 
 /** Apple Maps on an iPhone, Google Maps everywhere else. */
 function mapsLink(address: string): string {
@@ -331,6 +332,9 @@ type EodExtra = 'asked' | 'deliveries' | 'visits' | 'safety' | 'decision'
 export function EodSheet({ onClose, forDay }: { onClose: () => void; forDay?: string }) {
   const { home, t, act, toast, lang } = useCrew()
   const photos = usePhotos()
+  // Talk instead of type: a voice memo stands in for the questions (Marco, 10/16).
+  const memo = useVoiceMemo()
+  const [talk, setTalk] = useState(false)
   const cid = useRef(newClientId())
   const today = home?.day ?? ''
   const yesterday = today ? addDays(today, -1) : ''
@@ -355,7 +359,7 @@ export function EodSheet({ onClose, forDay }: { onClose: () => void; forDay?: st
   ]
 
   async function go() {
-    if (done.trim().length < 2) return setProblem(t.eodNeedDone)
+    if (done.trim().length < 2 && !memo.ref) return setProblem(t.eodNeedDone)
     if (!validJob(job)) return setProblem(t.otherJobName)
     setBusy(true)
     setProblem('')
@@ -373,7 +377,8 @@ export function EodSheet({ onClose, forDay }: { onClose: () => void; forDay?: st
       visits: value('visits'),
       safety: value('safety'),
       decision: value('decision'),
-      files: photos.refs,
+      files: memo.ref ? [...photos.refs, memo.ref] : photos.refs,
+      ...(memo.ref ? { memoSeconds: memo.seconds } : {}),
       clientId: cid.current,
     })
     setBusy(false)
@@ -393,15 +398,42 @@ export function EodSheet({ onClose, forDay }: { onClose: () => void; forDay?: st
       <Field label={t.job}>
         <JobPicker value={job} onChange={setJob} />
       </Field>
-      <Field label={t.eodDone}>
-        <textarea className={AREA} value={done} maxLength={2000} onChange={(e) => setDone(e.target.value)} />
-      </Field>
-      <Field label={t.eodStuck}>
-        <textarea className={`${INPUT} min-h-[64px] resize-y`} value={stuck} maxLength={1500} onChange={(e) => setStuck(e.target.value)} />
-      </Field>
-      <Field label={t.eodNeeds} hint={t.eodNeedsHint}>
-        <textarea className={`${INPUT} min-h-[64px] resize-y`} value={needs} maxLength={1500} onChange={(e) => setNeeds(e.target.value)} />
-      </Field>
+
+      {memo.supported && !talk ? (
+        memo.ref ? (
+          <VoiceMemoChip memo={memo} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setTalk(true)}
+            className="flex w-full items-center gap-3 rounded-2xl border border-[var(--color-stone)] bg-white px-4 py-3 text-left"
+          >
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-teal)] text-white">
+              <Mic className="size-5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[15px] font-medium text-[var(--color-charcoal)]">{t.eodTalk}</span>
+              <span className="block text-[12px] leading-snug text-[var(--color-charcoal-light)]">{t.eodTalkHint}</span>
+            </span>
+          </button>
+        )
+      ) : null}
+
+      {talk ? (
+        <VoiceMemoPanel memo={memo} onUseForm={() => setTalk(false)} />
+      ) : (
+        <>
+          <Field label={t.eodDone}>
+            <textarea className={AREA} value={done} maxLength={2000} onChange={(e) => setDone(e.target.value)} />
+          </Field>
+          <Field label={t.eodStuck}>
+            <textarea className={`${INPUT} min-h-[64px] resize-y`} value={stuck} maxLength={1500} onChange={(e) => setStuck(e.target.value)} />
+          </Field>
+          <Field label={t.eodNeeds} hint={t.eodNeedsHint}>
+            <textarea className={`${INPUT} min-h-[64px] resize-y`} value={needs} maxLength={1500} onChange={(e) => setNeeds(e.target.value)} />
+          </Field>
+        </>
+      )}
 
       <p className="pt-1 text-[11px] font-medium uppercase tracking-[0.16em]" style={{ color: 'var(--color-gold-accessible)' }}>
         {t.eodMore}
@@ -447,8 +479,8 @@ export function EodSheet({ onClose, forDay }: { onClose: () => void; forDay?: st
         <PhotoStrip photos={photos} />
       </div>
       <Problem text={problem} />
-      <Button variant="primary" full busy={busy} disabled={photos.busy} onClick={go} className="min-h-12">
-        {photos.busy ? t.uploading : t.eodSend}
+      <Button variant="primary" full busy={busy} disabled={photos.busy || memo.busy} onClick={go} className="min-h-12">
+        {photos.busy || memo.phase === 'uploading' ? t.uploading : memo.phase === 'recording' ? t.eodRecording : t.eodSend}
       </Button>
     </Sheet>
   )
