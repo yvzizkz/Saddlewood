@@ -181,21 +181,40 @@ export type PurchaseTripDetail = {
   jobs: { id: string; name: string; billingJobId: string | null }[];
 };
 
+/**
+ * The lines of one trip, from the key in a trip link (a trip_key) or a line's
+ * source key. Plain .eq() filters only: a key can hold commas or parentheses
+ * and must never become part of a filter expression.
+ */
+async function tripRows(db: ReturnType<typeof getSupabaseAdmin>, key: string): Promise<DbPurchaseRow[]> {
+  const byTrip = await db.from("purchases").select("*").eq("trip_key", key).order("source_key", { ascending: true });
+  if (byTrip.error) throw new Error(`purchases: ${byTrip.error.message}`);
+  if (byTrip.data?.length) return byTrip.data as DbPurchaseRow[];
+  // Not a trip key: a line's source key opens the trip it belongs to.
+  const line = await db.from("purchases").select("*").eq("source_key", key).maybeSingle();
+  if (line.error) throw new Error(`purchases: ${line.error.message}`);
+  const row = line.data as DbPurchaseRow | null;
+  if (!row) return [];
+  const tk = row.trip_key || computeTripKey(row.source_key);
+  const trip = await db.from("purchases").select("*").eq("trip_key", tk).order("source_key", { ascending: true });
+  if (trip.error) throw new Error(`purchases: ${trip.error.message}`);
+  return trip.data?.length ? (trip.data as DbPurchaseRow[]) : [row];
+}
+
 export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<PurchaseTripDetail | null> {
   const db = getSupabaseAdmin();
   const decoded = decodeURIComponent(keyOrSourceKey);
-  const tk = computeTripKey(decoded);
-
-  // Match either exact trip_key or exact source_key
-  const [byTripRes, crewJobsRes, billingJobsRes, trades, billRes] = await Promise.all([
-    db.from("purchases").select("*").or(`trip_key.eq.${tk},source_key.eq.${decoded}`).order("source_key", { ascending: true }),
+  const [rows, crewJobsRes, billingJobsRes, trades] = await Promise.all([
+    tripRows(db, decoded),
     db.from("crew_jobs").select("id,name,active").order("name"),
     db.from("jobs").select("id,name,crew_job_id"),
     listTrades(),
-    db.from("bills").select("id,bill_number,status,amount_cents").eq("purchase_trip_key", tk).maybeSingle(),
   ]);
-
-  if (byTripRes.error || !byTripRes.data?.length) return null;
+  if (!rows.length) return null;
+  // The bill paid for this trip, by the trip the lines are actually on.
+  const tripKeyOfLines = rows[0].trip_key || computeTripKey(rows[0].source_key);
+  const billRes = await db.from("bills").select("id,bill_number,status,amount_cents").eq("purchase_trip_key", tripKeyOfLines).maybeSingle();
+  const byTripRes = { data: rows };
 
   const billingByCrewId = new Map<string, string>();
   for (const bj of (billingJobsRes.data ?? []) as { id: string; name: string; crew_job_id: string | null }[]) {
