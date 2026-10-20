@@ -24,7 +24,9 @@ vi.mock("@/lib/accounting/access", async (importOriginal) => {
     moneySeatForPage: moneySeatForPageMock,
   };
 });
-vi.mock("@/lib/accounting/purchases", () => ({
+vi.mock("@/lib/accounting/purchases", async (orig) => ({
+  // The real scope check; only the loader is stood in for.
+  tripInScope: (await orig<typeof import("@/lib/accounting/purchases")>()).tripInScope,
   loadPurchaseTrip: loadPurchaseTripMock,
 }));
 vi.mock("@/components/accounting/AccountingFrame", () => ({
@@ -39,7 +41,7 @@ vi.mock("@/app/(portal)/app/accounting/purchases/PurchaseActions", () => ({
 import PurchaseTripPage from "@/app/(portal)/app/accounting/purchases/trip/[key]/page";
 
 const SAMPLE_TRIP = {
-  tripKey: "app:entry:42",
+  tripKey: "app:42",
   purchasedOn: "2026-10-20",
   vendor: "Home Depot",
   store: "Field Receipt (App)",
@@ -64,6 +66,7 @@ const SAMPLE_TRIP = {
       trade: "drywall" as const,
       tradeLabel: "Drywall",
       tradeManual: true,
+      rawJobId: "9146-w-hutton-dr",
     },
   ],
   jobs: [{ id: "9146-w-hutton-dr", name: "9146 W Hutton Dr", key: "9146-w-hutton-dr" }],

@@ -258,6 +258,8 @@ export async function loadPayables(today = localDay()): Promise<{
       if (!sub.coi_expires_on) coiStatus = "missing";
       else if (sub.coi_expires_on < today) coiStatus = "expired";
       else coiStatus = "valid";
+    } else if (b.sub_id) {
+      coiStatus = "missing";
     }
 
     const isOnHold =
@@ -265,13 +267,18 @@ export async function loadPayables(today = localDay()): Promise<{
       b.status === "hold_coi" ||
       b.status === "needs_approval" ||
       b.waiver_status === "missing" ||
-      coiStatus === "expired";
+      coiStatus === "expired" ||
+      coiStatus === "missing";
 
     let holdReason: string | null = null;
     if (b.status === "hold_waiver" || b.waiver_status === "missing") {
       holdReason = b.note || "Missing conditional progress lien waiver (SOP-004)";
-    } else if (b.status === "hold_coi" || coiStatus === "expired") {
-      holdReason = b.note || "Subcontractor COI expired — renewal required before payment";
+    } else if (b.status === "hold_coi" || coiStatus === "expired" || coiStatus === "missing") {
+      holdReason =
+        b.note ||
+        (coiStatus === "missing"
+          ? "Subcontractor COI missing — required on file before payment"
+          : "Subcontractor COI expired — renewal required before payment");
     } else if (b.status === "needs_approval") {
       holdReason = b.note || "Awaiting PM field verification & sign-off";
     }
@@ -308,7 +315,7 @@ export async function loadPayables(today = localDay()): Promise<{
       notes: b.note || null,
       agingBucket,
       daysPastDue: Math.max(0, pastDue),
-      dueByFriday: balanceCents > 0 && dueOn <= fridayCutoff,
+      dueByFriday: balanceCents > 0 && dueOn <= fridayCutoff && !isOnHold,
       coiStatus,
       coiExpiresAt: sub?.coi_expires_on ?? null,
       w9OnFile: sub ? sub.w9_on_file : null,

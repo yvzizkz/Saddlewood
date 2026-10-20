@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import AccountingFrame from "@/components/accounting/AccountingFrame";
 import { Card } from "@/components/bot/ui";
 import { moneySeatForPage, seesCrewJob } from "@/lib/accounting/access";
-import { loadPurchaseTrip } from "@/lib/accounting/purchases";
+import { loadPurchaseTrip, tripInScope } from "@/lib/accounting/purchases";
 import { hrefOf } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { LineTradeSelector, TripJobAndTradeControl } from "../../PurchaseActions";
@@ -27,7 +27,8 @@ export default async function PurchaseTripPage({ params }: { params: Promise<{ k
   if (!seat) redirect("/app");
   const { key } = await params;
   const trip = await loadPurchaseTrip(key);
-  if (!trip || !seesCrewJob(seat, trip.jobId)) notFound();
+  // Every line must be on a job the seat sees, not just the first.
+  if (!trip || !tripInScope(trip, (j) => seesCrewJob(seat, j))) notFound();
 
   return (
     <AccountingFrame

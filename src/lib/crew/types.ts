@@ -219,6 +219,7 @@ export type CrewShift = {
   review: string;
   status: "ok" | "void";
   edits: ShiftEdit[];
+  trade?: string | null;
   /**
    * Meters from each punch to the job's address (src/lib/crew/geo.ts): null
    * when the punch or the job has no location, or the phone's fix was too
