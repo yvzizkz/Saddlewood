@@ -167,7 +167,7 @@ async function overlapNote(email: string, day: string, span: { start: number; en
  * Nothing found, or a service down, leaves it null; the save it follows has
  * already happened, so nothing here can block it. -> whether it was placed
  */
-async function placeJob(id: string, address: string, nowDate: Date): Promise<boolean> {
+export async function placeJob(id: string, address: string, nowDate: Date): Promise<boolean> {
   try {
     const hit = address.trim() ? await geocodeAddress(address) : null;
     await patchJob(id, { geo: hit ? { lat: hit.lat, lng: hit.lng, source: hit.source, at: nowDate.toISOString() } : null });

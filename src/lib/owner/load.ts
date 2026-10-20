@@ -4,6 +4,7 @@ import { listJobPeople, listJobs, listPeople, listReports, listTasks } from "@/l
 import { listRequests } from "@/lib/crew/requestQueries";
 import { readSettings, SETTING_DEFAULTS } from "@/lib/crew/settings";
 import { addDays, localDay } from "@/lib/crew/time";
+import { openWatches } from "@/lib/sales/awardStore";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { buildWaiting, type WaitingItem } from "./waiting";
 
@@ -31,7 +32,7 @@ function quiet<T>(what: string, p: Promise<T>, fallback: T): Promise<T> {
 
 export async function loadWaiting(owners: string[], now: Date = new Date()): Promise<WaitingItem[]> {
   const today = localDay(now);
-  const [people, reports, tasks, jobs, hours, money, purchases, requests, jobPeople, settings] = await Promise.all([
+  const [people, reports, tasks, jobs, hours, money, purchases, requests, jobPeople, settings, watches] = await Promise.all([
     quiet("crew people", listPeople(), []),
     quiet("plans", listReports(addDays(today, -1)), []),
     quiet("tasks", listTasks({ closedSince: now.toISOString() }), []),
@@ -42,6 +43,7 @@ export async function loadWaiting(owners: string[], now: Date = new Date()): Pro
     quiet("requests", listRequests({ since: now.toISOString() }), []),
     quiet("job people", listJobPeople(), []),
     quiet("settings", readSettings(), { ...SETTING_DEFAULTS }),
+    quiet("watches", openWatches(), []),
   ]);
   return buildWaiting({
     now,
@@ -60,5 +62,6 @@ export async function loadWaiting(owners: string[], now: Date = new Date()): Pro
     pmLimitCents: settings["requests.pmLimitCents"],
     planDue: settings["crew.planDue"],
     answersFirst: settings["requests.answersFirst"],
+    watches,
   });
 }

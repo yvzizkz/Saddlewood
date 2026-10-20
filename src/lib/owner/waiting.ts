@@ -6,6 +6,7 @@ import { SETTING_DEFAULTS, type AnswersFirst } from "@/lib/crew/settings";
 import { planDueLabel } from "@/lib/crew/settingsRules";
 import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewPerson, type CrewReport, type CrewRequest, type CrewTask } from "@/lib/crew/types";
 import { planAsk } from "@/lib/crew/plan";
+import { WATCH_AHEAD_DAYS, watchDue, watchLane, type JobWatch } from "@/lib/sales/award";
 import type { Lane } from "./lanes";
 
 export { planAsk };
@@ -63,6 +64,8 @@ export type WaitingInput = {
   answersFirst?: AnswersFirst;
   /** When the nightly plan is due (crew.planDue, "HH:MM"); PLAN_DUE when not given. */
   planDue?: string;
+  /** Paperwork awarded jobs still owe (0027), with the job's name, its opportunity and its first day of work. */
+  watches?: { watch: JobWatch; jobName: string; opportunityId: string | null; firstDay: string | null }[];
 };
 
 /** How many "Which job is this?" names get their own line; the rest fold into one. */
@@ -318,6 +321,25 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       detail: `${dollars(older.cents)} across them; find them with search.`,
       href: "/app/money",
       at: null,
+    });
+  }
+
+  // ---- paperwork a won job owes (Award, 0027) --------------------------------------
+  // Shown from a few days before it is due; the 20-day notice from the first
+  // day anyone works there. Done is a tap on the job's Sales screen.
+  for (const { watch: w, jobName, opportunityId, firstDay } of input.watches ?? []) {
+    if (w.doneAt) continue;
+    const due = watchDue(w, firstDay);
+    if (!due || daysFrom(today, due) > WATCH_AHEAD_DAYS) continue;
+    const late = due < today;
+    items.push({
+      key: `watch-${w.id}`,
+      lane: watchLane(w.kind),
+      kind: late ? "signal" : "decision",
+      title: `${w.title}: ${jobName}`,
+      detail: late ? `Was due ${dayShort(due)}. ${clip(w.note, 120)}` : `Due ${dayShort(due)}. ${clip(w.note, 120)}`,
+      href: opportunityId ? `/app/sales/${opportunityId}` : "/app/money",
+      at: w.createdAt,
     });
   }
 

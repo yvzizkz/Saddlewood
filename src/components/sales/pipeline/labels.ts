@@ -79,6 +79,7 @@ export function eventText(e: SalesEvent): string {
       return `${what}${to ? ` to ${to}` : ''}${how ? ` (${how})` : ''}`
     }
     case 'job':
+      if (d.award) return e.text || 'Awarded'
       return d.created ? 'Job opened' : 'Linked to an existing job'
     case 'field':
       return `From ${typeof d.by === 'string' ? d.by : 'the crew'}: ${e.text}`
