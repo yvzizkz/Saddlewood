@@ -176,7 +176,179 @@ The job is the hub. The billing side `jobs` (uuid) and the field side `crew_jobs
 
 ---
 
-## 6. The program
+## 6. Every department, one schedule, one task system
+
+**Owner's scope (10/20):** schedule, field operations, worker functions, the PM's task delegation, and every department identified for automation. They must be cohesive, all in one app, connected through the job.
+
+Source: KB `OPERATING-MODEL-2026-09-04` (OM) §2–§8, `ROLE-GAP-ANALYSIS`, `FIELD-SIGNALS-PLAN-2026-10-19` (FSP), and SOP-001 to SOP-009. OM and SOP-005 to SOP-009 are still drafts.
+
+### 6.1 Structure change: organize by the work, not by the person
+
+The OM splits the company by person: Marco, Lando, Ilene, Eli, an empty Estimating Admin seat and a proposed Bookkeeper. Putting that split into an app breaks in three places:
+
+1. **Two seats are empty.** Estimating Admin and Bookkeeper have no person, and the Field Ops Lead isn't designed yet.
+2. **The SOP owner headers disagree with OM §2.** SOP-001, SOP-002 and SOP-004 still say Marco; OM says Lando or Ilene.
+3. **Purchase limits are written three ways:**
+   - OM: PM under $500, Lando $500–5k, Marco over $5k;
+   - FSP and the app: $500/$1,000, PM then owner;
+   - SOP-008: work orders under $10k.
+
+**Decision:** the app is organized by **work objects**: Jobs, Schedule, Tasks, Accounting, Sales, Crew, Subs and vendors, Compliance.
+- A **department home** is a view of those objects through a role.
+- Work is **assigned to a role** (PM, Finance, Sales admin, Owner, Field lead, Crew), and a role is held by a person.
+- An empty seat is held by whoever covers it: Marco covers Sales admin, Ilene covers Bookkeeper. Hiring someone reassigns the seat, and every open task follows.
+- **One decision-rights table** in Company policies (role × action × dollar limit) replaces the three versions of the limits. It drives approvals, task assignment and escalation. The SOP owner lines are read from it.
+
+*Why:* a department named after a person is the same mistake as a page named after a prototype. The work outlives the seat.
+
+### 6.2 Department homes
+
+| Department (role) | Held by | Home | KPI header (period picker, drill-down) | Table |
+|---|---|---|---|---|
+| Owner | Marco | `/app` (Owner desk) | Decisions waiting, CO dollars awaiting price, AR 14+ days, margin by job | Decisions (`ASK:` items, approvals over limits) with `rule?`; weekly count of decisions without a rule (OM A6) |
+| Ops and systems | Lando | `/app/ops` | Friction log ranked (score = per week × minutes × weight), board throughput, automation rungs (Rule → Draft → Auto → Measured) | Ops cards, friction items, SOP revisions |
+| Finance and admin | Ilene (+ Bookkeeper seat) | `/app/accounting` (§3) + **Compliance** | AR, AP, payroll, materials, job cost; compliance: COIs expiring, waivers missing, W-9s | Every Accounting table; compliance register |
+| Project management | Eli | `/app/jobs` + Schedule + Tasks | Jobs behind plan, hours used vs earned by phase, open punch, COs awaiting price, daily logs missing | My jobs, my team's tasks, look-ahead |
+| Estimating and sales admin | empty (Marco) | `/app/sales` | Pipeline value by stage and source, win rate by source, estimates past follow-up (SOP-005: 5 business days) | Leads, estimates, revisions queue |
+| Field and crew | crew, Field lead | `/app` crew Today | Their day: where, what, hours, tasks | Their tasks, their week |
+| Subs and vendors | PM (awards under $10k), Marco | `/app/subs` | Packages by stage against SOP-008 service levels, sub scorecard, COI and W-9 status, spend by vendor | Directory, packages, bids, bills (links into AP) |
+
+Every home uses the same blocks: period picker, KPI header, drill-down, a table you can filter, search, select and export, and breadcrumbs. Every row links through its job.
+
+### 6.3 One schedule
+
+Today a job's schedule is spread over eight places:
+- Eli's night-before dispatch;
+- `crew_schedule`;
+- phase windows (`crew_job_phases`);
+- the GC's Procore schedule;
+- the Wednesday look-ahead;
+- `job_watches`;
+- `tasks.py` reminders (COI, billing);
+- the Ops calendar (`ops_goals`).
+
+**Decision:** one schedule feed (`src/lib/schedule/feed.ts`) reads every source in place and returns one list of events:
+
+`{ id, kind, job, title, start, end, who (role or person), source link, status }`
+
+Only events that have no home today get a new table, `schedule_items`: inspections, site visits, deliveries, meetings and sub mobilizations.
+
+| Kind | Source |
+|---|---|
+| Crew assignment (who, where, when) | `crew_schedule` |
+| Phase window / stage | `crew_job_phases` (planned_from/to, verified_at) |
+| Sub mobilization, bid due | `bid_packages.due_at`, awards → `schedule_items` |
+| Inspection, site visit, delivery, meeting | **new** `schedule_items` |
+| Billing cutoff (AFT 23rd, homeowner 1st/15th, Schifferer per subcontract) + PM % complete due at cutoff −3 business days | computed from `clients.billing` + `jobs.billing` |
+| AR ladder steps | `billing/ladder.ts` |
+| Contract watches (agreement, deposit, 20-day notice, COI to GC, permit) | `job_watches` |
+| COI and W-9 expiries, MSA renewals | `subs` (+ compliance register) |
+| Pay days: payroll and sub pay cadence | `app_settings` + per-sub terms (AP) |
+| Company dates and goals | `ops_goals` |
+
+The views are cuts of that one feed:
+- **My day** on the phone: where to be, what to do, what's due.
+- **Week board** on the desktop: jobs × days with crews, subs, inspections and deliveries.
+- **Month** calendar.
+- **Two-week look-ahead** per GC: the Wednesday email, drafted for review, never sent automatically.
+- **Job timeline:** the phases with everything dated on that job.
+
+### 6.4 Field operations and worker functions
+
+The crew's day stays on the phone. Each part writes straight to the job, payroll and job costing:
+
+| Worker function | Writes | Flows to |
+|---|---|---|
+| Clock in/out (geo, far-punch chip at 805 m) | `crew_shifts` (+ `trade` from the phase being worked, 0029) | Payroll, job labor, job cost |
+| Where to be, what to do | schedule feed + tasks | My day |
+| Receipts | `crew_entries` receipt → **normalized into `purchases`** (source `app`, trade, job) | Purchases, AP (reimbursement when paid by the worker), job cost |
+| Daily log (SOP-006 App C: weather, crew, work done, deliveries, visitors, directives, inspections, issues/RFI, safety, photos), due 6 PM | `crew_entries` eod + structured fields | Job log, PM "logs missing", Owner desk |
+| Progress photos (3 end-of-day, SOP-009) | `crew_entries` progress + files | Job documents, billing % complete evidence |
+| Pre-cover checklist (every wall, both faces, location label; chain pre-cover → pre-board → pre-tape → pre-texture → pre-paint) | **new** `checklists` per phase | Phase verify (`tasks.verify`), quality gate before the next phase |
+| Punch | tasks of kind `punch` per job and location | Closeout gate, PM punch count |
+| Needs and will-call | material request → pickup → runner (live) | Purchases, approvals by the decision-rights table |
+| Directives and T&M | `ASK:`/directive items → **CO intake** (`CO-n awaiting price`, age alert) | Owner desk, Billing (CO register) |
+
+### 6.5 One task system (PM delegation)
+
+Today tasks live in seven places:
+- `crew_tasks`;
+- bot duties;
+- `ops_cards`;
+- the bot's waiting-on ledger;
+- "Which job is this?" cards;
+- material-request approvals;
+- job watches.
+
+**Decision:** one `work_items` table for every new kind, plus a read model (`src/lib/tasks/feed.ts`) that lists the existing kinds in place until each moves over.
+
+**Fields:** kind, title, job, department, assignee (role and, optionally, person), due date, escalation rule, status, source link, created by.
+
+**Kinds:**
+- task, punch, follow-up;
+- approval (from the decision-rights table);
+- CO awaiting price;
+- decision (`ASK:`);
+- compliance (COI, waiver, W-9);
+- billing step (% complete due, invoice package);
+- daily-log missing;
+- friction item.
+
+**Escalation** follows the decision-rights table and the SOP service levels:
+- SOP-004: a sub invoice unapproved after 10 days;
+- SOP-005: no follow-up after 5 business days;
+- SOP-008: package in 2 days, invites in 1, level in 2, award in 1;
+- SOP-009: miss ladder;
+- SOP-001: receipt exceptions.
+
+An overdue item moves up one role and shows in that person's "Waiting on you".
+
+**Views:**
+- **Mine** (phone);
+- **My team** (PM: assign, re-assign, due dates);
+- **Per job** (job page tab);
+- **Per department** (department home).
+
+The 7 AM push reads the same feed.
+
+### 6.6 Automation map: every "Build next" row has a disposition
+
+OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its phase), already live, or dropped.
+
+| ID | Need | Disposition |
+|---|---|---|
+| A1 | Daily log + missing-log nag | **Build (P2):** structured daily log on the phone; "log missing" task at 6 PM (the app setting; OM's 5 pm is stale) |
+| A2 | Directive/CO capture | **Build (P2):** CO register + intake → "CO-n awaiting price" with an age alert; invoice guard against lines with no CO (SOP-002, more than 2% growth) |
+| A3 | Billing calendar + invoice package | **Build (P1 Billing calendar, P2 package):** cutoffs in the schedule; PM % complete task at cutoff −3 business days; package = % complete + photos + COs + waiver |
+| A4 | Invoice receipt confirmation | **Live** (ladder step "not viewed after 2 business days"); show it in Receivables |
+| A5 | AR ladder | **Live in `ladder.ts`.** One ladder config in Company policies. OM says "never auto-sent"; SOP-007 says the first three steps auto-send. **Owner question** below |
+| A6 | Decision log | **Build (P2):** `ASK:` lines from the end-of-day memo → decision items to Marco with `rule?`; weekly count on the Owner desk |
+| A7 | Job scorecard | **Build (P1 Job costing, P2 job page):** contract, billed, labor, materials, subs, margin; hours used vs earned by phase |
+| A8 | Contract obligations → watches | **Live** (`job_watches`); extracting terms from a signed contract stays in the bot (dropped from the app) |
+| A9 | Quality gates (pre-cover photos) | **Build (P2):** `checklists` per phase on the phone; gates phase verify |
+| A10 | Handoff packet (Gate 0) | **Build (P2):** packet on the job page from Award (budget by phase, SOV, terms) + PM sign-off task |
+| A11 | Sub bid-out | **Live** (0028: packages, invites, leveling, award). Quote parser **dropped** (bot); WO/MSA from variables → S7 |
+| A12 | Sub pay cadence | **Build (P1 AP):** per-sub terms → bill due dates; flag unapproved after 10 days |
+| A13 | Ops Board | **Live** (`/internal/ops`) → moves into the app (P2) |
+| S1 | Directory fields + scorecard | **Live** + scorecard (P2: on-time against service levels, bid hit rate, punch count) |
+| S2–S3 | Package generator, invite fan-out | **Live** (0028) |
+| S4 | Quote parser | **Dropped** from the app (bot attachment extraction) |
+| S5 | Leveling with gap plugging | **Live** (0028) |
+| S6 | Award / thank-you emails | **Build (P2)** as drafts for review only; nothing sends without the owner |
+| S7 | Work order / MSA from variables | **Build (P2):** work order document on the awarded bid (frozen like an invoice); no start without a signed WO and a COI |
+| S8 | ROC lookup + COI watch | **Build (P2):** compliance register with COI expiry watches; ROC stays a manual field (no external calls) |
+| S9 | Sub waiver per payment + scorecard | **Build (P1 AP):** a bill payment requires a conditional waiver; final waiver at closeout |
+
+**Open owner questions (the app needs one answer each):**
+1. **AR ladder sending.** Do the +1 and earlier steps send automatically from accounting@ (SOP-007, 10/05), or stay drafts (OM §7)? *Recommendation: SOP-007's three courtesy steps auto-send; +7 and later are drafts.*
+2. **Decision-rights table seed.**
+   - *Recommendation:* PM under $500; owners over $1,000 with both told; sub work orders under $10k by the PM inside budget. Lando's $500–5k band becomes a "Lando may approve" row.
+   - *Why:* the app's live limits are what people are using now.
+3. **Daily log time.** *Recommendation:* 6 PM (the app setting); OM text to be updated.
+
+---
+
+## 7. The program
 
 ### Phase 1: audit, design, Accounting (this PR)
 1. Audit (§1) and this plan. ✅
@@ -187,41 +359,77 @@ The job is the hub. The billing side `jobs` (uuid) and the field side `crew_jobs
 6. A synthetic local seed (`supabase/seed-cohesive.sql`) that fills every section across Today/WTD/MTD/YTD.
 7. Cross-review at 390 px and on desktop. One draft PR with phone and desktop screenshots.
 
-### Phase 2: everything else on the same structure (autopilot runs these in order; one PR)
+### Phase 2: every department, one schedule, one task system, the automation gaps (autopilot runs these in order, one PR per two or three steps)
 1. **Job hub** `/app/jobs` + `/app/jobs/[id]`:
-   - list on the shared blocks (period, by stage/PM/client);
-   - job page with tabs Overview · Money · Labor · Purchases · Subs · Changes · Documents · Crew, each reusing the Accounting section filtered to `job=<id>`;
+   - list on the shared blocks (period; by stage, PM or client);
+   - job page tabs: Overview · Schedule · Tasks · Money · Labor · Purchases · Subs · Changes · Log · Documents · Crew, each reusing a section filtered to `job=<id>`;
    - `/app/projects` and `/app/crew?view=projects` redirect there.
    - Fix `JobPaperwork.tsx:70`.
-2. **Lifecycle on the job:** a stage strip (Sale → Award → Handoff → Build → Billing → Closeout → Warranty) from `JOB-LIFECYCLE-PLAN`, each stage linking to its records. Award lands on the new job page.
-3. **Links everywhere:**
-   - Home PaymentsCard, JobMoneyCard and PurchaseSearch results link their invoice and job;
+   - Stage strip: Sale → Award → Handoff → Build → Billing → Closeout → Warranty.
+2. **Decision-rights table** (§6.1):
+   - `decision_rights` rows (role, action, limit) in Company policies;
+   - roles and seats (who holds PM, Finance, Sales admin, Field lead), with cover for empty seats;
+   - existing limits (`requests.pmLimitCents`, award limits) read from it.
+3. **One task system** (§6.5):
+   - `work_items` migration + `src/lib/tasks/feed.ts` over `crew_tasks`, ops cards, bot waiting-on, watches, purchase cards and request approvals;
+   - views Mine / My team / Per job / Per department;
+   - escalation by service level;
+   - the 7 AM push and Home read it.
+4. **One schedule** (§6.3):
+   - `schedule_items` migration + `src/lib/schedule/feed.ts` over every source in the table;
+   - My day (phone), Week board and Month (desktop), Job timeline, GC look-ahead draft.
+5. **Field operations** (§6.4):
+   - structured daily log + "log missing" item;
+   - receipts normalized into `purchases`;
+   - pre-cover `checklists` per phase gating verify;
+   - punch items;
+   - directives → CO intake.
+6. **Billing completion:**
+   - CO register (A2), waiver register, invoice package at cutoff (A3), ladder config (A5);
+   - SOV percent-complete billing replacing the Powell tracker path (keep the tracker until it's replaced).
+7. **Subs and compliance:**
+   - work order document (S7), compliance register with COI and W-9 watches (S8), sub scorecard (S1);
+   - award emails as drafts (S6).
+8. **Department homes** (§6.2):
+   - Owner desk (decisions with `rule?`, A6);
+   - Ops in the app (A13, friction log ranking);
+   - Sales KPIs by source;
+   - PM home;
+   - Finance home = Accounting + Compliance.
+9. **Links and duplicates:**
+   - Home PaymentsCard, JobMoneyCard and PurchaseSearch link their invoice and job;
    - `/app/money/[id]` links its job and sale;
-   - tracker pages link the job, not raw JSON.
-4. **Change orders and waivers registers** under Billing (CO number, amount, signed, billed on; waiver per invoice and amount, conditional or final, received).
-5. **Ops** moves under `/app/ops` with the same navigation. Settings gathers into one place (Company policies, Sales settings, Field settings).
-6. **Remove duplicate paths that aren't on hold:**
-   - `/internal?tab=` estimates fold into Sales › Pipeline estimates;
+   - tracker pages link the job;
+   - `/internal?tab=` estimates fold into Sales;
    - `/internal/activity` and `/internal/bid-log` placeholders go;
    - Money's purchase search becomes Accounting › Purchases.
-   - Never the four batch-2 prototypes: they wait for their bot scripts to move (KB `APP-CLEANUP` batch 2).
-7. **PM access:** Accounting sections for `money.view` seats scoped to their jobs, no cost or pay.
-8. Each step: tests, lint, build, and screenshots at 390 px and on desktop.
+   - Never the four batch-2 prototypes (they wait for their bot scripts).
+10. **PM access:** Accounting sections for `money.view` seats scoped to their jobs, no cost or pay. Field lead seat.
+11. Each step: tests, lint, build, screenshots at 390 px and on desktop.
 
-### Phase 3: scenario testing (one PR)
-1. Write `docs/SCENARIOS.md` from `docs/KB-OPERATIONS-MODEL.md`. At least:
-   - (a) an AFT billing week: work through Friday, the 23rd cutoff, a change order, a conditional waiver, Melio paying the gross less 1%;
-   - (b) Powell progress payments on the SOV;
-   - (c) a crew week with hours by trade across two jobs, a time fix and the payroll export;
-   - (d) a Home Depot run split across jobs, plus an unmatched register name;
-   - (e) a sub bid → award → sub bill → payment → waiver.
-2. Seed each scenario on the local stack: `supabase/seed-scenarios/*.sql`, synthetic names.
-3. Drive them with Playwright (`e2e/*.spec.ts`) against `npm run dev` on the local stack. Assert the numbers on every screen they touch: section headlines, job page, export rows.
-4. Fix what breaks. Report a can/can't table for owner, PM and accountant.
+### Phase 3: scenario testing, every department's real week (one PR)
+1. Write `docs/SCENARIOS.md` from `docs/KB-OPERATIONS-MODEL.md` and OM §4. One scenario per department week, at least:
+   - **Finance:**
+     - an AFT billing week: Friday hours, the 23rd cutoff, PM % complete at −3 days, a change order, a conditional waiver, Melio paying the gross less 1%;
+     - Powell progress payments on the SOV;
+     - Tuesday AR call through the ladder;
+     - payroll week export;
+     - sub pay run with waivers.
+   - **PM:** Gate 0 handoff → Gate 1 pre-con checklist → a week of dispatch, look-ahead Wednesday, Friday schedule and hours-vs-earned review, a punch walk.
+   - **Field and crew:** a crew week with hours by trade across two jobs, a far punch, a time fix, receipts, the 6 PM daily log with photos, a pre-cover checklist that blocks a phase, a will-call pickup.
+   - **Purchasing:** a Home Depot run split across jobs, an unmatched register name, a price-watch flag, a $500+ request through the decision-rights table.
+   - **Subs:** package → invites → leveling → award under $10k by the PM → work order → no-COI block → bill → payment with waiver.
+   - **Sales admin:** lead with source → estimate → no follow-up after 5 days escalates → proposal → award builds the job.
+   - **Owner:** Monday decisions with `rule?`, CO pricing, AR day-14 call, Friday ops review.
+2. Seed each scenario on the local stack (`supabase/seed-scenarios/*.sql`, synthetic names).
+3. Drive them with Playwright (`e2e/*.spec.ts`) against `npm run dev` on the local stack. Assert the numbers on every screen they touch: department headlines, job page, schedule, tasks, exports.
+4. Fix what breaks. Report a can/can't table per role: owner, PM, finance, sales admin, field lead, crew.
+
+**Done means:** every department in §6.2 has its home in the app, connected through the job; the schedule and the tasks are one feed each; every row of §6.6 is built, live or consciously dropped; and every Phase 3 scenario passes.
 
 ---
 
-## 7. Hard rules (bind every phase)
+## 8. Hard rules (bind every phase)
 
 - **Local data only:**
   - Run against `supabase start` in this worktree, with `.env.local` pointing at it.
