@@ -46,6 +46,7 @@ export default function SubsScreen() {
   const [scorecards, setScorecards] = useState<SubScorecard[] | null>(null)
   const [complianceSummary, setComplianceSummary] = useState<ComplianceSummary | null>(null)
   const [can, setCan] = useState({ manage: false, award: false })
+  const [isOwner, setIsOwner] = useState(false)
   const [q, setQ] = useState('')
   const [trade, setTrade] = useState('')
   const [editing, setEditing] = useState<Sub | 'new' | null>(null)
@@ -57,13 +58,14 @@ export default function SubsScreen() {
     try {
       const [p, s] = await Promise.all([
         botApi<{ packages: PackageRow[]; can: typeof can }>('/api/bids'),
-        botApi<{ subs: Sub[]; scorecards?: SubScorecard[]; complianceSummary?: ComplianceSummary }>('/api/subs'),
+        botApi<{ subs: Sub[]; scorecards?: SubScorecard[]; complianceSummary?: ComplianceSummary; me?: { role?: string } }>('/api/subs'),
       ])
       setPackages(p.packages)
       setSubs(s.subs)
       setScorecards(s.scorecards ?? null)
       setComplianceSummary(s.complianceSummary ?? null)
       setCan(p.can)
+      setIsOwner(s.me?.role === 'owner')
       setError('')
     } catch (e) {
       setError((e as Error).message)
@@ -268,7 +270,7 @@ export default function SubsScreen() {
                       </Chip>
                     </div>
 
-                    <div className="mt-2.5 grid grid-cols-2 gap-2 rounded-xl bg-[var(--color-cream)] px-3 py-2 text-xs text-[var(--color-charcoal)] md:grid-cols-4">
+                    <div className={`mt-2.5 grid grid-cols-2 gap-2 rounded-xl bg-[var(--color-cream)] px-3 py-2 text-xs text-[var(--color-charcoal)] ${isOwner && sc.openBillsCents !== undefined ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
                       <div>
                         <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Bids / Invited</span>
                         <span className="font-mono font-medium">
@@ -282,13 +284,15 @@ export default function SubsScreen() {
                           {sc.awardedCount} won{sc.hitRatePct !== null ? ` (${sc.hitRatePct}%)` : ''}
                         </span>
                       </div>
-                      <div>
-                        <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Open bills</span>
-                        <span className="font-mono font-medium">
-                          {sc.openBillsCount ? `${sc.openBillsCount} · ${usd(sc.openBillsCents)}` : '$0.00'}
-                          {sc.heldBillsCount ? ` (${sc.heldBillsCount} held)` : ''}
-                        </span>
-                      </div>
+                      {isOwner && sc.openBillsCents !== undefined ? (
+                        <div>
+                          <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Open bills</span>
+                          <span className="font-mono font-medium">
+                            {sc.openBillsCount ? `${sc.openBillsCount} · ${usd(sc.openBillsCents)}` : '$0.00'}
+                            {sc.heldBillsCount ? ` (${sc.heldBillsCount} held)` : ''}
+                          </span>
+                        </div>
+                      ) : null}
                       <div>
                         <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Open punch</span>
                         <span className="font-mono font-medium">{sc.punchOpenCount}</span>

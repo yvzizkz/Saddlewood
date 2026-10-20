@@ -1,9 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: () => ({ from: fromMock }),
+}));
 
 import {
   buildNormalizedReceiptPurchase,
   defaultChecklistItems,
   extractEodWorkItems,
+  syncEodDirectivesAndDecisions,
+  syncReceiptEntryToPurchases,
 } from "../ops";
 
 describe("field operations helpers", () => {
@@ -33,11 +40,179 @@ describe("field operations helpers", () => {
     });
 
     expect(res.purchaseRow.source).toBe("app");
-    expect(res.purchaseRow.source_key).toBe("app:entry:42");
+    expect(res.purchaseRow.source_key).toBe("app:entry:42:0");
     expect(res.purchaseRow.line_total_cents).toBe(8450);
     expect(res.purchaseRow.trade).toBe("drywall");
     expect(res.purchaseRow.class).toBe("COMPANY CARD");
     expect(res.reimbursementBill).toBeNull();
+  });
+
+  it("gives each receipt its own distinct trip_key when purchases strips the line index", () => {
+    const r1 = buildNormalizedReceiptPurchase({
+      entryId: 42,
+      day: "2026-10-20",
+      jobId: "9146-w-hutton-dr",
+      jobName: "9146 W Hutton Dr",
+      vendor: "Home Depot",
+      amountDollars: 20,
+      paidBy: "company",
+      note: "Tape",
+      personName: "Jorge",
+      personEmail: "jorge@saddlewood.crew",
+    });
+    const r2 = buildNormalizedReceiptPurchase({
+      entryId: 43,
+      day: "2026-10-20",
+      jobId: "9146-w-hutton-dr",
+      jobName: "9146 W Hutton Dr",
+      vendor: "Home Depot",
+      amountDollars: 35,
+      paidBy: "company",
+      note: "Screws",
+      personName: "Jorge",
+      personEmail: "jorge@saddlewood.crew",
+    });
+    const tripKeyOf = (sk: string) => sk.slice(0, sk.lastIndexOf(":"));
+    expect(tripKeyOf(r1.purchaseRow.source_key)).toBe("app:entry:42");
+    expect(tripKeyOf(r2.purchaseRow.source_key)).toBe("app:entry:43");
+    expect(tripKeyOf(r1.purchaseRow.source_key)).not.toBe(tripKeyOf(r2.purchaseRow.source_key));
+  });
+
+  it("syncReceiptEntryToPurchases inserts a worker reimbursement bill and treats repeat sync (23505) as idempotent", async () => {
+    const upsertCalls: unknown[] = [];
+    const billInsertCalls: unknown[] = [];
+    let repeatSync = false;
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === "jobs") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: { id: "20000000-0000-0000-0000-000000000001" }, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "purchases") {
+        return {
+          upsert: async (row: unknown, opts: unknown) => {
+            upsertCalls.push({ row, opts });
+            return { error: null };
+          },
+        };
+      }
+      if (table === "bills") {
+        return {
+          insert: async (row: unknown) => {
+            billInsertCalls.push(row);
+            return repeatSync
+              ? { error: { code: "23505", message: "duplicate key value violates unique constraint" } }
+              : { error: null };
+          },
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const input = {
+      entryId: 105,
+      day: "2026-10-20",
+      jobId: "9146-w-hutton-dr",
+      jobName: "9146 W Hutton Dr",
+      vendor: "Home Depot",
+      amountDollars: 52.75,
+      paidBy: "me" as const,
+      note: "Corner bead",
+      trade: "drywall",
+      personName: "Carlos",
+      personEmail: "carlos@saddlewood.crew",
+    };
+
+    await syncReceiptEntryToPurchases(input);
+    expect(upsertCalls).toHaveLength(1);
+    expect(billInsertCalls).toHaveLength(1);
+    expect((billInsertCalls[0] as { bill_number: string; purchase_trip_key: string }).bill_number).toBe("REIMB-ENTRY-105");
+    expect((billInsertCalls[0] as { purchase_trip_key: string }).purchase_trip_key).toBe("app:entry:105");
+    expect(errSpy).not.toHaveBeenCalled();
+
+    repeatSync = true;
+    await syncReceiptEntryToPurchases(input);
+    expect(billInsertCalls).toHaveLength(2);
+    expect(errSpy).not.toHaveBeenCalled();
+
+    errSpy.mockRestore();
+  });
+
+  it("logs console.error when Supabase calls fail in syncReceiptEntryToPurchases or syncEodDirectivesAndDecisions", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "jobs") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: { message: "jobs failed" } }),
+            }),
+          }),
+        };
+      }
+      if (table === "purchases") {
+        return {
+          upsert: async () => ({ error: { message: "purchases failed" } }),
+        };
+      }
+      if (table === "bills") {
+        return {
+          insert: async () => ({ error: { code: "42P01", message: "bills failed" } }),
+        };
+      }
+      if (table === "work_items") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: null, error: { message: "work_items select failed" } }),
+              }),
+            }),
+          }),
+          insert: async () => ({ error: { code: "23502", message: "work_items insert failed" } }),
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await syncReceiptEntryToPurchases({
+      entryId: 106,
+      day: "2026-10-20",
+      jobId: "9146-w-hutton-dr",
+      jobName: "9146 W Hutton Dr",
+      vendor: "Home Depot",
+      amountDollars: 15,
+      paidBy: "me",
+      note: "Shims",
+      personName: "Carlos",
+      personEmail: "carlos@saddlewood.crew",
+    });
+    expect(errSpy).toHaveBeenCalledWith("syncReceiptEntryToPurchases jobs lookup failed:", { message: "jobs failed" });
+    expect(errSpy).toHaveBeenCalledWith("syncReceiptEntryToPurchases purchases upsert failed:", { message: "purchases failed" });
+    expect(errSpy).toHaveBeenCalledWith("syncReceiptEntryToPurchases bills insert failed:", { code: "42P01", message: "bills failed" });
+
+    errSpy.mockClear();
+    await syncEodDirectivesAndDecisions({
+      entryId: 107,
+      day: "2026-10-20",
+      jobId: "9146-w-hutton-dr",
+      jobName: "9146 W Hutton Dr",
+      done: "",
+      asked: "Super asked for extra blocking",
+      decision: "",
+      stuck: "",
+      createdBy: "jorge@saddlewood.crew",
+    });
+    expect(errSpy).toHaveBeenCalledWith("syncEodDirectivesAndDecisions jobs lookup failed:", { message: "jobs failed" });
+    expect(errSpy).toHaveBeenCalledWith("syncEodDirectivesAndDecisions work_items lookup failed:", { message: "work_items select failed" });
+    expect(errSpy).toHaveBeenCalledWith("syncEodDirectivesAndDecisions work_items insert failed:", { code: "23502", message: "work_items insert failed" });
+    errSpy.mockRestore();
   });
 
   it("normalizes an out-of-pocket ('me') field receipt into both purchases and a reimbursement bill", () => {

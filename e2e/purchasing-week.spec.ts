@@ -30,7 +30,7 @@ test.describe("Purchasing: the purchasing week", () => {
   test("An unmatched register PO name ('BAMBI BACKYARD') is assigned to a job and increases that job's material spend", async ({ owner: page }) => {
     const jobSlug = "6402-e-bambi-drive";
     await page.request.patch("/api/accounting/purchases", {
-      data: { action: "assign_job", jobKey: "bambi backyard", jobId: null, clearAlias: true },
+      data: { action: "alias_rule", jobKey: "bambi backyard", jobId: null, clearAlias: true },
     });
 
     await page.goto(`/app/jobs/${jobSlug}?tab=purchases&p=ytd`);
@@ -53,7 +53,7 @@ test.describe("Purchasing: the purchasing week", () => {
     } finally {
       // Restore BAMBI BACKYARD to unassigned so reruns find it in the banner
       await page.request.patch("/api/accounting/purchases", {
-        data: { action: "assign_job", jobKey: "bambi backyard", jobId: null, clearAlias: true },
+        data: { action: "alias_rule", jobKey: "bambi backyard", jobId: null, clearAlias: true },
       });
     }
   });
