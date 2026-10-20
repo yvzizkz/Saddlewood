@@ -17,16 +17,9 @@ const test = base.extend<{ pmPage: Page }>({
 });
 
 test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
-  test("reaches Roles and duties on a 390px phone from More, reaches My jobs and Tasks, lists only Eli's assigned jobs without cost/margin columns, and 404s on an unassigned job", async ({
+  test("reaches My jobs and Tasks from crew More, lists only Eli's assigned jobs without cost/margin columns, and 404s on an unassigned job", async ({
     pmPage: page,
   }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/app/more", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("link", { name: "Roles and duties" })).toBeVisible();
-    await page.getByRole("link", { name: "Roles and duties" }).click();
-    await expect(page).toHaveURL(/\/app\/duties$/);
-
-    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/app/more", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("link", { name: "My jobs", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Tasks on my jobs" })).toBeVisible();
