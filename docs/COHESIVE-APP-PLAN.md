@@ -359,7 +359,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
 6. A synthetic local seed (`supabase/seed-cohesive.sql`) that fills every section across Today/WTD/MTD/YTD.
 7. Cross-review at 390 px and on desktop. One draft PR with phone and desktop screenshots.
 
-### Phase 2: every department, one schedule, one task system, the automation gaps (autopilot runs these in order, one PR per two or three steps)
+### Phase 2 ✅ (2026-10-20, PR #32): every department, one schedule, one task system, the automation gaps (autopilot runs these in order, one PR per two or three steps)
 1. ✅ **Job hub** `/app/jobs` + `/app/jobs/[id]`:
    - list on the shared blocks (period; by stage, PM or client);
    - job page tabs: Overview · Schedule · Tasks · Money · Labor · Purchases · Subs · Changes · Log · Documents · Crew, each reusing a section filtered to `job=<id>`;
@@ -388,7 +388,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
 6. ✅ (except SOV % billing) **Billing completion:** done as 0040 (`change_orders`, `lien_waivers`), `src/lib/billing/registers.ts`, the registers on Billing and the job's Changes tab, and CO, package and waiver items in the task feed. Still open: ladder config (owner question 1) and SOV % billing.
    - CO register (A2), waiver register, invoice package at cutoff (A3), ladder config (A5);
    - SOV percent-complete billing replacing the Powell tracker path (keep the tracker until it's replaced).
-7. **Subs and compliance:**
+7. ✅ **Subs and compliance** (agy, `a7c0957`): sub scorecard and compliance register on Subs, a frozen work order with a mobilization gate, award and thank-you emails as drafts (never sent automatically), and a Gate 0 handoff card on the job page.
    - work order document (S7), compliance register with COI and W-9 watches (S8), sub scorecard (S1);
    - award emails as drafts (S6).
 8. ✅ **Department homes** (§6.2): `/app/departments` and `/app/departments/[role]` (`src/lib/departments/home.ts`). The Ops board itself still lives at `/internal/ops`; the Ops home links to it.
@@ -408,7 +408,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
 10. ✅ **PM access:** `src/lib/accounting/access.ts`. A `money.view` seat sees Receivables, Billing, Purchases and Payroll hours on its own jobs. Pay and cost show only if `policy.pm.laborCost` / `policy.pm.margin` are on, never Payables, and invoices are read-only. Still to do: a field-lead seat. Accounting sections for `money.view` seats scoped to their jobs, no cost or pay. Field lead seat.
 11. Each step: tests, lint, build, screenshots at 390 px and on desktop.
 
-### Phase 3: scenario testing, every department's real week (one PR)
+### Phase 3 (in progress; `docs/SCENARIOS.md`, `npm run e2e`): scenario testing, every department's real week (one PR)
 1. Write `docs/SCENARIOS.md` from `docs/KB-OPERATIONS-MODEL.md` and OM §4. One scenario per department week, at least:
    - **Finance:**
      - an AFT billing week: Friday hours, the 23rd cutoff, PM % complete at −3 days, a change order, a conditional waiver, Melio paying the gross less 1%;
