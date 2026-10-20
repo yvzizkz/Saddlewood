@@ -2,6 +2,7 @@ import { ownerEmails } from "@/lib/bot/home";
 import { laneOwners, type Lane } from "@/lib/owner/lanes";
 import { sendPush } from "@/lib/bot/push";
 import { readState } from "@/lib/bot/queries";
+import { loadLaneSeats } from "@/lib/roles/store";
 import { say } from "./messages";
 import { listJobPeople, listPeople } from "./queries";
 import type { CrewLang } from "./types";
@@ -18,8 +19,8 @@ export async function ownerAddresses(): Promise<string[]> {
 
 /** The owner who holds a lane (src/lib/owner/lanes.ts), or every owner if nobody does. */
 export async function laneAddresses(lane: Lane): Promise<string[]> {
-  const { sections } = await readState();
-  return laneOwners(lane, sections.people);
+  const [{ sections }, seats] = await Promise.all([readState(), loadLaneSeats()]);
+  return laneOwners(lane, sections.people, seats);
 }
 
 /**

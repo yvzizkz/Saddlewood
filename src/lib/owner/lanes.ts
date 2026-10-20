@@ -21,25 +21,33 @@ export const LANE_INFO: Record<Lane, { label: string; primary: string; backup: s
   systems: { label: "The app and the bot", primary: "Lando", backup: "Marco" },
 };
 
+/**
+ * Who holds each lane when the role seats (0032, /app/policies/rights) say
+ * otherwise: a first name or an email per lane. Without it, LANE_INFO.
+ */
+export type LaneSeats = Partial<Record<Lane, { primary: string; backup: string }>>;
+
 function firstWord(name: string): string {
   return name.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
 }
 
 function ownerSeats(people: BotPeople, name: string): string[] {
-  const want = name.toLowerCase();
+  const want = name.trim().toLowerCase();
+  if (!want) return [];
   return Object.entries(people)
-    .filter(([, p]) => p.role === "owner" && firstWord(p.name) === want)
+    .filter(([email, p]) => p.role === "owner" && (want.includes("@") ? email.toLowerCase() === want : firstWord(p.name) === want))
     .map(([email]) => email)
     .sort();
 }
 
 /** Who holds a lane right now: the person's name and their owner seats. */
-export function laneHolder(lane: Lane, people: BotPeople): { name: string; emails: string[]; backup: boolean } {
-  const { primary, backup } = LANE_INFO[lane];
+export function laneHolder(lane: Lane, people: BotPeople, seats?: LaneSeats): { name: string; emails: string[]; backup: boolean } {
+  const { primary, backup } = seats?.[lane] ?? LANE_INFO[lane];
+  const nameOf = (v: string, emails: string[]) => (v.includes("@") ? (people[emails[0]]?.name.split(/\s+/)[0] ?? v) : v);
   const first = ownerSeats(people, primary);
-  if (first.length) return { name: primary, emails: first, backup: false };
+  if (first.length) return { name: nameOf(primary, first), emails: first, backup: false };
   const second = ownerSeats(people, backup);
-  if (second.length) return { name: backup, emails: second, backup: true };
+  if (second.length) return { name: nameOf(backup, second), emails: second, backup: true };
   const all = Object.entries(people)
     .filter(([, p]) => p.role === "owner")
     .map(([email]) => email)
@@ -48,20 +56,20 @@ export function laneHolder(lane: Lane, people: BotPeople): { name: string; email
 }
 
 /** The addresses to alert for a lane. */
-export function laneOwners(lane: Lane, people: BotPeople): string[] {
-  return laneHolder(lane, people).emails;
+export function laneOwners(lane: Lane, people: BotPeople, seats?: LaneSeats): string[] {
+  return laneHolder(lane, people, seats).emails;
 }
 
 /** The lanes this address holds right now. */
-export function lanesOf(email: string, people: BotPeople): Lane[] {
-  return LANES.filter((lane) => laneHolder(lane, people).emails.includes(email));
+export function lanesOf(email: string, people: BotPeople, seats?: LaneSeats): Lane[] {
+  return LANES.filter((lane) => laneHolder(lane, people, seats).emails.includes(email));
 }
 
 /** For the screen: who holds each lane, by first name. */
-export function laneNames(people: BotPeople): Record<Lane, { name: string; backup: boolean }> {
+export function laneNames(people: BotPeople, seats?: LaneSeats): Record<Lane, { name: string; backup: boolean }> {
   return Object.fromEntries(
     LANES.map((lane) => {
-      const h = laneHolder(lane, people);
+      const h = laneHolder(lane, people, seats);
       return [lane, { name: h.name, backup: h.backup }];
     }),
   ) as Record<Lane, { name: string; backup: boolean }>;

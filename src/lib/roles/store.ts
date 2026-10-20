@@ -3,6 +3,7 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readState } from "@/lib/bot/queries";
+import type { LaneSeats } from "@/lib/owner/lanes";
 import { DEFAULT_SEATS, peopleOf, ROLES, type Person, type Role, type Seat } from "./seats";
 
 export async function loadSeats(): Promise<Seat[]> {
@@ -33,4 +34,23 @@ export async function saveSeat(role: string, patch: { holder?: string; backup?: 
   }
   const { error } = await getSupabaseAdmin().from("role_seats").upsert(row, { onConflict: "role" });
   if (error) throw new Error(`role_seats write failed: ${error.message}`);
+}
+
+/** The bot's lanes from the seats: sales, decisions, money (finance) and systems (ops). */
+export function laneSeatsOf(seats: Seat[]): LaneSeats {
+  const of = (r: Role) => seats.find((s) => s.role === r);
+  const pair = (r: Role) => {
+    const s = of(r);
+    return s ? { primary: s.holder, backup: s.backup } : undefined;
+  };
+  return { sales: pair("sales"), decisions: pair("decisions"), money: pair("finance"), systems: pair("ops") };
+}
+
+/** For the alert paths: the lanes as the seats say, or undefined (the decided defaults) if they cannot be read. */
+export async function loadLaneSeats(): Promise<LaneSeats | undefined> {
+  try {
+    return laneSeatsOf(await loadSeats());
+  } catch {
+    return undefined;
+  }
 }

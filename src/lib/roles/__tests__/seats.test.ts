@@ -45,3 +45,22 @@ describe("rights and escalation", () => {
     expect(escalationOf("decisions")).toBe("ops");
   });
 });
+
+import { laneHolder, lanesOf } from "@/lib/owner/lanes";
+import { laneSeatsOf } from "../store";
+
+describe("lanes follow the seats", () => {
+  const bot = { "marco@x.com": { name: "Marco Ruiz", role: "owner" }, "lando@x.com": { name: "Lando", role: "owner" }, "ilene@x.com": { name: "Ilene", role: "owner" } } as never;
+  it("keeps the decided lanes with no seats", () => {
+    expect(laneHolder("money", bot).emails).toEqual(["ilene@x.com"]);
+  });
+  it("moves a lane when its seat changes, by name or by email", () => {
+    const seats = laneSeatsOf([
+      { role: "finance", holder: "lando@x.com", backup: "", note: "", updatedBy: "", updatedAt: null },
+      { role: "sales", holder: "Gone", backup: "Ilene", note: "", updatedBy: "", updatedAt: null },
+    ]);
+    expect(laneHolder("money", bot, seats)).toEqual({ name: "Lando", emails: ["lando@x.com"], backup: false });
+    expect(laneHolder("sales", bot, seats)).toMatchObject({ name: "Ilene", backup: true });
+    expect(lanesOf("lando@x.com", bot, seats)).toContain("money");
+  });
+});
