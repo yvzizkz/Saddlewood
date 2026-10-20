@@ -63,6 +63,11 @@ function toSnapshot(r: InvoiceRow): TrackerInvoiceSnapshot {
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 
+/** A tracker's saved state has its lines; the prototypes' rows in the same table do not. */
+export function isTrackerState(state: unknown): boolean {
+  return !!state && typeof state === 'object' && Array.isArray((state as { lines?: unknown }).lines)
+}
+
 export function isTrackerId(id: string): boolean {
   return ID_RE.test(id)
 }
@@ -71,7 +76,9 @@ export async function listTrackers(): Promise<TrackerListRow[]> {
   const db = getSupabaseAdmin()
   const { data, error } = await db.from('progress_trackers').select('*').order('project_name', { ascending: true })
   if (error) throw new Error(`progress_trackers select failed: ${error.message}`)
-  return ((data ?? []) as Row[]).map((r) => {
+  // The table also holds two old prototypes' saved state (accounting-state from
+  // Expenses, contracts-state from Contracts): not trackers, so not listed.
+  return ((data ?? []) as Row[]).filter((r) => isTrackerState((r as { state?: unknown }).state)).map((r) => {
     const rec = toRecord(r)
     const s = summary(rec.state)
     const { state: _state, ...rest } = rec
