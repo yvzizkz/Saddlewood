@@ -17,9 +17,11 @@ import { ago } from '@/lib/bot/view'
 // one switch that stops the bot from sending on its own.
 
 const PORTAL: { href: string; label: string; note: string }[] = [
+  { href: '/app/tasks', label: 'Tasks', note: 'Everything waiting on someone, mine and the team\'s' },
   { href: '/app/sales', label: 'Sales', note: 'Prospects, estimates and proposals, start to finish' },
   { href: '/app/subs', label: 'Subs and bids', note: 'The sub directory, bid packages, leveling and awards' },
   { href: '/app/policies', label: 'Company policies', note: 'Deposits, interest, change orders, approvals: the owners\' rules' },
+  { href: '/app/policies/rights', label: 'Who decides', note: 'Roles, who holds them, and what each may approve' },
   { href: '/internal/ops', label: 'Ops board', note: 'SOPs, roles, what is being built' },
   { href: '/internal/ops/calendar', label: 'Calendar', note: 'Rhythm, milestones, deadlines' },
   { href: '/internal/trackers', label: 'Progress trackers', note: 'Schedules of values and invoices' },

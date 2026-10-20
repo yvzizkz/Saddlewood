@@ -94,6 +94,8 @@ describe("numbers", () => {
   it("ticks are round", () => {
     expect(niceTicks(37)).toEqual([0, 10, 20, 30, 40]);
     expect(niceTicks(0)).toEqual([0, 1]);
+    expect(niceTicks(2, 4, { integer: true })).toEqual([0, 1, 2]);
+    expect(niceTicks(9, 4, { integer: true })).toEqual([0, 5, 10]);
   });
 
   it("delta is null with nothing to compare", () => {

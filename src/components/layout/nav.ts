@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Construction,
   HardHat,
+  ListTodo,
   Home,
   Landmark,
   ListChecks,
@@ -51,6 +52,7 @@ export const NAV: NavItem[] = [
   { href: '/app/sales', label: 'Sales', icon: TrendingUp, group: 'Work', tab: 2 },
   { href: '/app/jobs', label: 'Jobs', icon: Briefcase, group: 'Work', tab: 3, access: 'owner', also: ['/app/projects'] },
   { href: '/app/crew', label: 'Crew', icon: HardHat, group: 'Work', tab: 4, access: 'crewAdmin' },
+  { href: '/app/tasks', label: 'Tasks', icon: ListTodo, group: 'Work', access: 'owner' },
   { href: '/app/subs', label: 'Subs and bids', icon: Users, group: 'Work' },
   {
     href: '/app/accounting',

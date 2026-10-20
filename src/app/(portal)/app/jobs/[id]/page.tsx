@@ -14,6 +14,11 @@ import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { clockText, localClock, localDay } from "@/lib/crew/time";
 import { getJobRef, jobHref } from "@/lib/jobs/hub";
 import { jobBills, jobCrew, jobLabor, jobMoney, jobPackages, jobPurchases, jobWatches } from "@/lib/jobs/jobData";
+import { listJobRefs } from "@/lib/jobs/hub";
+import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
+import { loadPeople, loadSeats } from "@/lib/roles/store";
+import { KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
+import { NewTask } from "@/components/tasks/TaskActions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +36,7 @@ const TABS: JobTab[] = [
   { key: "subs", label: "Subs" },
   { key: "changes", label: "Changes" },
   { key: "documents", label: "Documents" },
+  { key: "tasks", label: "Tasks" },
   { key: "crew", label: "Crew and phases" },
 ];
 
@@ -239,6 +245,46 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         <DataTable rows={pk} columns={[{ key: "title", header: "Package", kind: "text", hrefKey: "href", phone: "title" }, { key: "trade", header: "Trade", kind: "text", filter: true }, { key: "status", header: "Status", kind: "text", filter: true, phone: "value" }, { key: "due", header: "Bids due", kind: "date" }]} searchKeys={["title", "trade"]} name={`${ref.key}-packages`} rowHrefKey="href" empty="No bid packages on this job." />
         <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Sub and vendor bills</p>
         <DataTable rows={bl} columns={[{ key: "number", header: "Bill", kind: "text", hrefKey: "href", phone: "title" }, { key: "vendor", header: "From", kind: "text", filter: true }, { key: "trade", header: "Trade", kind: "text", filter: true }, { key: "status", header: "Status", kind: "text", filter: true }, { key: "issued", header: "Issued", kind: "date", phone: "hide" }, { key: "due", header: "Due", kind: "date" }, { key: "amount", header: "Amount", kind: "money", total: true, phone: "hide" }, { key: "open", header: "Open", kind: "money", total: true, phone: "value" }]} searchKeys={["number", "vendor", "trade", "status"]} name={`${ref.key}-bills`} rowHrefKey="href" initialSort={{ key: "issued", dir: "desc" }} empty="No bills on this job." />
+      </JobFrame>
+    );
+  }
+
+  if (tab === "tasks") {
+    const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
+    const items = (await loadFeed(refs, seats, today)).filter((i) => i.jobKey === ref.key);
+    const table: TableRow[] = items.map((i) => ({
+      id: i.id,
+      title: i.title,
+      detail: i.detail,
+      href: i.href,
+      kind: KIND_LABEL[i.kind],
+      who: i.assignee ? (people.find((p) => p.email === i.assignee)?.name ?? i.assignee) : seatHolder(i.nowRole, seats, people).name,
+      due: i.dueOn,
+      late: i.overdueDays || null,
+    }));
+    return (
+      <JobFrame {...frame}>
+        <NewTask
+          job={ref.key}
+          roles={ROLES.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
+          jobs={[{ value: ref.key, label: ref.name }]}
+          kinds={Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label }))}
+        />
+        <DataTable
+          rows={table}
+          columns={[
+            { key: "title", header: "Task", kind: "text", hrefKey: "href", subKey: "detail", phone: "title" },
+            { key: "who", header: "With", kind: "text", filter: true },
+            { key: "kind", header: "Kind", kind: "text", filter: true },
+            { key: "due", header: "Due", kind: "date", phone: "value" },
+            { key: "late", header: "Days late", kind: "count" },
+          ]}
+          searchKeys={["title", "detail", "who", "kind"]}
+          name={`${ref.key}-tasks`}
+          rowHrefKey="href"
+          initialSort={{ key: "late", dir: "desc" }}
+          empty="Nothing open on this job."
+        />
       </JobFrame>
     );
   }
