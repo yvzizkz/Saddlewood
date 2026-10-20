@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { fillTerms, POLICY_DEFAULTS, type Policies } from "@/lib/policies/rules";
 import { DEFAULT_PRESENT, DEFAULT_PRICING, DEFAULT_TERMS, type EstimateDefaults } from "./templates";
 import { ALLOWANCE_DISPLAYS, MARKUP_DISPLAYS, PRESENT_LAYOUTS, SIGNING_MODES, type Presentation, type Pricing } from "./types";
 
@@ -261,12 +262,12 @@ export function readSettings(raw: unknown): SalesSettings {
   return s;
 }
 
-/** What a new estimate starts from. */
-export function estimateDefaults(s: SalesSettings): EstimateDefaults {
+/** What a new estimate starts from; the terms' policy markers filled from Company policies. */
+export function estimateDefaults(s: SalesSettings, policies: Policies = POLICY_DEFAULTS): EstimateDefaults {
   return {
     pricing: { ...s.pricing },
     present: { ...s.proposal.present, packageIds: [] },
-    terms: s.proposal.terms,
+    terms: fillTerms(s.proposal.terms, policies),
     validDays: s.proposal.validDays,
     schedule: s.proposal.schedule,
   };

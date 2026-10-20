@@ -583,6 +583,10 @@ export async function issueProposal(
   const body = readEstimateBody(est.body);
   if (!body.ok) throw new SalesError(body.error, 400);
 
+  // Any policy marker still in the terms (pasted, or from an older estimate) is filled now: a client never sees "{deposit_pct}".
+  const { loadPolicies } = await import("@/lib/policies/store");
+  const { fillTerms } = await import("@/lib/policies/rules");
+  body.value.terms = fillTerms(body.value.terms, (await loadPolicies()).values);
   const priced = priceEstimate(body.value);
   const proposal = buildProposal(body.value, today, priced, signing);
   const lead = proposal.packages.find((p) => p.recommended) ?? proposal.packages[0];

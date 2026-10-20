@@ -301,7 +301,7 @@ export function FieldSettingsCard({ settings, onSaved }: { settings: AppSettings
   async function save(key: SettingKey) {
     const raw = draft[key] ?? ''
     let value: number | string
-    if (key === 'requests.answersFirst') value = raw
+    if (key === 'requests.answersFirst' || key === 'crew.planDue') value = raw
     else if (CENTS_KEYS.includes(key)) {
       const cents = centsFrom(raw)
       if (cents === null) return setProblem('Type a dollar amount, like 500.')
@@ -340,6 +340,15 @@ export function FieldSettingsCard({ settings, onSaved }: { settings: AppSettings
                       </option>
                     ))}
                   </select>
+                ) : key === 'crew.planDue' ? (
+                  <input
+                    className={INPUT}
+                    type="time"
+                    step={900}
+                    value={draft[key]}
+                    aria-label={SETTING_LABELS[key].label}
+                    onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                  />
                 ) : (
                   <input
                     className={INPUT}

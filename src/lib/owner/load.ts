@@ -58,6 +58,7 @@ export async function loadWaiting(owners: string[], now: Date = new Date()): Pro
     requests,
     jobPeople,
     pmLimitCents: settings["requests.pmLimitCents"],
+    planDue: settings["crew.planDue"],
     answersFirst: settings["requests.answersFirst"],
   });
 }

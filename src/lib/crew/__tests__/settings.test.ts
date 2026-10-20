@@ -41,7 +41,7 @@ beforeEach(() => {
 
 describe("the owners' settings", () => {
   it("start at $500 for the PM, $1,000 for the owners, either owner first, and half a mile", async () => {
-    expect(SETTING_DEFAULTS).toEqual({ "requests.pmLimitCents": 50000, "requests.ownerLimitCents": 100000, "requests.answersFirst": "either", "crew.farFromJobM": 805 });
+    expect(SETTING_DEFAULTS).toEqual({ "requests.pmLimitCents": 50000, "requests.ownerLimitCents": 100000, "requests.answersFirst": "either", "crew.farFromJobM": 805, "crew.planDue": "18:00" });
     expect(await readSettings()).toEqual(SETTING_DEFAULTS);
   });
 
@@ -60,7 +60,7 @@ describe("the owners' settings", () => {
       { key: "requests.ownerLimitCents", value: -1 },
       { key: "something.else", value: 1 },
     ];
-    expect(await readSettings(10_000)).toEqual({ "requests.pmLimitCents": 75000, "requests.ownerLimitCents": 100000, "requests.answersFirst": "marco", "crew.farFromJobM": 805 });
+    expect(await readSettings(10_000)).toEqual({ "requests.pmLimitCents": 75000, "requests.ownerLimitCents": 100000, "requests.answersFirst": "marco", "crew.farFromJobM": 805, "crew.planDue": "18:00" });
     store.rows[0].value = 90000;
     expect((await readSettings(20_000))["requests.pmLimitCents"]).toBe(75000); // cached
     expect((await readSettings(50_000))["requests.pmLimitCents"]).toBe(90000); // 30 s later

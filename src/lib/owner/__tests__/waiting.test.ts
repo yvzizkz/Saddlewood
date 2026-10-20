@@ -130,6 +130,15 @@ describe("the supervisor's plan", () => {
     // Saturday evening: tomorrow is Sunday.
     expect(buildWaiting(input({ reports: [], now: new Date("2026-10-18T02:00:00Z") }))).toEqual([]);
   });
+
+  it("follows the deadline the owners set (crew.planDue)", () => {
+    const at530 = new Date("2026-10-15T00:30:00Z"); // 5:30 PM
+    expect(buildWaiting(input({ reports: [], now: at530, planDue: "17:00" }))).toEqual([
+      expect.objectContaining({ key: "plan-late-2026-10-15", detail: "It was due by 5 PM." }),
+    ]);
+    expect(buildWaiting(input({ reports: [], now: at530, planDue: "17:45" }))).toEqual([]);
+    expect(buildWaiting(input({ reports: [], now: at530, planDue: "junk" }))).toEqual([]); // falls back to 6 PM
+  });
 });
 
 describe("work reported done", () => {

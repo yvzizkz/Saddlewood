@@ -18,6 +18,7 @@ import { ago } from '@/lib/bot/view'
 
 const PORTAL: { href: string; label: string; note: string }[] = [
   { href: '/app/sales', label: 'Sales', note: 'Prospects, estimates and proposals, start to finish' },
+  { href: '/app/policies', label: 'Company policies', note: 'Deposits, interest, change orders, approvals: the owners\' rules' },
   { href: '/internal/ops', label: 'Ops board', note: 'SOPs, roles, what is being built' },
   { href: '/internal/ops/calendar', label: 'Calendar', note: 'Rhythm, milestones, deadlines' },
   { href: '/internal/trackers', label: 'Progress trackers', note: 'Schedules of values and invoices' },
