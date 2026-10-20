@@ -12,6 +12,8 @@ vi.mock("@/lib/ops/auth", () => ({ authorizeOps: (...a: unknown[]) => authorizeO
 // Billing changes are for the owners (src/lib/billing/access.ts).
 const readState = vi.fn();
 vi.mock("@/lib/bot/queries", () => ({ readState: (...a: unknown[]) => readState(...a) }));
+// The owner's allowlist as the Mac mirrors it: the contacts these tests mail are on it.
+const ALLOW = { addresses: ["ap@client.com", "pw@client.joistapp.com"], domains: ["aft.com"], updatedAt: new Date().toISOString() };
 const OWNERS = {
   "lando@saddlewoodcontracting.com": { name: "Lando", role: "owner" },
   "ilene@saddlewoodcontracting.com": { name: "Ilene Ochoa", role: "owner" },
@@ -67,7 +69,7 @@ function call(body: unknown, id = ID) {
 beforeEach(() => {
   sendMock.mockReset().mockResolvedValue({ data: { id: "em_1" }, error: null });
   authorizeOps.mockReset().mockResolvedValue({ actor: "lando@saddlewoodcontracting.com", via: "session" });
-  readState.mockReset().mockResolvedValue({ sections: { people: OWNERS }, bridge: {} });
+  readState.mockReset().mockResolvedValue({ sections: { people: OWNERS, outboundAllow: ALLOW }, bridge: {} });
   getDocument.mockReset().mockResolvedValue(DOC);
   clientContactEmails.mockReset().mockResolvedValue(["ap@client.com"]);
   recordEvent.mockReset().mockResolvedValue(true);

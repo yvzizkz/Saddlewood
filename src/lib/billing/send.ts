@@ -24,17 +24,83 @@ export function cleanAddress(value: unknown): string | null {
 
 export type Recipients = { to: string[]; cc: string[] };
 
+// ---------------------------------------------------------------------------
+// The owner's allowlist, mirrored
+// ---------------------------------------------------------------------------
+//
+// Two lists must agree before a client's billing leaves: the client's contacts
+// on file (the site's, below) and the owner's outbound allowlist, which lives
+// on the Mac (owner-owned, added to by command only). The Mac reports a
+// read-only copy with the rest of its snapshot (bot_state.outboundAllow). A
+// copy that is missing, or older than two days, means the site cannot vouch
+// for an outside address, and refuses it.
+
+export type AllowMirror = { addresses: string[]; domains: string[]; updatedAt: string };
+
+export const ALLOW_MIRROR_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
+
+export function mirrorIsFresh(allow: AllowMirror | null | undefined, now = Date.now()): allow is AllowMirror {
+  if (!allow) return false;
+  const at = Date.parse(allow.updatedAt);
+  return Number.isFinite(at) && now - at <= ALLOW_MIRROR_MAX_AGE_MS;
+}
+
+/** On the owner's list: the address itself, or its whole domain. Company addresses always are. */
+export function allowedByMirror(address: string, allow: AllowMirror): boolean {
+  const a = address.trim().toLowerCase();
+  if (a.endsWith(INTERNAL_DOMAIN)) return true;
+  if (allow.addresses.some((x) => x.trim().toLowerCase() === a)) return true;
+  const domain = a.split("@")[1] ?? "";
+  return allow.domains.some((d) => d.trim().toLowerCase().replace(/^@/, "") === domain);
+}
+
+/** The command only an owner runs, shown next to an address the owner has not allowed. */
+const ALLOW_TOOL = "python3 ~/dev/Saddlewood-KB/bot/outbound_allow.py";
+export function allowAddCommand(address: string): string {
+  return [ALLOW_TOOL, "add", address.trim().toLowerCase(), '--who "<name>" --note "<why>"'].join(" ");
+}
+
+export type RecipientStatus =
+  | "company" // ours; always fine
+  | "ok" // a contact of this client, on the owner's list
+  | "allowed_not_contact" // on the owner's list, not yet a contact of this client
+  | "contact_not_allowed" // a contact, but the owner never allowed the address
+  | "unknown" // neither
+  | "no_mirror"; // the Mac has not reported the owner's list (or it is stale)
+
+export function recipientStatus(
+  address: string,
+  clientContacts: string[],
+  allow: AllowMirror | null | undefined,
+  now = Date.now(),
+): { status: RecipientStatus; addCommand?: string } {
+  const a = address.trim().toLowerCase();
+  if (a.endsWith(INTERNAL_DOMAIN)) return { status: "company" };
+  if (!mirrorIsFresh(allow, now)) return { status: "no_mirror" };
+  const contact = clientContacts.some((c) => c.trim().toLowerCase() === a);
+  const allowed = allowedByMirror(a, allow);
+  if (contact && allowed) return { status: "ok" };
+  if (allowed) return { status: "allowed_not_contact" };
+  if (contact) return { status: "contact_not_allowed", addCommand: allowAddCommand(a) };
+  return { status: "unknown", addCommand: allowAddCommand(a) };
+}
+
 /**
- * Who a document may be mailed to: the contacts on file for its client, and
- * people inside the company. Anyone else is refused by name, so a typo or a
- * guessed address cannot receive a client's billing.
+ * Who a document may be mailed to: people inside the company, and an outside
+ * address that is BOTH a contact on file for the document's client AND on the
+ * owner's outbound allowlist (its mirror, above). Anyone else is refused by
+ * name, so a typo, a guessed address, or an address the owner never approved
+ * cannot receive a client's billing.
  */
 export function checkRecipients(
   to: unknown,
   cc: unknown,
   clientContacts: string[],
+  allow: AllowMirror | null | undefined,
+  now = Date.now(),
 ): { ok: true; recipients: Recipients } | { ok: false; error: string } {
   const known = new Set(clientContacts.map((c) => c.trim().toLowerCase()));
+  const fresh = mirrorIsFresh(allow, now);
   const read = (raw: unknown, field: string): string[] | string => {
     if (raw === undefined || raw === null) return [];
     if (!Array.isArray(raw)) return `${field} must be a list of addresses`;
@@ -42,8 +108,10 @@ export function checkRecipients(
     for (const item of raw) {
       const addr = cleanAddress(item);
       if (!addr) return `${field} has an address that is not valid`;
-      if (!addr.endsWith(INTERNAL_DOMAIN) && !known.has(addr)) {
-        return `${addr} is not a contact on file for this client`;
+      if (!addr.endsWith(INTERNAL_DOMAIN)) {
+        if (!known.has(addr)) return `${addr} is not a contact on file for this client`;
+        if (!fresh) return `${addr}: the Mac has not reported the owner allowlist, so no outside address can be sent to right now`;
+        if (!allowedByMirror(addr, allow)) return `${addr} is not on the owner's outbound allowlist (an owner adds it: ${allowAddCommand(addr)})`;
       }
       if (!out.includes(addr)) out.push(addr);
     }

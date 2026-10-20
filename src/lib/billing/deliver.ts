@@ -1,6 +1,8 @@
 import { Resend } from "resend";
 
+import { readState } from "@/lib/bot/queries";
 import { claimForSend, clientContactEmails, DocumentError, getDocument, issueDocument, recordEvent, releaseClaim } from "./documents";
+import { listExhibits, readExhibitFile } from "./exhibits";
 import {
   BILLING_FROM,
   BILLING_REPLY_TO,
@@ -11,9 +13,13 @@ import {
   copyLinks,
   documentLink,
   internalLink,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS,
   RECORDS_COPY,
   splitInternal,
+  type AllowMirror,
   type BillingMessage,
+  type MailAttachment,
   type MailLink,
   type Recipients,
 } from "./send";
@@ -90,6 +96,60 @@ function readLabels(raw: unknown): Record<string, string> | string {
   return out;
 }
 
+/** The owner's allowlist as the Mac last reported it; null when it has not, or the state cannot be read (then no outside address passes). */
+export async function allowMirror(): Promise<AllowMirror | null> {
+  try {
+    const { sections } = await readState();
+    return sections.outboundAllow ?? null;
+  } catch (err) {
+    console.error("billing send: could not read the allowlist mirror:", err);
+    return null;
+  }
+}
+
+const ATTACH_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+/**
+ * The files on the documents' own pages (the Joist PDF, the signed waiver the
+ * Mac put there), ready to ride on the message. The phone never uploads them.
+ */
+export async function exhibitAttachments(docs: BillingDocument[]): Promise<{ ok: true; files: MailAttachment[] } | { ok: false; error: string }> {
+  const files: MailAttachment[] = [];
+  for (const d of docs) {
+    const exhibits = (await listExhibits(d.id)).filter((x) => x.kind === "file" && x.storagePath);
+    for (const x of exhibits) {
+      const ext = (x.storagePath!.split(".").pop() ?? "").toLowerCase();
+      if (!Object.prototype.hasOwnProperty.call(ATTACH_TYPES, ext)) continue; // an image type the page shows but mail does not carry
+      const base = x.label.replace(/[\x00-\x1f"<>|:*?/\\]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || d.number;
+      let name = `${base}.${ext}`;
+      if (files.some((f) => f.filename.toLowerCase() === name.toLowerCase())) name = `${d.number} ${base}.${ext}`;
+      const content = await readExhibitFile(x.storagePath!);
+      files.push({ filename: name, content, contentType: x.contentType || ATTACH_TYPES[ext] });
+    }
+  }
+  return { ok: true, files };
+}
+
+/** Files given with the request plus the pages' own, under the one limit that applies to the message. */
+export function mergeAttachments(given: MailAttachment[], fromPages: MailAttachment[]): { ok: true; files: MailAttachment[] } | { ok: false; error: string } {
+  const files = [...given];
+  for (const f of fromPages) {
+    if (!files.some((g) => g.filename.toLowerCase() === f.filename.toLowerCase())) files.push(f);
+  }
+  if (files.length > MAX_ATTACHMENTS) return { ok: false, error: `too many attachments (${files.length}; ${MAX_ATTACHMENTS} at most). Take an exhibit down or send without the pages' files.` };
+  const total = files.reduce((s, f) => s + f.content.length, 0);
+  if (total > MAX_ATTACHMENT_BYTES) {
+    return { ok: false, error: `the attachments come to ${(total / 1024 / 1024).toFixed(1)} MB; the limit is ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB together. Take an exhibit down or send without the pages' files.` };
+  }
+  return { ok: true, files };
+}
+
 type Composed = {
   main: BillingMessage;
   copy: BillingMessage | null;
@@ -122,12 +182,21 @@ async function deliverDocuments(
   }
 
   const contacts = clientId ? await clientContactEmails(clientId) : [];
-  const checked = checkRecipients(input.to, input.cc, contacts);
+  const checked = checkRecipients(input.to, input.cc, contacts, await allowMirror());
   if (!checked.ok) return refuse(400, checked.error);
   const links = checkLinks(input.links);
   if (!links.ok) return refuse(400, links.error);
   const attached = checkAttachments(input.attachments);
   if (!attached.ok) return refuse(400, attached.error);
+  // "attachExhibits": the files on the documents' pages ride along (the Bill screen's send).
+  let mailFiles: MailAttachment[] = attached.files;
+  if (input.attachExhibits === true && docs.length) {
+    const fromPages = await exhibitAttachments(docs);
+    if (!fromPages.ok) return refuse(400, fromPages.error);
+    const merged = mergeAttachments(attached.files, fromPages.files);
+    if (!merged.ok) return refuse(400, merged.error);
+    mailFiles = merged.files;
+  }
   const named = typeof input.linkLabel === "string" ? input.linkLabel.replace(/\s+/g, " ").trim().slice(0, 60) : "";
   const labels = readLabels(input.linkLabels);
   if (typeof labels === "string") return refuse(400, labels);
@@ -192,7 +261,7 @@ async function deliverDocuments(
       cc: mainCc,
       subject: main.subject,
       body: main.text,
-      attachments: attached.ok ? attached.files.map((f) => ({ filename: f.filename, bytes: f.content.length })) : [],
+      attachments: mailFiles.map((f) => ({ filename: f.filename, bytes: f.content.length })),
       ...(group
         ? { group: { id: group.id, name: group.name }, documents: docs.map((d) => ({ id: d.id, ...describe(d) })) }
         : { document: docs[0] ? describe(docs[0]) : null }),
@@ -243,7 +312,7 @@ async function deliverDocuments(
 
   // 2. Send.
   const resend = new Resend(key);
-  const files = attached.files.length ? { attachments: attached.files } : {};
+  const files = mailFiles.length ? { attachments: mailFiles } : {};
   let data: { id: string } | null = null;
   let error: unknown = null;
   try {
@@ -329,7 +398,7 @@ async function deliverDocuments(
           cc: mainCc,
           subject: main.subject,
           via: "mail service",
-          ...(attached.files.length ? { attachments: attached.files.map((f) => f.filename) } : {}),
+          ...(mailFiles.length ? { attachments: mailFiles.map((f) => f.filename) } : {}),
           ...(links.links.length ? { links: links.links.map((l) => l.label) } : {}),
           ...(split ? { internalCopy: out.inside } : {}),
           ...(held.has(d.id) ? { issued: true } : {}),

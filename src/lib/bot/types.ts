@@ -193,6 +193,27 @@ const activitySchema = z.object({
 });
 export type BotActivity = z.infer<typeof activitySchema>;
 
+// The owner's outbound allowlist (bot/outbound_allow.json on the Mac), mirrored
+// read-only so the site can refuse a billing recipient the owner never approved.
+// The list itself stays owner-owned and command-only; nothing here changes it.
+const allowMirrorSchema = z.object({
+  addresses: z.array(z.string().max(254)).catch([]),
+  domains: z.array(z.string().max(120)).catch([]),
+  updatedAt: str(40),
+});
+export type AllowMirror = z.infer<typeof allowMirrorSchema>;
+
+// The last Joist invoices still unsent, so the Bill screen can offer them.
+const joistRecentSchema = z.object({
+  id: z.number().int(),
+  number: str(60),
+  client: str(200),
+  totalCents: z.number().int().catch(0),
+  date: str(20),
+  status: str(20),
+});
+export type JoistRecent = z.infer<typeof joistRecentSchema>;
+
 /** Keep every element that parses; drop the ones that do not. */
 export function listOf<T>(schema: z.ZodType<T>) {
   return z
@@ -229,6 +250,8 @@ export const sectionSchemas = {
   automations: listOf(automationSchema),
   duties: listOf(dutySchema),
   activity: listOf(activitySchema),
+  outboundAllow: allowMirrorSchema.nullable().catch(null),
+  joistRecent: listOf(joistRecentSchema),
 } as const;
 
 export type BotSectionKey = keyof typeof sectionSchemas;
@@ -247,6 +270,8 @@ export type BotSections = {
   automations: BotAutomation[];
   duties: BotDuty[];
   activity: BotActivity[];
+  outboundAllow: AllowMirror | null;
+  joistRecent: JoistRecent[];
 };
 
 export function emptySections(): BotSections {
@@ -263,6 +288,8 @@ export function emptySections(): BotSections {
     automations: [],
     duties: [],
     activity: [],
+    outboundAllow: null,
+    joistRecent: [],
   };
 }
 
@@ -405,6 +432,18 @@ export const actionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("autosend.off"), payload: z.object({}).default({}) }),
   // The lead page's "Sync GoHighLevel": the Mac pulls the list and sends it.
   z.object({ kind: z.literal("leads.sync"), payload: z.object({}).default({}) }),
+  // The Bill screen's Prepare: the Mac reads the Joist invoices (only it can)
+  // and makes the drafts, their exhibits and the send group on the site.
+  z.object({
+    kind: z.literal("billing.prepare"),
+    payload: z.object({
+      numbers: z.array(z.string().trim().min(1).max(40).regex(/^[#A-Za-z0-9 ._-]+$/, "a Joist number")).min(1).max(8),
+      group: z.string().trim().min(1).max(60),
+      intro: z.string().trim().max(600).default(""),
+      titles: z.record(z.string().max(40), z.string().trim().max(200)).default({}),
+      notes: z.record(z.string().max(40), z.string().trim().max(600)).default({}),
+    }),
+  }),
 ]);
 export type BotActionInput = z.infer<typeof actionSchema>;
 export type BotActionKind = BotActionInput["kind"];
@@ -521,7 +560,7 @@ export type BotHome = {
   now: string;
   me: BotMe;
   bridge: { seenAt: string | null; online: boolean; reportedAt: string | null };
-  sections: Omit<BotSections, "people">;
+  sections: Omit<BotSections, "people" | "outboundAllow" | "joistRecent">;
   /** One seat per person (info@ and lando@ are both Lando): who a to-do or an invite can go to. */
   team: { email: string; name: string }[];
   /** Every address with a seat -> the person's name, for showing who owns what. */

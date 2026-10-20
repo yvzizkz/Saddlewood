@@ -96,6 +96,20 @@ export type BillingDocument = {
   updatedAt?: string;
 };
 
+/** The working email of a send group (supabase/migrations/0020). Edited until the group is sent. */
+export type SendGroupMessage = {
+  subject?: string;
+  body?: string;
+  to?: string[];
+  cc?: string[];
+  intro?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  /** Set when the group went out. */
+  sentAt?: string;
+  emailId?: string;
+};
+
 export type SendGroup = {
   id: string;
   name: string;
@@ -103,6 +117,7 @@ export type SendGroup = {
   note: string;
   createdBy: string;
   createdAt: string;
+  message: SendGroupMessage;
 };
 
 export type DocumentEventKind =

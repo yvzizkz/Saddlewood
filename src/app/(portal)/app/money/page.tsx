@@ -29,7 +29,12 @@ export default async function MoneyScreen() {
   return (
     <main className="mx-auto max-w-xl px-4 pb-24 pt-5">
       <ScreenTitle eyebrow="Money" title={money(o.totalOpenCents)}>
-        <p className="text-sm text-[var(--color-charcoal-light)]">open across {o.clients.length} client{o.clients.length === 1 ? "" : "s"}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-[var(--color-charcoal-light)]">open across {o.clients.length} client{o.clients.length === 1 ? "" : "s"}</p>
+          <Link href="/app/bill" className="inline-flex min-h-11 items-center rounded-xl bg-[var(--color-teal)] px-4 text-sm font-medium text-white">
+            Bill
+          </Link>
+        </div>
       </ScreenTitle>
 
       <SectionTitle count={waiting.length}>Waiting on you</SectionTitle>
