@@ -6,6 +6,7 @@ import PurchaseSearch from "@/components/purchases/PurchaseSearch";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
 import { loadPurchases, type PurchaseItemRow } from "@/lib/accounting/purchases";
+import CappedNotice from "@/components/accounting/CappedNotice";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { moneySeatForPage, seesCrewJob } from "@/lib/accounting/access";
@@ -31,6 +32,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
   const allRows = loaded.rows.filter((r) => seesCrewJob(seat, r.rawJobId));
   const jobs = loaded.jobs.filter((j) => seesCrewJob(seat, j.id));
   const unmatched = seat.owner ? loaded.unmatched : [];
+  const capped = loaded.capped;
   const now = allRows.filter((r) => inRange(r.purchasedOn, period.from, period.to));
   const before = allRows.filter((r) => inRange(r.purchasedOn, period.previous.from, period.previous.to));
 
@@ -229,6 +231,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
         </div>
       }
     >
+      {capped ? <CappedNotice what="purchase lines" /> : null}
       <KpiHeader
         label="Material & purchase spend"
         value={totalSpendCents}

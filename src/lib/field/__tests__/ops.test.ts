@@ -12,6 +12,7 @@ import {
   syncEodDirectivesAndDecisions,
   syncReceiptEntryToPurchases,
 } from "../ops";
+import { OTHER_JOB } from "@/lib/crew/types";
 
 describe("field operations helpers", () => {
   it("provides SOP-009 pre-cover checklist items with photo requirements for each stage", () => {
@@ -23,124 +24,81 @@ describe("field operations helpers", () => {
     expect(prePaint.some((i) => i.label.includes("500W raking light"))).toBe(true);
   });
 
-  it("normalizes a company-card field receipt into a purchases row without a reimbursement bill", () => {
-    const res = buildNormalizedReceiptPurchase({
-      entryId: 42,
-      day: "2026-10-20",
-      jobId: "9146-w-hutton-dr",
-      jobName: "9146 W Hutton Dr",
-      billingJobId: "20000000-0000-0000-0000-000000000001",
-      vendor: "Home Depot",
-      amountDollars: 84.5,
-      paidBy: "company",
-      note: "90-minute hot mud + mesh tape",
-      trade: "drywall",
-      personName: "Jorge",
-      personEmail: "jorge@saddlewood.crew",
-    });
+  const RECEIPT = {
+    entryId: 42,
+    day: "2026-10-20",
+    jobId: "9146-w-hutton-dr",
+    jobName: "9146 W Hutton Dr",
+    billingJobId: "20000000-0000-0000-0000-000000000001",
+    vendor: "Home Depot",
+    amountDollars: 84.5 as number | null,
+    paidBy: "company" as "company" | "me",
+    note: "90-minute hot mud + mesh tape",
+    trade: "drywall",
+    personName: "Jorge",
+    personEmail: "jorge@saddlewood.crew",
+  };
 
-    expect(res.purchaseRow.source).toBe("app");
-    expect(res.purchaseRow.source_key).toBe("app:entry:42:0");
-    expect(res.purchaseRow.line_total_cents).toBe(8450);
-    expect(res.purchaseRow.trade).toBe("drywall");
-    expect(res.purchaseRow.class).toBe("COMPANY CARD");
+  it("keys a receipt's line exactly as the bot does (app:<entry id>), one row per receipt", () => {
+    const res = buildNormalizedReceiptPurchase(RECEIPT);
+    expect(res.purchaseRow?.source).toBe("app");
+    expect(res.purchaseRow?.source_key).toBe("app:42");
+    expect(res.purchaseRow?.line_total_cents).toBe(8450);
+    expect(res.purchaseRow?.trade).toBe("drywall");
+    expect(res.purchaseRow?.class).toBe("COMPANY CARD");
     expect(res.reimbursementBill).toBeNull();
   });
 
-  it("gives each receipt its own distinct trip_key when purchases strips the line index", () => {
-    const r1 = buildNormalizedReceiptPurchase({
-      entryId: 42,
-      day: "2026-10-20",
-      jobId: "9146-w-hutton-dr",
-      jobName: "9146 W Hutton Dr",
-      vendor: "Home Depot",
-      amountDollars: 20,
-      paidBy: "company",
-      note: "Tape",
-      personName: "Jorge",
-      personEmail: "jorge@saddlewood.crew",
-    });
-    const r2 = buildNormalizedReceiptPurchase({
-      entryId: 43,
-      day: "2026-10-20",
-      jobId: "9146-w-hutton-dr",
-      jobName: "9146 W Hutton Dr",
-      vendor: "Home Depot",
-      amountDollars: 35,
-      paidBy: "company",
-      note: "Screws",
-      personName: "Jorge",
-      personEmail: "jorge@saddlewood.crew",
-    });
-    const tripKeyOf = (sk: string) => sk.slice(0, sk.lastIndexOf(":"));
-    expect(tripKeyOf(r1.purchaseRow.source_key)).toBe("app:entry:42");
-    expect(tripKeyOf(r2.purchaseRow.source_key)).toBe("app:entry:43");
-    expect(tripKeyOf(r1.purchaseRow.source_key)).not.toBe(tripKeyOf(r2.purchaseRow.source_key));
+  it("writes no line while the receipt has no amount", () => {
+    expect(buildNormalizedReceiptPurchase({ ...RECEIPT, amountDollars: null }).purchaseRow).toBeNull();
+    expect(buildNormalizedReceiptPurchase({ ...RECEIPT, amountDollars: 0 }).purchaseRow).toBeNull();
   });
 
-  it("syncReceiptEntryToPurchases inserts a worker reimbursement bill and treats repeat sync (23505) as idempotent", async () => {
-    const upsertCalls: unknown[] = [];
-    const billInsertCalls: unknown[] = [];
-    let repeatSync = false;
+  it("makes no reimbursement bill for a receipt paid out of pocket (the bot books it to reimburse)", () => {
+    const res = buildNormalizedReceiptPurchase({ ...RECEIPT, paidBy: "me" });
+    expect(res.purchaseRow?.class).toBe("REIMBURSEMENT");
+    expect(res.reimbursementBill).toBeNull();
+  });
 
+  it("puts an 'Other job' receipt on no job, so it waits in Which job is this?", () => {
+    const res = buildNormalizedReceiptPurchase({ ...RECEIPT, jobId: OTHER_JOB, jobName: "Smith garage" });
+    expect(res.purchaseRow?.job_id).toBeNull();
+    expect(res.purchaseRow?.job_key).toBe("smith garage");
+  });
+
+  it("syncReceiptEntryToPurchases upserts one row on app:<id>, writes no bill, and keeps a trade set by hand", async () => {
+    const upserts: Record<string, unknown>[] = [];
+    const tables: string[] = [];
+    let existing: Record<string, unknown> | null = null;
     fromMock.mockImplementation((table: string) => {
-      if (table === "jobs") {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: { id: "20000000-0000-0000-0000-000000000001" }, error: null }),
-            }),
-          }),
-        };
-      }
+      tables.push(table);
+      if (table === "jobs") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "20000000-0000-0000-0000-000000000001" }, error: null }) }) }) };
       if (table === "purchases") {
         return {
-          upsert: async (row: unknown, opts: unknown) => {
-            upsertCalls.push({ row, opts });
-            return { error: null };
-          },
-        };
-      }
-      if (table === "bills") {
-        return {
-          insert: async (row: unknown) => {
-            billInsertCalls.push(row);
-            return repeatSync
-              ? { error: { code: "23505", message: "duplicate key value violates unique constraint" } }
-              : { error: null };
-          },
+          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: existing, error: null }) }) }),
+          upsert: async (row: Record<string, unknown>) => (upserts.push(row), { error: null }),
         };
       }
       throw new Error(`unexpected table ${table}`);
     });
-
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const input = {
-      entryId: 105,
-      day: "2026-10-20",
-      jobId: "9146-w-hutton-dr",
-      jobName: "9146 W Hutton Dr",
-      vendor: "Home Depot",
-      amountDollars: 52.75,
-      paidBy: "me" as const,
-      note: "Corner bead",
-      trade: "drywall",
-      personName: "Carlos",
-      personEmail: "carlos@saddlewood.crew",
-    };
 
-    await syncReceiptEntryToPurchases(input);
-    expect(upsertCalls).toHaveLength(1);
-    expect(billInsertCalls).toHaveLength(1);
-    expect((billInsertCalls[0] as { bill_number: string; purchase_trip_key: string }).bill_number).toBe("REIMB-ENTRY-105");
-    expect((billInsertCalls[0] as { purchase_trip_key: string }).purchase_trip_key).toBe("app:entry:105");
+    // Filed with no amount: nothing written.
+    await syncReceiptEntryToPurchases({ ...RECEIPT, paidBy: "me", amountDollars: null, trade: "" });
+    expect(upserts).toHaveLength(0);
+
+    // The amount is answered: the line is written, keyed as the bot keys it.
+    await syncReceiptEntryToPurchases({ ...RECEIPT, paidBy: "me", amountDollars: 52.75, trade: "" });
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0]).toMatchObject({ source_key: "app:42", line_total_cents: 5275 });
+
+    // Someone re-tagged it and put it on a job by hand; a resync keeps both.
+    existing = { trade: "framing", trade_manual: true, job_id: "8009-n-ironwood-dr", job_manual: true };
+    await syncReceiptEntryToPurchases({ ...RECEIPT, paidBy: "me", amountDollars: 60, trade: "" });
+    expect(upserts[1]).toMatchObject({ source_key: "app:42", line_total_cents: 6000, trade: "framing", trade_manual: true, job_id: "8009-n-ironwood-dr" });
+
+    expect(tables).not.toContain("bills");
     expect(errSpy).not.toHaveBeenCalled();
-
-    repeatSync = true;
-    await syncReceiptEntryToPurchases(input);
-    expect(billInsertCalls).toHaveLength(2);
-    expect(errSpy).not.toHaveBeenCalled();
-
     errSpy.mockRestore();
   });
 
@@ -157,6 +115,7 @@ describe("field operations helpers", () => {
       }
       if (table === "purchases") {
         return {
+          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: "purchases lookup failed" } }) }) }),
           upsert: async () => ({ error: { message: "purchases failed" } }),
         };
       }
@@ -195,7 +154,7 @@ describe("field operations helpers", () => {
     });
     expect(errSpy).toHaveBeenCalledWith("syncReceiptEntryToPurchases jobs lookup failed:", { message: "jobs failed" });
     expect(errSpy).toHaveBeenCalledWith("syncReceiptEntryToPurchases purchases upsert failed:", { message: "purchases failed" });
-    expect(errSpy).toHaveBeenCalledWith("syncReceiptEntryToPurchases bills insert failed:", { code: "42P01", message: "bills failed" });
+    expect(errSpy).toHaveBeenCalledWith("syncReceiptEntryToPurchases purchases lookup failed:", { message: "purchases lookup failed" });
 
     errSpy.mockClear();
     await syncEodDirectivesAndDecisions({
@@ -213,30 +172,6 @@ describe("field operations helpers", () => {
     expect(errSpy).toHaveBeenCalledWith("syncEodDirectivesAndDecisions work_items lookup failed:", { message: "work_items select failed" });
     expect(errSpy).toHaveBeenCalledWith("syncEodDirectivesAndDecisions work_items insert failed:", { code: "23502", message: "work_items insert failed" });
     errSpy.mockRestore();
-  });
-
-  it("normalizes an out-of-pocket ('me') field receipt into both purchases and a reimbursement bill", () => {
-    const res = buildNormalizedReceiptPurchase({
-      entryId: 99,
-      day: "2026-10-20",
-      jobId: "9146-w-hutton-dr",
-      jobName: "9146 W Hutton Dr",
-      billingJobId: "20000000-0000-0000-0000-000000000001",
-      vendor: "Westside Building Material",
-      amountDollars: 64.25,
-      paidBy: "me",
-      note: "2 boxes of 093V vinyl control joint",
-      trade: "drywall",
-      personName: "Carlos",
-      personEmail: "carlos@saddlewood.crew",
-    });
-
-    expect(res.purchaseRow.class).toBe("REIMBURSEMENT");
-    expect(res.reimbursementBill).not.toBeNull();
-    expect(res.reimbursementBill?.kind).toBe("reimbursement");
-    expect(res.reimbursementBill?.amount_cents).toBe(6425);
-    expect(res.reimbursementBill?.due_on).toBe("2026-10-23");
-    expect(res.reimbursementBill?.purchase_trip_key).toBe("app:entry:99");
   });
 
   it("extracts CO awaiting price and owner ASK decision items from EOD daily logs", () => {
@@ -260,5 +195,24 @@ describe("field operations helpers", () => {
     expect(co?.title).toContain("CO awaiting price");
     expect(dec?.role).toBe("decisions");
     expect(dec?.title).toContain("Should we fur out the north niche 1.5in for flush tile?");
+  });
+
+  it("puts EOD items from an 'Other job' log on no job (no crew_jobs foreign key to break)", () => {
+    const items = extractEodWorkItems({
+      entryId: 77,
+      day: "2026-10-20",
+      jobId: OTHER_JOB,
+      jobName: "Smith garage",
+      done: "Framed",
+      asked: "Add a header over the side door",
+      decision: "ASK: T&M or CO?",
+      stuck: "",
+      createdBy: "jorge@saddlewood.crew",
+    });
+    expect(items).toHaveLength(2);
+    for (const i of items) {
+      expect(i.crew_job_id).toBeNull();
+      expect(i.href).toBe("/app/tasks");
+    }
   });
 });

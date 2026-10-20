@@ -17,7 +17,10 @@ import { isDay } from "@/lib/crew/time";
 //         up to MAX_PURCHASE_LINES a call. Strings are trimmed and clipped; a
 //         line that does not parse is dropped and counted, not refused. Each
 //         line gets its job from its own jobId (a receipt filed in the app:
-//         source "app", sourceKey "app:<entryId>") when that is a job, else
+//         source "app", sourceKey "app:<entryId>"; the app writes that same
+//         row itself once the receipt has an amount (field/ops.ts), so this
+//         push updates it rather than adding a second; a receipt paid out of
+//         pocket is reimbursed through the bot's expense, not a bill here) when that is a job, else
 //         from job_aliases by the normalized register name, else from a
 //         register name that is a job's name or id; and its trade from
 //         trade_map.

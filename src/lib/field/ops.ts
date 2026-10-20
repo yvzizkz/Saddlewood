@@ -5,7 +5,8 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeJobName, TRADE_SLUGS, type Trade } from "@/lib/crew/purchases";
-import { addDays, localDay } from "@/lib/crew/time";
+import { localDay } from "@/lib/crew/time";
+import { OTHER_JOB } from "@/lib/crew/types";
 import { jobHref, type JobRef } from "@/lib/jobs/hub";
 import type { FeedItem } from "@/lib/tasks/feed";
 import { placeItem } from "@/lib/tasks/feed";
@@ -85,9 +86,22 @@ export function defaultChecklistItems(stage: ChecklistStage): ChecklistItem[] {
   }
 }
 
+/** A field job id for a foreign key: "Other job" (OTHER_JOB) and none are no job. */
+export function crewJobIdOf(jobId: string | null | undefined): string | null {
+  return jobId && jobId !== OTHER_JOB ? jobId : null;
+}
+
 /**
- * Pure helper: normalizes a crew receipt entry into a `purchases` row and an
- * optional worker reimbursement `bills` row when `paidBy === "me"`.
+ * Pure helper: a crew receipt entry as its `purchases` line, or null while it
+ * has no amount (the line is written when the amount is answered).
+ *
+ * One owner per receipt (PR #32 review): this line is keyed exactly as the
+ * Mac's push keys it (Saddlewood-KB bot/crew.py purchase_line: source "app",
+ * source_key "app:<entry id>"), so the app's write and the bot's later push
+ * land on the same row instead of two. A receipt paid out of pocket gets no
+ * bill here: the bot books it as an expense marked to reimburse, and a second
+ * bill in Payables would pay the worker twice. `reimbursementBill` stays in
+ * the shape for callers and is always null.
  */
 export function buildNormalizedReceiptPurchase(input: {
   entryId: number;
@@ -106,12 +120,11 @@ export function buildNormalizedReceiptPurchase(input: {
   const cents = Math.max(0, Math.round((input.amountDollars ?? 0) * 100));
   const rawTrade = (input.trade ?? "").trim().toLowerCase();
   const trade: Trade = (TRADE_SLUGS as readonly string[]).includes(rawTrade) ? (rawTrade as Trade) : "general";
-  const tripKey = `app:entry:${input.entryId}`;
-  const sourceKey = `${tripKey}:0`;
+  const sourceKey = `app:${input.entryId}`;
   const vendor = input.vendor.trim() || "Home Depot";
   const description = input.note.trim() || `Field receipt (${vendor})`;
 
-  const purchaseRow = {
+  const purchaseRow = cents <= 0 ? null : {
     source: "app" as const,
     source_key: sourceKey,
     purchased_on: input.day,
@@ -120,7 +133,8 @@ export function buildNormalizedReceiptPurchase(input: {
     order_ref: `REC-${input.entryId}`,
     job_name_raw: input.jobName,
     job_key: normalizeJobName(input.jobName || input.jobId),
-    job_id: input.jobId || null,
+    // "Other job" is no job: the line waits in "Which job is this?" by its register name.
+    job_id: crewJobIdOf(input.jobId),
     trade,
     trade_manual: Boolean(rawTrade),
     department: "FIELD RECEIPT",
@@ -137,29 +151,7 @@ export function buildNormalizedReceiptPurchase(input: {
     },
   };
 
-  const reimbursementBill =
-    input.paidBy === "me" && cents > 0
-      ? {
-          bill_number: `REIMB-ENTRY-${input.entryId}`,
-          kind: "reimbursement" as const,
-          vendor_name: `${input.personName} (Crew Reimbursement)`,
-          job_id: input.billingJobId ?? null,
-          crew_job_id: input.jobId || null,
-          purchase_trip_key: tripKey,
-          trade,
-          description: `Out-of-pocket field receipt: ${description}`,
-          lines: [{ description, trade, qty: 1, unitCents: cents, totalCents: cents }],
-          issued_on: input.day,
-          due_on: addDays(input.day, 3),
-          amount_cents: cents,
-          retainage_cents: 0,
-          status: "needs_approval" as const,
-          waiver_status: "not_required" as const,
-          payment_terms: "friday_run" as const,
-          note: `Normalized from field receipt #${input.entryId} (${vendor}).`,
-          created_by: input.personEmail,
-        }
-      : null;
+  const reimbursementBill = null;
 
   return { purchaseRow, reimbursementBill };
 }
@@ -202,11 +194,11 @@ export function extractEodWorkItems(input: {
       detail: `Directive captured on ${input.day} EOD log (#${input.entryId}). Price before billing cutoff.`,
       role: "decisions",
       job_id: input.billingJobId ?? null,
-      crew_job_id: input.jobId || null,
+      crew_job_id: crewJobIdOf(input.jobId),
       due_on: input.day,
       escalate_days: 2,
       source: `eod:asked:${input.entryId}`,
-      href: `/app/jobs/${encodeURIComponent(input.jobId)}?tab=changes`,
+      href: crewJobIdOf(input.jobId) ? `/app/jobs/${encodeURIComponent(input.jobId)}?tab=changes` : "/app/tasks",
       created_by: input.createdBy,
     });
   }
@@ -227,11 +219,11 @@ export function extractEodWorkItems(input: {
       detail: `Rule? Logged in ${input.day} EOD check-in (#${input.entryId}).`,
       role: "decisions",
       job_id: input.billingJobId ?? null,
-      crew_job_id: input.jobId || null,
+      crew_job_id: crewJobIdOf(input.jobId),
       due_on: input.day,
       escalate_days: 1,
       source: `eod:decision:${input.entryId}`,
-      href: `/app/jobs/${encodeURIComponent(input.jobId)}?tab=log`,
+      href: crewJobIdOf(input.jobId) ? `/app/jobs/${encodeURIComponent(input.jobId)}?tab=log` : "/app/tasks",
       created_by: input.createdBy,
     });
   }
@@ -239,7 +231,11 @@ export function extractEodWorkItems(input: {
   return items;
 }
 
-/** Writes the normalized receipt into `purchases` (and `bills` when `paidBy === "me"`). Never throws to caller. */
+/**
+ * Writes the receipt's purchase line (keyed as the bot keys it, see above).
+ * Called when the receipt is filed and again when its amount is answered; a
+ * line someone re-tagged or put on a job by hand keeps that. Never throws.
+ */
 export async function syncReceiptEntryToPurchases(input: Parameters<typeof buildNormalizedReceiptPurchase>[0]): Promise<void> {
   try {
     const db = getSupabaseAdmin();
@@ -249,15 +245,16 @@ export async function syncReceiptEntryToPurchases(input: Parameters<typeof build
       if (jobErr) console.error("syncReceiptEntryToPurchases jobs lookup failed:", jobErr);
       billingJobId = (data as { id: string } | null)?.id ?? null;
     }
-    const { purchaseRow, reimbursementBill } = buildNormalizedReceiptPurchase({ ...input, billingJobId });
-    const { error: purchErr } = await db.from("purchases").upsert(purchaseRow, { onConflict: "source_key" });
+    const { purchaseRow } = buildNormalizedReceiptPurchase({ ...input, billingJobId });
+    if (!purchaseRow) return;
+    const row: Record<string, unknown> = { ...purchaseRow };
+    const { data: existing, error: exErr } = await db.from("purchases").select("*").eq("source_key", purchaseRow.source_key).maybeSingle();
+    if (exErr) console.error("syncReceiptEntryToPurchases purchases lookup failed:", exErr);
+    const ex = existing as { trade?: string; trade_manual?: boolean; job_id?: string | null; job_manual?: boolean } | null;
+    if (ex?.trade_manual && !purchaseRow.trade_manual) Object.assign(row, { trade: ex.trade, trade_manual: true });
+    if (ex?.job_manual) row.job_id = ex.job_id ?? null;
+    const { error: purchErr } = await db.from("purchases").upsert(row, { onConflict: "source_key" });
     if (purchErr) console.error("syncReceiptEntryToPurchases purchases upsert failed:", purchErr);
-    if (reimbursementBill) {
-      const { error: billErr } = await db.from("bills").insert(reimbursementBill);
-      if (billErr && (billErr as { code?: string }).code !== "23505") {
-        console.error("syncReceiptEntryToPurchases bills insert failed:", billErr);
-      }
-    }
   } catch (err) {
     console.error("syncReceiptEntryToPurchases unexpected error:", err);
   }
