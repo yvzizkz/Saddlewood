@@ -156,9 +156,9 @@ test.describe("Subs: the subcontractor & compliance week", () => {
     await expect(page.getByText("Sonoran Thermal Insulation LLC (Synthetic)").first()).toBeVisible();
     await expect(page.getByText(/On hold|Missing/i).first()).toBeVisible();
 
-    // Collecting the waiver and clearing the hold schedules the bill for Friday's run
+    // Recording the waiver clears that hold only (an expired COI would still hold it)
     const clearRes = await page.request.patch("/api/accounting/payables", {
-      data: { action: "update_bill", billId, waiverReceived: true, clearHold: true },
+      data: { action: "update_bill", billId, clearHold: "waiver" },
     });
     expect(clearRes.ok()).toBeTruthy();
 
@@ -168,7 +168,7 @@ test.describe("Subs: the subcontractor & compliance week", () => {
     } finally {
       // Restore the hold state so reruns see the same starting state
       await page.request.patch("/api/accounting/payables", {
-        data: { action: "update_bill", billId, status: "hold" },
+        data: { action: "update_bill", billId, status: "hold_waiver" },
       });
     }
   });

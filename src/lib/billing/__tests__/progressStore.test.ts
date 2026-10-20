@@ -111,7 +111,7 @@ describe("the deposit", () => {
     db.t.jobs = [job({ sov: SOV, award: { depositId: "dep" } })];
     db.t.documents.push({ id: "dep", number: "3526-01", status: "issued", total_cents: 20_000, created_at: "2026-09-01T00:00:00Z" });
     let net = 20_000; // the deposit invoice
-    for (const asked of [{ "sov:0": 30 }, { "sov:0": 75, "sov:1": 40 }, { "sov:0": 100, "sov:1": 100 }]) {
+    for (const asked of [{ "sov:0": 30 }, { "sov:0": 75, "sov:1": 40 }, { "sov:0": 100, "sov:1": 100 }] as Record<string, number>[]) {
       const made = await createDrawDraft(JOB, asked, "lando");
       net += made.draw.dueCents;
       db.t.documents.find((d) => d.id === made.documentId)!.status = "issued";
