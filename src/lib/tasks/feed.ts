@@ -19,6 +19,8 @@ import { addDays, localDay } from "@/lib/crew/time";
 import { loadWaiting } from "@/lib/owner/load";
 import type { Lane } from "@/lib/owner/lanes";
 import { loadPayables } from "@/lib/accounting/payables";
+import { loadBillingCalendar } from "@/lib/accounting/receivables";
+import { loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
 import { jobHref, jobKeyOf, type JobRef } from "@/lib/jobs/hub";
 import { escalationOf, ROLE_INFO, seatHolder, type Person, type Role, type Seat } from "@/lib/roles/seats";
 
@@ -39,7 +41,7 @@ export const KIND_LABEL: Record<TaskKind, string> = {
 
 export type FeedItem = {
   id: string;
-  source: "work" | "waiting" | "crew" | "ops" | "bill";
+  source: "work" | "waiting" | "crew" | "ops" | "bill" | "billing";
   kind: TaskKind;
   title: string;
   detail: string;
@@ -91,12 +93,15 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
   const owners = Object.entries(sections.people)
     .filter(([, p]) => p.role === "owner")
     .map(([e]) => e);
-  const [work, waiting, crewTasks, cards, payables] = await Promise.all([
+  const [work, waiting, crewTasks, cards, payables, cos, calendar, waivers] = await Promise.all([
     db.from("work_items").select("*").eq("status", "open").order("due_on", { ascending: true, nullsFirst: false }).limit(1000),
     loadWaiting(owners).catch(() => []),
     db.from("crew_tasks").select("id,email,title,detail,job_id,job_name,due,status").in("status", ["open", "doing", "blocked"]).limit(500),
     db.from("ops_cards").select("id,title,owner,col,note,updated_at").is("archived_at", null).in("col", ["backlog", "drafting", "review"]).limit(300),
     loadPayables(today).catch(() => ({ rows: [] as Awaited<ReturnType<typeof loadPayables>>["rows"] })),
+    loadChangeOrders(refs, today).catch(() => []),
+    loadBillingCalendar(today).catch(() => []),
+    loadWaivers(refs).catch(() => []),
   ]);
   const nameOfJob = (key: string | null) => (key ? (refs.find((r) => r.key === key)?.name ?? key) : "");
   const out: FeedItem[] = [];
@@ -181,6 +186,57 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
     } else if (b.isOnHold && b.balanceCents > 0) {
       out.push({ ...base, id: `b${b.id}`, kind: "compliance", title: `Clear the hold on ${b.vendorName} ${b.billNumber}`, detail: b.holdReason ?? "On hold", role: "finance", dueOn: b.dueOn, ...placeItem("finance", b.dueOn, 0, today) });
     }
+  }
+
+  // Change orders (0040, SOP-002): awaiting a price ages from the request; a
+  // priced one not sent, and a signed one not billed, are follow-ups.
+  for (const c of cos) {
+    if (c.registerId === null) continue;
+    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
+    if (c.status === "requested") {
+      const due = c.requestedOn ? addDays(c.requestedOn, 2) : null;
+      out.push({ ...base, id: `co${c.registerId}`, kind: "co_price", title: `Price: ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 1, today) });
+    } else if (c.status === "priced" || c.status === "sent") {
+      const due = c.requestedOn ? addDays(c.requestedOn, 7) : null;
+      out.push({ ...base, id: `co${c.registerId}`, kind: "follow_up", title: `${c.status === "priced" ? "Send" : "Get signed"}: ${c.number} ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 2, today) });
+    } else if (c.status === "signed") {
+      out.push({ ...base, id: `co${c.registerId}`, kind: "billing", title: `Bill ${c.number} ${c.title}`, role: "finance", dueOn: null, nowRole: "finance", overdueDays: 0, escalated: false });
+    }
+  }
+
+  // The invoice package at each client's cutoff (SOP-006 Gate 3, SOP-007 §4):
+  // the PM's percent complete 3 business days before, then finance builds it.
+  for (const c of calendar) {
+    if (c.prepOn > addDays(today, 7)) continue;
+    const base = { source: "billing" as const, assignee: "", jobKey: null, job: "", since: null, href: "/app/accounting/billing", editable: false };
+    out.push({ ...base, id: `pc${c.clientId}:${c.day}`, kind: "billing", title: `% complete and photos for ${c.client}`, detail: `${c.openJobs} open job${c.openJobs === 1 ? "" : "s"} · bills ${c.day}`, role: "pm", dueOn: c.prepOn, ...placeItem("pm", c.prepOn, 0, today) });
+    out.push({ ...base, id: `pk${c.clientId}:${c.day}`, kind: "billing", title: `Invoice package for ${c.client}`, detail: [c.delivery, ...c.attachments].join(" · "), role: "finance", dueOn: c.day, ...placeItem("finance", c.day, 0, today) });
+  }
+
+  // Waivers owed: ours with an invoice, a sub's before we pay (S9).
+  const ids = new Set(out.map((i) => i.id));
+  for (const w of waivers) {
+    if (w.status !== "missing") continue;
+    // A sub bill already on hold for its waiver is one item, not two.
+    if (w.direction === "in" && ids.has(`b${w.id.slice(1)}`)) continue;
+    out.push({
+      id: `wv${w.id}`,
+      source: "billing",
+      kind: "compliance",
+      title: w.direction === "out" ? `Waiver for ${w.covers} (${w.party})` : `Collect ${w.party}'s waiver for ${w.covers}`,
+      detail: `${(w.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} · ${w.kind.replace("_", " ")}`,
+      role: "finance",
+      nowRole: "finance",
+      assignee: "",
+      jobKey: w.jobKey,
+      job: w.job,
+      dueOn: null,
+      since: null,
+      overdueDays: 0,
+      escalated: false,
+      href: w.coversHref,
+      editable: false,
+    });
   }
 
   return out;

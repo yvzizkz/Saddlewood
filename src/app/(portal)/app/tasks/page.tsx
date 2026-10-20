@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 const PATH = "/app/tasks";
 type SP = Record<string, string | string[] | undefined>;
 
-const SOURCE: Record<FeedItem["source"], string> = { work: "Handed out", waiting: "Waiting on you", crew: "Crew task", ops: "Ops board", bill: "Payables" };
+const SOURCE: Record<FeedItem["source"], string> = { work: "Handed out", waiting: "Waiting on you", crew: "Crew task", ops: "Ops board", bill: "Payables", billing: "Billing" };
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<SP> }) {
   const viewer = await getViewer();

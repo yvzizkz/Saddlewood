@@ -19,6 +19,8 @@ import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
 import { KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
 import { NewTask } from "@/components/tasks/TaskActions";
+import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
+import { CO_LABEL, loadChangeOrders } from "@/lib/billing/registers";
 
 export const dynamic = "force-dynamic";
 
@@ -163,8 +165,67 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     );
   }
 
-  if (tab === "money" || tab === "changes" || tab === "documents") {
-    const docs = tab === "changes" ? money.issued.filter((d) => d.kind === "change_order") : money.issued;
+  if (tab === "changes") {
+    const refs = await listJobRefs();
+    const cos = (await loadChangeOrders(refs, today)).filter((c) => c.jobKey === ref.key);
+    const waiting = cos.filter((c) => c.registerId !== null && !["billed", "rejected", "void"].includes(c.status));
+    const table: TableRow[] = cos.map((c) => ({
+      id: c.id,
+      number: c.number,
+      title: c.title,
+      href: c.documentId ? `/app/money/${c.documentId}` : null,
+      status: CO_LABEL[c.status],
+      source: c.source,
+      requested: c.requestedOn,
+      age: c.ageDays,
+      amount: c.amountCents,
+      billedHref: c.billedDocumentId ? `/app/money/${c.billedDocumentId}` : null,
+    }));
+    return (
+      <JobFrame {...frame}>
+        <RequestChangeOrder job={ref.key} />
+        {waiting.length ? (
+          <Card className="p-4">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Moving</p>
+            <ul className="divide-y divide-[var(--color-stone)]">
+              {waiting.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--color-charcoal)]">
+                      {c.number ? <span className="font-medium">{c.number} </span> : null}
+                      {c.title}
+                    </p>
+                    <p className="text-xs text-[var(--color-charcoal-light)]">
+                      {[CO_LABEL[c.status], c.amountCents !== null ? formatValue("money", c.amountCents) : null, c.ageDays !== null ? `${c.ageDays} day${c.ageDays === 1 ? "" : "s"} since asked` : null].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <ChangeOrderStep id={c.registerId!} status={c.status} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
+        <DataTable
+          rows={table}
+          columns={[
+            { key: "number", header: "CO", kind: "text", hrefKey: "href", subKey: "title", phone: "title" },
+            { key: "status", header: "Where it is", kind: "text", filter: true },
+            { key: "source", header: "From", kind: "text", filter: true, phone: "hide" },
+            { key: "requested", header: "Asked", kind: "date" },
+            { key: "age", header: "Days open", kind: "count", phone: "hide" },
+            { key: "amount", header: "Amount", kind: "money", total: true, phone: "value" },
+          ]}
+          searchKeys={["number", "title", "status", "source"]}
+          name={`${ref.key}-change-orders`}
+          initialSort={{ key: "requested", dir: "desc" }}
+          empty="No change orders on this job. Record one the day the change is asked for (SOP-002)."
+        />
+      </JobFrame>
+    );
+  }
+
+  if (tab === "money" || tab === "documents") {
+    const docs = money.issued;
     const paidOn = new Map<string, number>();
     for (const c of money.collected) if (c.documentId) paidOn.set(c.documentId, (paidOn.get(c.documentId) ?? 0) + c.amountCents);
     const openBy = new Map(money.open.map((o) => [o.id, o]));
@@ -210,7 +271,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             ))}
           </dl>
         ) : null}
-        <DataTable rows={table} columns={columns} searchKeys={["number", "title", "kind", "status"]} name={`${ref.key}-${tab}`} rowHrefKey="href" initialSort={{ key: "day", dir: "desc" }} empty={tab === "changes" ? "No change orders on this job yet." : "Nothing billed on this job yet."} />
+        <DataTable rows={table} columns={columns} searchKeys={["number", "title", "kind", "status"]} name={`${ref.key}-${tab}`} rowHrefKey="href" initialSort={{ key: "day", dir: "desc" }} empty="Nothing billed on this job yet." />
         {tab === "money" ? (
           <>
             <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Payments received</p>
