@@ -287,19 +287,16 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
       }
     }
     const asked = input.asked.trim();
+    const crewJobId = crewJobIdOf(input.jobId);
     if (asked.length >= 2) {
       const title = asked.slice(0, 200);
-      const { data: existingCo, error: coSelErr } = await db
-        .from("change_orders")
-        .select("id")
-        .eq("crew_job_id", input.jobId)
-        .eq("title", title)
-        .maybeSingle();
+      const lookup = db.from("change_orders").select("id").eq("title", title);
+      const { data: existingCo, error: coSelErr } = await (crewJobId ? lookup.eq("crew_job_id", crewJobId) : lookup.is("crew_job_id", null)).maybeSingle();
       if (coSelErr) console.error("syncEodDirectivesAndDecisions change_orders lookup failed:", coSelErr);
       if (!existingCo) {
         const { error: coErr } = await db.from("change_orders").insert({
           job_id: billingJobId,
-          crew_job_id: input.jobId || null,
+          crew_job_id: crewJobId,
           title,
           detail: `Directive captured on ${input.day} EOD log (#${input.entryId}).`,
           source: "directive",
