@@ -36,7 +36,7 @@ describe("loadPayables without 0031", () => {
     const ok = { data: [], error: null };
     const q = (res: unknown) => {
       const b: Record<string, unknown> = {};
-      for (const k of ["select", "neq", "order", "is", "eq"]) b[k] = () => b;
+      for (const k of ["select", "neq", "order", "is", "eq", "range"]) b[k] = () => b;
       b.then = (f: (v: unknown) => unknown) => Promise.resolve(res).then(f);
       return b;
     };

@@ -7,6 +7,7 @@ import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { CATEGORY_LABEL, loadJobCost, type CostLine } from "@/lib/accounting/jobCost";
 import PayablesMissing from "@/components/accounting/PayablesMissing";
+import CappedNotice from "@/components/accounting/CappedNotice";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 
 export const dynamic = "force-dynamic";
@@ -109,6 +110,7 @@ export default async function JobCostingPage({ searchParams }: { searchParams: P
       filters={d.filters}
     >
       {cur.payablesMissing ? <PayablesMissing /> : null}
+      {cur.capped || prev.capped ? <CappedNotice what="purchase lines or bills" /> : null}
       <KpiHeader
         label="Cost"
         value={cost}

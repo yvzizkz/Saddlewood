@@ -7,6 +7,7 @@ import KpiHeader from "@/components/data/KpiHeader";
 import { loadPayables } from "@/lib/accounting/payables";
 import { payablesRows, type ApRow, type Measure } from "@/lib/accounting/payablesView";
 import PayablesMissing from "@/components/accounting/PayablesMissing";
+import CappedNotice from "@/components/accounting/CappedNotice";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { periodParams, resolvePeriod } from "@/lib/analytics/period";
@@ -27,7 +28,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
   const mParam = one("m");
   const measure: Measure = mParam === "billed" || mParam === "paid" ? mParam : "open";
 
-  const { rows: allRows, payments, fridayCutoff, missing } = await loadPayables();
+  const { rows: allRows, payments, fridayCutoff, missing, capped } = await loadPayables();
   // Open AP is what is owed now, whenever billed; billed and paid are the period's (paid by the day it went out).
   const now = payablesRows(allRows, payments, measure, period.from, period.to);
   const before = measure === "open" ? undefined : payablesRows(allRows, payments, measure, period.previous.from, period.previous.to);
@@ -154,6 +155,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
       }
     >
       {missing ? <PayablesMissing /> : null}
+      {capped ? <CappedNotice what="bills or payments" /> : null}
       <KpiHeader
         label={headlineLabel}
         value={headlineValue}

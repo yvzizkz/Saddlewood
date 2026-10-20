@@ -5,6 +5,7 @@ import AccountingFrame from "@/components/accounting/AccountingFrame";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
 import { loadPurchases, type PurchaseItemRow } from "@/lib/accounting/purchases";
+import CappedNotice from "@/components/accounting/CappedNotice";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
@@ -24,7 +25,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
   const view = one("view") === "trips" ? "trips" : "items";
 
-  const { rows: allRows, jobs, unmatched } = await loadPurchases(period.previous.from, period.to);
+  const { rows: allRows, jobs, unmatched, capped } = await loadPurchases(period.previous.from, period.to);
   const now = allRows.filter((r) => inRange(r.purchasedOn, period.from, period.to));
   const before = allRows.filter((r) => inRange(r.purchasedOn, period.previous.from, period.previous.to));
 
@@ -222,6 +223,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
         </div>
       }
     >
+      {capped ? <CappedNotice what="purchase lines" /> : null}
       <KpiHeader
         label="Material & purchase spend"
         value={totalSpendCents}
