@@ -32,13 +32,13 @@ export async function PATCH(request: NextRequest) {
   if (action === "update_bill") {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (typeof body.status === "string") patch.status = body.status;
-    if (body.holdReason !== undefined) patch.hold_reason = body.holdReason;
     if (body.waiverReceived === true) {
-      patch.waiver_received_on = localDay();
-      if (body.clearHold === true) {
-        patch.status = "approved";
-        patch.hold_reason = null;
-      }
+      patch.waiver_status = "conditional_received";
+    }
+    if (body.clearHold === true) {
+      patch.status = "scheduled";
+      patch.approved_by = actor;
+      patch.approved_at = new Date().toISOString();
     }
     const { error } = await db.from("bills").update(patch).eq("id", billId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -51,8 +51,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "amountCents must be positive" }, { status: 400 });
     }
     const method = typeof body.method === "string" ? body.method : "melio";
-    const reference = typeof body.reference === "string" && body.reference.trim() ? body.reference.trim() : null;
-    const waiverType = typeof body.waiverType === "string" && body.waiverType.trim() ? body.waiverType.trim() : "conditional_progress";
+    const reference = typeof body.reference === "string" ? body.reference.trim() : "";
 
     const { error: payErr } = await db.from("bill_payments").insert({
       bill_id: billId,
@@ -60,12 +59,12 @@ export async function PATCH(request: NextRequest) {
       amount_cents: amountCents,
       method,
       reference,
-      waiver_type: waiverType,
-      notes: `Recorded by ${actor}`,
+      waiver_collected: true,
+      recorded_by: actor,
+      note: `Recorded by ${actor}`,
     });
     if (payErr) return NextResponse.json({ ok: false, error: payErr.message }, { status: 500 });
 
-    // Recompute bill total vs payments to set status = 'paid' or 'partial'
     const [billRes, allPayRes] = await Promise.all([
       db.from("bills").select("amount_cents").eq("id", billId).maybeSingle(),
       db.from("bill_payments").select("amount_cents").eq("bill_id", billId).is("voided_at", null),
@@ -81,7 +80,7 @@ export async function PATCH(request: NextRequest) {
       .from("bills")
       .update({
         status: nextStatus,
-        hold_reason: null,
+        waiver_status: nextStatus === "paid" ? "final_received" : "conditional_received",
         updated_at: new Date().toISOString(),
       })
       .eq("id", billId);

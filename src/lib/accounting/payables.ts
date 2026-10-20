@@ -8,24 +8,29 @@ import { listTrades, resolveTrade, type Trade } from "./trades";
 
 export type BillStatus =
   | "draft"
-  | "pending_approval"
-  | "approved"
-  | "on_hold"
+  | "needs_approval"
+  | "hold_waiver"
+  | "hold_coi"
+  | "open"
   | "scheduled"
   | "partial"
   | "paid"
+  | "disputed"
   | "void";
+
+export type WaiverStatus = "not_required" | "missing" | "conditional_received" | "final_received";
 
 export type BillPaymentItem = {
   id: string;
   billId: string;
   paidOn: string;
   amountCents: number;
+  feeCents: number;
   method: string;
   reference: string | null;
-  melioPaymentId: string | null;
-  waiverType: string | null;
-  notes: string | null;
+  waiverCollected: boolean;
+  recordedBy: string;
+  note: string | null;
 };
 
 export type PayableRow = {
@@ -48,10 +53,12 @@ export type PayableRow = {
   balanceCents: number;
   status: BillStatus;
   statusLabel: string;
+  isOnHold: boolean;
   holdReason: string | null;
-  waiverRequired: boolean;
-  waiverReceivedOn: string | null;
-  paymentMethod: string;
+  waiverStatus: WaiverStatus;
+  waiverLabel: string;
+  paymentTerms: string;
+  paymentTermsLabel: string;
   purchaseTripKey: string | null;
   bidPackageId: string | null;
   description: string;
@@ -67,8 +74,8 @@ export type PayableRow = {
 type DbBillRow = {
   id: string;
   bill_number: string;
+  kind: string;
   vendor_name: string;
-  vendor_kind: string;
   sub_id: string | null;
   job_id: string | null;
   crew_job_id: string | null;
@@ -76,16 +83,15 @@ type DbBillRow = {
   purchase_trip_key: string | null;
   trade: string;
   issued_on: string;
-  due_on: string;
+  due_on: string | null;
   amount_cents: number;
   retainage_cents: number;
   status: BillStatus;
-  hold_reason: string | null;
-  waiver_required: boolean;
-  waiver_received_on: string | null;
-  payment_method: string | null;
-  description: string;
-  notes: string | null;
+  waiver_status: WaiverStatus;
+  payment_terms: string;
+  approved_by: string;
+  approved_at: string | null;
+  note: string;
 };
 
 type DbBillPaymentRow = {
@@ -93,31 +99,48 @@ type DbBillPaymentRow = {
   bill_id: string;
   paid_on: string;
   amount_cents: number;
+  fee_cents: number;
   method: string;
-  reference: string | null;
-  melio_payment_id: string | null;
-  waiver_type: string | null;
-  notes: string | null;
+  reference: string;
+  waiver_collected: boolean;
+  recorded_by: string;
+  note: string;
   voided_at: string | null;
 };
 
 type DbSubRow = {
   id: string;
   name: string;
-  coi_on_file: boolean;
-  coi_expires_at: string | null;
+  coi_expires_on: string | null;
   w9_on_file: boolean;
 };
 
 const STATUS_LABELS: Record<BillStatus, string> = {
   draft: "Draft",
-  pending_approval: "Pending PM approval",
-  approved: "Approved for pay run",
-  on_hold: "On hold (compliance)",
-  scheduled: "Scheduled (Melio/ACH)",
+  needs_approval: "Needs PM approval",
+  hold_waiver: "Hold · Missing waiver",
+  hold_coi: "Hold · Expired COI",
+  open: "Approved / Open",
+  scheduled: "Scheduled (Friday run)",
   partial: "Partially paid",
   paid: "Paid",
+  disputed: "Disputed",
   void: "Void",
+};
+
+const WAIVER_LABELS: Record<WaiverStatus, string> = {
+  not_required: "Not required",
+  missing: "Waiver missing",
+  conditional_received: "Conditional waiver on file",
+  final_received: "Unconditional final waiver on file",
+};
+
+const TERMS_LABELS: Record<string, string> = {
+  friday_run: "Friday Melio/ACH run",
+  pay_when_paid: "Pay-when-paid",
+  net_15: "Net 15",
+  net_30: "Net 30",
+  due_on_receipt: "Due on receipt",
 };
 
 function daysBetween(fromDay: string, toDay: string): number {
@@ -144,7 +167,7 @@ export async function loadPayables(today = localDay()): Promise<{
   const [billsRes, payRes, subsRes, crewJobsRes, billingJobsRes, trades] = await Promise.all([
     db.from("bills").select("*").neq("status", "void").order("issued_on", { ascending: false }),
     db.from("bill_payments").select("*").is("voided_at", null).order("paid_on", { ascending: false }),
-    db.from("subs").select("id,name,coi_on_file,coi_expires_at,w9_on_file"),
+    db.from("subs").select("id,name,coi_expires_on,w9_on_file"),
     db.from("crew_jobs").select("id,name"),
     db.from("jobs").select("id,name,crew_job_id"),
     listTrades(),
@@ -158,11 +181,12 @@ export async function loadPayables(today = localDay()): Promise<{
     billId: p.bill_id,
     paidOn: p.paid_on,
     amountCents: Number(p.amount_cents) || 0,
+    feeCents: Number(p.fee_cents) || 0,
     method: p.method,
-    reference: p.reference,
-    melioPaymentId: p.melio_payment_id,
-    waiverType: p.waiver_type,
-    notes: p.notes,
+    reference: p.reference || null,
+    waiverCollected: Boolean(p.waiver_collected),
+    recordedBy: p.recorded_by || "",
+    note: p.note || null,
   }));
 
   const paidByBill = new Map<string, number>();
@@ -197,7 +221,8 @@ export async function loadPayables(today = localDay()): Promise<{
         ? (billingJobsById.get(b.job_id)?.name ?? b.job_id)
         : "Shop & Overhead";
 
-    const pastDue = balanceCents > 0 ? daysBetween(b.due_on, today) : 0;
+    const dueOn = b.due_on || b.issued_on;
+    const pastDue = balanceCents > 0 ? daysBetween(dueOn, today) : 0;
     let agingBucket = "Paid";
     if (balanceCents > 0) {
       if (pastDue <= 0) agingBucket = "Current (not yet due)";
@@ -209,16 +234,32 @@ export async function loadPayables(today = localDay()): Promise<{
     const sub = b.sub_id ? subsById.get(b.sub_id) : undefined;
     let coiStatus: PayableRow["coiStatus"] = "n/a";
     if (sub) {
-      if (!sub.coi_on_file) coiStatus = "missing";
-      else if (sub.coi_expires_at && sub.coi_expires_at < today) coiStatus = "expired";
+      if (!sub.coi_expires_on) coiStatus = "missing";
+      else if (sub.coi_expires_on < today) coiStatus = "expired";
       else coiStatus = "valid";
+    }
+
+    const isOnHold =
+      b.status === "hold_waiver" ||
+      b.status === "hold_coi" ||
+      b.status === "needs_approval" ||
+      b.waiver_status === "missing" ||
+      coiStatus === "expired";
+
+    let holdReason: string | null = null;
+    if (b.status === "hold_waiver" || b.waiver_status === "missing") {
+      holdReason = b.note || "Missing conditional progress lien waiver (SOP-004)";
+    } else if (b.status === "hold_coi" || coiStatus === "expired") {
+      holdReason = b.note || "Subcontractor COI expired — renewal required before payment";
+    } else if (b.status === "needs_approval") {
+      holdReason = b.note || "Awaiting PM field verification & sign-off";
     }
 
     return {
       id: b.id,
       billNumber: b.bill_number,
       vendorName: b.vendor_name,
-      vendorKind: b.vendor_kind,
+      vendorKind: b.kind,
       subId: b.sub_id,
       jobId: rawCrewJobId ?? b.job_id ?? "overhead",
       rawCrewJobId,
@@ -227,26 +268,28 @@ export async function loadPayables(today = localDay()): Promise<{
       trade: t?.key ?? "general",
       tradeLabel: t?.label ?? "General conditions",
       issuedOn: b.issued_on,
-      dueOn: b.due_on,
+      dueOn,
       amountCents,
       retainageCents,
       paidCents,
       balanceCents,
       status: b.status,
       statusLabel: STATUS_LABELS[b.status] ?? b.status,
-      holdReason: b.hold_reason,
-      waiverRequired: b.waiver_required,
-      waiverReceivedOn: b.waiver_received_on,
-      paymentMethod: b.payment_method ?? "melio",
+      isOnHold,
+      holdReason,
+      waiverStatus: b.waiver_status,
+      waiverLabel: WAIVER_LABELS[b.waiver_status] ?? b.waiver_status,
+      paymentTerms: b.payment_terms,
+      paymentTermsLabel: TERMS_LABELS[b.payment_terms] ?? b.payment_terms,
       purchaseTripKey: b.purchase_trip_key,
       bidPackageId: b.bid_package_id,
       description: b.description || "",
-      notes: b.notes,
+      notes: b.note || null,
       agingBucket,
       daysPastDue: Math.max(0, pastDue),
-      dueByFriday: balanceCents > 0 && b.due_on <= fridayCutoff,
+      dueByFriday: balanceCents > 0 && dueOn <= fridayCutoff,
       coiStatus,
-      coiExpiresAt: sub?.coi_expires_at ?? null,
+      coiExpiresAt: sub?.coi_expires_on ?? null,
       w9OnFile: sub ? sub.w9_on_file : null,
     };
   });

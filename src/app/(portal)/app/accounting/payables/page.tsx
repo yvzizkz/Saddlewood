@@ -57,8 +57,8 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
   const openCents = d.rows.reduce((a, r) => a + r.balanceCents, 0);
   const billedCents = d.rows.reduce((a, r) => a + r.amountCents, 0);
   const paidCents = d.rows.reduce((a, r) => a + r.paidCents, 0);
-  const dueFridayCents = d.rows.filter((r) => r.dueByFriday && r.status !== "on_hold").reduce((a, r) => a + r.balanceCents, 0);
-  const heldBills = d.rows.filter((r) => r.status === "on_hold" && r.balanceCents > 0);
+  const dueFridayCents = d.rows.filter((r) => r.dueByFriday && !r.isOnHold).reduce((a, r) => a + r.balanceCents, 0);
+  const heldBills = d.rows.filter((r) => r.isOnHold && r.balanceCents > 0);
   const onHoldCents = heldBills.reduce((a, r) => a + r.balanceCents, 0);
 
   const base = {
@@ -70,12 +70,8 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
   const tableRows: TableRow[] = d.rows.map((r) => {
     const billHref = `${PATH}/bill/${r.id}`;
     const complianceFlags = [
-      r.holdReason ? `Hold: ${r.holdReason}` : "",
-      r.waiverRequired
-        ? r.waiverReceivedOn
-          ? `Waiver rec'd ${formatValue("date", r.waiverReceivedOn)}`
-          : "Waiver required"
-        : "",
+      r.holdReason ? r.holdReason : "",
+      r.waiverStatus !== "not_required" ? r.waiverLabel : "",
       r.coiStatus === "expired" ? "COI expired" : r.coiStatus === "missing" ? "COI missing" : "",
       r.retainageCents > 0 ? `Retainage ${formatValue("money", r.retainageCents)}` : "",
     ]
@@ -95,7 +91,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
       trade: r.tradeLabel,
       tradeHref: hrefOf(PATH, { ...base, trade: r.trade }),
       status: r.statusLabel,
-      complianceSub: complianceFlags || `Via ${r.paymentMethod.toUpperCase()}`,
+      complianceSub: complianceFlags || r.paymentTermsLabel,
       aging: r.agingBucket,
       amount: r.amountCents,
       paid: r.paidCents,

@@ -43,11 +43,11 @@ export function ComplianceHoldBanner({ heldBills }: { heldBills: PayableRow[] })
         <div className="flex items-center gap-2">
           <ShieldAlert className="size-4 shrink-0 text-[#9a2a1f]" aria-hidden="true" />
           <h2 className="text-sm font-semibold text-[var(--color-charcoal)]">
-            Compliance hold — {heldBills.length} {heldBills.length === 1 ? "bill" : "bills"} blocked from Friday Melio run
+            Compliance & approval hold — {heldBills.length} {heldBills.length === 1 ? "bill" : "bills"} blocked from Friday Melio run
           </h2>
         </div>
         <p className="text-xs text-[var(--color-charcoal-light)]">
-          SOP-004: Conditional lien waiver & active COI required before disbursement.
+          SOP-004: PM verification, conditional lien waiver & active COI required before disbursement.
         </p>
       </div>
       <ul className="mt-3 divide-y divide-[var(--color-stone)]">
@@ -63,7 +63,7 @@ export function ComplianceHoldBanner({ heldBills }: { heldBills: PayableRow[] })
                   <span className="ml-1.5 font-semibold tabular-nums">{formatValue("money", b.balanceCents)}</span>
                 </p>
                 <p className="text-xs text-[#9a2a1f]">
-                  {b.holdReason || "Missing conditional lien waiver / compliance check"} · {b.job}
+                  {b.holdReason || b.statusLabel} · {b.job}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -74,7 +74,7 @@ export function ComplianceHoldBanner({ heldBills }: { heldBills: PayableRow[] })
                   className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[var(--color-teal)] px-3 text-xs font-medium text-white disabled:opacity-50"
                 >
                   <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  Mark waiver & COI verified
+                  Verify & queue for Friday run
                 </button>
               </div>
             </li>
@@ -88,7 +88,7 @@ export function ComplianceHoldBanner({ heldBills }: { heldBills: PayableRow[] })
 export function BillDetailControls({ bill }: { bill: PayableRow }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [method, setMethod] = useState(bill.paymentMethod || "melio");
+  const [method, setMethod] = useState("melio");
   const [reference, setReference] = useState("");
   const [amountDollars, setAmountDollars] = useState((bill.balanceCents / 100).toFixed(2));
   const [msg, setMsg] = useState<string | null>(null);
@@ -103,11 +103,10 @@ export function BillDetailControls({ bill }: { bill: PayableRow }) {
         billId: bill.id,
         waiverReceived: true,
         clearHold: true,
-        status: "approved",
       }),
     });
     if (res.ok) {
-      setMsg("Bill approved for Friday pay run");
+      setMsg("Bill verified & scheduled for Friday pay run");
       start(() => router.refresh());
     }
   };
@@ -127,7 +126,6 @@ export function BillDetailControls({ bill }: { bill: PayableRow }) {
         amountCents: cents,
         method,
         reference: reference || `${method.toUpperCase()}-${new Date().toISOString().slice(0, 10)}`,
-        waiverType: cents >= bill.balanceCents ? "unconditional_final" : "conditional_progress",
       }),
     });
     if (res.ok) {
@@ -141,7 +139,7 @@ export function BillDetailControls({ bill }: { bill: PayableRow }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--color-stone)] bg-[#faf7f2] p-4">
       <div className="flex flex-wrap items-center gap-2">
-        {bill.status === "on_hold" || bill.status === "pending_approval" || (bill.waiverRequired && !bill.waiverReceivedOn) ? (
+        {bill.isOnHold ? (
           <button
             type="button"
             disabled={pending}
@@ -149,7 +147,7 @@ export function BillDetailControls({ bill }: { bill: PayableRow }) {
             className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--color-teal)] px-3.5 text-xs font-medium text-white disabled:opacity-50"
           >
             <CheckCircle2 className="size-4" aria-hidden="true" />
-            Verify waiver & approve for Friday run
+            Verify waiver & schedule for Friday run
           </button>
         ) : null}
         {msg ? <span className="text-xs font-medium text-[#2f6b4a]">{msg}</span> : null}

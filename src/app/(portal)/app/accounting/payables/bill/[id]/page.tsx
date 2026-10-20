@@ -54,7 +54,7 @@ export default async function PayableBillPage({ params }: { params: Promise<{ id
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   bill.status === "paid"
                     ? "bg-[#e8f2ec] text-[#2f6b4a]"
-                    : bill.status === "on_hold"
+                    : bill.isOnHold
                       ? "bg-[#fae8e5] text-[#9a2a1f]"
                       : "bg-[var(--color-cream)] text-[var(--color-charcoal)]"
                 }`}
@@ -77,19 +77,13 @@ export default async function PayableBillPage({ params }: { params: Promise<{ id
               ) : null}
               <Row label="Paid to date">{formatValue("money", bill.paidCents)}</Row>
               <Row label="Open AP balance">{formatValue("money", bill.balanceCents)}</Row>
-              <Row label="Disbursement channel">{bill.paymentMethod.toUpperCase()}</Row>
+              <Row label="Payment terms">{bill.paymentTermsLabel}</Row>
               {bill.holdReason ? (
-                <Row label="Compliance hold reason">
+                <Row label="Compliance / Approval status">
                   <span className="text-[#9a2a1f]">{bill.holdReason}</span>
                 </Row>
               ) : null}
-              <Row label="Lien waiver (AZ statutory)">
-                {bill.waiverRequired
-                  ? bill.waiverReceivedOn
-                    ? `Received ${formatValue("date", bill.waiverReceivedOn)}`
-                    : "Required before Friday pay run"
-                  : "Not required (material supplier / utility)"}
-              </Row>
+              <Row label="Lien waiver (AZ statutory)">{bill.waiverLabel}</Row>
               {bill.subId ? (
                 <>
                   <Row label="Sub COI status">
@@ -121,7 +115,7 @@ export default async function PayableBillPage({ params }: { params: Promise<{ id
                     <tr className="border-y border-[var(--color-stone)] bg-[#faf7f2] text-left text-[11px] uppercase tracking-[0.08em] text-[var(--color-charcoal-light)]">
                       <th className="px-3 py-2 font-medium">Paid date</th>
                       <th className="px-3 py-2 font-medium">Method / Ref</th>
-                      <th className="px-3 py-2 font-medium">Waiver logged</th>
+                      <th className="px-3 py-2 font-medium">Waiver collected</th>
                       <th className="px-3 py-2 text-right font-medium">Amount</th>
                     </tr>
                   </thead>
@@ -134,12 +128,12 @@ export default async function PayableBillPage({ params }: { params: Promise<{ id
                             {p.method.toUpperCase()}
                             {p.reference ? ` · ${p.reference}` : ""}
                           </p>
-                          {p.melioPaymentId ? (
-                            <p className="text-xs text-[var(--color-charcoal-light)]">Melio ID: {p.melioPaymentId}</p>
+                          {p.note ? (
+                            <p className="text-xs text-[var(--color-charcoal-light)]">{p.note}</p>
                           ) : null}
                         </td>
                         <td className="px-3 py-2.5 text-xs text-[var(--color-charcoal-light)]">
-                          {p.waiverType ? p.waiverType.replace(/_/g, " ") : "—"}
+                          {p.waiverCollected ? "Signed waiver on file" : "Pending"}
                         </td>
                         <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-[var(--color-charcoal)]">
                           {formatValue("money", p.amountCents)}
