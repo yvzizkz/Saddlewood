@@ -22,13 +22,15 @@ async function factsOf(db: ReturnType<typeof getSupabaseAdmin>, billId: string):
   if (!data) return null;
   const bill = data as BillRow;
   let coiExpired = false;
+  let coiMissing = false;
   if (bill.sub_id) {
     const { data: sub, error: subErr } = await db.from("subs").select("coi_expires_on").eq("id", bill.sub_id).maybeSingle();
     if (subErr) throw new Error(`subs read: ${subErr.message}`);
     const on = (sub as { coi_expires_on: string | null } | null)?.coi_expires_on ?? null;
-    coiExpired = !!on && on < localDay();
+    coiMissing = !on;
+    coiExpired = !on || on < localDay();
   }
-  return { bill, facts: { kind: bill.kind, status: bill.status, waiverStatus: bill.waiver_status, coiExpired } };
+  return { bill, facts: { kind: bill.kind, status: bill.status, waiverStatus: bill.waiver_status, coiExpired, coiMissing } };
 }
 
 export async function PATCH(request: NextRequest) {

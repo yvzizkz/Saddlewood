@@ -51,21 +51,26 @@ beforeEach(() => {
     subs: [
       { id: "s-ok", coi_expires_on: "2027-01-01" },
       { id: "s-old", coi_expires_on: "2026-09-30" },
+      { id: "s-missing", coi_expires_on: null },
     ],
     bills: [
       { id: "b-open", kind: "sub", sub_id: "s-ok", status: "open", waiver_status: "conditional_received", amount_cents: 100_000 },
       { id: "b-held", kind: "sub", sub_id: "s-ok", status: "hold_waiver", waiver_status: "missing", amount_cents: 100_000 },
       { id: "b-coi", kind: "sub", sub_id: "s-old", status: "hold_coi", waiver_status: "conditional_received", amount_cents: 100_000 },
       { id: "b-vendor", kind: "vendor", sub_id: null, status: "open", waiver_status: "not_required", amount_cents: 50_000 },
+      { id: "b-coi-missing", kind: "sub", sub_id: "s-missing", status: "hold_coi", waiver_status: "conditional_received", amount_cents: 100_000 },
+      { id: "b-open-no-coi", kind: "sub", sub_id: "s-missing", status: "open", waiver_status: "conditional_received", amount_cents: 100_000 },
     ],
     bill_payments: [],
   };
 });
 
 describe("record_payment", () => {
-  it("refuses a bill on hold, and one whose sub's COI is expired", async () => {
+  it("refuses a bill on hold, one whose sub's COI is expired, and one whose sub's COI is missing", async () => {
     expect((await PATCH(req({ action: "record_payment", billId: "b-held", amountCents: 100_000, waiverCollected: true }))).status).toBe(409);
     expect((await PATCH(req({ action: "record_payment", billId: "b-coi", amountCents: 100_000, waiverCollected: true }))).status).toBe(409);
+    expect((await PATCH(req({ action: "record_payment", billId: "b-coi-missing", amountCents: 100_000, waiverCollected: true }))).status).toBe(409);
+    expect((await PATCH(req({ action: "record_payment", billId: "b-open-no-coi", amountCents: 100_000, waiverCollected: true }))).status).toBe(409);
     expect(db.tables.bill_payments).toHaveLength(0);
   });
 
@@ -85,16 +90,19 @@ describe("record_payment", () => {
 });
 
 describe("update_bill", () => {
-  it("won't clear a COI hold while the COI is expired, and clears a waiver hold only", async () => {
+  it("won't clear a COI hold while the COI is expired or missing, and clears a waiver hold only", async () => {
     expect((await PATCH(req({ action: "update_bill", billId: "b-coi", clearHold: "coi" }))).status).toBe(409);
     expect(db.tables.bills[2].status).toBe("hold_coi");
+    expect((await PATCH(req({ action: "update_bill", billId: "b-coi-missing", clearHold: "coi" }))).status).toBe(409);
+    expect(db.tables.bills[4].status).toBe("hold_coi");
     expect((await PATCH(req({ action: "update_bill", billId: "b-held", clearHold: "waiver" }))).status).toBe(200);
     expect(db.tables.bills[1]).toMatchObject({ status: "scheduled", waiver_status: "conditional_received" });
   });
 
-  it("refuses a status that isn't settable, and scheduling a held bill", async () => {
+  it("refuses a status that isn't settable, and scheduling a held or missing-COI bill", async () => {
     expect((await PATCH(req({ action: "update_bill", billId: "b-open", status: "paid" }))).status).toBe(400);
     expect((await PATCH(req({ action: "update_bill", billId: "b-coi", status: "scheduled" }))).status).toBe(409);
+    expect((await PATCH(req({ action: "update_bill", billId: "b-open-no-coi", status: "scheduled" }))).status).toBe(409);
     expect((await PATCH(req({ action: "update_bill", billId: "b-open", status: "disputed" }))).status).toBe(200);
     expect((await PATCH(req({ action: "update_bill", billId: "b-open", status: "hold" }))).status).toBe(400);
   });
