@@ -4,7 +4,7 @@
 // and directive/ASK intake into `work_items` (docs/COHESIVE-APP-PLAN.md §6.4).
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { normalizeJobName, TRADE_SLUGS, type Trade } from "@/lib/crew/purchases";
+import { normalizeJobName, TRADE_SLUGS, tripKey as computeTripKey, type Trade } from "@/lib/crew/purchases";
 import { localDay } from "@/lib/crew/time";
 import { OTHER_JOB } from "@/lib/crew/types";
 import { jobHref, type JobRef } from "@/lib/jobs/hub";
@@ -473,7 +473,8 @@ export async function loadJobFieldOps(ref: JobRef) {
     if (e.kind === "receipt") {
       const amt = typeof e.data?.amount === "number" ? e.data.amount : 0;
       const customKey = str("normalizedPurchaseKey");
-      const tripKey = customKey ? customKey.replace(/:[^:]*$/, "") : `app:entry:${e.id}`;
+      // The receipt's purchase line is keyed app:<entry id> and is its own trip (0044).
+      const tripKey = customKey ? computeTripKey(customKey) : `app:${e.id}`;
       receipts.push({
         id: e.id,
         day: e.day,

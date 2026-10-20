@@ -299,3 +299,11 @@ export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<Purchase
     jobs,
   };
 }
+
+/**
+ * Whether a seat may open this trip: every line on a job it sees. A trip with
+ * one line on someone else's job (or on no job) is not a PM's to open.
+ */
+export function tripInScope(trip: Pick<PurchaseTripDetail, "lines">, sees: (crewJobId: string | null) => boolean): boolean {
+  return trip.lines.length > 0 && trip.lines.every((l) => sees(l.rawJobId));
+}
