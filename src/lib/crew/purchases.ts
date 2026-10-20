@@ -10,9 +10,33 @@ import { addDays, isDay } from "./time";
 // in job_aliases under the normalized name. Pure, so every rule here is
 // tested without a database; purchaseQueries.ts reads and writes.
 
-/** The owners' short list. Anything Home Depot sells that is none of these is general. */
+/** The owners' short list for the quick search chips. */
 export const TRADES = ["framing", "drywall", "electrical", "plumbing", "paint", "tools", "rentals", "general"] as const;
-export type Trade = (typeof TRADES)[number];
+
+/** The full trade list (matching public.trades in 0029_trades.sql) accepted by trade_map and purchases.trade. */
+export const TRADE_SLUGS = [
+  "general",
+  "demo",
+  "concrete",
+  "framing",
+  "roofing",
+  "windows",
+  "plumbing",
+  "electrical",
+  "hvac",
+  "insulation",
+  "drywall",
+  "finish-carpentry",
+  "cabinets",
+  "tile",
+  "flooring",
+  "paint",
+  "landscape",
+  "cleanup",
+  "tools",
+  "rentals",
+] as const;
+export type Trade = (typeof TRADE_SLUGS)[number];
 
 /** A trip this small is worth noticing: someone drove to the store for a box of screws. */
 export const SMALL_TRIP_CENTS = 7500;
@@ -69,7 +93,7 @@ export function tradeFor(rules: TradeRule[], department: string, cls: string): T
   const hit =
     rules.find((r) => upper(r.department) === d && upper(r.class) === c) ??
     rules.find((r) => upper(r.department) === d && r.class.trim() === "");
-  return hit && (TRADES as readonly string[]).includes(hit.trade) ? (hit.trade as Trade) : "general";
+  return hit && (TRADE_SLUGS as readonly string[]).includes(hit.trade) ? (hit.trade as Trade) : "general";
 }
 
 // ---- what the Mac posts ---------------------------------------------------------------

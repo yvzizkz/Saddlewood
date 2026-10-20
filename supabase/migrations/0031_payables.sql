@@ -90,6 +90,38 @@ create table if not exists public.bill_payments (
 create index if not exists bill_payments_bill_idx on public.bill_payments (bill_id, paid_on desc);
 create index if not exists bill_payments_paid_on_idx on public.bill_payments (paid_on desc);
 
+-- Payments out may not exceed the bill amount, and subcontractor bills require a collected lien waiver (SOP-004).
+create or replace function public.bill_payments_guard()
+returns trigger
+language plpgsql
+as $$
+declare
+  total bigint;
+  gross bigint;
+  bkind text;
+begin
+  select amount_cents, kind into gross, bkind from public.bills where id = new.bill_id;
+  if gross is null then
+    raise exception 'no such bill' using errcode = 'foreign_key_violation';
+  end if;
+  if new.voided_at is null and bkind = 'sub' and not new.waiver_collected then
+    raise exception 'subcontractor bill payment requires waiver_collected = true (SOP-004)' using errcode = 'check_violation';
+  end if;
+  select coalesce(sum(amount_cents), 0) into total
+    from public.bill_payments
+   where bill_id = new.bill_id and voided_at is null;
+  if total > gross then
+    raise exception 'bill payments (%) exceed the bill (%)', total, gross using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_bill_payments_guard on public.bill_payments;
+create trigger trg_bill_payments_guard
+  after insert or update on public.bill_payments
+  for each row execute function public.bill_payments_guard();
+
 alter table public.bills enable row level security;
 alter table public.bill_payments enable row level security;
 
