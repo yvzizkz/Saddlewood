@@ -21,7 +21,9 @@ import { ACCENT, ACCENT_WASH, GRID } from '@/lib/analytics/palette'
 export type ChartPoint = { bucket: string; label: string; value: number }
 export type ChartSlice = { key: string; label: string; value: number; share: number; count: number; color: string; href: string | null }
 
-function useWidth<T extends HTMLElement>(initial = 640) {
+// Starts at 0 and draws once measured: a guessed width would push a phone
+// layout wider than the screen before the first measurement.
+function useWidth<T extends HTMLElement>(initial = 0) {
   const ref = useRef<T>(null)
   const [w, setW] = useState(initial)
   useEffect(() => {
@@ -47,7 +49,7 @@ export function TrendChart({ points, kind, height = 168, label }: { points: Char
   const padB = 22
   const plotW = Math.max(1, width - padL - padR)
   const plotH = height - padT - padB
-  const columns = n <= 16
+  const columns = n <= 31
   const band = plotW / Math.max(1, n)
   const x = (i: number) => padL + (columns ? band * i + band / 2 : n === 1 ? plotW / 2 : (plotW * i) / (n - 1))
   const y = (v: number) => padT + plotH - (v / top) * plotH
@@ -79,8 +81,10 @@ export function TrendChart({ points, kind, height = 168, label }: { points: Char
   const area = n > 1 ? `${line}L${x(n - 1).toFixed(1)},${y(0)}L${x(0).toFixed(1)},${y(0)}Z` : ''
   const h = hover !== null ? points[hover] : null
 
+  if (width === 0) return <div ref={ref} className="w-full min-w-0" style={{ height }} />
+
   return (
-    <div ref={ref} className="relative w-full select-none">
+    <div ref={ref} className="relative w-full min-w-0 select-none">
       <svg
         width={width}
         height={height}

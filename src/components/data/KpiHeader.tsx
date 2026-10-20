@@ -60,22 +60,24 @@ export default function KpiHeader(p: KpiHeaderProps) {
           </div>
         </div>
         {p.stats?.length ? (
-          <dl className="grid flex-1 grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4 md:max-w-xl">
+          <dl className="grid w-full grid-cols-2 gap-x-4 gap-y-3 sm:w-auto sm:flex-1 sm:grid-cols-4 md:max-w-xl">
             {p.stats.map((s) => {
               const v = typeof s.value === 'string' ? s.value : formatValue(s.kind, s.value)
               const inner = (
                 <>
                   <dt className="text-[11px] text-[var(--color-charcoal-light)]">{s.label}</dt>
-                  <dd className="text-lg font-semibold text-[var(--color-charcoal)]">{v}</dd>
+                  <dd className="truncate text-lg font-semibold text-[var(--color-charcoal)]">{v}</dd>
                   {s.hint ? <dd className="text-[11px] text-[var(--color-charcoal-light)]">{s.hint}</dd> : null}
                 </>
               )
               return s.href ? (
-                <Link key={s.label} href={s.href} className="rounded-lg hover:bg-[var(--color-cream)] -m-1 p-1">
+                <Link key={s.label} href={s.href} className="min-w-0 rounded-lg hover:bg-[var(--color-cream)] -m-1 p-1">
                   {inner}
                 </Link>
               ) : (
-                <div key={s.label}>{inner}</div>
+                <div key={s.label} className="min-w-0">
+                  {inner}
+                </div>
               )
             })}
           </dl>
@@ -83,11 +85,11 @@ export default function KpiHeader(p: KpiHeaderProps) {
       </div>
 
       <div className="mt-5 grid gap-6 md:grid-cols-5">
-        <div className="md:col-span-3">
+        <div className="min-w-0 md:col-span-3">
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">{p.trendLabel ?? 'Trend'}</p>
           <TrendChart points={p.trend} kind={p.kind} label={p.trendLabel ?? p.label} />
         </div>
-        <div className="md:col-span-2">
+        <div className="min-w-0 md:col-span-2">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">By {p.breakdown.dim.label.toLowerCase()}</p>
             {p.byOptions.length > 1 ? (
