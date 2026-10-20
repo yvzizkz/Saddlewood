@@ -14,6 +14,7 @@ export type PolicyControl =
   | { type: "percent"; max: number; step?: number }
   | { type: "days"; max: number }
   | { type: "years"; max: number }
+  | { type: "count"; max: number; unit: string }
   | { type: "choice"; options: { value: string; label: string }[] };
 
 export type PolicyDef = {
@@ -206,6 +207,22 @@ export const DECISIONS: DecisionDef[] = [
     ],
   },
   {
+    id: "subbids",
+    title: "Bidding out sub work",
+    question: "How many bids, how long subs get to bid, and who may award?",
+    recommendation: "Three bids on any package of $5,000 or more, five business days to bid, and the PM awards an approved sub inside budget up to $10,000. Above that, an owner.",
+    why: "One bid is a price, not a market. The cheapest headline on the Jon Wright job was the pool sub whose gas line became a $5,500 argument; bids are compared leveled, and a bigger award gets an owner's eyes.",
+    sources: "SOP-008 §2 stages 2 and 5 (three invites, five business days, the PM awards under $10,000 inside budget).",
+    liveIn: "Sub bids: the due date on a new package, the bid-count warning, who may press Award.",
+    laterIn: "",
+    policies: [
+      { key: "policy.subs.minBids", label: "Bids wanted", recommended: 3, control: { type: "count", max: 10, unit: "bids" } },
+      { key: "policy.subs.minBidsFromCents", label: "On packages from", recommended: 500_000, control: { type: "money" }, hint: "Smaller packages may go to one sub." },
+      { key: "policy.subs.bidDays", label: "Time to bid", recommended: 5, control: { type: "days", max: 30 }, hint: "Business days from the invite, due at 5 PM." },
+      { key: "policy.subs.pmAwardLimitCents", label: "The PM awards up to", recommended: 1_000_000, control: { type: "money" }, hint: "An approved sub, inside budget. Anything else goes to an owner." },
+    ],
+  },
+  {
     id: "pmcost",
     title: "What the project manager sees",
     question: "Does the PM see labor cost and margin?",
@@ -254,6 +271,7 @@ export function parsePolicyValue(key: string, value: unknown): boolean | number 
       return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= c.max ? Math.round(value * 100) / 100 : null;
     case "days":
     case "years":
+    case "count":
       return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= c.max ? value : null;
     case "choice":
       return typeof value === "string" && c.options.some((o) => o.value === value) ? value : null;

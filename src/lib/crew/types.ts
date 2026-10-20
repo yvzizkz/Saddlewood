@@ -57,6 +57,10 @@ export const CAPABILITIES = [
   // countersigning also need the owners to allow it in Sales > Settings.
   { key: "sales.view", area: "sales", label: "Sales: work the pipeline and build estimates" },
   { key: "sales.send", area: "sales", label: "Send proposals and countersign them, when Sales settings allow it" },
+  // Subs and bids (0028, SOP-008): the directory, bid packages, invites and
+  // leveling; awarding inside the PM limit in Company policies.
+  { key: "subs.manage", area: "subs", label: "Subs and bids: the directory, bid packages, invites and the leveling sheet" },
+  { key: "subs.award", area: "subs", label: "Award a bid to an approved sub inside budget, up to the PM limit in Company policies" },
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number]["key"];
 export const CAPABILITY_KEYS = CAPABILITIES.map((c) => c.key) as Capability[];
@@ -67,6 +71,7 @@ export function normalizePerms(perms: readonly string[]): Capability[] {
   if (CAPABILITIES.some((c) => c.area === "crew" && c.key !== "crew.view" && set.has(c.key))) set.add("crew.view");
   if (set.has("hours.edit")) set.add("hours.view");
   if (set.has("sales.send")) set.add("sales.view");
+  if (set.has("subs.award")) set.add("subs.manage");
   return CAPABILITY_KEYS.filter((k) => set.has(k));
 }
 

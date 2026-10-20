@@ -1378,6 +1378,7 @@ const AREAS: { area: (typeof CAPABILITIES)[number]['area']; title: string; hint:
   { area: 'projects', title: 'Projects', hint: 'For someone running several jobs. "Only the jobs they are assigned to" needs people on each job (Jobs, then a job).' },
   { area: 'money', title: 'Money', hint: 'Read only unless the owners say otherwise. Sending, payments and pay rates always stay with the owners.' },
   { area: 'sales', title: 'Sales', hint: 'The pipeline and estimates. Sending and countersigning also need the owners to allow it in Sales settings.' },
+  { area: 'subs', title: 'Subs and bids', hint: 'Bidding work out to subs. Bigger awards, and any sub not yet approved, stay with the owners (Company policies).' },
 ]
 
 export function GroupSheet({ group, onClose }: { group: CrewGroup | null; onClose: () => void }) {

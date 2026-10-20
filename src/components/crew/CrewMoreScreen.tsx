@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bell, BellOff, Download, LogOut } from 'lucide-react'
+import Link from 'next/link'
+import { Bell, BellOff, ChevronRight, Download, HardHat, LogOut } from 'lucide-react'
 
 import { triggerOnboardingReplay } from '@/components/auth/OnboardingFlow'
 import { PasskeyCard } from '@/components/auth/PasskeyCard'
@@ -172,6 +173,15 @@ export default function CrewMoreScreen() {
       />
 
       <ReferJob />
+      {home?.me.perms.includes('subs.manage') ? (
+        <Link href="/app/subs" className="mt-4 block">
+          <Card className="flex items-center gap-3 p-4">
+            <HardHat className="size-5 text-[var(--color-teal)]" aria-hidden="true" />
+            <span className="flex-1 text-[15px] font-medium text-[var(--color-charcoal)]">{lang === 'es' ? 'Subcontratistas y ofertas' : 'Subs and bids'}</span>
+            <ChevronRight className="size-4 text-[var(--color-charcoal-light)]" aria-hidden="true" />
+          </Card>
+        </Link>
+      ) : null}
       <InstallCard />
       <NotificationsCard />
       <PasskeyCard lang={lang} />
