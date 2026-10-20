@@ -8,9 +8,11 @@ import { useBot } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle, Segmented } from '@/components/bot/ui'
 import ProjectsView from '@/components/projects/ProjectsView'
 import { useCrew } from '@/components/crew/CrewProvider'
+import { RequestAddSheet, RequestDecideCard, RequestLine, RequestOrderSheet } from '@/components/crew/RequestCards'
 import { ago } from '@/lib/bot/view'
 import { farLabels } from '@/lib/crew/geo'
 import { buildPlan, planAsk, taskStatusWord } from '@/lib/crew/plan'
+import { dollars, pmDecides, requestDetail, requestTitle } from '@/lib/crew/requestRules'
 import { addDays, clock12, clockText, dayLabel, dayShort, hoursText, localDay, localInstant, weekDays, weekStart, workedMinutes } from '@/lib/crew/time'
 import {
   firstNameOf,
@@ -21,6 +23,7 @@ import {
   type CrewJob,
   type CrewPerson,
   type CrewPickup,
+  type CrewRequest,
   type CrewShift,
   type CrewTask,
 } from '@/lib/crew/types'
@@ -60,6 +63,8 @@ type Open =
   | { kind: 'assign'; day: string; preset?: { jobId: string; startTime: string; note: string; priority?: number | null } }
   | { kind: 'pickup-add'; day: string }
   | { kind: 'pickup'; pickup: CrewPickup }
+  | { kind: 'request-add' }
+  | { kind: 'request-order'; request: CrewRequest }
   | { kind: 'group'; group: CrewGroup | null }
   | { kind: 'task-add'; to?: string }
   | { kind: 'task'; task: CrewTask }
@@ -92,9 +97,11 @@ function Row({ children, onClick }: { children: React.ReactNode; onClick?: () =>
 
 /** "In 2.1 mi from the job", "Out 3.4 mi from the job": only when a punch was far. Nothing when it was near or unknown. */
 function FarChips({ shift }: { shift: Pick<CrewShift, 'fromJobM'> }) {
+  // The owners' far-from-job setting (crew.farFromJobM), half a mile to start.
+  const { data } = useCrewAdmin()
   return (
     <>
-      {farLabels(shift.fromJobM).map((label) => (
+      {farLabels(shift.fromJobM, data?.settings['crew.farFromJobM']).map((label) => (
         <Chip key={label} tone="bad">
           {label}
         </Chip>
@@ -106,7 +113,7 @@ function FarChips({ shift }: { shift: Pick<CrewShift, 'fromJobM'> }) {
 // ---- Today ------------------------------------------------------------------------
 
 function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void }) {
-  const { nameOf, run, can } = useCrewAdmin()
+  const { nameOf, run, can, isOwner, refresh, toast } = useCrewAdmin()
   const now = useNow()
   const [range, setRange] = useState<'today' | 'week'>('today')
   // Hours stay with the owners: the lead sees who is on, not the timesheet.
@@ -120,7 +127,19 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
   const blocked = data.tasks.filter((x) => x.status === 'blocked')
   // Your own work is checked by someone else (an owner), so it is never yours to check.
   const toCheck = data.tasks.filter((x) => isReportedDone(x) && x.email !== data.viewer.email)
-  const needs = fixes.length + review.length + cant.length + blocked.length + toCheck.length
+  // Material requests (0023): the ones this viewer decides (an owner: all of them; a PM: on their jobs, not their own,
+  // within the PM limit), the ones approved and not ordered yet, and the rest for the record.
+  const pmLimit = data.settings['requests.pmLimitCents']
+  const asked = data.requests.filter((r) => r.status === 'asked')
+  const toDecide = can('requests.approve') ? asked.filter((r) => isOwner || pmDecides(r, data.viewer.email, pmLimit)) : []
+  const withOwners = can('requests.approve') ? asked.filter((r) => !toDecide.includes(r)) : []
+  const toOrder = can('requests.approve') ? data.requests.filter((r) => r.status === 'approved') : []
+  const otherRequests = can('requests.approve') ? data.requests.filter((r) => r.status !== 'asked' && r.status !== 'approved').slice(0, 8) : []
+  const requestDone = (note: string) => {
+    if (note) toast(note, 'ok')
+    void refresh()
+  }
+  const needs = fixes.length + review.length + cant.length + blocked.length + toCheck.length + toDecide.length
 
   const scheduledToday = data.schedule.filter((s) => s.day === data.day)
   const worked = new Set(todayShifts.map((s) => s.email))
@@ -203,6 +222,65 @@ function TodayView({ data, show }: { data: CrewAdminHome; show: (o: Open) => voi
       ) : null}
 
       {can('money.view') ? <UnmatchedPurchases /> : null}
+      {can('requests.approve') ? (
+        <>
+          <SectionTitle
+            count={toDecide.length + toOrder.length}
+            action={
+              <Button className="min-h-9 px-3 text-[13px]" onClick={() => show({ kind: 'request-add' })}>
+                <Plus className="size-4" aria-hidden="true" /> Request
+              </Button>
+            }
+          >
+            Material requests
+          </SectionTitle>
+          {toDecide.length || toOrder.length || withOwners.length || otherRequests.length ? (
+            <Card className="divide-y divide-[var(--color-stone)]">
+              {toDecide.map((r) => (
+                <RequestDecideCard
+                  key={r.id}
+                  id={r.id}
+                  title={requestTitle(r, firstNameOf(nameOf(r.askedBy)))}
+                  detail={requestDetail(r)}
+                  estCents={r.estCents}
+                  talk={r.talk}
+                  hint={isOwner && r.estCents !== null && r.estCents > pmLimit ? `Over the PM limit (${dollars(pmLimit)})` : undefined}
+                  onDone={requestDone}
+                />
+              ))}
+              {toOrder.map((r) => (
+                <RequestLine
+                  key={r.id}
+                  r={r}
+                  who={firstNameOf(nameOf(r.askedBy))}
+                  action={
+                    <Button className="min-h-9 px-3 text-[13px]" onClick={() => show({ kind: 'request-order', request: r })}>
+                      Order placed
+                    </Button>
+                  }
+                />
+              ))}
+              {withOwners.map((r) => (
+                <RequestLine
+                  key={r.id}
+                  r={r}
+                  who={firstNameOf(nameOf(r.askedBy))}
+                  action={
+                    <span className="text-right text-[11px] text-[var(--color-charcoal-light)]">
+                      {r.askedBy === data.viewer.email ? 'Marco or Lando decides' : `Over ${dollars(pmLimit)}: with Marco or Lando`}
+                    </span>
+                  }
+                />
+              ))}
+              {otherRequests.map((r) => (
+                <RequestLine key={r.id} r={r} who={firstNameOf(nameOf(r.askedBy))} />
+              ))}
+            </Card>
+          ) : (
+            <Empty>No material requests. What the crew says they need at the end of the day lands here, and you can ask for material yourself.</Empty>
+          )}
+        </>
+      ) : null}
 
       <SectionTitle count={onClock.length}>On the clock</SectionTitle>
       {onClock.length ? (
@@ -1094,7 +1172,7 @@ function TeamView({ data, show }: { data: CrewAdminHome; show: (o: Open) => void
 // ---- the screen -------------------------------------------------------------------
 
 function Screen() {
-  const { data, error, refresh, isOwner, can } = useCrewAdmin()
+  const { data, error, refresh, isOwner, can, toast } = useCrewAdmin()
   // A link from Home can open a view: /app/crew?view=plan.
   const asked = useSearchParams().get('view')
   const [view, setView] = useState<View>(asked && (VIEWS as readonly string[]).includes(asked) ? (asked as View) : 'today')
@@ -1126,11 +1204,14 @@ function Screen() {
   }
 
   const toCheck = data.tasks.filter((x) => isReportedDone(x) && x.email !== data.viewer.email).length
+  const pmLimit = data.settings['requests.pmLimitCents']
+  const requestsToDecide = can('requests.approve') ? data.requests.filter((r) => r.status === 'asked' && (isOwner || pmDecides(r, data.viewer.email, pmLimit))).length : 0
   const needs =
     data.entries.filter((e) => e.kind === 'timefix' && e.status === 'new').length +
     (can('hours.edit') ? data.shifts.filter((s) => s.status === 'ok' && s.review).length : 0) +
     data.tasks.filter((x) => x.status === 'blocked').length +
-    toCheck
+    toCheck +
+    requestsToDecide
   const planDue = !data.reports.some((r) => r.day === addDays(data.day, 1))
   const pickupProblems = data.pickups.filter((p) => p.status === 'problem').length
 
@@ -1175,6 +1256,29 @@ function Screen() {
       {open?.kind === 'ask' ? <AskSheet key={sheetKey} to={open.to} onClose={close} /> : null}
       {open?.kind === 'pickup-add' ? <PickupAddSheet key={sheetKey} day={open.day} onClose={close} /> : null}
       {open?.kind === 'pickup' ? <PickupSheet key={sheetKey} pickup={open.pickup} onClose={close} /> : null}
+      {open?.kind === 'request-add' ? (
+        <RequestAddSheet
+          key={sheetKey}
+          jobs={data.jobs}
+          onClose={close}
+          onDone={(note) => {
+            if (note) toast(note, 'ok')
+            void refresh()
+          }}
+        />
+      ) : null}
+      {open?.kind === 'request-order' ? (
+        <RequestOrderSheet
+          key={sheetKey}
+          request={open.request}
+          today={data.day}
+          onClose={close}
+          onDone={(note) => {
+            if (note) toast(note, 'ok')
+            void refresh()
+          }}
+        />
+      ) : null}
       {open?.kind === 'job' ? <JobSheet key={sheetKey} job={open.job} suggested={open.suggested} onClose={close} /> : null}
       {can('hours.edit') && open?.kind === 'shift' ? <ShiftSheet key={sheetKey} shift={open.shift} onClose={close} /> : null}
       {can('hours.edit') && open?.kind === 'shift-add' ? <ShiftAddSheet key={sheetKey} day={open.day} email={open.email} onClose={close} /> : null}

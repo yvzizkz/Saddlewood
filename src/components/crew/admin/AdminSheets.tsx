@@ -399,10 +399,11 @@ function mapLink(geo: { lat: number; lng: number }): string {
   return `https://www.google.com/maps/search/?api=1&query=${geo.lat},${geo.lng}`
 }
 
-/** " · 0.1 mi from the job", red past half a mile. Nothing when the punch or the job has no place on the map. */
+/** " · 0.1 mi from the job", red past the owners' far-from-job setting (half a mile to start). Nothing when the punch or the job has no place on the map. */
 function FromJob({ m }: { m: number | null }) {
+  const { data } = useCrewAdmin()
   if (m === null) return null
-  return <span style={isFar(m) ? { color: '#9a2a1f', fontWeight: 500 } : undefined}>{` · ${milesText(m)} from the job`}</span>
+  return <span style={isFar(m, data?.settings['crew.farFromJobM']) ? { color: '#9a2a1f', fontWeight: 500 } : undefined}>{` · ${milesText(m)} from the job`}</span>
 }
 
 export function ShiftSheet({ shift, onClose }: { shift: CrewShift; onClose: () => void }) {

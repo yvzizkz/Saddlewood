@@ -6,6 +6,8 @@ import { ownerNames } from "@/lib/bot/home";
 import { sendPush } from "@/lib/bot/push";
 import { readState } from "@/lib/bot/queries";
 import { listJobPeople, listJobs, listPeople, listReports, listSchedule, listTasks } from "@/lib/crew/queries";
+import { listRequests } from "@/lib/crew/requestQueries";
+import { readSettings } from "@/lib/crew/settings";
 import { localDay } from "@/lib/crew/time";
 import { loadWaiting } from "@/lib/owner/load";
 import { buildMorning } from "@/lib/owner/morning";
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const day = localDay(now);
   try {
-    const [{ sections }, people, schedule, tasks, reports, jobPeople, jobs] = await Promise.all([
+    const [{ sections }, people, schedule, tasks, reports, jobPeople, jobs, requests, settings] = await Promise.all([
       readState(),
       listPeople(),
       listSchedule({ fromDay: day, toDay: day }),
@@ -43,6 +45,9 @@ export async function GET(request: NextRequest) {
       listReports(day),
       listJobPeople().catch(() => []),
       listJobs().catch(() => []),
+      // Material requests (0023) still open; empty before the migration.
+      listRequests({ since: now.toISOString() }).catch(() => []),
+      readSettings(),
     ]);
     const waiting = await loadWaiting(ownerNames(sections.people), now);
     const notes = buildMorning({
@@ -58,6 +63,8 @@ export async function GET(request: NextRequest) {
       // What the Mac saw come in late from the field (bot_state crewLate): yesterday's rides along.
       late: sections.crewLate.items,
       jobs,
+      requests,
+      pmLimitCents: settings["requests.pmLimitCents"],
     });
     if (dry) return NextResponse.json({ ok: true, day, dry: true, notes }, { headers: { "Cache-Control": "no-store" } });
     let sent = 0;

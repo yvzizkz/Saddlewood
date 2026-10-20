@@ -36,8 +36,9 @@ export function fromJobOf(shift: Pick<CrewShift, "startGeo" | "endGeo">, job: La
   return { in: punchFromJob(shift.startGeo, job), out: punchFromJob(shift.endGeo, job) };
 }
 
-export function isFar(m: number | null): boolean {
-  return m !== null && m > FAR_FROM_JOB_M;
+/** `farM` is the owners' setting (crew.farFromJobM, src/lib/crew/settings.ts) when the screen has it; the constant otherwise. */
+export function isFar(m: number | null, farM: number = FAR_FROM_JOB_M): boolean {
+  return m !== null && m > farM;
 }
 
 /** "2.1 mi" */
@@ -46,10 +47,10 @@ export function milesText(m: number): string {
 }
 
 /** What to say about a punch that was far: "In 2.1 mi from the job", "Out 3.4 mi from the job". Empty when neither was. */
-export function farLabels(f: FromJob | undefined): string[] {
+export function farLabels(f: FromJob | undefined, farM: number = FAR_FROM_JOB_M): string[] {
   if (!f) return [];
   const out: string[] = [];
-  if (isFar(f.in)) out.push(`In ${milesText(f.in as number)} from the job`);
-  if (isFar(f.out)) out.push(`Out ${milesText(f.out as number)} from the job`);
+  if (isFar(f.in, farM)) out.push(`In ${milesText(f.in as number)} from the job`);
+  if (isFar(f.out, farM)) out.push(`Out ${milesText(f.out as number)} from the job`);
   return out;
 }

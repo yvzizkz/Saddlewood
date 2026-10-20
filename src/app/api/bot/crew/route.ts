@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
     (sent("shifts") - parsed.data.shifts.length) +
     (sent("schedule") - parsed.data.schedule.length) +
     (sent("tasks") - parsed.data.tasks.length) +
-    (sent("notify") - parsed.data.notify.length);
+    (sent("notify") - parsed.data.notify.length) +
+    (sent("requests") - parsed.data.requests.length);
   try {
     const applied = await applyCrewSync(parsed.data);
     return NextResponse.json({ ok: true, applied: { ...applied, dropped } });

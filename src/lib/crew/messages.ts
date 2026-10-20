@@ -64,6 +64,7 @@ export const MSG = {
   noPickup: { en: "That pickup is no longer on your list.", es: "Ese recogido ya no está en tu lista." },
   deliveredPhoto: { en: "Add a photo of the material at the job.", es: "Agrega una foto del material en la obra." },
   problemNote: { en: "Say what the problem is.", es: "Di cuál es el problema." },
+  noRequest: { en: "That request is no longer open.", es: "Esa solicitud ya no está abierta." },
 
   // ---- notifications to a crew member ----
   scheduled: (job: string, day: string, today: string, time: string): { title: Both; body: Both } => {
@@ -116,6 +117,37 @@ export const MSG = {
   newQuestion: (body: string, bodyEs: string, fromBot: boolean): { title: Both; body: Both } => ({
     title: fromBot ? { en: "Quick question", es: "Una pregunta" } : { en: "The office has a question", es: "La oficina tiene una pregunta" },
     body: { en: body, es: bodyEs || body },
+  }),
+  // ---- material requests (0023) ----
+  newRequest: (first: string, job: string, items: string): { title: Both; body: Both } => ({
+    title: { en: "Material request", es: "Solicitud de material" },
+    body: { en: `${first}${job ? ` · ${job}` : ""}: ${items}`, es: `${first}${job ? ` · ${job}` : ""}: ${items}` },
+  }),
+  requestDecided: (approved: boolean, by: string, items: string, note: string): { title: Both; body: Both } => ({
+    title: approved ? { en: "Material approved", es: "Material aprobado" } : { en: "Material not approved", es: "Material no aprobado" },
+    body: {
+      en: `${by} ${approved ? "approved" : "did not approve"}: ${items}${note ? ` — ${note}` : ""}`,
+      es: `${by} ${approved ? "aprobó" : "no aprobó"}: ${items}${note ? ` — ${note}` : ""}`,
+    },
+  }),
+  requestTalk: (by: string, items: string, note: string): { title: Both; body: Both } => ({
+    title: { en: `${by} wants to talk about your request`, es: `${by} quiere hablar de tu solicitud` },
+    body: { en: `${items}${note ? ` — ${note}` : ""}`, es: `${items}${note ? ` — ${note}` : ""}` },
+  }),
+  requestToOrder: (first: string, items: string): { title: Both; body: Both } => ({
+    title: { en: "Approved: place the order", es: "Aprobado: haz el pedido" },
+    body: { en: `${first}'s request: ${items}`, es: `Solicitud de ${first}: ${items}` },
+  }),
+  requestOrdered: (items: string, supplier: string, day: string, today: string): { title: Both; body: Both } => {
+    const d = dayWord(day, today);
+    return {
+      title: { en: "Material ordered", es: "Material pedido" },
+      body: { en: `${items} · ${supplier}, pickup ${d.en}.`, es: `${items} · ${supplier}, se recoge ${d.es}.` },
+    };
+  },
+  requestCancelled: (by: string, items: string, note: string): { title: Both; body: Both } => ({
+    title: { en: "Request cancelled", es: "Solicitud cancelada" },
+    body: { en: `${by} cancelled: ${items}${note ? ` — ${note}` : ""}`, es: `${by} canceló: ${items}${note ? ` — ${note}` : ""}` },
   }),
   fixDecided: (day: string, approved: boolean, note: string): { title: Both; body: Both } => ({
     title: { en: "Your time fix", es: "Tu corrección de horas" },

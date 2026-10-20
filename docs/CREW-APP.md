@@ -195,6 +195,46 @@ see the stage yet.
 - The site can be deployed before the migration: jobs read with no phases and
   no stage until 0024 is applied, and the phase acts fail until then.
 
+## Material requests (migration 0023)
+
+Added 2026-10-19 (Lando: "if at close out the worker says material is needed,
+set up a will call so the items can be ready for pick up upon approval through
+the right process").
+
+- **Where one comes from.** The end-of-day "what do you need for tomorrow?"
+  becomes one `crew_requests` row (status `asked`, one per entry however often
+  the form is re-sent). The Mac can post what it read out of a voice memo
+  (`POST /api/bot/crew`, `requests: [{entryId, jobId?, jobName?, items, trade?}]`,
+  same one-per-entry rule). A PM or an owner asks by hand (`request.add`).
+- **Who decides.** The owners' limits live in `app_settings`, editable under
+  More, Field settings (`settings.set`, owners only; defaults in
+  `src/lib/crew/settingsRules.ts`): `requests.pmLimitCents` $500,
+  `requests.ownerLimitCents` $1,000, `requests.answersFirst` either,
+  `crew.farFromJobM` 805. A seat with the `requests.approve` switch (the
+  built-in Project manager group gets it) decides requests on its jobs up to
+  the PM limit, never its own; a yes above the limit is handed up to the owners
+  with the number kept; owners decide anything. A yes needs an estimate (the
+  card has an amount field when there is none). "Talk to me" keeps it `asked`
+  and tells the asker who wants to talk. Deny needs a note. The rules are pure
+  in `src/lib/crew/requestRules.ts`; the server side is `requests.ts`.
+- **Who is told.** A new request goes to the PM(s) on the job when there is one
+  and it is within the limit, else to the owners: whoever `answersFirst` names
+  (both when "either"), and both of them over the owners' limit. A decision
+  goes to the asker in their language. An approval also tells the PM to place
+  the order.
+- **Ordering.** `request.order` (supplier, store, order ref, day; tomorrow by
+  default) marks it `ordered` and makes the runner's `crew_pickups` row (any
+  runner, note "request #id"); the runner's picked / delivered mirror back to
+  the request (`picked`, `delivered`; a pickup staged again goes back to
+  `ordered`). An owner's order on an `asked` request is its approval.
+- **Where it shows.** Owners' Home, "Waiting on you": requests that are the
+  owners' (over the PM limit, or on a job with no PM) with Approve / Deny /
+  Talk to me on the card. The Crew tab, Today, "Material requests": what the
+  viewer decides, what is approved and waiting for "Order placed", and the rest.
+  The worker's Today, "Your requests": one line per request with its status,
+  EN/ES. The 7 AM push: a PM's line gets "N material requests waiting". The
+  Mac's feed (`GET /api/bot/crew`) carries `requests` of the last seven days.
+
 ## Who can do what
 
 - **Crew** are a row in `crew_people` AND `app_metadata.sw_role = "crew"` on

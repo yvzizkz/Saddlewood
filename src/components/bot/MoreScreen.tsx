@@ -6,6 +6,7 @@ import { Bell, BellOff, ChevronRight, Download, LogOut, Send, Share2, ShieldChec
 
 import { triggerOnboardingReplay } from '@/components/auth/OnboardingFlow'
 import { PasskeyCard } from '@/components/auth/PasskeyCard'
+import { FieldSettingsCard } from '@/components/crew/RequestCards'
 import { createClient } from '@/lib/supabase/client'
 import { botApi, useBot } from './BotProvider'
 import { Button, Card, Chip, Empty, INPUT, ScreenTitle, SectionTitle } from './ui'
@@ -335,7 +336,7 @@ function InviteCard() {
 }
 
 export default function MoreScreen() {
-  const { home, error, act, busy, toast } = useBot()
+  const { home, error, act, busy, toast, refresh } = useBot()
   const [armed, setArmed] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
@@ -430,6 +431,19 @@ export default function MoreScreen() {
               wire or bank details.
             </p>
           </Card>
+
+          {home.settings ? (
+            <>
+              <SectionTitle>Field settings</SectionTitle>
+              <FieldSettingsCard
+                settings={home.settings}
+                onSaved={(note) => {
+                  if (note) toast(note, 'ok')
+                  void refresh()
+                }}
+              />
+            </>
+          ) : null}
 
           <SectionTitle count={openFixes.length}>The bot asked for these fixes</SectionTitle>
           {openFixes.length ? (
