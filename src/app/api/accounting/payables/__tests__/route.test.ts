@@ -96,5 +96,11 @@ describe("update_bill", () => {
     expect((await PATCH(req({ action: "update_bill", billId: "b-open", status: "paid" }))).status).toBe(400);
     expect((await PATCH(req({ action: "update_bill", billId: "b-coi", status: "scheduled" }))).status).toBe(409);
     expect((await PATCH(req({ action: "update_bill", billId: "b-open", status: "disputed" }))).status).toBe(200);
+    expect((await PATCH(req({ action: "update_bill", billId: "b-open", status: "hold" }))).status).toBe(400);
+  });
+
+  it("puts a sub bill back on waiver hold, owing the waiver again", async () => {
+    expect((await PATCH(req({ action: "update_bill", billId: "b-open", status: "hold_waiver" }))).status).toBe(200);
+    expect(db.tables.bills[0]).toMatchObject({ status: "hold_waiver", waiver_status: "missing" });
   });
 });

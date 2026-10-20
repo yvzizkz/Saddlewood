@@ -76,6 +76,8 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ ok: false, error: `Clear the hold first: ${paymentBlock({ ...facts, status: "open" })}` }, { status: 409 });
       }
       patch.status = body.status;
+      // On waiver hold means the waiver is owed again.
+      if (body.status === "hold_waiver" && bill.kind === "sub") patch.waiver_status = "missing";
     } else {
       return NextResponse.json({ ok: false, error: "Nothing to change." }, { status: 400 });
     }

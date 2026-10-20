@@ -6,8 +6,8 @@
 export const BILL_STATUSES = ["draft", "needs_approval", "hold_waiver", "hold_coi", "open", "scheduled", "partial", "paid", "disputed", "void"] as const;
 export type BillStatusValue = (typeof BILL_STATUSES)[number];
 
-/** Statuses an owner may set by hand; paid and partial come from payments, holds from the rules. */
-export const SETTABLE_STATUSES: BillStatusValue[] = ["draft", "needs_approval", "open", "scheduled", "disputed", "void"];
+/** Statuses an owner may set by hand (putting a bill on hold included); paid and partial come from payments. */
+export const SETTABLE_STATUSES: BillStatusValue[] = ["draft", "needs_approval", "hold_waiver", "hold_coi", "open", "scheduled", "disputed", "void"];
 
 export type Hold = "waiver" | "coi" | "approval";
 
