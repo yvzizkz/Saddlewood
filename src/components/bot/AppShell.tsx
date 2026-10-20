@@ -4,30 +4,30 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { HardHat, Home, ListChecks, Menu, MessageSquare, TrendingUp, Wallet, type LucideIcon } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 
 import { OnboardingFlow } from '@/components/auth/OnboardingFlow'
 import { BotProvider, useBot } from './BotProvider'
 import { Dot } from './ui'
 import { healthLine, needsYouCount } from '@/lib/bot/view'
+import AppSidebar from '@/components/layout/AppSidebar'
+import { activeHref, phoneTabs, type NavViewer } from '@/components/layout/nav'
 
 // The frame every app screen sits in: a slim header that says whether the bot
 // is alive, and the thumb tabs. On a desktop it is the same column, centered.
 
-type Tab = { href: string; label: string; icon: LucideIcon; ownersOnly?: boolean; staffOnly?: boolean }
+// The tabs and the desktop rail are the one navigation (components/layout/nav.ts).
+// Ask is a tool, not a place: it sits in the header.
 
-const TABS: Tab[] = [
-  { href: '/app', label: 'Home', icon: Home },
-  // Every prospect from the first call to the signed job, and its estimates.
-  { href: '/app/sales', label: 'Sales', icon: TrendingUp },
-  { href: '/app/ask', label: 'Ask', icon: MessageSquare },
-  // The field crew: who is on the clock, what came in, the schedule, hours.
-  { href: '/app/crew', label: 'Crew', icon: HardHat, ownersOnly: true },
-  // Who owes what, the proof record, payments in.
-  { href: '/app/money', label: 'Money', icon: Wallet, staffOnly: true },
-  { href: '/app/duties', label: 'Duties', icon: ListChecks },
-  { href: '/app/more', label: 'More', icon: Menu },
-]
+/** Pages laid out for a desktop: tables and charts use the full width. */
+const WIDE = ['/app/accounting', '/app/jobs']
+
+function useNavViewer(): NavViewer {
+  const { home } = useBot()
+  const owner = home?.me.role === 'owner'
+  // The Crew tab shows once the crew side exists for this owner (home.crew is null until its tables do).
+  return { owner, crewAdmin: owner && !!home?.crew }
+}
 
 /** True while the on-screen keyboard is up, so the tab bar can step aside. */
 function useKeyboardOpen(): boolean {
@@ -64,18 +64,18 @@ function TabBar() {
   const { home } = useBot()
   const keyboardOpen = useKeyboardOpen()
   const badge = needsYouCount(home)
+  const tabs = phoneTabs(useNavViewer())
   if (keyboardOpen) return null
   return (
     <nav
       aria-label="App"
       // z-30: under a sheet's backdrop (z-40), so an open sheet dims the tabs too.
-      className="fixed bottom-0 inset-x-0 z-30 border-t border-[var(--color-stone)] bg-[var(--color-background)] pb-safe"
+      className="fixed bottom-0 inset-x-0 z-30 border-t border-[var(--color-stone)] bg-[var(--color-background)] pb-safe md:hidden"
     >
       <div className="mx-auto flex max-w-xl">
-        {/* The Crew tab shows once the crew side exists for this owner (home.crew is null until its tables do). */}
-        {TABS.filter((tab) => (!tab.ownersOnly || (home?.me.role === 'owner' && !!home.crew)) && (!tab.staffOnly || home?.me.role === 'owner')).map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon
-          const active = tab.href === '/app' ? pathname === '/app' : pathname.startsWith(tab.href)
+          const active = activeHref(pathname, tabs) === tab.href
           const count = tab.href === '/app' ? badge : tab.href === '/app/crew' ? (home?.crew?.needs ?? 0) : 0
           const showBadge = count > 0
           return (
@@ -116,6 +116,47 @@ function OwnerOnboarding() {
   return <OnboardingFlow email={home.me.email} name={home.me.name ?? ''} role="owner" />
 }
 
+function Frame({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const viewer = useNavViewer()
+  const { home } = useBot()
+  const wide = WIDE.some((w) => pathname === w || pathname.startsWith(w + '/'))
+  const col = wide ? 'max-w-7xl' : 'max-w-xl'
+  return (
+    <div className="bot-app ph-no-capture min-h-dvh">
+      <OwnerOnboarding />
+      <AppSidebar viewer={viewer} badges={{ '/app': needsYouCount(home) }} />
+      <div className="md:pl-60">
+        <header className="sticky top-0 z-30 border-b border-[var(--color-stone)] bg-[var(--color-background)]/95 backdrop-blur pt-[env(safe-area-inset-top,0px)]">
+          {/* 52px + the 1px rule: AskScreen pins itself under exactly this. */}
+          <div className={`mx-auto flex h-[52px] ${col} items-center justify-between gap-2 px-4`}>
+            <Link href="/app" className="flex items-center gap-2.5 md:invisible">
+              <Image src="/images/logo-roundel.png" alt="" width={30} height={30} className="rounded-full" />
+              <span className="text-lg text-[var(--color-charcoal)]" style={{ fontFamily: 'var(--font-fraunces)' }}>
+                Saddlewood
+              </span>
+            </Link>
+            <div className="flex items-center gap-2">
+              <StatusPill />
+              <Link
+                href="/app/ask"
+                aria-label="Ask the bot"
+                aria-current={pathname.startsWith('/app/ask') ? 'page' : undefined}
+                className="inline-flex size-9 items-center justify-center rounded-full border border-[var(--color-stone)] bg-white text-[var(--color-charcoal)] aria-[current=page]:bg-[var(--color-teal)] aria-[current=page]:text-white"
+              >
+                <MessageSquare className="size-[18px]" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </header>
+        {/* AskScreen measures itself against this column; wide pages set their own padding. */}
+        <main className={`mx-auto ${col} pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-8`}>{children}</main>
+      </div>
+      <TabBar />
+    </div>
+  )
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter()
 
@@ -137,23 +178,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {/* ph-no-capture: the site's analytics must not record what is on these
           screens (draft emails, amounts, client names) or the text of what is
           tapped. Sheets render outside this div and carry the class themselves. */}
-      <div className="bot-app ph-no-capture min-h-dvh">
-        <OwnerOnboarding />
-        <header className="sticky top-0 z-30 border-b border-[var(--color-stone)] bg-[var(--color-background)]/95 backdrop-blur pt-[env(safe-area-inset-top,0px)]">
-          {/* 52px + the 1px rule: AskScreen pins itself under exactly this. */}
-          <div className="mx-auto flex h-[52px] max-w-xl items-center justify-between px-4">
-            <Link href="/app" className="flex items-center gap-2.5">
-              <Image src="/images/logo-roundel.png" alt="" width={30} height={30} className="rounded-full" />
-              <span className="text-lg text-[var(--color-charcoal)]" style={{ fontFamily: 'var(--font-fraunces)' }}>
-                Saddlewood
-              </span>
-            </Link>
-            <StatusPill />
-          </div>
-        </header>
-        <main className="mx-auto max-w-xl pb-[calc(56px+env(safe-area-inset-bottom,0px))]">{children}</main>
-        <TabBar />
-      </div>
+      <Frame>{children}</Frame>
     </BotProvider>
   )
 }
