@@ -21,7 +21,7 @@ Each scenario drives the screens a person in that seat would use, writes through
 | 5 | **Purchasing:** Home Depot run split across jobs, an unmatched register name assigned, a line re-tagged to a trade, export of selected lines | Finance / PM | `e2e/purchasing-week.spec.ts` | **done (4/4)** · agy |
 | 6 | **Subs:** package → invites → leveling → award under $10k by the PM → work order → no-COI block → bill → waiver hold → payment | PM / Finance | `e2e/subs-week.spec.ts` | **done (4/4)** · agy |
 | 7 | **Sales admin:** lead with source → estimate → no follow-up in 5 days escalates → proposal → award builds the job | Sales (Marco covering) | `e2e/sales-week.spec.ts` | **done (2/2)** · agy |
-| 8 | **Powell progress payments:** percent complete on the SOV, a minor extra, invoice, check, roll-forward | Finance | `e2e/powell-draw.spec.ts` | **blocked**: SOV percent-complete billing is not built (plan Phase 2 step 6, still open). The Powell tracker (`/internal/trackers`) is the path today |
+| 8 | **Powell progress payments:** percent complete on the SOV, a minor extra, invoice, check, roll-forward | Finance | `e2e/powell-draw.spec.ts` | **done (2/2)** · agy |
 
 ## 1. Finance: the AFT billing week (Ilene)
 
@@ -96,9 +96,20 @@ Each scenario drives the screens a person in that seat would use, writes through
 1. **Department home & >5-day follow-up escalation.** `Departments › Sales` shows open pipeline, win rate, `"No next step or past it"`, and win rate by source; an opportunity 6 days past its follow-up date escalates to `Owner` in `Tasks`.
 2. **Lead → Estimate → Proposal → Won → Award → Gate 0 Handoff Packet (`A10`).** Creating a referral lead, pricing a framing & drywall estimate, issuing a frozen proposal, marking it won, and running Award creates the linked billing + field job, seeds template phases & pre-start watches, and populates the `Gate 0 Handoff & Watches` card on the new job's Overview tab.
 
+## 8. Powell: schedule-of-values progress draws
+
+1. **Joist cutover opening, guards, Draw #1 → issue → check payment, and Draw #2 roll-forward.**
+   - Setting/verifying the pre-app opening percents (`action: "opening"`) on `3526 Emerson Street (Powell)` shows `$298,500 of $420,000 ($298,500 of it before the app)` on `Job › Money`.
+   - Entering a percent lower than billed-to-date (`85%` vs `90%`) triggers the backward-percent guard (`Issue a credit instead`) and disables `"Make the draft invoice"`.
+   - Advancing Framing (`90% → 95%`, `+$8,250`) and Drywall (`75% → 85%`, `+$12,500`) previews `$20,750` due on the draw and creates the draft invoice; a second draw while the first is still a draft is refused (`409`).
+   - Issuing Draw #1 and recording Powell's `$20,750` check payment updates `Billed to date` to `$319,250 of $420,000`, and Draw #2 (`Finish 45% → 65%`, `Tile 40% → 50%` = `$21,500`) rolls forward from the new baseline.
+2. **Signed minor extra (Change Order) + client retainage.**
+   - Creating, pricing (`$2,500`), and signing a change order on `9146 W Hutton Dr` (`10%` retainage) adds the signed CO to the `Progress billing` schedule.
+   - Billing the CO to `100%` previews `$2,500` gross, `−$250` retainage held (`10%`), and `$2,250` due, creates the draft invoice, and automatically marks the CO `billed`.
+
 ## What an owner, a PM and finance can and can't do today
 
-From the runs on 2026-10-20: `npx playwright test` passes **31/31**, twice in a row (Finance 6, Owner 5, PM access 5, Field 5, Purchasing 4, Subs 4, Sales 2).
+From the runs on 2026-10-20: `npx playwright test` passes **33/33**, twice in a row (Finance 6, Owner 5, PM access 5, Field 5, Purchasing 4, Subs 4, Sales 2, Powell SOV draws 2).
 
 ### Real bugs caught and fixed by the Phase 3 scenario suite
 1. **Trip detail route 404 (`src/lib/accounting/purchases.ts`):** `loadPurchaseTrip` ran `computeTripKey(decoded)` on an already-computed `tripKey`, stripping the last `:segment` and returning 404 on `/app/accounting/purchases/trip/[key]` links. Fixed to match `trip_key.eq.${decoded}` alongside `tk` and `source_key`.
@@ -109,5 +120,5 @@ From the runs on 2026-10-20: `npx playwright test` passes **31/31**, twice in a 
 | Seat | Can, end to end in the app | Can't yet (gap → where it goes) |
 |---|---|---|
 | **Owner** | Read every department's figures and what waits on it; price, sign and bill a CO from the job page; move a seat and see the work follow; hand a task to a role and watch it move up when overdue; close it; see the job page agree with Receivables to the cent | Record a payment from a P-number match in the app; it still goes through Joist (bot path). Approve and send an invoice package in one step: the package is a checklist and a task today, and sending is the Bill screen |
-| **Finance** | See each client's cutoff and what must go with the invoice; get told to bill a signed CO; record a lien waiver on the invoice (gap fixed in this phase); read AR with aging, proof and the ladder; split Melio's fee from the gross; see Friday's pay run and the holds; export payroll that matches the table | Record a sub's incoming waiver from a screen: the API takes it (`POST /api/waivers` direction in), the bill page has no button yet → step 7 (agy, subs and compliance). SOV percent-complete billing → still open in Phase 2 step 6 |
+| **Finance** | See each client's cutoff and what must go with the invoice; get told to bill a signed CO; record a lien waiver on the invoice (gap fixed in this phase); bill SOV progress draws by percent complete with retainage and signed COs (`0041`); read AR with aging, proof and the ladder; split Melio's fee from the gross; see Friday's pay run and the holds; export payroll that matches the table | Record a sub's incoming waiver from a standalone waiver form on the bill page (the bill page toggles `waiver_received`, and `/api/waivers` records directional rows) |
 | **PM** | Open Overview, Payroll hours, Purchases, Receivables and Billing on his own jobs; open his own invoices read-only; reach it from crew More | See pay, labor dollars or margin (by policy, unless an owner switches them on); Payables; Jobs, Departments, Tasks (owners' screens, so a PM can't create or close tasks in the app yet) → next: open Tasks and the job page to PM seats on their jobs |

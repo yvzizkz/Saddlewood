@@ -156,10 +156,11 @@ values
       "contractCents": 24850000,
       "cutoffDay": 23,
       "sov": [
-        {"id": "framing", "label": "Structural & Steel Stud Framing", "cents": 11200000, "billedPct": 85},
-        {"id": "insulation", "label": "Thermal & Sound Batt Insulation", "cents": 2450000, "billedPct": 80},
-        {"id": "drywall", "label": "Level 5 Drywall Hang, Tape & Skim", "cents": 11200000, "billedPct": 65}
-      ]
+        {"description": "Structural & Steel Stud Framing", "amountCents": 11200000, "kind": "section"},
+        {"description": "Thermal & Sound Batt Insulation", "amountCents": 2450000, "kind": "section"},
+        {"description": "Level 5 Drywall Hang, Tape & Skim", "amountCents": 11200000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 85, "sov:1": 80, "sov:2": 65}
     }'::jsonb
   ),
   (
@@ -180,10 +181,11 @@ values
       "contractCents": 18600000,
       "cutoffDay": 23,
       "sov": [
-        {"id": "framing", "label": "Wood Framing & Backing", "cents": 8400000, "billedPct": 100},
-        {"id": "drywall", "label": "Drywall & Smooth Finish", "cents": 7200000, "billedPct": 100},
-        {"id": "finish", "label": "Trim, Doors & Cleanup", "cents": 3000000, "billedPct": 90}
-      ]
+        {"description": "Wood Framing & Backing", "amountCents": 8400000, "kind": "section"},
+        {"description": "Drywall & Smooth Finish", "amountCents": 7200000, "kind": "section"},
+        {"description": "Trim, Doors & Cleanup", "amountCents": 3000000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 100, "sov:1": 100, "sov:2": 90}
     }'::jsonb
   ),
   (
@@ -204,9 +206,10 @@ values
       "contractCents": 9420000,
       "cutoffDay": 23,
       "sov": [
-        {"id": "demo", "label": "Selective Demo & Framing", "cents": 5220000, "billedPct": 50},
-        {"id": "drywall", "label": "Drywall Assembly", "cents": 4200000, "billedPct": 25}
-      ]
+        {"description": "Selective Demo & Framing", "amountCents": 5220000, "kind": "section"},
+        {"description": "Drywall Assembly", "amountCents": 4200000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 50, "sov:1": 25}
     }'::jsonb
   ),
   (
@@ -229,11 +232,12 @@ values
       "payWhenPaidDays": 10,
       "cutoffDay": 20,
       "sov": [
-        {"id": "metal-framing", "label": "Commercial Metal Stud Framing & Soffits", "cents": 13800000, "billedPct": 55},
-        {"id": "insulation", "label": "Acoustic & Thermal Batt Insulation", "cents": 3600000, "billedPct": 40},
-        {"id": "drywall", "label": "5/8 Type X & Abuse-Resistant GWB", "cents": 10800000, "billedPct": 30},
-        {"id": "chamclad", "label": "ChamClad Soffit Panel Install (Labor)", "cents": 3000000, "billedPct": 15}
-      ]
+        {"description": "Commercial Metal Stud Framing & Soffits", "amountCents": 13800000, "kind": "section"},
+        {"description": "Acoustic & Thermal Batt Insulation", "amountCents": 3600000, "kind": "section"},
+        {"description": "5/8 Type X & Abuse-Resistant GWB", "amountCents": 10800000, "kind": "section"},
+        {"description": "ChamClad Soffit Panel Install (Labor)", "amountCents": 3000000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 55, "sov:1": 40, "sov:2": 30, "sov:3": 15}
     }'::jsonb
   ),
   (
@@ -253,11 +257,12 @@ values
     '{
       "contractCents": 42000000,
       "sov": [
-        {"id": "framing", "label": "Main Residence & Casita Framing", "cents": 16500000, "billedPct": 90},
-        {"id": "drywall", "label": "Drywall Hang, Tape & Level 4 Finish", "cents": 12500000, "billedPct": 75},
-        {"id": "finish", "label": "Interior Trim, Doors & Paint", "cents": 8500000, "billedPct": 45},
-        {"id": "tile", "label": "Primary Bath & Flooring", "cents": 4500000, "billedPct": 40}
-      ]
+        {"description": "Main Residence & Casita Framing", "amountCents": 16500000, "kind": "section"},
+        {"description": "Drywall Hang, Tape & Level 4 Finish", "amountCents": 12500000, "kind": "section"},
+        {"description": "Interior Trim, Doors & Paint", "amountCents": 8500000, "kind": "section"},
+        {"description": "Primary Bath & Flooring", "amountCents": 4500000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 90, "sov:1": 75, "sov:2": 45, "sov:3": 40}
     }'::jsonb
   ),
   (
@@ -277,10 +282,11 @@ values
     '{
       "contractCents": 13817300,
       "sov": [
-        {"id": "framing", "label": "Addition & Interior Framing", "cents": 5647300, "billedPct": 100},
-        {"id": "drywall", "label": "Drywall & Texture", "cents": 4800000, "billedPct": 60},
-        {"id": "paint", "label": "Interior & Exterior Paint", "cents": 3370000, "billedPct": 20}
-      ]
+        {"description": "Addition & Interior Framing", "amountCents": 5647300, "kind": "section"},
+        {"description": "Drywall & Texture", "amountCents": 4800000, "kind": "section"},
+        {"description": "Interior & Exterior Paint", "amountCents": 3370000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 100, "sov:1": 60, "sov:2": 20}
     }'::jsonb
   ),
   (
@@ -300,9 +306,10 @@ values
     '{
       "contractCents": 16480000,
       "sov": [
-        {"id": "framing", "label": "Custom Home Structural Framing", "cents": 9880000, "billedPct": 85},
-        {"id": "drywall", "label": "Whole-House Drywall", "cents": 6600000, "billedPct": 50}
-      ]
+        {"description": "Custom Home Structural Framing", "amountCents": 9880000, "kind": "section"},
+        {"description": "Whole-House Drywall", "amountCents": 6600000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 85, "sov:1": 50}
     }'::jsonb
   )
 on conflict (id) do update
@@ -1072,6 +1079,18 @@ values
 -- ---------------------------------------------------------------------------
 -- Note: `documents` has a freeze trigger on issued rows and `payments`/`document_events` are append-only,
 -- so we use deterministic UUIDs with ON CONFLICT DO NOTHING.
+
+-- Reset any non-seeded SOV progress draw documents from manual/E2E runs so seeded jobs start at their opening percents
+update public.documents
+   set status = 'void',
+       void_reason = 'seed reset',
+       voided_at = now()
+ where id in (select document_id from public.sov_progress)
+   and status = 'issued';
+
+delete from public.documents
+ where id in (select document_id from public.sov_progress)
+   and status = 'draft';
 
 insert into public.documents (
   id, kind, job_id, client_id, number, title, status, revision,
