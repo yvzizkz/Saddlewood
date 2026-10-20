@@ -8,6 +8,7 @@ import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { CATEGORY_LABEL, loadJobCost, type CostLine } from "@/lib/accounting/jobCost";
 import { moneySeatForPage } from "@/lib/accounting/access";
 import PayablesMissing from "@/components/accounting/PayablesMissing";
+import CappedNotice from "@/components/accounting/CappedNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -87,14 +88,52 @@ export default async function JobCostingPage({ searchParams }: { searchParams: P
     { key: "burn", header: "Cost / contract", kind: "percent", phone: "hide" },
   ];
 
-  const lineRows: TableRow[] = d.rows.map((l) => ({
+  const visibleLines: CostLine[] = seat.laborCost
+    ? d.rows
+    : [
+        ...Array.from(
+          d.rows
+            .filter((l) => l.category === "labor")
+            .reduce((map, l) => {
+              const key = `${l.jobKey}::${l.trade}`;
+              const prevRow = map.get(key);
+              if (!prevRow) {
+                map.set(key, {
+                  id: `labor:${l.jobKey}:${l.trade}`,
+                  day: l.day,
+                  jobKey: l.jobKey,
+                  job: l.job,
+                  category: "labor" as const,
+                  trade: l.trade,
+                  tradeLabel: l.tradeLabel,
+                  cents: l.cents,
+                  href: "",
+                  label: `${l.tradeLabel} labor total`,
+                });
+              } else {
+                prevRow.cents += l.cents;
+                if (l.day > prevRow.day) prevRow.day = l.day;
+              }
+              return map;
+            }, new Map<string, CostLine>())
+            .values(),
+        ),
+        ...d.rows.filter((l) => l.category !== "labor"),
+      ];
+
+  const lineRows: TableRow[] = visibleLines.map((l) => ({
     id: l.id,
     day: l.day,
     job: l.job,
     kind: CATEGORY_LABEL[l.category],
     trade: l.tradeLabel,
     what: l.label,
-    href: l.href,
+    href:
+      !l.href ||
+      (!seat.laborCost && l.category === "labor") ||
+      (!seat.owner && (l.category === "subs" || l.href.startsWith("/app/accounting/payables/bill/")))
+        ? null
+        : l.href,
     cents: l.cents,
   }));
   const lineColumns: Column[] = [
@@ -116,6 +155,7 @@ export default async function JobCostingPage({ searchParams }: { searchParams: P
       filters={d.filters}
     >
       {cur.payablesMissing ? <PayablesMissing /> : null}
+      {cur.capped || prev.capped ? <CappedNotice what="purchase lines or bills" /> : null}
       <KpiHeader
         label="Cost"
         value={cost}

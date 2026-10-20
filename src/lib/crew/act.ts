@@ -405,6 +405,21 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
         const entry = entryId ? await getEntry(entryId) : null;
         if (entry && entry.email === email && entry.kind === "receipt") {
           await patchEntry(entry.id, { data: { ...entry.data, amount } });
+          // The receipt's purchase line is written once it has an amount (field/ops.ts).
+          const d = entry.data as { vendor?: string; paidBy?: string; trade?: string };
+          await syncReceiptEntryToPurchases({
+            entryId: entry.id,
+            day: entry.day,
+            jobId: entry.jobId,
+            jobName: entry.jobName,
+            vendor: d.vendor ?? "",
+            amountDollars: amount,
+            paidBy: d.paidBy === "me" ? "me" : "company",
+            note: entry.body,
+            trade: d.trade,
+            personName: person.name,
+            personEmail: person.email,
+          });
         }
       }
 
