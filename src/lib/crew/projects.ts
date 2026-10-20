@@ -3,11 +3,14 @@ import {
   isReportedDone,
   type CrewJob,
   type CrewJobPerson,
+  type CrewJobPhase,
   type CrewJobRole,
+  type CrewJobStaged,
   type CrewPerson,
   type CrewReport,
   type CrewScheduleItem,
   type CrewTask,
+  type JobStage,
 } from "./types";
 import { inScope, type JobScope } from "./scope";
 
@@ -50,6 +53,9 @@ export type ProjectCard = {
   cant: { day: string; who: string; note: string }[];
   /** The billing job this is (jobs.crew_job_id), for the money card. Never its amounts. */
   billingJobId: string | null;
+  /** The job's phases in order, and where it is (0024). */
+  phases: CrewJobPhase[];
+  stage: JobStage | null;
 };
 
 export type ProjectsView = {
@@ -58,6 +64,8 @@ export type ProjectsView = {
   narrowed: boolean;
   /** Whether the viewer may see the money card (money.view). */
   money: boolean;
+  /** What the viewer may do to a job's phases: check one off, set the list, plan dates. */
+  can: { verify: boolean; phases: boolean; plan: boolean };
   projects: ProjectCard[];
   /** The newest plans, newest first. */
   plans: CrewReport[];
@@ -67,7 +75,8 @@ export type ProjectsInput = {
   day: string;
   now: Date;
   scope: JobScope;
-  jobs: CrewJob[];
+  /** With `phases` and `stage` when the route read them (stageJobs); plain jobs read as having none. */
+  jobs: (CrewJob & Partial<Pick<CrewJobStaged, "phases" | "stage">>)[];
   people: Pick<CrewPerson, "email" | "name">[];
   jobPeople: CrewJobPerson[];
   schedule: CrewScheduleItem[];
@@ -83,7 +92,7 @@ function daysFrom(from: string, to: string): number {
 
 const isLive = (t: CrewTask) => t.status === "open" || t.status === "doing" || t.status === "blocked";
 
-export function buildProjects(input: ProjectsInput): Omit<ProjectsView, "ok" | "narrowed" | "money"> {
+export function buildProjects(input: ProjectsInput): Omit<ProjectsView, "ok" | "narrowed" | "money" | "can"> {
   const { day } = input;
   const since = new Date(input.now.getTime() - PROJECT_WINDOW_DAYS * 86_400_000).toISOString();
   const nameOf = (email: string) => firstNameOf(input.people.find((p) => p.email === email)?.name ?? "") || email.split("@")[0];
@@ -105,6 +114,7 @@ export function buildProjects(input: ProjectsInput): Omit<ProjectsView, "ok" | "
       const cant = slots.filter((s) => s.ack === "cant").map((s) => ({ day: s.day, who: nameOf(s.email), note: s.ackNote }));
       const promiseIn = job.promised ? daysFrom(day, job.promised) : null;
       const openWork = live.length + toCheck.length;
+      const stage = job.stage ?? null;
 
       let tone: ProjectTone = "ok";
       let headline = live.length ? `${live.length} open` : "Nothing open";
@@ -120,6 +130,9 @@ export function buildProjects(input: ProjectsInput): Omit<ProjectsView, "ok" | "
       } else if (promiseIn !== null && promiseIn <= PROMISE_SOON_DAYS && openWork) {
         tone = "warn";
         headline = promiseIn === 0 ? "Promise is today" : promiseIn === 1 ? "Promise is tomorrow" : `Promise in ${promiseIn} days`;
+      } else if (stage?.behind) {
+        tone = "warn";
+        headline = `${stage.name} is behind its plan`;
       } else if (toCheck.length) {
         tone = "warn";
         headline = `${toCheck.length} to check`;
@@ -146,6 +159,8 @@ export function buildProjects(input: ProjectsInput): Omit<ProjectsView, "ok" | "
         sentBack,
         cant,
         billingJobId: input.billing[job.id] ?? null,
+        phases: job.phases ?? [],
+        stage,
       };
     });
 

@@ -30,6 +30,7 @@ import {
   type CrewShift,
   type CrewTask,
 } from '@/lib/crew/types'
+import { StageStrip } from './StageStrip'
 import { useCrewAdmin, useFilesBase } from './useCrewAdmin'
 
 // The owner's forms on the Crew tab. Each is mounted only while it is open.
@@ -932,6 +933,7 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
           {job.active ? 'Take it off the list (job is done)' : 'Put it back on the list'}
         </Button>
       ) : null}
+      {job ? <JobStages job={job} /> : null}
       {job && data?.viewer.role === 'owner' ? (
         <>
           <JobPeople job={job} />
@@ -939,6 +941,27 @@ export function JobSheet({ job, onClose, suggested = '' }: { job: CrewJob | null
         </>
       ) : null}
     </AdminSheet>
+  )
+}
+
+/** The job's phases and where it is (0024): verified by a person here, never moved on a worker's word. */
+function JobStages({ job }: { job: CrewJob }) {
+  const { data, run, can, isOwner } = useCrewAdmin()
+  const staged = data?.jobs.find((j) => j.id === job.id)
+  if (!data || !staged) return null
+  const edit = isOwner || can('jobs.manage') || can('projects.mine')
+  return (
+    <Group label="Stage">
+      <StageStrip
+        jobId={job.id}
+        jobName={job.name}
+        phases={staged.phases}
+        stage={staged.stage}
+        today={data.day}
+        can={{ verify: can('tasks.verify'), edit, plan: edit || can('jobs.promise') }}
+        act={(input) => run(input, true)}
+      />
+    </Group>
   )
 }
 

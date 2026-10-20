@@ -16,6 +16,7 @@ import {
   deleteSchedule,
   getEntry,
   getJob,
+  getJobPhase,
   deleteGroup,
   getGroup,
   getPerson,
@@ -26,12 +27,14 @@ import {
   getTask,
   insertGroup,
   insertJob,
+  insertJobPhases,
   insertPickup,
   insertQuestion,
   insertReport,
   insertShift,
   insertTasks,
   linkBillingJob,
+  listJobPhases,
   listJobs,
   listPeople,
   listPickups,
@@ -41,16 +44,19 @@ import {
   patchEntry,
   patchGroup,
   patchJob,
+  patchJobPhase,
   patchPerson,
   patchPickup,
   patchShift,
   patchTask,
+  replaceJobPhases,
   savePerson,
   setJobPeople,
   upsertSchedule,
   type CrewPersonRow,
   type CrewShiftRow,
 } from "./queries";
+import { planPhaseSet, templatePhases } from "./phases";
 import { CREW_ROLE, FORMER_ROLE } from "./role";
 import { inScope, visibleCrewJobs, type ScopeCaller } from "./scope";
 import { addDays, clock12, dayShort, localClock, localDay, localInstant } from "./time";
@@ -269,6 +275,12 @@ const OWN_WORK = "Someone else checks your own work: Marco or Lando will check t
 
 const NOT_YOURS = "That job is not one of yours. Marco or Lando can add you to it.";
 
+/** A phase's note keeps what was said at each check, newest last; the oldest goes when it gets long. */
+function phaseNote(before: string, line: string): string {
+  const next = before ? `${before}\n${line}` : line;
+  return next.length > 1500 ? next.slice(next.length - 1500) : next;
+}
+
 /**
  * The jobs an act touches, read from the rows it names when it names a row.
  * null when it is not about a job (a question, a group, a seat).
@@ -281,9 +293,15 @@ async function jobsOfAct(act: AdminAct): Promise<(string | null | undefined)[] |
       return [act.id];
     case "job.geocode":
       return act.id ? [act.id] : null;
+    case "job.phases.set":
+    case "job.phases.template":
     case "schedule.set":
     case "shift.add":
       return [act.jobId];
+    case "phase.verify":
+    case "phase.unverify":
+    case "phase.plan":
+      return [(await getJobPhase(act.id))?.jobId];
     case "task.add":
     case "pickup.add":
       return [act.jobId];
@@ -495,6 +513,70 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       if (res === "missing") return bad(404, "That billing job is gone.");
       if (res === "taken") return bad(409, "That billing job is already linked to another field job. Unlink it there first.");
       return ok(act.billingJobId ? `${job.name} is linked to its billing job.` : `${job.name} has no billing job now.`);
+    }
+
+    case "job.phases.set": {
+      const job = await getJob(act.jobId);
+      if (!job) return bad(404, "That job is not on the list.");
+      for (const p of act.phases) {
+        if (p.plannedFrom && p.plannedTo && p.plannedFrom > p.plannedTo) return bad(400, `"${p.name}": the plan ends before it starts.`);
+      }
+      const plan = planPhaseSet(
+        await listJobPhases({ jobId: job.id }),
+        act.phases.map((p) => ({ name: p.name, trade: p.trade, plannedFrom: p.plannedFrom || null, plannedTo: p.plannedTo || null })),
+      );
+      if (!plan.ok) return bad(409, plan.error);
+      const rows = await replaceJobPhases(
+        job.id,
+        plan.keep,
+        plan.add.map((a) => ({ jobId: job.id, ...a, createdBy: owner.name })),
+      );
+      return ok(rows.length ? `${rows.length} ${rows.length === 1 ? "phase" : "phases"} on ${job.name}.` : `${job.name} has no phases now.`);
+    }
+
+    case "job.phases.template": {
+      const job = await getJob(act.jobId);
+      if (!job) return bad(404, "That job is not on the list.");
+      const have = await listJobPhases({ jobId: job.id });
+      const start = have.reduce((m, p) => Math.max(m, p.ord), 0);
+      const specs = templatePhases(act.template);
+      await insertJobPhases(specs.map((s, i) => ({ jobId: job.id, ord: start + i + 1, ...s, createdBy: owner.name })));
+      const what = act.template === "both" ? "framing and drywall" : act.template;
+      return ok(`${specs.length} ${what} phases on ${job.name}${have.length ? ", after the ones it had" : ""}.`);
+    }
+
+    case "phase.verify": {
+      const phase = await getJobPhase(act.id);
+      if (!phase) return bad(404, "That phase is gone.");
+      if (phase.verifiedAt) return bad(409, `${phase.verifiedBy || "Someone"} already verified it.`);
+      const line = `Verified by ${firstNameOf(owner.name)} (${dayShort(today)})${act.note.trim() ? `: ${act.note.trim()}` : ""}`;
+      const saved = await patchJobPhase(
+        phase.id,
+        { verified_at: nowDate.toISOString(), verified_by: owner.name, note: phaseNote(phase.note, line) },
+        { verified: false },
+      );
+      if (!saved) return bad(409, "Someone else just verified it.");
+      return ok(`${phase.name}: verified.`);
+    }
+
+    case "phase.unverify": {
+      const phase = await getJobPhase(act.id);
+      if (!phase) return bad(404, "That phase is gone.");
+      if (!phase.verifiedAt) return bad(409, "That phase is not verified.");
+      const line = `Unverified by ${firstNameOf(owner.name)} (${dayShort(today)}): ${act.note.trim()}`;
+      const saved = await patchJobPhase(phase.id, { verified_at: null, verified_by: "", note: phaseNote(phase.note, line) }, { verified: true });
+      if (!saved) return bad(409, "Someone else just changed it.");
+      return ok(`${phase.name} is open again.`);
+    }
+
+    case "phase.plan": {
+      const phase = await getJobPhase(act.id);
+      if (!phase) return bad(404, "That phase is gone.");
+      const from = act.plannedFrom || null;
+      const to = act.plannedTo || null;
+      if (from && to && from > to) return bad(400, "The plan ends before it starts.");
+      const saved = await patchJobPhase(phase.id, { planned_from: from, planned_to: to });
+      return saved ? ok() : bad(404, "That phase is gone.");
     }
 
     case "schedule.set": {

@@ -5,6 +5,7 @@ import type {
   CrewEntryKind,
   CrewEntryStatus,
   CrewJob,
+  CrewJobPhase,
   CrewLang,
   CrewOption,
   CrewPerson,
@@ -377,6 +378,146 @@ export async function patchJob(
   if (error) fail("crew_jobs update", error.message);
   const row = (data as JobRow[] | null)?.[0];
   return row ? toJob(row) : null;
+}
+
+// ---- job phases (0024) ----------------------------------------------------------
+
+type PhaseRow = {
+  id: number;
+  job_id: string;
+  ord: number;
+  name: string;
+  trade: string;
+  planned_from: string | null;
+  planned_to: string | null;
+  verified_by: string;
+  verified_at: string | null;
+  note: string;
+  created_by: string;
+};
+
+const PHASE_COLS = "id, job_id, ord, name, trade, planned_from, planned_to, verified_by, verified_at, note, created_by";
+
+function toPhase(r: PhaseRow): CrewJobPhase {
+  return {
+    id: r.id,
+    jobId: r.job_id,
+    ord: r.ord,
+    name: r.name,
+    trade: r.trade ?? "",
+    plannedFrom: r.planned_from ?? null,
+    plannedTo: r.planned_to ?? null,
+    verifiedBy: r.verified_by ?? "",
+    verifiedAt: r.verified_at ?? null,
+    note: r.note ?? "",
+    createdBy: r.created_by ?? "",
+  };
+}
+
+/** Every job's phases in order, or one job's. */
+export async function listJobPhases(filter: { jobId?: string } = {}): Promise<CrewJobPhase[]> {
+  const db = getSupabaseAdmin();
+  let q = db.from("crew_job_phases").select(PHASE_COLS);
+  if (filter.jobId) q = q.eq("job_id", filter.jobId);
+  const { data, error } = await q.order("job_id", { ascending: true }).order("ord", { ascending: true }).limit(2000);
+  if (error) fail("crew_job_phases list", error.message);
+  return ((data ?? []) as PhaseRow[]).map(toPhase);
+}
+
+export async function getJobPhase(id: number): Promise<CrewJobPhase | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("crew_job_phases").select(PHASE_COLS).eq("id", id).maybeSingle();
+  if (error) fail("crew_job_phases read", error.message);
+  return data ? toPhase(data as PhaseRow) : null;
+}
+
+export type NewPhase = { jobId: string; ord: number; name: string; trade: string; plannedFrom: string | null; plannedTo: string | null; createdBy: string };
+
+export async function insertJobPhases(rows: NewPhase[]): Promise<CrewJobPhase[]> {
+  if (!rows.length) return [];
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("crew_job_phases")
+    .insert(
+      rows.map((r) => ({
+        job_id: r.jobId,
+        ord: r.ord,
+        name: r.name,
+        trade: r.trade,
+        planned_from: r.plannedFrom,
+        planned_to: r.plannedTo,
+        created_by: r.createdBy,
+      })),
+    )
+    .select(PHASE_COLS);
+  if (error) fail("crew_job_phases insert", error.message);
+  return ((data ?? []) as PhaseRow[]).map(toPhase);
+}
+
+/**
+ * -> null when the phase is gone, or `only` does not hold: verified: true
+ * patches only a verified phase, false only an unverified one (so two people
+ * verifying at once cannot both win).
+ */
+export async function patchJobPhase(
+  id: number,
+  patch: Partial<{ name: string; trade: string; planned_from: string | null; planned_to: string | null; verified_by: string; verified_at: string | null; note: string }>,
+  only?: { verified?: boolean },
+): Promise<CrewJobPhase | null> {
+  const db = getSupabaseAdmin();
+  let q = db.from("crew_job_phases").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
+  if (only?.verified === true) q = q.not("verified_at", "is", null);
+  if (only?.verified === false) q = q.is("verified_at", null);
+  const { data, error } = await q.select(PHASE_COLS);
+  if (error) fail("crew_job_phases update", error.message);
+  const row = (data as PhaseRow[] | null)?.[0];
+  return row ? toPhase(row) : null;
+}
+
+/**
+ * Re-make a job's list: the unverified phases go, the verified ones (`keep`)
+ * move to their new positions, and `add` is inserted. Kept rows are parked at
+ * a negative ord first so the unique (job_id, ord) never collides while they
+ * move. -> the job's phases afterwards.
+ */
+export async function replaceJobPhases(
+  jobId: string,
+  keep: { id: number; ord: number; trade: string; plannedFrom: string | null; plannedTo: string | null }[],
+  add: NewPhase[],
+): Promise<CrewJobPhase[]> {
+  const db = getSupabaseAdmin();
+  const gone = await db.from("crew_job_phases").delete().eq("job_id", jobId).is("verified_at", null);
+  if (gone.error) fail("crew_job_phases delete", gone.error.message);
+  for (const k of keep) {
+    const parked = await db.from("crew_job_phases").update({ ord: -k.id }).eq("id", k.id).eq("job_id", jobId);
+    if (parked.error) fail("crew_job_phases park", parked.error.message);
+  }
+  const at = new Date().toISOString();
+  for (const k of keep) {
+    const moved = await db
+      .from("crew_job_phases")
+      .update({ ord: k.ord, trade: k.trade, planned_from: k.plannedFrom, planned_to: k.plannedTo, updated_at: at })
+      .eq("id", k.id)
+      .eq("job_id", jobId);
+    if (moved.error) fail("crew_job_phases move", moved.error.message);
+  }
+  await insertJobPhases(add);
+  return listJobPhases({ jobId });
+}
+
+/** The day of the earliest kept shift on each of these jobs (none when nobody has clocked in there). */
+export async function firstShiftDays(jobIds: string[]): Promise<Record<string, string>> {
+  const db = getSupabaseAdmin();
+  const out: Record<string, string> = {};
+  await Promise.all(
+    jobIds.map(async (id) => {
+      const { data, error } = await db.from("crew_shifts").select("day").eq("job_id", id).eq("status", "ok").order("day", { ascending: true }).limit(1);
+      if (error) fail("crew_shifts first", error.message);
+      const day = (data as { day: string }[] | null)?.[0]?.day;
+      if (day) out[id] = day;
+    }),
+  );
+  return out;
 }
 
 // ---- shifts -------------------------------------------------------------------
