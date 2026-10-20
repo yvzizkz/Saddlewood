@@ -161,6 +161,8 @@ export type PurchaseTripDetail = {
   store: string;
   orderRef: string;
   rawJobId: string | null;
+  /** The field job the trip is on (for a PM's scope check), or null. */
+  jobId: string | null;
   billingJobId: string | null;
   jobName: string;
   jobNameRaw: string;

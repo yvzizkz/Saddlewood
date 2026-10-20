@@ -44,7 +44,6 @@ export default async function PurchaseTripPage({ params }: { params: Promise<{ k
       {seat.owner ? (
         <TripJobAndTradeControl
           tripKey={trip.tripKey}
-          jobKey={trip.jobKey}
           currentJobId={trip.rawJobId}
           trades={trip.trades}
           jobs={trip.jobs}

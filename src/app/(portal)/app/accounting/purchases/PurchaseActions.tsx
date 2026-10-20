@@ -29,7 +29,7 @@ export function UnmatchedBanner({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "assign_job",
+          action: "alias_rule",
           jobKey: u.key,
           jobId,
         }),
@@ -173,13 +173,11 @@ export function LineTradeSelector({
 
 export function TripJobAndTradeControl({
   tripKey,
-  jobKey,
   currentJobId,
   trades,
   jobs,
 }: {
   tripKey: string;
-  jobKey: string;
   currentJobId: string | null;
   trades: Trade[];
   jobs: { id: string; name: string }[];
@@ -197,9 +195,9 @@ export function TripJobAndTradeControl({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        // This trip only: the register name's rule stays as it is.
         action: "assign_job",
         tripKey,
-        jobKey: jobKey || undefined,
         jobId: nextJobId || null,
       }),
     });
