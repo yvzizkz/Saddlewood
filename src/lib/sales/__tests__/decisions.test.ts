@@ -177,3 +177,42 @@ describe("screenRecipients", () => {
     expect(r.refused[0].reason).toMatch(/allowlist lately/);
   });
 });
+
+describe("proposal recipients (owner decision 2026-10-19)", () => {
+  const allow = { addresses: ["ana@example.com"], domains: [], updatedAt: new Date().toISOString() };
+
+  it("a person's send goes to whoever they address, naming the ones off the allowlist", () => {
+    const r = screenRecipients(["New.Client@Gmail.com", "ana@example.com", "marco@saddlewoodcontracting.com", "typo@@x"], allow, "addressed");
+    expect(r.ok).toEqual(["new.client@gmail.com", "ana@example.com", "marco@saddlewoodcontracting.com"]);
+    expect(r.unlisted).toEqual(["new.client@gmail.com"]);
+    expect(r.refused.map((x) => x.address)).toEqual(["typo@@x"]);
+  });
+
+  it("does not depend on the Mac's copy of the list being fresh", () => {
+    expect(screenRecipients(["new.client@gmail.com"], null, "addressed").ok).toEqual(["new.client@gmail.com"]);
+  });
+
+  it("the allowlist rule still refuses, with the owner's command", () => {
+    const r = screenRecipients(["new.client@gmail.com"], allow, "allowlist");
+    expect(r.ok).toEqual([]);
+    expect(r.refused[0].addCommand).toMatch(/outbound_allow\.py/);
+    expect(r.refused[0].addCommand).toContain("new.client@gmail.com");
+  });
+
+  it("is 'anyone you address' unless an owner chose otherwise", () => {
+    expect(DEFAULT_SETTINGS.email.recipients).toBe("addressed");
+    expect(readSettings({ email: { recipients: "allowlist" } }).email.recipients).toBe("allowlist");
+    expect(readSettings({ email: { recipients: "everyone" } }).email.recipients).toBe("addressed");
+  });
+
+  it("signing notices go to the signer's email and every outside address the proposal was sent to", async () => {
+    const { clientAddresses } = await import("../mail");
+    const sigs = [{ role: "client", email: "Ana@Example.com" }] as Parameters<typeof clientAddresses>[0];
+    const events = [
+      { kind: "sent", detail: { mail: "proposal", to: ["ana@example.com"], cc: ["husband@example.com"] } },
+      { kind: "sent", detail: { mail: "notice", to: ["someone@else.com"] } },
+      { kind: "sent", detail: { mail: "proposal", to: ["info@saddlewoodcontracting.com"] } },
+    ];
+    expect(clientAddresses(sigs, events)).toEqual(["ana@example.com", "husband@example.com"]);
+  });
+});

@@ -18,7 +18,7 @@ import type { BillingDocument } from "@/lib/billing/types";
 import { laneAddresses } from "@/lib/crew/notify";
 import { renderProposalPdf, pdfFileName, type PdfInput } from "./pdf";
 import type { ProposalSnapshot } from "./presentation";
-import { fillTemplate, SIGNATURE_FONTS, type SalesSettings } from "./settings";
+import { fillTemplate, SIGNATURE_FONTS, type RecipientRule, type SalesSettings } from "./settings";
 import { publicSignature, type Signature } from "./signing";
 import { addEvent, type EstimateSnapshot } from "./store";
 
@@ -27,11 +27,14 @@ import { addEvent, type EstimateSnapshot } from "./store";
 // client signs and when every signature is on (each one an owner turns on or
 // off in Sales settings).
 //
-// The rule for who may receive it is the billing rule: our own addresses
-// always; an outside address only when it is on the owner's outbound
-// allowlist, as the Mac last reported it (the owner adds an address by
-// command; the site never adds one). A notice to a client whose address is
-// not on it is skipped, and the office is told which command would allow it.
+// Who may receive it is a Sales setting (email.recipients). "addressed", the
+// default since 2026-10-19: a proposal goes to whoever the sender puts on it
+// (the preview names any address not on the owner's allowlist, so a typo is
+// seen before Send), and the client's signing notices go to those addresses
+// and to the email the client typed when signing. "allowlist": the billing
+// rule, our addresses plus the owner's outbound allowlist only. Either way the
+// site never adds anyone to the allowlist; that stays a command on the Mac,
+// and it still governs the bot's automated replies and billing mail.
 //
 // MAIL_DRY_RUN=1 (local testing only) writes every message to the log instead
 // of the mail service, so a test can never reach a real inbox.
@@ -53,10 +56,20 @@ function fromLine(s: SalesSettings): string {
   return `${s.email.fromName} <${s.email.fromAddress}>`;
 }
 
-/** Sort addresses into ours, allowed outside, and refused (with why). */
-export function screenRecipients(addresses: string[], allow: AllowMirror | null, now = Date.now()): { ok: string[]; refused: Refused[] } {
+/**
+ * Sort addresses into ours, allowed outside, and refused (with why). Under the
+ * "addressed" rule an outside address off the allowlist is allowed too, and
+ * listed in `unlisted` so the preview can say so.
+ */
+export function screenRecipients(
+  addresses: string[],
+  allow: AllowMirror | null,
+  rule: RecipientRule = "allowlist",
+  now = Date.now(),
+): { ok: string[]; refused: Refused[]; unlisted: string[] } {
   const ok: string[] = [];
   const refused: Refused[] = [];
+  const unlisted: string[] = [];
   const fresh = mirrorIsFresh(allow, now);
   for (const raw of addresses) {
     const a = cleanAddress(raw);
@@ -66,11 +79,14 @@ export function screenRecipients(addresses: string[], allow: AllowMirror | null,
     }
     if (ok.includes(a) || refused.some((r) => r.address === a)) continue;
     if (a.endsWith(INTERNAL_DOMAIN)) ok.push(a);
-    else if (!fresh) refused.push({ address: a, reason: "the Mac has not reported the owner's allowlist lately, so no outside address can be sent to right now" });
-    else if (allowedByMirror(a, allow!)) ok.push(a);
+    else if (fresh && allowedByMirror(a, allow!)) ok.push(a);
+    else if (rule === "addressed") {
+      ok.push(a);
+      unlisted.push(a);
+    } else if (!fresh) refused.push({ address: a, reason: "the Mac has not reported the owner's allowlist lately, so no outside address can be sent to right now" });
     else refused.push({ address: a, reason: "not on the owner's outbound allowlist", addCommand: allowAddCommand(a) });
   }
-  return { ok, refused };
+  return { ok, refused, unlisted };
 }
 
 export type PdfContext = Omit<PdfInput, "proposal" | "signatures">;
@@ -162,7 +178,7 @@ export type ProposalMailInput = { to: string[]; cc: string[]; subject: string; b
 
 export type PreparedMail =
   | { ok: false; error: string; refused?: Refused[] }
-  | { ok: true; client: Outgoing; staffCopy: Outgoing | null; refused: Refused[] };
+  | { ok: true; client: Outgoing; staffCopy: Outgoing | null; refused: Refused[]; unlisted: string[] };
 
 /**
  * The message as it will leave: who from, to whom, the words with the
@@ -181,9 +197,11 @@ export async function prepareProposalMail(
   if (!input.link && !input.attachPdf) return { ok: false, error: "send the link, the PDF, or both" };
   if (doc.status !== "issued" || !doc.token) return { ok: false, error: "this proposal was withdrawn" };
   const allow = await allowMirror();
-  const to = screenRecipients(input.to, allow);
-  const cc = screenRecipients(input.cc, allow);
+  const rule = settings.email.recipients ?? "allowlist";
+  const to = screenRecipients(input.to, allow, rule);
+  const cc = screenRecipients(input.cc, allow, rule);
   const refused = [...to.refused, ...cc.refused];
+  const unlisted = [...to.unlisted, ...cc.unlisted];
   const outsideTo = to.ok.filter((a) => !a.endsWith(INTERNAL_DOMAIN));
   const outsideCc = cc.ok.filter((a) => !a.endsWith(INTERNAL_DOMAIN));
   const inside = [...to.ok, ...cc.ok].filter((a) => a.endsWith(INTERNAL_DOMAIN));
@@ -202,13 +220,14 @@ export async function prepareProposalMail(
   const base = { from: fromLine(settings), replyTo: settings.email.replyTo, attachments };
   // Nobody outside: the whole message is our own people's (uncounted links).
   if (outsideTo.length === 0) {
-    return { ok: true, client: { ...base, to: inside, cc: [], ...copyMsg }, staffCopy: null, refused };
+    return { ok: true, client: { ...base, to: inside, cc: [], ...copyMsg }, staffCopy: null, refused, unlisted };
   }
   return {
     ok: true,
     client: { ...base, to: outsideTo, cc: outsideCc, ...mainMsg },
     staffCopy: inside.length ? { ...base, to: inside, cc: [], subject: `[Copy] ${copyMsg.subject}`, text: copyMsg.text, html: copyMsg.html } : null,
     refused,
+    unlisted,
   };
 }
 
@@ -260,13 +279,15 @@ function money(cents: number): string {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
-/** The client's address for a notice: what they gave when signing, else where the proposal was emailed. */
-function clientAddresses(sigs: Signature[], events: { kind: string; detail: Record<string, unknown> }[]): string[] {
-  const fromSig = sigs.filter((s) => s.role === "client" && s.email).map((s) => s.email);
-  if (fromSig.length) return [...new Set(fromSig)];
+/** The client's addresses for a notice: the email they gave when signing, and every outside address a person sent the proposal to. */
+export function clientAddresses(sigs: Signature[], events: { kind: string; detail: Record<string, unknown> }[]): string[] {
+  const fromSig = sigs.filter((s) => s.role === "client" && s.email).map((s) => s.email.toLowerCase());
   const sent = events.filter((e) => e.kind === "sent" && e.detail.mail !== "notice");
-  const to = sent.flatMap((e) => (Array.isArray(e.detail.to) ? (e.detail.to as string[]) : []));
-  return [...new Set(to.filter((a) => !a.endsWith(INTERNAL_DOMAIN)))];
+  const to = sent.flatMap((e) => [
+    ...(Array.isArray(e.detail.to) ? (e.detail.to as string[]) : []),
+    ...(Array.isArray(e.detail.cc) ? (e.detail.cc as string[]) : []),
+  ]);
+  return [...new Set([...fromSig, ...to.map((a) => a.toLowerCase())].filter((a) => !a.endsWith(INTERNAL_DOMAIN)))];
 }
 
 /**
@@ -329,7 +350,7 @@ export async function notifyAfterSignature(args: {
       return;
     }
     const allow = await allowMirror();
-    const { ok, refused } = screenRecipients(addresses, allow);
+    const { ok, refused } = screenRecipients(addresses, allow, settings.email.recipients ?? "allowlist");
     const outside = ok.filter((a) => !a.endsWith(INTERNAL_DOMAIN));
     await send(outside, subject, body, link || null, executed ? "View the signed proposal" : "View what you signed", kind);
     if (refused.length && oppId) {

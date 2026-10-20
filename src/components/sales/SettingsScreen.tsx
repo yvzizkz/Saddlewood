@@ -6,7 +6,7 @@ import { ArrowLeft, Lock, Plus, RotateCcw, Trash2 } from 'lucide-react'
 
 import { Button, Field, INPUT, ScreenTitle } from '@/components/bot/ui'
 import { NumberField, Panel, Pill, Toggle } from '@/components/sales/builder/fields'
-import { DEFAULT_SETTINGS, SIGNATURE_FONTS, type CompanyActors, type SalesSettings, type SignatureFont } from '@/lib/sales/settings'
+import { DEFAULT_SETTINGS, RECIPIENT_RULES, SIGNATURE_FONTS, type CompanyActors, type RecipientRule, type SalesSettings, type SignatureFont } from '@/lib/sales/settings'
 import { ALLOWANCE_DISPLAYS, MARKUP_DISPLAYS, PRESENT_LAYOUTS, SIGNING_MODES, type Presentation, type Pricing } from '@/lib/sales/types'
 import { stamp, personName } from './format'
 import { SIGNATURE_FAMILY, SIGNATURE_SCALE } from './signatureFonts'
@@ -434,6 +434,16 @@ export default function SettingsScreen({ canEdit: canEditProp }: { canEdit: bool
           </div>
           <p className="mb-1.5 mt-3 text-xs font-medium">Who may issue and email proposals</p>
           <Who label="Who sends" value={s.email.whoMaySend} onChange={(v) => email({ whoMaySend: v })} />
+          <p className="mb-1.5 mt-3 text-xs font-medium">Who a proposal can be emailed to</p>
+          <Choice<RecipientRule>
+            label="Proposal recipients"
+            value={s.email.recipients}
+            onChange={(v) => email({ recipients: v })}
+            options={RECIPIENT_RULES.map((r) => ({ key: r.key, label: r.label, hint: r.hint }))}
+          />
+          <p className="mt-1.5 text-[11px] text-[var(--color-charcoal-light)]">
+            The bot&apos;s automated replies and billing mail always keep to the owner&apos;s allowlist; this is only for proposals a person sends.
+          </p>
         </Section>
 
         <Section title="Signing notifications" hint="Emails that go out on their own when a signature comes in.">
@@ -453,7 +463,9 @@ export default function SettingsScreen({ canEdit: canEditProp }: { canEdit: bool
             check={(a) => (COMPANY.test(a) ? null : 'Company addresses only (@saddlewoodcontracting.com).')}
           />
           <p className="mt-3 rounded-xl bg-[var(--color-cream)] px-3 py-2 text-xs text-[var(--color-charcoal)]">
-            Client emails only go to addresses on the owner&apos;s outbound allowlist. Any other address is skipped, and the timeline says so with the command an owner runs to allow it.
+            {s.email.recipients === 'allowlist'
+              ? "Client emails only go to addresses on the owner's outbound allowlist. Any other address is skipped, and the timeline says so with the command an owner runs to allow it."
+              : 'The client gets these at the addresses the proposal was emailed to and the email they gave when signing. With neither, the timeline says the copy was not sent.'}
           </p>
         </Section>
       </fieldset>

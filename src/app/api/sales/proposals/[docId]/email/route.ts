@@ -11,8 +11,10 @@ export const dynamic = "force-dynamic";
 
 // Email an issued proposal from the app: the link, the PDF, or both. Without
 // { confirm: true } it answers exactly what would leave (sender, recipients,
-// words, attachments, and any address refused with the owner's command to
-// allow it). Nothing is sent until the same request comes back confirmed.
+// words, attachments; which addresses are not on the owner's allowlist; any
+// address refused, with the owner's command to allow it). Nothing is sent
+// until the same request comes back confirmed. Who it may go to is the Sales
+// setting email.recipients (src/lib/sales/mail.ts).
 
 const input = z.object({
   to: z.array(z.string().max(254)).min(1).max(10),
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         text: m.text,
         attachments: m.attachments.map((a) => ({ filename: a.filename, bytes: a.content.length })),
         refused: prepared.refused,
+        unlisted: prepared.unlisted,
       });
     }
     // Refused addresses are not quietly dropped from a confirmed send: the owner fixes the list first.

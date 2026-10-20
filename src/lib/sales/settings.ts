@@ -28,6 +28,22 @@ export const SIGNATURE_FONT_KEYS = SIGNATURE_FONTS.map((f) => f.key) as Signatur
 /** Who may act for the company: the owners only, or the owners and anyone with the Sales send switch. */
 export type CompanyActors = "owners" | "owners_and_sales";
 
+/**
+ * Who a proposal can be emailed to. Owner decision 2026-10-19 (Lando): a
+ * proposal someone deliberately sends goes to the addresses the client gave,
+ * with no allowlist step; the allowlist is for the bot's automated replies.
+ *
+ *   addressed  any address the sender puts on it (the preview names the ones
+ *              not on the allowlist); signing notices go to those addresses and
+ *              to the email the client typed when signing
+ *   allowlist  only company addresses and the owner's outbound allowlist
+ */
+export const RECIPIENT_RULES = [
+  { key: "addressed", label: "Anyone you address", hint: "Whoever you put on it, after the preview. The client's signed copy goes to them too." },
+  { key: "allowlist", label: "The owner's allowlist only", hint: "Outside addresses must be added on the Mac first (outbound_allow.py)." },
+] as const;
+export type RecipientRule = (typeof RECIPIENT_RULES)[number]["key"];
+
 export type SalesSettings = {
   pricing: Pricing;
   proposal: {
@@ -62,6 +78,8 @@ export type SalesSettings = {
     defaultLink: boolean;
     defaultAttachPdf: boolean;
     whoMaySend: CompanyActors;
+    /** Who a proposal and its signing notices can go to. */
+    recipients: RecipientRule;
     notify: {
       /** Email the sales lane when the client signs or accepts. */
       companyOnClientSign: boolean;
@@ -114,6 +132,7 @@ export const DEFAULT_SETTINGS: SalesSettings = {
     defaultLink: true,
     defaultAttachPdf: false,
     whoMaySend: "owners",
+    recipients: "addressed",
     notify: {
       companyOnClientSign: true,
       clientCopyOnSign: true,
@@ -210,6 +229,7 @@ function schema(d: SalesSettings) {
         defaultLink: bool(d.email.defaultLink),
         defaultAttachPdf: bool(d.email.defaultAttachPdf),
         whoMaySend: z.enum(["owners", "owners_and_sales"]).catch(d.email.whoMaySend),
+        recipients: z.enum(RECIPIENT_RULES.map((r) => r.key) as [RecipientRule, ...RecipientRule[]]).catch(d.email.recipients),
         notify: z
           .object({
             companyOnClientSign: bool(d.email.notify.companyOnClientSign),
