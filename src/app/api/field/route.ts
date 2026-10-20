@@ -9,7 +9,8 @@ import {
   type ChecklistItem,
   type ChecklistStage,
 } from "@/lib/field/ops";
-import { jobForWrite, seesJob, workSeat } from "@/lib/jobs/access";
+import { jobForWrite, PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
+import type { Role } from "@/lib/roles/seats";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const STAGES: ChecklistStage[] = ["pre_cover", "pre_board", "pre_tape", "pre_texture", "pre_paint", "final_walk"];
@@ -232,11 +233,28 @@ export async function PATCH(req: Request) {
     if (!id || !["open", "done", "dropped"].includes(status)) {
       return NextResponse.json({ error: "Bad punch update" }, { status: 400 });
     }
-    const { data: punch } = await db.from("work_items").select("job_id,crew_job_id").eq("id", id).maybeSingle();
-    const on = punch as { job_id: string | null; crew_job_id: string | null } | null;
-    // A PM closes punch on their own jobs only; a task with no job is not a punch item of theirs.
-    if (!on || (!seat.owner && !((on.job_id || on.crew_job_id) && seesJob(seat, { billingId: on.job_id, crewId: on.crew_job_id })))) {
+    const { data: punch } = await db
+      .from("work_items")
+      .select("kind,role,created_by,job_id,crew_job_id")
+      .eq("id", id)
+      .maybeSingle();
+    const on = punch as {
+      kind: string;
+      role: string;
+      created_by: string;
+      job_id: string | null;
+      crew_job_id: string | null;
+    } | null;
+    // A PM closes punch on their own jobs only; non-punch rows or off-job rows are not found.
+    if (
+      !on ||
+      on.kind !== "punch" ||
+      (!seat.owner && !((on.job_id || on.crew_job_id) && seesJob(seat, { billingId: on.job_id, crewId: on.crew_job_id })))
+    ) {
       return NextResponse.json({ error: "Punch item not found" }, { status: 404 });
+    }
+    if (!seat.owner && !(PM_ROLES.includes(on.role as Role) || on.created_by === seat.email)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { error } = await db
       .from("work_items")
@@ -245,7 +263,8 @@ export async function PATCH(req: Request) {
         done_at: status === "open" ? null : new Date().toISOString(),
         done_by: status === "open" ? "" : seat.email,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("kind", "punch");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

@@ -46,7 +46,7 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
     pmPage: page,
     browser,
   }) => {
-    for (const tab of ["overview", "money", "labor", "subs", "log"] as const) {
+    for (const tab of ["overview", "schedule", "money", "labor", "subs", "log"] as const) {
       const res = await page.goto(`/app/jobs/8009-n-ironwood-dr?tab=${tab}`, {
         waitUntil: "domcontentloaded",
       });
@@ -56,6 +56,11 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
       await expect(page.getByText("Margin", { exact: true })).toHaveCount(0);
       await expect(page.getByText("Sub and vendor bills")).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Make the draft invoice" })).toHaveCount(0);
+      await expect(page.locator('a[href^="/app/accounting/payables"]')).toHaveCount(0);
+      await expect(page.locator('a[href^="/app/schedule"]')).toHaveCount(0);
+      if (tab === "schedule") {
+        await expect(page.locator('a[href^="/app/subs/bids"]')).toHaveCount(0);
+      }
     }
 
     // Record a change request on ?tab=changes; PM cannot price or sign it.

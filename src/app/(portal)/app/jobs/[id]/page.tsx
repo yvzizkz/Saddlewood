@@ -413,18 +413,25 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   if (tab === "schedule") {
     const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
     const allSched = await loadScheduleFeed(refs, today);
-    const jobSched = allSched.filter((i) => i.jobKey === ref.key || (!i.jobKey && i.client && i.client === ref.client));
-    const table: TableRow[] = jobSched.map((i) => ({
-      id: i.id,
-      day: i.startDay,
-      time: i.startTime ? clockText(i.startTime) : "All day",
-      title: i.title,
-      detail: i.detail,
-      kind: i.kindLabel || SCHEDULE_KIND_LABEL[i.kind],
-      who: i.who || seatHolder(i.role, seats, people).name,
-      status: i.status,
-      href: i.href,
-    }));
+    const jobSched = allSched
+      .filter((i) => i.jobKey === ref.key || (!i.jobKey && i.client && i.client === ref.client))
+      .filter((i) => owner || i.source !== "pay");
+    const table: TableRow[] = jobSched.map((i) => {
+      const deadHref =
+        (!subsSeat && i.source === "bid") ||
+        (!owner && Boolean(i.href?.startsWith("/app/schedule")));
+      return {
+        id: i.id,
+        day: i.startDay,
+        time: i.startTime ? clockText(i.startTime) : "All day",
+        title: i.title,
+        detail: i.detail,
+        kind: i.kindLabel || SCHEDULE_KIND_LABEL[i.kind],
+        who: i.who || seatHolder(i.role, seats, people).name,
+        status: i.status,
+        href: deadHref ? null : i.href,
+      };
+    });
     const editableItems = jobSched.filter((i) => i.editable && i.itemId);
     return (
       <JobFrame {...frame} actions={owner ? <Link className="text-sm underline" href={hrefOf("/app/schedule", { job: ref.key })}>Open in Schedule</Link> : undefined}>
