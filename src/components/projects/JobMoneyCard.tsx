@@ -6,11 +6,14 @@ import { botApi } from '@/components/bot/BotProvider'
 import { Button, Chip, Dot } from '@/components/bot/ui'
 import { day, money } from '@/components/money/format'
 import type { JobMoney } from '@/lib/billing/jobMoney'
+import type { MaterialBlock as Material } from '@/lib/crew/purchases'
+import MaterialBlock from './MaterialBlock'
 
 // One job's money on the Projects screen (money.view): contract, billed, paid,
-// owed and past due, read only. The numbers come from
-// /api/crew/projects/money, which checks the switch and the job assignment
-// and answers only for this job. Nothing here can change money.
+// owed and past due, read only, and the Material block (Home Depot, 0022).
+// The numbers come from /api/crew/projects/money, which checks the switch and
+// the job assignment and answers only for this job. Nothing here can change
+// money. A field job with no billing job yet still gets its material.
 
 export function JobMoneyFigures({ m }: { m: JobMoney }) {
   const late = m.open.filter((o) => (o.daysLate ?? 0) >= 1)
@@ -64,26 +67,29 @@ export function JobMoneyFigures({ m }: { m: JobMoney }) {
   )
 }
 
-type Load = { state: 'loading' } | { state: 'error'; error: string } | { state: 'ok'; m: JobMoney }
+type Load = { state: 'loading' } | { state: 'error'; error: string } | { state: 'ok'; m: JobMoney | null; material: Material | null }
 
-export default function JobMoneyCard({ billingJobId }: { billingJobId: string | null }) {
+const NOT_LINKED = 'Money: no billing job linked yet. An owner links it on the Crew tab.'
+
+export default function JobMoneyCard({ billingJobId, crewJobId = '' }: { billingJobId: string | null; crewJobId?: string }) {
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
-    if (!billingJobId) return
+    if (!billingJobId && !crewJobId) return
     let live = true
-    botApi<{ ok: true; money: JobMoney }>(`/api/crew/projects/money?job=${encodeURIComponent(billingJobId)}`)
-      .then((d) => live && setLoad({ state: 'ok', m: d.money }))
+    const query = billingJobId ? `job=${encodeURIComponent(billingJobId)}` : `crewJob=${encodeURIComponent(crewJobId)}`
+    botApi<{ ok: true; money: JobMoney | null; material: Material | null }>(`/api/crew/projects/money?${query}`)
+      .then((d) => live && setLoad({ state: 'ok', m: d.money, material: d.material }))
       .catch((e: Error) => live && setLoad({ state: 'error', error: e.message }))
     return () => {
       live = false
     }
-  }, [billingJobId, attempt])
+  }, [billingJobId, crewJobId, attempt])
 
   return (
     <div className="mt-3 border-t border-[var(--color-stone)] pt-3">
-      {!billingJobId ? (
-        <p className="text-[12px] text-[var(--color-charcoal-light)]">Money: no billing job linked yet. An owner links it on the Crew tab.</p>
+      {!billingJobId && !crewJobId ? (
+        <p className="text-[12px] text-[var(--color-charcoal-light)]">{NOT_LINKED}</p>
       ) : load.state === 'loading' ? (
         <p className="text-[12px] text-[var(--color-charcoal-light)]">Money: loading…</p>
       ) : load.state === 'error' ? (
@@ -99,7 +105,10 @@ export default function JobMoneyCard({ billingJobId }: { billingJobId: string | 
           </Button>
         </div>
       ) : (
-        <JobMoneyFigures m={load.m} />
+        <>
+          {load.m ? <JobMoneyFigures m={load.m} /> : <p className="text-[12px] text-[var(--color-charcoal-light)]">{NOT_LINKED}</p>}
+          {load.material ? <MaterialBlock m={load.material} /> : null}
+        </>
       )}
     </div>
   )

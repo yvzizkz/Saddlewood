@@ -8,6 +8,8 @@ import { geocodeAddress } from "./geocode";
 import { MSG } from "./messages";
 import { notifyCrew, notifyOwners } from "./notify";
 import { buildPlan } from "./plan";
+import { relinkPurchases, upsertAlias } from "./purchaseQueries";
+import { normalizeJobName } from "./purchases";
 import {
   answerReport,
   cancelQuestion,
@@ -61,7 +63,7 @@ type Owner = Pick<Manager, "email" | "name"> & { role?: Manager["role"]; perms?:
 // tasks, time corrections, questions. Every change to someone's time keeps
 // what the row said before and who changed it.
 
-export type AdminResult = ActResult | { ok: true; note?: string; code?: string; link?: string; hours?: number; set?: number };
+export type AdminResult = ActResult | { ok: true; note?: string; code?: string; link?: string; hours?: number; set?: number; linked?: number };
 
 const ok = (note?: string): ActResult => ({ ok: true, ...(note ? { note } : {}) });
 const bad = (status: number, error: string): ActResult => ({ ok: false, status, error });
@@ -299,6 +301,8 @@ async function jobsOfAct(act: AdminAct): Promise<(string | null | undefined)[] |
       return [(await getShift(act.id))?.jobId];
     case "fix.decide":
       return [(await getEntry(act.id))?.jobId];
+    case "purchase.assign":
+      return act.jobId ? [act.jobId] : null;
     default:
       return null;
   }
@@ -824,6 +828,21 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
     case "question.cancel": {
       await cancelQuestion(act.id);
       return ok();
+    }
+
+    case "purchase.assign": {
+      // The screen sends the key it was shown; a raw name normalizes to the same thing.
+      const key = normalizeJobName(act.alias);
+      if (!key) return bad(400, "Which name?");
+      if (act.jobId === null && owner.role === "member") {
+        return bad(403, "Setting a name aside is for the owners. Pick a job, or leave it for Marco or Lando.");
+      }
+      const job = act.jobId ? await getJob(act.jobId) : null;
+      if (act.jobId && !job) return bad(404, "That job is not on the list.");
+      await upsertAlias(key, act.jobId, owner.name);
+      const linked = await relinkPurchases(key, act.jobId);
+      const lines = `${linked} ${linked === 1 ? "line" : "lines"}`;
+      return { ok: true, linked, note: job ? `"${act.alias}" is ${job.name}: ${lines} filed.` : `"${act.alias}" set aside: ${lines} ignored.` };
     }
   }
 }

@@ -23,6 +23,8 @@ import {
   type CrewShiftRow,
 } from "./queries";
 import type { Manager } from "./auth";
+import { listUnmatchedPurchases, loadPurchasesToday } from "./purchaseQueries";
+import type { PurchasesToday, UnmatchedPurchase } from "./purchases";
 import { inScope, visibleCrewJobs } from "./scope";
 import { addDays, isDay, localDay, weekStart } from "./time";
 import type { BillingJobRef, Capability, CrewAdminHome, CrewJobPerson, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift, OwnShift } from "./types";
@@ -117,7 +119,7 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
   const week = weekParam && isDay(weekParam) ? weekStart(weekParam) : weekStart(day);
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS).toISOString();
   const scope = await visibleCrewJobs(viewer);
-  const [people, allJobs, weekShifts, recentShifts, open, allEntries, allSchedule, allTasks, questions, suggested, allPickups, allReports, groups, jobPeople, billingJobs] = await Promise.all([
+  const [people, allJobs, weekShifts, recentShifts, open, allEntries, allSchedule, allTasks, questions, suggested, allPickups, allReports, groups, jobPeople, billingJobs, unmatchedPurchases] = await Promise.all([
     listPeople(),
     listJobs(),
     hours ? listShifts({ fromDay: week, toDay: addDays(week, 6), includeVoid: fixes }) : Promise.resolve([] as CrewShiftRow[]),
@@ -133,6 +135,8 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     viewer.role === "owner" ? listGroups() : Promise.resolve([]),
     listJobPeople().catch(() => [] as CrewJobPerson[]),
     viewer.role === "owner" ? listBillingJobs().catch(() => [] as BillingJobRef[]) : Promise.resolve([] as BillingJobRef[]),
+    // Which job is this? (0022): for anyone who sees money. The tab must open before the migration is applied, so a missing table is an empty list.
+    can("money.view") ? listUnmatchedPurchases().catch(() => [] as UnmatchedPurchase[]) : Promise.resolve([] as UnmatchedPurchase[]),
   ]);
   // A project manager sees only the jobs they are on, and the plans they sent.
   const mine = <T extends { jobId: string }>(rows: T[]) => rows.filter((r) => inScope(scope, r.jobId));
@@ -163,6 +167,7 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     jobPeople: jobPeople.filter((a) => inScope(scope, a.jobId)),
     billingJobs,
     narrowed: scope !== null,
+    unmatchedPurchases,
   };
 }
 
@@ -191,6 +196,8 @@ export async function crewFeed(now = new Date()): Promise<CrewFeed> {
     listQuestions({ since }),
     listUnseenAnswers(),
   ]);
+  // Today's Home Depot trips per job (0022). The feed must not fail over a missing purchases table.
+  const purchasesToday: PurchasesToday[] = await loadPurchasesToday(day, jobs).catch(() => []);
 
   // An answer can arrive days after the receipt it is about ("what was the
   // total?"). The Mac needs that receipt in the same feed to act on the answer.
@@ -228,5 +235,6 @@ export async function crewFeed(now = new Date()): Promise<CrewFeed> {
     schedule,
     tasks,
     questions: byId<CrewQuestion>([...questions, ...unseen]).sort((a, b) => a.id - b.id),
+    purchasesToday,
   };
 }
