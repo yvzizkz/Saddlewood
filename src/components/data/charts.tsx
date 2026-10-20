@@ -128,7 +128,8 @@ export function TrendChart({ points, kind, height = 168, label }: { points: Char
               </>
             )}
         {points.map((p, i) =>
-          i % every === 0 || i === n - 1 ? (
+          // Every `every`th label, and the last one unless it would sit on the one before.
+          (i % every === 0 && (i === n - 1 || n - 1 - i >= every)) || i === n - 1 ? (
             <text key={p.bucket} x={x(i)} y={height - 6} textAnchor={i === n - 1 && !columns ? 'end' : 'middle'} className="fill-[#8a837a] text-[10px]">
               {p.label}
             </text>

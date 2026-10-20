@@ -29,7 +29,8 @@ describe("format", () => {
     expect(formatValue("money", 123456)).toBe("$1,234.56");
     expect(formatValue("money", 1_250_000_00, { compact: true })).toBe("$1.3M");
     expect(formatValue("hours", 450)).toBe("7.5 h");
-    expect(formatValue("date", "2026-10-20")).toBe("Oct 20, 26");
+    expect(formatValue("date", "2019-10-20")).toBe("Oct 20, 2019");
+    expect(formatValue("date", `${new Date().getFullYear()}-03-04`)).toBe("Mar 4");
     expect(formatValue("hours", null)).toBe("–");
   });
 

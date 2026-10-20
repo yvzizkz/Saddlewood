@@ -126,8 +126,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-[var(--color-charcoal)]">{formatValue("date", c.day).replace(/, \d\d$/, "")}</p>
-                        <p className={`text-[11px] ${soon ? "font-medium text-[#9a2a1f]" : "text-[var(--color-charcoal-light)]"}`}>% complete by {formatValue("date", c.prepOn).replace(/, \d\d$/, "")}</p>
+                        <p className="text-sm font-semibold text-[var(--color-charcoal)]">{formatValue("date", c.day)}</p>
+                        <p className={`text-[11px] ${soon ? "font-medium text-[#9a2a1f]" : "text-[var(--color-charcoal-light)]"}`}>% complete by {formatValue("date", c.prepOn)}</p>
                       </div>
                     </div>
                     {c.attachments.length ? <p className="mt-2 text-[11px] text-[var(--color-charcoal-light)]">With every invoice: {c.attachments.join(", ")}</p> : null}

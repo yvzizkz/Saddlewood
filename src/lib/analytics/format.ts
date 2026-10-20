@@ -27,7 +27,10 @@ export function formatValue(kind: ValueKind, v: unknown, opts: { compact?: boole
       const s = String(v);
       const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T12:00:00Z`) : new Date(s);
       const tz = /^\d{4}-\d{2}-\d{2}$/.test(s) ? "UTC" : "America/Phoenix";
-      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit", timeZone: tz });
+      // The year only when it is not this one: "Oct 23", "Dec 30, 2025".
+      const thisYear = new Date().toLocaleDateString("en-US", { year: "numeric", timeZone: "America/Phoenix" });
+      const year = d.toLocaleDateString("en-US", { year: "numeric", timeZone: tz });
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year === thisYear ? {} : { year: "numeric" }), timeZone: tz });
     }
     default:
       return String(v);

@@ -124,7 +124,7 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
       title: "Payables",
       value: apOpen,
       kind: "money",
-      sub: `${formatValue("money", dueFriday)} due by Friday's pay run (${formatValue("date", payables.fridayCutoff).replace(/, \d\d$/, "")})`,
+      sub: `${formatValue("money", dueFriday)} due by Friday's pay run (${formatValue("date", payables.fridayCutoff)})`,
       alert: held ? { text: `${held} bill${held === 1 ? "" : "s"} on hold (waiver or COI)`, href: "/app/accounting/payables" } : null,
     },
     {
@@ -140,7 +140,7 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
       title: "Billing",
       value: billed,
       kind: "money",
-      sub: next ? `Next: ${next.client.replace(/ \(Synthetic\)$/, "")}, ${formatValue("date", next.day).replace(/, \d\d$/, "")}` : "No billing dates ahead",
+      sub: next ? `Next: ${next.client.replace(/ \(Synthetic\)$/, "")}, ${formatValue("date", next.day)}` : "No billing dates ahead",
       spark: spark(issued.filter((r) => r.status === "issued"), (r) => r.day, (r) => r.totalCents),
       alert: drafts ? { text: `${drafts} draft${drafts === 1 ? "" : "s"} waiting to go`, href: "/app/bill" } : next && next.prepOn <= today ? { text: `% complete for ${next.client} is due`, href: link("/app/accounting/billing") } : null,
     },
