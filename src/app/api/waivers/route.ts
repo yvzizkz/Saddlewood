@@ -16,6 +16,23 @@ const KINDS = ["conditional_progress", "unconditional_progress", "conditional_fi
 const STATUSES = ["required", "prepared", "sent", "received", "void"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** The register's rows for one invoice (?document=) or one bill (?bill=). */
+export async function GET(request: NextRequest) {
+  const owner = await requireOwner(request);
+  if (!owner) return NextResponse.json({ ok: false, error: "owners only" }, { status: 403 });
+  const doc = request.nextUrl.searchParams.get("document");
+  const bill = request.nextUrl.searchParams.get("bill");
+  const id = doc ?? bill;
+  if (!id || !UUID.test(id)) return NextResponse.json({ ok: false, error: "Which invoice or bill?" }, { status: 400 });
+  const { data, error } = await getSupabaseAdmin()
+    .from("lien_waivers")
+    .select("id,direction,kind,status,amount_cents,received_on,file_url")
+    .eq(doc ? "document_id" : "bill_id", id)
+    .order("id", { ascending: true });
+  if (error) throw new Error(`lien_waivers read: ${error.message}`);
+  return NextResponse.json({ ok: true, waivers: data ?? [] });
+}
+
 export async function POST(request: NextRequest) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ ok: false, error: "owners only" }, { status: 403 });

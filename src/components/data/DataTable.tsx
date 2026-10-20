@@ -146,7 +146,7 @@ export default function DataTable({
   const details = columns.filter((c) => c !== title && c !== value && c.phone !== 'hide')
 
   return (
-    <section className="rounded-2xl border border-[var(--color-stone)] bg-white">
+    <section data-table={name} className="rounded-2xl border border-[var(--color-stone)] bg-white">
       {/* Controls: one row above the rows they scope. */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-stone)] p-3">
         <label className="relative min-w-[12rem] flex-1">
@@ -196,7 +196,7 @@ export default function DataTable({
       </div>
 
       <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-[var(--color-charcoal-light)]">
-        <span>
+        <span data-rows={visible.length}>
           {visible.length.toLocaleString('en-US')} {visible.length === 1 ? 'row' : 'rows'}
           {visible.length !== rows.length ? ` of ${rows.length.toLocaleString('en-US')}` : ''}
         </span>
@@ -311,7 +311,7 @@ export default function DataTable({
                   <tr className="border-t border-[var(--color-stone-mid)] bg-[#faf7f2] font-semibold">
                     <td className="px-3 py-2" />
                     {columns.map((c, i) => (
-                      <td key={c.key} className={`px-3 py-2 ${c.total ? 'text-right tabular-nums' : ''}`}>
+                      <td key={c.key} data-total={c.total ? c.key : undefined} className={`px-3 py-2 ${c.total ? 'text-right tabular-nums' : ''}`}>
                         {c.total ? formatValue(c.kind, sumOf(visible, c.key)) : i === 0 ? 'Total' : ''}
                       </td>
                     ))}
