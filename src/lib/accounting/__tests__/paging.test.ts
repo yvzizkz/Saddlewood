@@ -102,4 +102,26 @@ describe("loadPurchases and loadPayables", () => {
     expect(ap.payments).toHaveLength(1_100);
     expect(ap.capped).toBe(false);
   });
+
+  it("treats missing and expired sub COIs as held and excludes them from the Friday pay run, while valid COIs pass", async () => {
+    db.tables.subs = [
+      { id: "sub-valid", name: "Valid Sub", coi_expires_on: "2027-01-01", w9_on_file: true },
+      { id: "sub-expired", name: "Expired Sub", coi_expires_on: "2026-04-01", w9_on_file: true },
+      { id: "sub-missing", name: "Missing Sub", coi_expires_on: null, w9_on_file: true },
+    ];
+    db.tables.bills = [
+      { id: "b-valid", bill_number: "V-1", kind: "sub", sub_id: "sub-valid", vendor_name: "Valid Sub", status: "open", waiver_status: "conditional_received", amount_cents: 100_00, retainage_cents: 0, issued_on: "2026-05-01", due_on: "2026-05-10", payment_terms: "friday_run", trade: "general" },
+      { id: "b-expired", bill_number: "E-1", kind: "sub", sub_id: "sub-expired", vendor_name: "Expired Sub", status: "open", waiver_status: "conditional_received", amount_cents: 200_00, retainage_cents: 0, issued_on: "2026-05-01", due_on: "2026-05-10", payment_terms: "friday_run", trade: "general" },
+      { id: "b-missing", bill_number: "M-1", kind: "sub", sub_id: "sub-missing", vendor_name: "Missing Sub", status: "open", waiver_status: "conditional_received", amount_cents: 300_00, retainage_cents: 0, issued_on: "2026-05-01", due_on: "2026-05-10", payment_terms: "friday_run", trade: "general" },
+    ];
+    db.tables.bill_payments = [];
+
+    const ap = await loadPayables("2026-05-10");
+    const byId = Object.fromEntries(ap.rows.map((r) => [r.id, r]));
+
+    expect(byId["b-valid"]).toMatchObject({ coiStatus: "valid", isOnHold: false, dueByFriday: true });
+    expect(byId["b-expired"]).toMatchObject({ coiStatus: "expired", isOnHold: true, dueByFriday: false });
+    expect(byId["b-missing"]).toMatchObject({ coiStatus: "missing", isOnHold: true, dueByFriday: false });
+    expect(byId["b-missing"].holdReason).toMatch(/COI missing/i);
+  });
 });

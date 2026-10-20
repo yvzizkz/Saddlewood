@@ -14,7 +14,13 @@ import { holdsOf, type Hold } from "@/lib/accounting/payablesRules";
 const HOLD_ACTION: Record<Hold, string> = { waiver: "Waiver received", approval: "Approve", coi: "COI renewed" };
 
 function holdsOfRow(b: PayableRow): Hold[] {
-  return holdsOf({ kind: b.vendorKind, status: b.status, waiverStatus: b.waiverStatus, coiExpired: b.coiStatus === "expired" });
+  return holdsOf({
+    kind: b.vendorKind,
+    status: b.status,
+    waiverStatus: b.waiverStatus,
+    coiExpired: b.coiStatus === "expired",
+    coiMissing: b.coiStatus === "missing",
+  });
 }
 
 async function clearHoldRequest(billId: string, hold: Hold): Promise<string | null> {
@@ -31,9 +37,9 @@ function HoldButtons({ bill, busy, onClear }: { bill: PayableRow; busy: boolean;
   return (
     <>
       {holdsOfRow(bill).map((hold) =>
-        hold === "coi" && bill.coiStatus === "expired" ? (
+        hold === "coi" && (bill.coiStatus === "expired" || bill.coiStatus === "missing") ? (
           <Link key={hold} href="/app/subs" className="text-xs font-medium text-[#9a2a1f] underline underline-offset-2">
-            COI expired: renew it on the sub
+            {bill.coiStatus === "missing" ? "COI missing: add it on the sub" : "COI expired: renew it on the sub"}
           </Link>
         ) : (
           <button

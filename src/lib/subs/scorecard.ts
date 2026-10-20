@@ -60,7 +60,7 @@ export function classifyCoi(coiExpiresOn: string | null, today: string): { daysL
 export function computeSubScorecards(
   subs: Sub[],
   invites: { sub_id: string; status: string }[],
-  bills: { vendorName: string; balanceCents: number; status: string }[],
+  bills: { subId?: string | null; vendorName: string; balanceCents: number; status: string; isOnHold?: boolean }[],
   openPunchByAssignee: Map<string, number>,
   today: string,
   opts?: { includeBills?: boolean },
@@ -87,11 +87,11 @@ export function computeSubScorecards(
 
     const lowerName = s.name.toLowerCase();
     const myBills = includeBills
-      ? bills.filter((b) => b.vendorName.toLowerCase() === lowerName && b.balanceCents > 0)
+      ? bills.filter((b) => (b.subId ? b.subId === s.id : b.vendorName.toLowerCase() === lowerName) && b.balanceCents > 0)
       : [];
     const openBillsCount = myBills.length;
     const openBillsCents = myBills.reduce((acc, b) => acc + b.balanceCents, 0);
-    const heldBillsCount = myBills.filter((b) => b.status === "hold").length;
+    const heldBillsCount = myBills.filter((b) => Boolean(b.isOnHold) || b.status === "hold_waiver" || b.status === "hold_coi").length;
 
     let punchOpenCount = 0;
     for (const [assignee, count] of openPunchByAssignee.entries()) {
@@ -169,7 +169,9 @@ export async function loadSubScorecards(
     openPunchByAssignee.set(key, (openPunchByAssignee.get(key) ?? 0) + 1);
   }
   const invites = ((invitesRes.data ?? []) as { sub_id: string; status: string }[]);
-  const bills = includeBills ? payables.rows.map((r) => ({ vendorName: r.vendorName, balanceCents: r.balanceCents, status: r.status })) : [];
+  const bills = includeBills
+    ? payables.rows.map((r) => ({ subId: r.subId, vendorName: r.vendorName, balanceCents: r.balanceCents, status: r.status, isOnHold: r.isOnHold }))
+    : [];
   const { scorecards, summary } = computeSubScorecards(subs, invites, bills, openPunchByAssignee, today, { includeBills });
   return { subs, scorecards, summary };
 }
