@@ -360,17 +360,18 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
 7. Cross-review at 390 px and on desktop. One draft PR with phone and desktop screenshots.
 
 ### Phase 2: every department, one schedule, one task system, the automation gaps (autopilot runs these in order, one PR per two or three steps)
-1. **Job hub** `/app/jobs` + `/app/jobs/[id]`:
+1. ✅ **Job hub** `/app/jobs` + `/app/jobs/[id]`:
    - list on the shared blocks (period; by stage, PM or client);
    - job page tabs: Overview · Schedule · Tasks · Money · Labor · Purchases · Subs · Changes · Log · Documents · Crew, each reusing a section filtered to `job=<id>`;
    - `/app/projects` and `/app/crew?view=projects` redirect there.
    - Fix `JobPaperwork.tsx:70`.
    - Stage strip: Sale → Award → Handoff → Build → Billing → Closeout → Warranty.
-2. **Decision-rights table** (§6.1):
+2. **Decision-rights table** (§6.1). ✅ Built differently from the plan: there is no separate rights table. The limits already live in Company policies, and a second copy would drift. So `decisionRights()` reads them from there (`src/lib/roles/seats.ts`), and the new data is only `role_seats` (0032): who holds each role, plus the backup who covers it. The screen is `/app/policies/rights`.
+   - Original plan, kept for reference:
    - `decision_rights` rows (role, action, limit) in Company policies;
    - roles and seats (who holds PM, Finance, Sales admin, Field lead), with cover for empty seats;
    - existing limits (`requests.pmLimitCents`, award limits) read from it.
-3. **One task system** (§6.5):
+3. ✅ **One task system** (§6.5): `work_items` (0033), `src/lib/tasks/feed.ts`, `/app/tasks`, and a Tasks tab on each job page. Still to do: the 7 AM push and Home reading the feed, and PM seats creating and closing items (step 10).
    - `work_items` migration + `src/lib/tasks/feed.ts` over `crew_tasks`, ops cards, bot waiting-on, watches, purchase cards and request approvals;
    - views Mine / My team / Per job / Per department;
    - escalation by service level;
