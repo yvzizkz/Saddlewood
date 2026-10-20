@@ -58,11 +58,10 @@ const tables: Record<string, Row[]> = {
       geo: { lat: 33.5535, lng: -111.9261, source: "owner", at: "2026-10-01T00:00:00.000Z" },
     },
   ],
-  trades: DEFAULT_TRADES.map((t, i) => ({
-    slug: t.key,
+  trades: DEFAULT_TRADES.map((t) => ({
+    slug: t.slug,
     label: t.label,
-    cost_code: t.code,
-    sort_order: i + 1,
+    ord: t.ord,
     active: true,
   })),
 };
