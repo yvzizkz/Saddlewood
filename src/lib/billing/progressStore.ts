@@ -158,7 +158,7 @@ export async function setOpening(billingJobId: string, pcts: Record<string, numb
   }
   const db = getSupabaseAdmin();
   const { data } = await db.from("jobs").select("billing").eq("id", billingJobId).maybeSingle();
-  const billing = { ...(((data as { billing?: Record<string, unknown> } | null)?.billing) ?? {}), sovOpening: clean, sovOpeningBy: by, sovOpeningAt: new Date().toISOString() };
+  const billing = { ...(((data as { billing?: Record<string, unknown> } | null)?.billing) ?? {}), sovOpening: clean, sovOpeningBy: by, sovOpeningAt: new Date().toISOString(), pmReport: null };
   const { error } = await db.from("jobs").update({ billing }).eq("id", billingJobId);
   if (error) throw new Error(`jobs update: ${error.message}`);
 }
