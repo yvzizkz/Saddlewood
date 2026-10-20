@@ -89,8 +89,9 @@ describe("subs scorecard & compliance (S1, S6, S7, S8)", () => {
       { sub_id: "sub-2", status: "invited" },
     ];
     const bills = [
-      { vendorName: "Desert Peak Drywall LLC", balanceCents: 420_000, status: "ready" },
-      { vendorName: "Sonoran Stucco Co", balanceCents: 185_000, status: "hold" },
+      { vendorName: "Desert Peak Drywall LLC", balanceCents: 420_000, status: "open" },
+      { vendorName: "Sonoran Stucco Co", balanceCents: 185_000, status: "hold_waiver" },
+      { vendorName: "Sonoran Stucco Co", balanceCents: 95_000, status: "hold_coi" },
     ];
     const punch = new Map<string, number>([["Desert Peak Drywall LLC", 2]]);
 
@@ -118,12 +119,24 @@ describe("subs scorecard & compliance (S1, S6, S7, S8)", () => {
     expect(s1.hitRatePct).toBe(50);
     expect(s1.responseRatePct).toBe(100);
     expect(s1.openBillsCents).toBe(420_000);
+    expect(s1.heldBillsCount).toBe(0);
     expect(s1.punchOpenCount).toBe(2);
 
     const s2 = scorecards.find((s) => s.subId === "sub-2")!;
     expect(s2.readyToMobilize).toBe(false);
     expect(s2.coiState).toBe("expired");
-    expect(s2.heldBillsCount).toBe(1);
+    expect(s2.heldBillsCount).toBe(2);
+  });
+
+  it("matches bills by subId when present (even if vendorName differs) and counts isOnHold bills", () => {
+    const bills = [
+      { subId: "sub-1", vendorName: "Desert Peak DBA", balanceCents: 150_000, status: "open", isOnHold: true },
+      { subId: "sub-other", vendorName: "Desert Peak Drywall LLC", balanceCents: 300_000, status: "hold_waiver" },
+    ];
+    const { scorecards } = computeSubScorecards([BASE_SUB], [], bills, new Map(), "2026-10-20");
+    expect(scorecards[0].openBillsCount).toBe(1);
+    expect(scorecards[0].openBillsCents).toBe(150_000);
+    expect(scorecards[0].heldBillsCount).toBe(1);
   });
 
   it("builds a frozen Work Order (S7) and Award + Thank-you email drafts (S6)", () => {
