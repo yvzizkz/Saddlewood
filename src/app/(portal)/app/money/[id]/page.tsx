@@ -9,7 +9,7 @@ import { listExhibits } from "@/lib/billing/exhibits";
 import { paidByDocument, paymentsForDocument } from "@/lib/billing/payments";
 import { describeDevice, summarizeProof } from "@/lib/billing/proof";
 import type { DocumentEvent } from "@/lib/billing/types";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesBillingJob } from "@/lib/accounting/access";
 import { getJobRef, jobHref } from "@/lib/jobs/hub";
 
 export const dynamic = "force-dynamic";
@@ -53,11 +53,13 @@ function eventLine(e: DocumentEvent): string {
 }
 
 export default async function MoneyDocument({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  // Owners: everything. A PM with money.view: read only, on their own jobs.
+  const seat = await moneySeatForPage("receivables");
+  if (!seat) redirect("/app");
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const doc = await getDocument(id);
-  if (!doc) notFound();
+  if (!doc || !seesBillingJob(seat, doc.jobId)) notFound();
 
   const [events, exhibits, payments, paid] = await Promise.all([listEvents(doc.id), listExhibits(doc.id), paymentsForDocument(doc.id), paidByDocument([doc.id])]);
   const p = paid.get(doc.id);
@@ -74,12 +76,12 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
         <Link href="/app/accounting/receivables" className="text-[var(--color-teal)]">
           ← Receivables
         </Link>
-        {job ? (
+        {job && seat.owner ? (
           <Link href={jobHref(job.key, "money")} className="text-[var(--color-teal)] underline-offset-2 hover:underline">
             Job: {job.name}
           </Link>
         ) : null}
-        {job?.saleId ? (
+        {job?.saleId && seat.owner ? (
           <Link href={`/app/sales/${job.saleId}`} className="text-[var(--color-teal)] underline-offset-2 hover:underline">
             Sale {job.saleNumber}
           </Link>
@@ -126,7 +128,7 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
         </div>
       </Card>
 
-      {doc.status === "issued" ? (
+      {doc.status === "issued" && seat.owner ? (
         <div className="mt-4">
           <RecordPayment documentId={doc.id} lines={lines} hasLines={lines.length > 1} />
         </div>

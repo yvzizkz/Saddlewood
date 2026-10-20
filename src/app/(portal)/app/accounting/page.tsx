@@ -12,7 +12,7 @@ import { loadLabor } from "@/lib/accounting/labor";
 import { loadPayables } from "@/lib/accounting/payables";
 import { loadPurchases } from "@/lib/accounting/purchases";
 import { loadBillingCalendar, loadIssued, loadOpenReceivables } from "@/lib/accounting/receivables";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesBillingJob, seesCrewJob } from "@/lib/accounting/access";
 import { localDay } from "@/lib/crew/time";
 
 export const dynamic = "force-dynamic";
@@ -63,7 +63,8 @@ function SectionCard({ t }: { t: Tile }) {
 }
 
 export default async function AccountingHome({ searchParams }: { searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("overview");
+  if (!seat) redirect("/app");
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "wtd");
@@ -71,14 +72,20 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
   const q = periodParams(period);
   const link = (path: string, extra: Record<string, string> = {}) => hrefOf(path, { ...q, ...extra });
 
-  const [labor, purchases, payables, open, issued, calendar] = await Promise.all([
-    loadLabor(period.from, period.to, { withPay: true }),
+  const [laborAll, purchasesAll, payablesAll, openAll, issuedAll, calendar] = await Promise.all([
+    loadLabor(period.from, period.to, { withPay: seat.laborCost }),
     loadPurchases(period.from, period.to),
-    loadPayables(today),
+    seat.owner ? loadPayables(today) : Promise.resolve({ rows: [], payments: [], trades: [], fridayCutoff: today }),
     loadOpenReceivables(today),
     loadIssued(period.from, period.to),
     loadBillingCalendar(today),
   ]);
+  // Narrowed to the seat's jobs (a PM sees theirs; owners see all).
+  const labor = { ...laborAll, rows: laborAll.rows.filter((r) => seesCrewJob(seat, r.jobId)), ratesMissing: seat.owner ? laborAll.ratesMissing : 0 };
+  const purchases = { ...purchasesAll, rows: purchasesAll.rows.filter((r) => seesCrewJob(seat, r.rawJobId)), unmatched: seat.owner ? purchasesAll.unmatched : [] };
+  const payables = payablesAll;
+  const open = { ...openAll, rows: openAll.rows.filter((r) => seesBillingJob(seat, r.jobId)) };
+  const issued = issuedAll.filter((r) => seesBillingJob(seat, r.jobId));
 
   const spark = <T,>(rows: T[], day: (r: T) => string | null, v: (r: T) => number) =>
     trend(rows, day, v, period.from, period.to, period.grain).map((p) => p.value);
@@ -142,7 +149,7 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
       kind: "money",
       sub: next ? `Next: ${next.client.replace(/ \(Synthetic\)$/, "")}, ${formatValue("date", next.day)}` : "No billing dates ahead",
       spark: spark(issued.filter((r) => r.status === "issued"), (r) => r.day, (r) => r.totalCents),
-      alert: drafts ? { text: `${drafts} draft${drafts === 1 ? "" : "s"} waiting to go`, href: "/app/bill" } : next && next.prepOn <= today ? { text: `% complete for ${next.client} is due`, href: link("/app/accounting/billing") } : null,
+      alert: drafts && seat.owner ? { text: `${drafts} draft${drafts === 1 ? "" : "s"} waiting to go`, href: "/app/bill" } : next && next.prepOn <= today ? { text: `% complete for ${next.client} is due`, href: link("/app/accounting/billing") } : null,
     },
     {
       href: link("/app/accounting/job-costing"),
@@ -153,10 +160,13 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
     },
   ];
 
+  const allowed = (href: string) => seat.sections.includes((href.split("?")[0].replace("/app/accounting", "").replace(/^\//, "") || "overview") as never);
+  const shown = tiles.filter((t) => allowed(t.href)).map((t) => (t.title === "Payroll and labor" && !seat.laborCost ? { ...t, sub: `${new Set(labor.rows.map((r) => r.email)).size} people on your jobs` } : t));
+
   return (
-    <AccountingFrame title="Overview" intro="Every money section in one place. Pick a period; each card opens its section on it." period={period}>
+    <AccountingFrame sections={seat.sections} title="Overview" intro="Every money section in one place. Pick a period; each card opens its section on it." period={period}>
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {tiles.map((t) => (
+        {shown.map((t) => (
           <li key={t.title}>
             <SectionCard t={t} />
           </li>

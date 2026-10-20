@@ -7,7 +7,7 @@ import KpiHeader from "@/components/data/KpiHeader";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { AGE_BUCKETS, loadCollected, loadOpenReceivables, type CollectedRow, type OpenRow } from "@/lib/accounting/receivables";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesBillingJob } from "@/lib/accounting/access";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,8 @@ const PATH = "/app/accounting/receivables";
 type SP = Record<string, string | string[] | undefined>;
 
 export default async function ReceivablesPage({ searchParams }: { searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("receivables");
+  if (!seat) redirect("/app");
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const mode = one("m") === "collected" ? "collected" : "open";
@@ -43,7 +44,7 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
 
   if (mode === "collected") {
     const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
-    const rows = await loadCollected(period.previous.from, period.to);
+    const rows = (await loadCollected(period.previous.from, period.to)).filter((r) => seesBillingJob(seat, r.jobId));
     const spec: DrillSpec<CollectedRow> = {
       path: PATH,
       title: "Collected",
@@ -93,7 +94,7 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
       { key: "fee", header: "Fee", kind: "money", total: true, phone: "hide" },
     ];
     return (
-      <AccountingFrame title="Receivables" intro="Payments received, placed on the invoices they paid. Melio's fee is shown apart: the gross is what the client paid." period={period} crumbs={[{ label: "Accounting", href: "/app/accounting" }, { label: "Receivables", href: PATH }, ...crumbs]} filters={filters} actions={switcher}>
+      <AccountingFrame sections={seat.sections} title="Receivables" intro="Payments received, placed on the invoices they paid. Melio's fee is shown apart: the gross is what the client paid." period={period} crumbs={[{ label: "Accounting", href: "/app/accounting" }, { label: "Receivables", href: PATH }, ...crumbs]} filters={filters} actions={switcher}>
         <KpiHeader
           label="Collected"
           value={d.total}
@@ -117,7 +118,9 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
   }
 
   // Open: a snapshot as of today. The trend shows what is still open by the month it was billed.
-  const { rows, today } = await loadOpenReceivables();
+  const open = await loadOpenReceivables();
+  const today = open.today;
+  const rows = open.rows.filter((r) => seesBillingJob(seat, r.jobId));
   const year = resolvePeriod({ p: "ytd" }, today);
   const trendPeriod = { ...year, from: rows.reduce((m, r) => (r.issuedOn && r.issuedOn < m ? r.issuedOn : m), year.from) };
   trendPeriod.grain = "month";
@@ -184,6 +187,7 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
 
   return (
     <AccountingFrame
+      sections={seat.sections}
       title="Receivables"
       intro="Every issued invoice, change order and statement with money still owed, as of today."
       crumbs={[{ label: "Accounting", href: "/app/accounting" }, { label: "Receivables", href: PATH }, ...crumbs.slice(1)]}

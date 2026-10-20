@@ -9,7 +9,7 @@ import { drill, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import { loadBillingCalendar, loadIssued, type IssuedRow } from "@/lib/accounting/receivables";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesBillingJob } from "@/lib/accounting/access";
 import { CO_LABEL, loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
 import { jobHref, listJobRefs } from "@/lib/jobs/hub";
 import { localDay } from "@/lib/crew/time";
@@ -26,14 +26,23 @@ type SP = Record<string, string | string[] | undefined>;
 const KIND: Record<string, string> = { invoice: "Invoice", change_order: "Change order", statement: "Statement" };
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("billing");
+  if (!seat) redirect("/app");
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
   const today = localDay();
 
-  const refs = await listJobRefs();
-  const [rows, calendar, register, waivers] = await Promise.all([loadIssued(period.previous.from, period.to), loadBillingCalendar(today), loadChangeOrders(refs, today), loadWaivers(refs)]);
+  const allRefs = await listJobRefs();
+  // A PM's seat sees its own jobs; everything below is narrowed to them.
+  const refs = allRefs.filter((r) => seesBillingJob(seat, r.billingId));
+  const keys = new Set(refs.map((r) => r.key));
+  const clientsInView = new Set(refs.map((r) => r.clientId).filter(Boolean));
+  const [allRows, allCalendar, allRegister, allWaivers] = await Promise.all([loadIssued(period.previous.from, period.to), loadBillingCalendar(today), loadChangeOrders(allRefs, today), loadWaivers(allRefs)]);
+  const rows = allRows.filter((r) => seesBillingJob(seat, r.jobId));
+  const calendar = seat.owner ? allCalendar : allCalendar.filter((c) => clientsInView.has(c.clientId));
+  const register = allRegister.filter((c) => seat.owner || (c.jobKey !== null && keys.has(c.jobKey)));
+  const waivers = allWaivers.filter((w) => seat.owner || (w.jobKey !== null && keys.has(w.jobKey)));
   const coRows: TableRow[] = register.map((c) => ({
     id: c.id,
     number: c.number,
@@ -102,15 +111,18 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
   return (
     <AccountingFrame
+      sections={seat.sections}
       title="Billing"
       intro="What went out in the period, and the next billing date for every client with an open job."
       period={period}
       crumbs={[{ label: "Accounting", href: "/app/accounting" }, ...d.crumbs]}
       filters={d.filters}
       actions={
-        <Link href="/app/bill" className="inline-flex min-h-10 items-center rounded-xl bg-[var(--color-teal)] px-4 text-sm font-medium text-white">
-          Bill
-        </Link>
+        seat.owner ? (
+          <Link href="/app/bill" className="inline-flex min-h-10 items-center rounded-xl bg-[var(--color-teal)] px-4 text-sm font-medium text-white">
+            Bill
+          </Link>
+        ) : undefined
       }
     >
       <KpiHeader

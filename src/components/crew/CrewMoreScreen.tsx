@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Bell, BellOff, ChevronRight, Download, HardHat, LogOut } from 'lucide-react'
+import { Bell, BellOff, ChevronRight, Download, HardHat, Landmark, LogOut } from 'lucide-react'
 
 import { triggerOnboardingReplay } from '@/components/auth/OnboardingFlow'
 import { PasskeyCard } from '@/components/auth/PasskeyCard'
@@ -178,6 +178,16 @@ export default function CrewMoreScreen() {
           <Card className="flex items-center gap-3 p-4">
             <HardHat className="size-5 text-[var(--color-teal)]" aria-hidden="true" />
             <span className="flex-1 text-[15px] font-medium text-[var(--color-charcoal)]">{lang === 'es' ? 'Subcontratistas y ofertas' : 'Subs and bids'}</span>
+            <ChevronRight className="size-4 text-[var(--color-charcoal-light)]" aria-hidden="true" />
+          </Card>
+        </Link>
+      ) : null}
+      {home?.me.perms.includes('money.view') ? (
+        // Receivables, billing, purchases and hours on their own jobs (src/lib/accounting/access.ts).
+        <Link href="/app/accounting" className="mt-4 block">
+          <Card className="flex items-center gap-3 p-4">
+            <Landmark className="size-5 text-[var(--color-teal)]" aria-hidden="true" />
+            <span className="flex-1 text-[15px] font-medium text-[var(--color-charcoal)]">{lang === 'es' ? 'Contabilidad de mis obras' : 'Accounting on my jobs'}</span>
             <ChevronRight className="size-4 text-[var(--color-charcoal-light)]" aria-hidden="true" />
           </Card>
         </Link>

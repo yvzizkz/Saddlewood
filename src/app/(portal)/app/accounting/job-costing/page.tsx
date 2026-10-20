@@ -6,7 +6,7 @@ import KpiHeader from "@/components/data/KpiHeader";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { CATEGORY_LABEL, loadJobCost, type CostLine } from "@/lib/accounting/jobCost";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage } from "@/lib/accounting/access";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +20,18 @@ const PATH = "/app/accounting/job-costing";
 type SP = Record<string, string | string[] | undefined>;
 
 export default async function JobCostingPage({ searchParams }: { searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("job-costing");
+  if (!seat) redirect("/app");
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "ytd");
 
-  const [cur, prev] = await Promise.all([loadJobCost(period.from, period.to), loadJobCost(period.previous.from, period.previous.to)]);
+  const [curAll, prevAll] = await Promise.all([loadJobCost(period.from, period.to), loadJobCost(period.previous.from, period.previous.to)]);
+  // A PM (with the margin policy on) sees their own jobs: keys are billing ids or "crew:<field id>".
+  const inView = (key: string) => seat.owner || (seat.billingJobs?.includes(key) ?? false) || (key.startsWith("crew:") && (seat.crewJobs?.includes(key.slice(5)) ?? false));
+  const narrow = (c: typeof curAll) => ({ ...c, lines: c.lines.filter((l) => inView(l.jobKey)), jobs: c.jobs.filter((j) => inView(j.jobKey)) });
+  const cur = narrow(curAll);
+  const prev = narrow(prevAll);
   const spec: DrillSpec<CostLine> = {
     path: PATH,
     title: "Job costing",
@@ -101,6 +107,7 @@ export default async function JobCostingPage({ searchParams }: { searchParams: P
 
   return (
     <AccountingFrame
+      sections={seat.sections}
       title="Job costing"
       intro="Labor (hours × current pay rate), materials and sub/vendor bills against what each job billed. Margin = billed − cost in the period."
       period={period}

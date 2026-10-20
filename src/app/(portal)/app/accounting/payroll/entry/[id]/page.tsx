@@ -7,7 +7,7 @@ import { formatValue } from "@/lib/analytics/format";
 import { when } from "@/components/money/format";
 import { hrefOf } from "@/lib/analytics/drill";
 import { listTrades, resolveTrade } from "@/lib/accounting/trades";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesCrewJob } from "@/lib/accounting/access";
 import { getJob, getPerson, getShift } from "@/lib/crew/queries";
 import { clockText, localClock, weekStart, workedMinutes } from "@/lib/crew/time";
 
@@ -28,16 +28,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default async function EntryPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("payroll");
+  if (!seat) redirect("/app");
   const { id } = await params;
   const n = Number(id);
   if (!Number.isInteger(n)) notFound();
   const shift = await getShift(n);
-  if (!shift) notFound();
+  // A job they are not on answers like one that does not exist.
+  if (!shift || !seesCrewJob(seat, shift.jobId)) notFound();
   const [person, job, trades] = await Promise.all([getPerson(shift.email), getJob(shift.jobId), listTrades()]);
 
   const minutes = workedMinutes(shift);
-  const rate = person?.payRate ?? null;
+  const rate = seat.laborCost ? (person?.payRate ?? null) : null;
   const trade = resolveTrade(person?.trade, trades);
   const week = { p: "custom", from: weekStart(shift.day), to: shift.day };
   const name = person?.name || shift.email;
@@ -60,7 +62,7 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
               {clockText(localClock(shift.startedAt))} – {shift.endedAt ? clockText(localClock(shift.endedAt)) : "on the clock"}
             </Row>
             <Row label="Unpaid break">{shift.breakMin} min</Row>
-            <Row label="Labor cost">{rate !== null ? `${formatValue("money", Math.round((minutes / 60) * rate * 100))} at $${rate.toFixed(2)}/h` : "No pay rate on file"}</Row>
+            {seat.laborCost ? <Row label="Labor cost">{rate !== null ? `${formatValue("money", Math.round((minutes / 60) * rate * 100))} at $${rate.toFixed(2)}/h` : "No pay rate on file"}</Row> : null}
             <Row label="Trade">{trade?.label ?? "None"}</Row>
             <Row label="Entered">{shift.source === "app" ? "Clocked in on the phone" : shift.source === "late" ? "Late entry by the worker" : "Entered by the office"}</Row>
             {shift.fromJobM.in !== null ? <Row label="Clock-in distance">{Math.round(shift.fromJobM.in)} m from the job</Row> : null}

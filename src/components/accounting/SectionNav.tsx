@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react'
 
 import { ACCOUNTING_SECTIONS } from '@/components/layout/nav'
 
-export default function SectionNav() {
+export default function SectionNav({ only }: { only?: string[] } = {}) {
   const pathname = usePathname()
   const search = useSearchParams()
   const keep = new URLSearchParams()
@@ -27,7 +27,7 @@ export default function SectionNav() {
   return (
     <nav ref={nav} aria-label="Accounting sections" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
       <ul className="flex w-max gap-1 rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-1">
-        {ACCOUNTING_SECTIONS.map((s) => {
+        {ACCOUNTING_SECTIONS.filter((s) => !only || only.includes(s.href.replace('/app/accounting', '').replace(/^\//, '') || 'overview')).map((s) => {
           const on = s.href === '/app/accounting' ? pathname === s.href : pathname === s.href || pathname.startsWith(s.href + '/')
           return (
             <li key={s.href}>
