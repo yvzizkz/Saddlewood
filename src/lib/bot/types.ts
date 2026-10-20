@@ -218,10 +218,11 @@ const joistRecentSchema = z.object({
 });
 export type JoistRecent = z.infer<typeof joistRecentSchema>;
 
-// Late from the field (Saddlewood-KB bot/crew.py): someone scheduled who had
-// not clocked in, a clock-out given afterwards, an end of day that came late.
-// The Mac keeps the list; the 7 AM push folds yesterday's in for the owners
-// and the supervisor (src/lib/owner/morning.ts). Strings are clipped, not refused.
+// Late from the field (Saddlewood-KB bot/crew.py): an end of day or a note to
+// the office filed after that day's evening brief had gone out, so the brief
+// could not carry it. The Mac keeps the list for three days; the 7 AM push
+// folds yesterday's in for the owners and the supervisor
+// (src/lib/owner/morning.ts). Strings are clipped, not refused.
 const crewLateItemSchema = z.object({
   /** The day it happened, YYYY-MM-DD. */
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
