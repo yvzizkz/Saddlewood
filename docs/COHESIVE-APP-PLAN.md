@@ -385,7 +385,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - pre-cover `checklists` per phase gating verify;
    - punch items;
    - directives → CO intake.
-6. **Billing completion:**
+6. ✅ (except SOV % billing) **Billing completion:** done as 0040 (`change_orders`, `lien_waivers`), `src/lib/billing/registers.ts`, the registers on Billing and the job's Changes tab, and CO, package and waiver items in the task feed. Still open: ladder config (owner question 1) and SOV % billing.
    - CO register (A2), waiver register, invoice package at cutoff (A3), ladder config (A5);
    - SOV percent-complete billing replacing the Powell tracker path (keep the tracker until it's replaced).
 7. **Subs and compliance:**
@@ -397,7 +397,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - Sales KPIs by source;
    - PM home;
    - Finance home = Accounting + Compliance.
-9. **Links and duplicates:**
+9. ✅ **Links and duplicates:** done. `/app/money` now redirects to Receivables, its purchase search moved to Purchases (`#find`), and the bot's lanes read `role_seats`.
    - Home PaymentsCard, JobMoneyCard and PurchaseSearch link their invoice and job;
    - `/app/money/[id]` links its job and sale;
    - tracker pages link the job;
