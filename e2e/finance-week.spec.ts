@@ -36,34 +36,49 @@ test.describe("Finance: the AFT billing week", () => {
 
   test("a change in the field goes from request to price to signed to billed, and Finance is told to bill it", async ({ owner: page }) => {
     const title = `E2E blocking ${Date.now()}`;
-    await page.goto(`/app/jobs/${JOB}?tab=changes`);
-    await page.getByRole("button", { name: "Record a change" }).click();
-    await page.getByLabel("What changed").fill(title);
-    await page.getByRole("button", { name: "Save" }).click();
-    const row = page.getByRole("listitem").filter({ hasText: title });
-    await expect(row).toContainText("Awaiting price");
+    let coId: number | null = null;
+    try {
+      await page.goto(`/app/jobs/${JOB}?tab=changes`);
+      await page.getByRole("button", { name: "Record a change" }).click();
+      await page.getByLabel("What changed").fill(title);
+      const waitCreate = page.waitForResponse(
+        (r) => r.url().includes("/api/change-orders") && r.request().method() === "POST",
+      );
+      await page.getByRole("button", { name: "Save" }).click();
+      const createRes = await waitCreate;
+      if (createRes.ok()) {
+        const createBody = (await createRes.json()) as { id?: number };
+        coId = createBody.id ?? null;
+      }
+      const row = page.getByRole("listitem").filter({ hasText: title });
+      await expect(row).toContainText("Awaiting price");
 
-    await row.getByPlaceholder("$ price").fill("1840");
-    await row.getByRole("button", { name: "Price it" }).click();
-    await expect(row).toContainText(/CO-\d+/);
-    await expect(row).toContainText("Priced, not sent");
-    const number = (await row.textContent())?.match(/CO-\d+/)?.[0] ?? "";
+      await row.getByPlaceholder("$ price").fill("1840");
+      await row.getByRole("button", { name: "Price it" }).click();
+      await expect(row).toContainText(/CO-\d+/);
+      await expect(row).toContainText("Priced, not sent");
+      const number = (await row.textContent())?.match(/CO-\d+/)?.[0] ?? "";
 
-    await row.getByRole("button", { name: "Signed" }).click();
-    await expect(row).toContainText("Signed, not billed");
+      await row.getByRole("button", { name: "Signed" }).click();
+      await expect(row).toContainText("Signed, not billed");
 
-    // Finance now has it to bill.
-    await page.goto("/app/tasks?view=all");
-    const tasks = page.locator('[data-table="tasks-all"]');
-    await tasks.getByRole("searchbox").fill(title);
-    await expect(tasks.getByRole("row").filter({ hasText: `Bill ${number}` })).toContainText("Finance");
+      // Finance now has it to bill.
+      await page.goto("/app/tasks?view=all");
+      const tasks = page.locator('[data-table="tasks-all"]');
+      await tasks.getByRole("searchbox").fill(title);
+      await expect(tasks.getByRole("row").filter({ hasText: `Bill ${number}` })).toContainText("Finance");
 
-    await page.goto(`/app/jobs/${JOB}?tab=changes`);
-    await page.getByRole("listitem").filter({ hasText: title }).getByRole("button", { name: "Billed" }).click();
-    await expect(page.getByRole("listitem").filter({ hasText: title })).toHaveCount(0);
-    await page.goto("/app/tasks?view=all");
-    await page.locator('[data-table="tasks-all"]').getByRole("searchbox").fill(title);
-    await expect(page.locator('[data-table="tasks-all"]').getByRole("row").filter({ hasText: `Bill ${number}` })).toHaveCount(0);
+      await page.goto(`/app/jobs/${JOB}?tab=changes`);
+      await page.getByRole("listitem").filter({ hasText: title }).getByRole("button", { name: "Billed" }).click();
+      await expect(page.getByRole("listitem").filter({ hasText: title })).toHaveCount(0);
+      await page.goto("/app/tasks?view=all");
+      await page.locator('[data-table="tasks-all"]').getByRole("searchbox").fill(title);
+      await expect(page.locator('[data-table="tasks-all"]').getByRole("row").filter({ hasText: `Bill ${number}` })).toHaveCount(0);
+    } finally {
+      if (coId !== null) {
+        await page.request.patch("/api/change-orders", { data: { id: coId, status: "void" } });
+      }
+    }
   });
 
   test("a waiver owed on an AFT invoice is recorded on the invoice and leaves the register and Finance's tasks", async ({ owner: page }) => {

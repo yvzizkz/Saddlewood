@@ -265,7 +265,11 @@ export async function syncReceiptEntryToPurchases(input: Parameters<typeof build
 }
 
 /** Writes directive (`co_price`) and `ASK:` (`decision`) rows from an EOD log into `work_items` and `change_orders`. Never throws to caller. */
-export async function syncEodDirectivesAndDecisions(input: Parameters<typeof extractEodWorkItems>[0]): Promise<void> {
+export async function syncEodDirectivesAndDecisions(
+  input: Parameters<typeof extractEodWorkItems>[0],
+): Promise<{ workItemIds: number[]; changeOrderId: number | null }> {
+  const workItemIds: number[] = [];
+  let changeOrderId: number | null = null;
   try {
     const db = getSupabaseAdmin();
     let billingJobId = input.billingJobId ?? null;
@@ -282,7 +286,12 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
         .eq("status", "open")
         .maybeSingle();
       if (!existing) {
-        await db.from("work_items").insert(item);
+        const { data: inserted } = await db.from("work_items").insert(item).select("id").single();
+        if (inserted && typeof (inserted as { id: number }).id === "number") {
+          workItemIds.push((inserted as { id: number }).id);
+        }
+      } else if (typeof (existing as { id: number }).id === "number") {
+        workItemIds.push((existing as { id: number }).id);
       }
     }
     const asked = input.asked.trim();
@@ -295,19 +304,29 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
         .eq("title", title)
         .maybeSingle();
       if (!existingCo) {
-        await db.from("change_orders").insert({
-          job_id: billingJobId,
-          crew_job_id: input.jobId || null,
-          title,
-          detail: `Directive captured on ${input.day} EOD log (#${input.entryId}).`,
-          source: "directive",
-          requested_by: input.createdBy,
-        });
+        const { data: insertedCo } = await db
+          .from("change_orders")
+          .insert({
+            job_id: billingJobId,
+            crew_job_id: input.jobId || null,
+            title,
+            detail: `Directive captured on ${input.day} EOD log (#${input.entryId}).`,
+            source: "directive",
+            requested_by: input.createdBy,
+          })
+          .select("id")
+          .single();
+        if (insertedCo && typeof (insertedCo as { id: number }).id === "number") {
+          changeOrderId = (insertedCo as { id: number }).id;
+        }
+      } else if (typeof (existingCo as { id: number }).id === "number") {
+        changeOrderId = (existingCo as { id: number }).id;
       }
     }
   } catch {
     // Non-fatal in mock/unit environments.
   }
+  return { workItemIds, changeOrderId };
 }
 
 /**

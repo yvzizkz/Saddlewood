@@ -75,36 +75,55 @@ test.describe("Field and crew: the field week", () => {
   test("6 PM EOD daily log with a field directive creates an unpriced CO on the job and a task in Owner decisions", async ({ owner: page }) => {
     const summary = `E2E Hung 42 sheets Type X in West corridor ${Date.now()}`;
     const directive = `E2E Super asked for 16-ga backing at corridor display ${Date.now()}`;
+    let changeOrderId: number | null = null;
+    let workItemIds: number[] = [];
 
-    await page.goto(`/app/jobs/${JOB}?tab=log`);
-    await page.getByRole("button", { name: "+ File daily log (SOP-006)" }).click();
-    await page.getByPlaceholder("Work performed today (required)").fill(summary);
-    await page.getByPlaceholder("Client / GC directive (creates CO awaiting price)").fill(directive);
-    await page.getByRole("button", { name: "Save daily log" }).click();
+    try {
+      await page.goto(`/app/jobs/${JOB}?tab=log`);
+      await page.getByRole("button", { name: "+ File daily log (SOP-006)" }).click();
+      await page.getByPlaceholder("Work performed today (required)").fill(summary);
+      await page.getByPlaceholder("Client / GC directive (creates CO awaiting price)").fill(directive);
+      const waitLog = page.waitForResponse(
+        (r) => r.url().includes("/api/field") && r.request().method() === "POST",
+      );
+      await page.getByRole("button", { name: "Save daily log" }).click();
+      const logRes = await waitLog;
+      if (logRes.ok()) {
+        const logJson = (await logRes.json()) as {
+          changeOrderId?: number | null;
+          workItemIds?: number[];
+        };
+        changeOrderId = logJson.changeOrderId ?? null;
+        workItemIds = logJson.workItemIds ?? [];
+      }
 
-    const logTable = page.locator(`[data-table="${JOB}-daily-logs"]`);
-    await expect(logTable.getByRole("row").filter({ hasText: summary })).toBeVisible();
+      const logTable = page.locator(`[data-table="${JOB}-daily-logs"]`);
+      await expect(logTable.getByRole("row").filter({ hasText: summary })).toBeVisible();
 
-    // Directive automatically created an awaiting_price Change Order on Changes tab
-    await page.goto(`/app/jobs/${JOB}?tab=changes`);
-    const coRow = page.getByRole("listitem").filter({ hasText: directive });
-    await expect(coRow).toContainText("Awaiting price");
+      // Directive automatically created an awaiting_price Change Order on Changes tab
+      await page.goto(`/app/jobs/${JOB}?tab=changes`);
+      const coRow = page.getByRole("listitem").filter({ hasText: directive });
+      await expect(coRow).toContainText("Awaiting price");
 
-    // And a co_price work item in Tasks for Owner decisions
-    await page.goto("/app/tasks?view=all");
-    const tasks = page.locator('[data-table="tasks-all"]');
-    await tasks.getByRole("searchbox").fill(directive);
-    const taskRow = tasks.getByRole("row").filter({ hasText: directive }).first();
-    await expect(taskRow).toContainText("Owner");
-    await expect(taskRow).toContainText("Change order to price");
-
-    // Clean up the CO so reruns stay clean
-    await page.goto(`/app/jobs/${JOB}?tab=changes`);
-    const cleanupRow = page.getByRole("listitem").filter({ hasText: directive });
-    await cleanupRow.getByPlaceholder("$ price").fill("950");
-    await cleanupRow.getByRole("button", { name: "Price it" }).click();
-    await cleanupRow.getByRole("button", { name: "Signed" }).click();
-    await cleanupRow.getByRole("button", { name: "Billed" }).click();
+      // And a co_price work item in Tasks for Owner decisions
+      await page.goto("/app/tasks?view=all");
+      const tasks = page.locator('[data-table="tasks-all"]');
+      await tasks.getByRole("searchbox").fill(directive);
+      const taskRow = tasks.getByRole("row").filter({ hasText: directive }).first();
+      await expect(taskRow).toContainText("Owner");
+      await expect(taskRow).toContainText("Change order to price");
+    } finally {
+      if (changeOrderId !== null) {
+        await page.request.patch("/api/change-orders", {
+          data: { id: changeOrderId, status: "void" },
+        });
+      }
+      for (const wid of workItemIds) {
+        await page.request.patch("/api/tasks", {
+          data: { id: wid, status: "dropped" },
+        });
+      }
+    }
   });
 
   test("Pre-cover quality checklist blocks phase verification until passed, and punch items track by room and wall face", async ({ owner: page }) => {

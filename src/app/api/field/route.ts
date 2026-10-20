@@ -92,7 +92,7 @@ export async function POST(req: Request) {
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     const entryId = (data as { id: number }).id;
-    await syncEodDirectivesAndDecisions({
+    const synced = await syncEodDirectivesAndDecisions({
       entryId,
       day,
       jobId: crewJobId,
@@ -104,7 +104,12 @@ export async function POST(req: Request) {
       stuck,
       createdBy: seat.email,
     });
-    return NextResponse.json({ ok: true, id: entryId });
+    return NextResponse.json({
+      ok: true,
+      id: entryId,
+      workItemIds: synced.workItemIds,
+      changeOrderId: synced.changeOrderId,
+    });
   }
 
   if (action === "receipt.add") {

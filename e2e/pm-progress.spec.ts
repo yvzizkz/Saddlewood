@@ -52,11 +52,10 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
       });
 
       // 1. Before reporting, '% complete and photos for Schifferer Built LLC (Synthetic)' is in PM's Tasks.
+      const taskTitle = "% complete and photos for Schifferer Built LLC (Synthetic)";
       await pmPage.goto("/app/tasks?view=all", { waitUntil: "domcontentloaded" });
-      await pmPage.getByRole("searchbox", { name: "Search" }).fill("Schifferer");
-      await expect(pmPage.getByRole("table")).toContainText(
-        "% complete and photos for Schifferer Built LLC (Synthetic)",
-      );
+      await pmPage.getByRole("searchbox", { name: "Search" }).fill("% complete and photos for Schifferer");
+      await expect(pmPage.getByRole("table")).toContainText(taskTitle);
       await expect(pmPage.getByRole("table")).toContainText("0 of 1 reported");
 
       // 2. API guards: off-job report -> 404; PM attempting a draw -> 403.
@@ -93,10 +92,8 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
 
       // 4. After reporting on Schifferer's only SOV job, the '% complete and photos' task clears.
       await pmPage.goto("/app/tasks?view=all", { waitUntil: "domcontentloaded" });
-      await pmPage.getByRole("searchbox", { name: "Search" }).fill("Schifferer");
-      await expect(
-        pmPage.getByText("% complete and photos for Schifferer Built LLC (Synthetic)"),
-      ).toHaveCount(0);
+      await pmPage.getByRole("searchbox", { name: "Search" }).fill("% complete and photos for Schifferer");
+      await expect(pmPage.getByText(taskTitle)).toHaveCount(0);
     } finally {
       await ownerPage.request.post(`/api/jobs/${BELLEVUE}/progress`, {
         data: { action: "clearReport" },
