@@ -9,6 +9,7 @@ import { BottomSheet } from '@/components/ui/BottomSheet'
 import { REQUEST_STATUS, dollars, requestDetail } from '@/lib/crew/requestRules'
 import { ANSWERS_FIRST, SETTING_KEYS, SETTING_LABELS, type AppSettings, type SettingKey } from '@/lib/crew/settingsRules'
 import { addDays, dayShort } from '@/lib/crew/time'
+import { POLICY_DEFS } from '@/lib/policies/rules'
 import { parseAmount, type CrewJob, type CrewRequest } from '@/lib/crew/types'
 
 // Material requests (migration 0023) as the owners and the project manager
@@ -324,7 +325,7 @@ export function FieldSettingsCard({ settings, onSaved }: { settings: AppSettings
 
   return (
     <Card className="divide-y divide-[var(--color-stone)]">
-      {SETTING_KEYS.map((key) => {
+      {FIELD_ONLY_KEYS.map((key) => {
         const changed = (draft[key] ?? '') !== shown(key)
         return (
           <div key={key} className="px-4 py-3.5">
@@ -366,7 +367,17 @@ export function FieldSettingsCard({ settings, onSaved }: { settings: AppSettings
           </div>
         )
       })}
+      <p className="px-4 py-3 text-[12px] text-[var(--color-charcoal-light)]">
+        The purchase limits and the plan deadline are in{' '}
+        <a href="/app/policies" className="text-[var(--color-teal)] underline">
+          Company policies
+        </a>
+        .
+      </p>
       <Problem text={problem} />
     </Card>
   )
 }
+
+/** The field settings Company policies does not hold; those (purchase limits, the plan deadline) are edited there only. */
+const FIELD_ONLY_KEYS = SETTING_KEYS.filter((k) => !POLICY_DEFS.some((p) => p.key === k))

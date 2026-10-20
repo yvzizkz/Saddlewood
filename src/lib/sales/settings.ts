@@ -269,8 +269,38 @@ export function estimateDefaults(s: SalesSettings, policies: Policies = POLICY_D
     present: { ...s.proposal.present, packageIds: [] },
     terms: fillTerms(s.proposal.terms, policies),
     validDays: s.proposal.validDays,
-    schedule: s.proposal.schedule,
+    schedule: scheduleWithDeposit(s.proposal.schedule, policies),
   };
+}
+
+/** A step that is the deposit: its label starts with "Deposit". */
+export function isDepositStep(label: string): boolean {
+  return /^\s*deposit\b/i.test(label);
+}
+
+/**
+ * The payment schedule with its deposit step at the deposit in Company
+ * policies (policy.deposit.pct), the one the Award step invoices: the rest
+ * of the steps share what is left in the same proportions, the last taking
+ * the rounding, so the schedule still adds up to 100. A schedule with no
+ * deposit step is left as it is.
+ */
+export function scheduleWithDeposit(schedule: { label: string; pct: number }[], policies: Policies = POLICY_DEFAULTS): { label: string; pct: number }[] {
+  const at = schedule.findIndex((x) => isDepositStep(x.label));
+  const want = policies["policy.deposit.pct"];
+  if (at < 0 || typeof want !== "number" || !Number.isFinite(want)) return schedule;
+  const rest = schedule.filter((_, i) => i !== at);
+  const restSum = rest.reduce((a, x) => a + x.pct, 0);
+  const left = Math.max(0, 100 - want);
+  let given = 0;
+  const scaled = rest.map((x, i) => {
+    const pct = i === rest.length - 1 ? Math.round((left - given) * 100) / 100 : restSum > 0 ? Math.round(((x.pct / restSum) * left) * 100) / 100 : 0;
+    given += pct;
+    return { ...x, pct };
+  });
+  const out = [...scaled];
+  out.splice(at, 0, { ...schedule[at], pct: want });
+  return out;
 }
 
 /** Fill {title}, {number}, {company}, {first} in a mail template. {link} is left for the mail builder. */

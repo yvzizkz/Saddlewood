@@ -22,6 +22,7 @@ type Preview = {
   people: { email: string; name: string; group: string }[]
   existing: { clientId: string | null; jobId: string | null; crewJobId: string | null; awarded: boolean }
   conflict: string
+  prefixUsedBy: string[]
 }
 
 const TEMPLATES: { value: AwardChoices['template']; label: string }[] = [
@@ -163,7 +164,7 @@ export function AwardSheet({ opportunityId, open, onClose, onDone, toast }: { op
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Number prefix" hint="Invoices are numbered from it.">
+              <Field label="Number prefix" hint={p.prefixUsedBy.length ? `Also used by ${p.prefixUsedBy.join(', ')}. Money matches bills to jobs by it; add a letter (${choices.prefix}B) to keep them apart.` : 'Invoices are numbered from it.'}>
                 <input className={INPUT} value={choices.prefix} placeholder="7120" onChange={(e) => set({ prefix: e.target.value })} />
               </Field>
               <Field label="Project manager">

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import BillScreen from "@/components/money/BillScreen";
-import { getViewer } from "@/lib/crew/auth";
+import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // is for the owners (billing is owners only, decision 2026-10-12).
 
 export default async function BillPage({ searchParams }: { searchParams: Promise<{ group?: string }> }) {
-  if ((await getViewer()).kind !== "staff") redirect("/app");
+  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
   const { group } = await searchParams;
   return (
     <main className="mx-auto max-w-xl px-4 pb-24 pt-5">

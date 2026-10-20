@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { createDraft, getDocument, listEvents } from "@/lib/billing/documents";
+import { createDraft, getDocument, listEvents, usedNumbers } from "@/lib/billing/documents";
+import { nextNumber } from "@/lib/billing/numbering";
 import { placeJob } from "@/lib/crew/admin";
 import { templatePhases } from "@/lib/crew/phases";
 import { firstShiftDays, getJob, insertJob, insertJobPhases, listJobPeople, listJobPhases, listPeople, setJobPeople } from "@/lib/crew/queries";
@@ -90,6 +91,8 @@ export type AwardPreview = {
   existing: { clientId: string | null; jobId: string | null; crewJobId: string | null; awarded: boolean };
   /** Why it cannot be built as it stands (another awarded job already has this name and address). */
   conflict: string;
+  /** Other jobs already using this number prefix (Money matches bills to jobs by it). */
+  prefixUsedBy: string[];
 };
 
 type JobRow = { id: string; name: string; address: string | null; client_id: string | null; crew_job_id: string | null; number_prefix: string | null; billing: Record<string, unknown> | null };
@@ -149,6 +152,9 @@ export async function awardPreview(opportunityId: string, asked: Partial<AwardCh
   const other = found && found.id !== o.jobId && isAwarded(found);
   const job = other ? null : found;
   const crewJobId = job?.crew_job_id ?? (await findCrewJob(plan.crew.name, job?.id ?? null));
+  // The deposit takes the next free number on a job that already has invoices.
+  if (plan.deposit && job) plan.deposit.number = nextNumber(plan.job.prefix, await usedNumbers("invoice", job.id));
+  const prefixUsedBy = plan.job.prefix ? await jobsWithPrefix(plan.job.prefix, job?.id ?? null) : [];
   return {
     opportunity: { id: o.id, number: o.number, title: o.title, kind: o.kind, address: o.address, contact: o.contact, stage: o.stage },
     proposal: b.proposal && b.documentId
@@ -160,7 +166,26 @@ export async function awardPreview(opportunityId: string, asked: Partial<AwardCh
     people: people.filter((p) => p.active).map((p) => ({ email: p.email, name: p.name, group: p.groupName })),
     existing: { clientId: job?.client_id ?? clientId, jobId: job?.id ?? null, crewJobId, awarded: isAwarded(job) },
     conflict: other ? `${plan.job.name} at this address was already awarded from another opportunity. Give this job its own name.` : "",
+    prefixUsedBy,
   };
+}
+
+async function jobsWithPrefix(prefix: string, notJob: string | null): Promise<string[]> {
+  const db = getSupabaseAdmin();
+  let q = db.from("jobs").select("id, name").eq("number_prefix", prefix).limit(5);
+  if (notJob) q = q.neq("id", notJob);
+  const { data, error } = await q;
+  if (error) fail("check prefix", error.message);
+  return ((data ?? []) as { name: string }[]).map((j) => j.name);
+}
+
+/** The deposit Award drafted on a job: the one its award record names, else the invoice titled Deposit. */
+async function findDeposit(jobId: string, award: AwardRecord | null): Promise<string | null> {
+  if (award?.depositId) return award.depositId;
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("documents").select("id").eq("job_id", jobId).eq("kind", "invoice").eq("title", "Deposit").order("created_at", { ascending: true }).limit(1).maybeSingle();
+  if (error) fail("find deposit", error.message);
+  return (data as { id: string } | null)?.id ?? null;
 }
 
 function stripUndefined<T extends object>(v: T): Partial<T> {
@@ -273,22 +298,26 @@ export async function awardJob(opportunityId: string, asked: Partial<AwardChoice
   // 4. The deposit invoice, a draft for an owner to look over and send from Money.
   let depositId: string | null = null;
   if (plan.deposit) {
-    const { data: have, error } = await db.from("documents").select("id").eq("job_id", jobId).eq("kind", "invoice").eq("number", plan.deposit.number).maybeSingle();
-    if (error) fail("find deposit", error.message);
-    depositId = (have as { id: string } | null)?.id ?? null;
-    if (!depositId) {
+    const planned = plan.deposit.number;
+    depositId = await findDeposit(jobId, null);
+    if (depositId) {
+      plan.deposit.number = (await getDocument(depositId))?.number ?? planned;
+    } else {
       const draft = await createDraft({
         kind: "invoice",
         jobId,
         clientId,
-        number: plan.deposit.number,
+        number: nextNumber(plan.job.prefix, await usedNumbers("invoice", jobId)),
         title: "Deposit",
         snapshot: plan.deposit.snapshot,
         dueDate: localDay(now),
         createdBy: actor,
       });
       depositId = draft.id;
+      plan.deposit.number = draft.number;
     }
+    // The log line and the deposit watch name the number it really got.
+    for (const w of plan.watches) if (w.kind === "deposit") w.note = w.note.replace(planned, plan.deposit.number);
   }
 
   // 5. The paperwork the job owes.
@@ -315,6 +344,7 @@ export async function awardJob(opportunityId: string, asked: Partial<AwardChoice
     acceptedBy: preview.accepted?.name ? `${preview.accepted.name} (on the link)` : `marked won by ${actor}`,
     awardedAt: now.toISOString(),
     awardedBy: actor,
+    depositId,
   };
   const { data: cur, error: curErr } = await db.from("jobs").select("billing").eq("id", jobId).single();
   if (curErr) fail("read job billing", curErr.message);
@@ -408,11 +438,9 @@ export async function awardedJob(jobId: string): Promise<AwardedJob | null> {
   if (!data) return null;
   const job = data as JobRow;
   const billing = (job.billing ?? {}) as { contractCents?: number; award?: AwardRecord };
-  const [watches, dep, first] = await Promise.all([
+  const [watches, depositId, first] = await Promise.all([
     listWatches({ jobId }),
-    job.number_prefix
-      ? db.from("documents").select("id").eq("job_id", jobId).eq("kind", "invoice").eq("number", `${job.number_prefix}-01`).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
+    findDeposit(jobId, billing.award ?? null),
     job.crew_job_id ? firstShiftDays([job.crew_job_id]) : Promise.resolve({} as Record<string, string>),
   ]);
   return {
@@ -421,7 +449,7 @@ export async function awardedJob(jobId: string): Promise<AwardedJob | null> {
     contractCents: typeof billing.contractCents === "number" ? billing.contractCents : null,
     crewJobId: job.crew_job_id,
     award: billing.award ?? null,
-    depositId: (dep.data as { id: string } | null)?.id ?? null,
+    depositId,
     watches,
     firstDay: job.crew_job_id ? (first[job.crew_job_id] ?? null) : null,
   };

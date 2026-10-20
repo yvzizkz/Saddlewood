@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Card, Chip, Empty, ScreenTitle, SectionTitle } from "@/components/bot/ui";
 import { day, money } from "@/components/money/format";
 import PurchaseSearch from "@/components/purchases/PurchaseSearch";
-import { getViewer } from "@/lib/crew/auth";
+import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { moneyOverview, type OpenDocument } from "@/lib/billing/overview";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ function standing(d: OpenDocument): { tone: "ok" | "warn" | "bad" | "quiet"; tex
 }
 
 export default async function MoneyScreen() {
-  if ((await getViewer()).kind !== "staff") redirect("/app");
+  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
   const o = await moneyOverview();
   const waiting = o.clients.flatMap((c) => c.documents).filter((d) => d.unconfirmed || (d.next && d.next.who === "marco" && d.next.on <= o.today));
 

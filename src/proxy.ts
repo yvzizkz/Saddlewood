@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasCrewRole } from "@/lib/crew/role";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
+import { STAFF_HOME } from "@/lib/auth/landing";
 
 // Master security gate for Saddlewood.
 // Public marketing routes remain accessible to everyone.
@@ -145,7 +146,7 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/login" && isAllowed) {
     const next = request.nextUrl.searchParams.get("next");
     const url = request.nextUrl.clone();
-    url.pathname = next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/internal";
+    url.pathname = next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : STAFF_HOME;
     url.search = "";
     return NextResponse.redirect(url);
   }

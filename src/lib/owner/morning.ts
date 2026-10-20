@@ -83,7 +83,10 @@ export function buildMorning(input: MorningInput): MorningNote[] {
   if (weekdayOf(day) === 0) return []; // the crew is off on Sunday
   const tag = `morning-${day}`;
   const notes: MorningNote[] = [];
+  // Supervisors (they check the crew's work) get their own morning line. Whose plan is missing is
+  // whoever sends the nightly plan (plan.send), the same people Waiting on you asks it of.
   const supervisors = input.people.filter((p) => p.active && p.perms.includes("tasks.verify"));
+  const planSenders = input.people.filter((p) => p.active && p.perms.includes("plan.send"));
 
   // ---- owners: what is waiting on them, in the order Home shows it ----------------
   const ownerNamesAll = new Set(Object.values(input.owners).filter((p) => p.role === "owner").map((p) => p.name));
@@ -103,8 +106,8 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     ].filter(Boolean);
     const top = [...decisions, ...signals].slice(0, 3).map((i) => i.title);
     const parts = [top.join("; "), crewLine(day, input.schedule)];
-    if (supervisors.length && lanes.includes("decisions") && !input.reports.some((r) => r.day === day)) {
-      parts.push(`No plan from ${supervisors.length === 1 ? firstNameOf(supervisors[0].name) : "the supervisor"} for today.`);
+    if (planSenders.length && lanes.includes("decisions") && !input.reports.some((r) => r.day === day)) {
+      parts.push(`No plan from ${planSenders.length === 1 ? firstNameOf(planSenders[0].name) : "the supervisor"} for today.`);
     }
     parts.push(lateClause(recentLate(input, null)));
     notes.push({

@@ -3,12 +3,13 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { safeNext } from "@/lib/auth/magicLink";
+import { STAFF_HOME } from "@/lib/auth/landing";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   // A path on this site only: `${origin}${next}` with next = "@evil.example" is another site.
-  const next = safeNext(searchParams.get("next") ?? "/internal");
+  const next = safeNext(searchParams.get("next") ?? STAFF_HOME);
 
   const supabaseError = searchParams.get("error");
   const supabaseErrorCode = searchParams.get("error_code");

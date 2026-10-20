@@ -216,3 +216,21 @@ describe("proposal recipients (owner decision 2026-10-19)", () => {
     expect(clientAddresses(sigs, events)).toEqual(["ana@example.com", "husband@example.com"]);
   });
 });
+
+describe("the proposal schedule's deposit follows Company policies", () => {
+  it("sets the deposit step to the policy and shares the rest in proportion", async () => {
+    const { scheduleWithDeposit } = await import("../settings");
+    const { POLICY_DEFAULTS } = await import("@/lib/policies/rules");
+    const s = [
+      { label: "Deposit at signing", pct: 10 },
+      { label: "Rough-in", pct: 40 },
+      { label: "Finishes", pct: 40 },
+      { label: "Final", pct: 10 },
+    ];
+    expect(scheduleWithDeposit(s, POLICY_DEFAULTS)).toEqual(s);
+    const r = scheduleWithDeposit(s, { ...POLICY_DEFAULTS, "policy.deposit.pct": 25 });
+    expect(r.map((x) => x.pct)).toEqual([25, 33.33, 33.33, 8.34]);
+    expect(r.reduce((a, x) => a + x.pct, 0)).toBeCloseTo(100, 6);
+    expect(scheduleWithDeposit([{ label: "Net 30", pct: 100 }], { ...POLICY_DEFAULTS, "policy.deposit.pct": 25 })).toEqual([{ label: "Net 30", pct: 100 }]);
+  });
+});

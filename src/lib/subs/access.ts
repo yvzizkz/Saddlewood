@@ -10,7 +10,8 @@ import { authorizeOps, type OpsActor } from "@/lib/ops/auth";
 // answer for the pages, the routes and the screens.
 //
 //   owner          everything
-//   office staff   (allowlisted, not an owner) everything an owner does here
+//   office staff   (allowlisted, not an owner) the directory and packages; they
+//                  award inside the PM limit like a PM, never past it
 //   a crew seat    with "subs.manage": the directory, packages, invites, the
 //                  leveling sheet; with "subs.award" too: award inside the PM
 //                  limit (Company policies; rules.ts canAward)
