@@ -109,5 +109,12 @@ test.describe("Owner: the owner's week", () => {
     const arOpen = cents(await page.locator('[data-kpi="value"]').textContent());
     expect(jobOpen).not.toBeNull();
     expect(jobOpen).toBe(arOpen);
+
+    // 390px phone check: Duties (/app/duties) is listed in /app/more and opens (T43).
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/app/more", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("link", { name: /^Duties\b/ })).toBeVisible();
+    await page.getByRole("link", { name: /^Duties\b/ }).click();
+    await expect(page).toHaveURL(/\/app\/duties$/);
   });
 });
