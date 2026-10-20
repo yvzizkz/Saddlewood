@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import AccountingFrame from "@/components/accounting/AccountingFrame";
+import PurchaseSearch from "@/components/purchases/PurchaseSearch";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
 import { loadPurchases, type PurchaseItemRow } from "@/lib/accounting/purchases";
@@ -277,6 +278,11 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
         initialSort={{ key: "purchasedOn", dir: "desc" }}
         empty="No purchases recorded in this period."
       />
+      {/* Any purchase, any job, any year (0026); moved here from Money so purchases have one home. */}
+      <section id="find" aria-label="Find a purchase" className="rounded-2xl border border-[var(--color-stone)] bg-white p-4">
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Find any purchase, any year</p>
+        <PurchaseSearch />
+      </section>
     </AccountingFrame>
   );
 }

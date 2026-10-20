@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react'
 import { Loader2, Mic, Search, X } from 'lucide-react'
 
@@ -351,8 +352,27 @@ function TripCard({ trip, showJob }: { trip: SearchTrip; showJob: boolean }) {
     <li className="rounded-2xl border border-[var(--color-stone)] bg-white px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 text-[13px] text-[var(--color-charcoal-light)]">
-          <span className="font-medium text-[var(--color-charcoal)]">{day(trip.purchasedOn)}</span> · {store}
-          {showJob && trip.jobName ? ` · ${trip.jobName}` : ''}
+          {/* With no job set this is the owners' search (Accounting › Purchases): the trip and its job open their pages. */}
+          {showJob ? (
+            <Link href={`/app/accounting/purchases/trip/${encodeURIComponent(trip.tripKey)}`} className="font-medium text-[var(--color-charcoal)] underline-offset-2 hover:underline">
+              {day(trip.purchasedOn)}
+            </Link>
+          ) : (
+            <span className="font-medium text-[var(--color-charcoal)]">{day(trip.purchasedOn)}</span>
+          )}{' '}
+          · {store}
+          {showJob && trip.jobName ? (
+            <>
+              {' · '}
+              {trip.jobId ? (
+                <Link href={`/app/jobs/${encodeURIComponent(trip.jobId)}`} className="underline underline-offset-2">
+                  {trip.jobName}
+                </Link>
+              ) : (
+                trip.jobName
+              )}
+            </>
+          ) : null}
         </p>
         <p className="shrink-0 text-[14px] font-semibold tabular-nums text-[var(--color-charcoal)]">{money(trip.totalCents)}</p>
       </div>

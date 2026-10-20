@@ -47,6 +47,7 @@ export default function DataTable({
   initialSort,
   empty = 'Nothing matches.',
   pageSize = 50,
+  initialQuery = '',
 }: {
   rows: TableRow[]
   columns: Column[]
@@ -57,8 +58,10 @@ export default function DataTable({
   initialSort?: Sort
   empty?: string
   pageSize?: number
+  /** Starts the search box filled in, e.g. from a link's ?q= (an invoice number). */
+  initialQuery?: string
 }) {
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(initialQuery)
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [sort, setSort] = useState<Sort | null>(initialSort ?? null)
   const [selected, setSelected] = useState<Set<string>>(new Set())

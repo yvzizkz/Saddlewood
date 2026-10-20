@@ -136,7 +136,7 @@ export function placeMoney(input: MoneyInput): Placed {
   return { byJob, unplaced };
 }
 
-export type OpenBill = { number: string; title: string; owedCents: number; dueOn: string | null; daysLate: number | null; payWhenPaid: boolean };
+export type OpenBill = { number: string; title: string; owedCents: number; dueOn: string | null; daysLate: number | null; payWhenPaid: boolean; documentId?: string };
 
 export type JobMoney = {
   jobId: string;
@@ -166,7 +166,7 @@ export function summarizeJobMoney(jobId: string, items: MoneyItem[], contractCen
     owed += left;
     const daysLate = it.dueOn ? daysBetween(it.dueOn, today) : null;
     if (daysLate !== null && daysLate >= 1) pastDue += left;
-    open.push({ number: it.number, title: it.title, owedCents: left, dueOn: it.dueOn, daysLate, payWhenPaid: it.payWhenPaid });
+    open.push({ number: it.number, title: it.title, owedCents: left, dueOn: it.dueOn, daysLate, payWhenPaid: it.payWhenPaid, documentId: it.documentId });
   }
   open.sort((a, b) => (b.daysLate ?? -Infinity) - (a.daysLate ?? -Infinity) || b.owedCents - a.owedCents);
   return { jobId, contractCents, billedCents: billed, paidCents: paid, owedCents: owed, pastDueCents: pastDue, open, asOf: today };

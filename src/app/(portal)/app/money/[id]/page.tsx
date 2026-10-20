@@ -10,6 +10,7 @@ import { paidByDocument, paymentsForDocument } from "@/lib/billing/payments";
 import { describeDevice, summarizeProof } from "@/lib/billing/proof";
 import type { DocumentEvent } from "@/lib/billing/types";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { getJobRef, jobHref } from "@/lib/jobs/hub";
 
 export const dynamic = "force-dynamic";
 
@@ -64,12 +65,26 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
   const lines = (doc.snapshot.lines ?? []).map((l, index) => ({ index, description: l.description, amountCents: l.amountCents, paidCents: p?.byLine.get(index) ?? 0 }));
   const proof = summarizeProof(events);
   const clientLink = doc.token ? `/d/${doc.token}?copy=1` : null;
+  // Where it belongs: its job (and the sale that won it), so a document is never a dead end.
+  const job = doc.jobId ? await getJobRef(doc.jobId).catch(() => null) : null;
 
   return (
     <main className="mx-auto max-w-xl px-4 pb-24 pt-5">
-      <Link href="/app/money" className="text-sm text-[var(--color-teal)]">
-        ← Money
-      </Link>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <Link href="/app/accounting/receivables" className="text-[var(--color-teal)]">
+          ← Receivables
+        </Link>
+        {job ? (
+          <Link href={jobHref(job.key, "money")} className="text-[var(--color-teal)] underline-offset-2 hover:underline">
+            Job: {job.name}
+          </Link>
+        ) : null}
+        {job?.saleId ? (
+          <Link href={`/app/sales/${job.saleId}`} className="text-[var(--color-teal)] underline-offset-2 hover:underline">
+            Sale {job.saleNumber}
+          </Link>
+        ) : null}
+      </div>
       <ScreenTitle eyebrow={doc.kind.replace("_", " ")} title={doc.number}>
         <p className="text-sm text-[var(--color-charcoal-light)]">{doc.title}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">

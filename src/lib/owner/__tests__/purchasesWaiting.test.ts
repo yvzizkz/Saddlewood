@@ -61,7 +61,7 @@ describe("Which job is this? on Home", () => {
       kind: "decision",
       title: "1,100 older Home Depot names from before the app",
       detail: "$123,456 across them; find them with search.",
-      href: "/app/money",
+      href: "/app/accounting/purchases#find",
       at: null,
     });
     expect(buildWaiting(input([], { count: 1, cents: 500 }))[0].title).toBe("1 older Home Depot name from before the app");

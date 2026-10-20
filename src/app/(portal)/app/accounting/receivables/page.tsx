@@ -111,7 +111,7 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
           breakdown={d.breakdown}
           byOptions={d.byOptions}
         />
-        <DataTable rows={tableRows} columns={columns} searchKeys={["client", "job", "number", "reference", "method"]} name={`collected-${period.key}`} initialSort={{ key: "day", dir: "desc" }} empty="No payments in this period." />
+        <DataTable rows={tableRows} columns={columns} searchKeys={["client", "job", "number", "reference", "method"]} name={`collected-${period.key}`} initialQuery={one("q") ?? ""} initialSort={{ key: "day", dir: "desc" }} empty="No payments in this period." />
       </AccountingFrame>
     );
   }
@@ -206,7 +206,7 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
         breakdown={d.breakdown}
         byOptions={d.byOptions}
       />
-      <DataTable rows={tableRows} columns={columns} searchKeys={["number", "title", "client", "job", "standing", "next"]} name="receivables-open" rowHrefKey="href" initialSort={{ key: "late", dir: "desc" }} empty="Nothing is owed. Everything issued is paid." />
+      <DataTable rows={tableRows} columns={columns} searchKeys={["number", "title", "client", "job", "standing", "next"]} name="receivables-open" rowHrefKey="href" initialQuery={one("q") ?? ""} initialSort={{ key: "late", dir: "desc" }} empty="Nothing is owed. Everything issued is paid." />
       <p className="text-xs text-[var(--color-charcoal-light)]">
         Recording a payment, resending or voiding happens on the invoice&apos;s own page (owners only). <Link className="underline" href={hrefOf(PATH, { ...periodParams(resolvePeriod({ p: "mtd" }, today)), m: "collected" })}>See what came in this month</Link>.
       </p>
