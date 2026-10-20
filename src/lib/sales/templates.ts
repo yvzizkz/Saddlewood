@@ -1,3 +1,4 @@
+import { fillTerms, POLICY_DEFAULTS } from "@/lib/policies/rules";
 import { RATE_CARD } from "./catalog";
 import type { EstimateBody, EstimateItem, EstimateSection, OpportunityKind, PaymentStep, Presentation, Pricing } from "./types";
 
@@ -40,17 +41,19 @@ export const DEFAULT_PRESENT: Presentation = {
 };
 
 /**
- * The short form of SOP-007 §1 that goes on every estimate. These are the
- * SOP's proposed values (deposit 10%, payment due in 7 days, 1.5% a month after
- * a 10-day grace, CO markup 20%, 2-year workmanship warranty): Marco's to
- * confirm, and counsel's to review before the residential template is final.
+ * The short form of SOP-007 §1 that goes on every estimate. The {markers}
+ * are filled from Company policies (src/lib/policies/rules.ts, fillTerms)
+ * when an estimate starts, so the terms say what the owners decided: the
+ * deposit, late interest, change-order markup and cancellation. Counsel
+ * reviews the residential template before it is final, as SOP-007 says.
  */
 export const DEFAULT_TERMS = [
-  "Deposit of 10% of the contract is due at signing, before scheduling, plus 100% of any special-order materials before they are ordered.",
-  "Progress invoices go out on the 1st and 15th against work completed and are due in 7 days. Balances unpaid 10 days after the due date accrue 1.5% per month.",
-  "Changes are made in writing and signed before the work starts, priced at cost plus 20% overhead and profit. Conditions concealed at the time of this estimate are a change.",
+  "Deposit of {deposit_pct}% of the contract is due at signing, before scheduling{special_orders}.",
+  "Progress invoices go out on the 1st and 15th against work completed and are due in 7 days. Balances unpaid {late_grace} days after the {late_from} accrue {late_rate}% per month.",
+  "Changes are made in writing and signed before the work starts, priced at cost plus {co_markup}% overhead and profit. Conditions concealed at the time of this estimate are a change.",
   "Allowances are budgets for selections still to be made; the difference between an allowance and the final selection is settled by change order.",
   "Workmanship is warranted for 2 years from substantial completion; manufacturer warranties pass through. Owner-supplied items are not covered.",
+  "{cancellation}",
   "An Arizona preliminary 20-day notice is served on every job as routine paperwork.",
 ].join("\n");
 
@@ -136,7 +139,7 @@ function base(template: TemplateKey, title: string, d?: EstimateDefaults): Estim
     schedule,
     exclusions: [],
     clarifications: [],
-    terms: d?.terms ?? DEFAULT_TERMS,
+    terms: d?.terms ?? fillTerms(DEFAULT_TERMS, POLICY_DEFAULTS),
     validDays: d?.validDays ?? 30,
     timeline: "",
     area: null,

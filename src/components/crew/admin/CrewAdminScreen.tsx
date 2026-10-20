@@ -47,6 +47,7 @@ import {
 import { UnmatchedPurchases } from './PurchaseCards'
 import { StageWord } from './StageStrip'
 import { CrewAdminProvider, useCrewAdmin } from './useCrewAdmin'
+import { planDueLabel, SETTING_DEFAULTS } from '@/lib/crew/settingsRules'
 
 // The Crew screens. Owners get five views, the lead (field supervisor) four:
 //   Today     who is on the clock, what needs a decision or a check, what came in from the field
@@ -673,9 +674,9 @@ function RunnerView({ data, show }: { data: CrewAdminHome; show: (o: Open) => vo
 
 // ---- Plan -------------------------------------------------------------------------
 
-/** A plan for `day` counts as on time when it was sent by 6 PM the evening before. */
-function onTime(day: string, sentAt: string): boolean {
-  const sent = localInstant(addDays(day, -1), '18:00').getTime()
+/** A plan for `day` counts as on time when it was sent by the due time (crew.planDue, 6 PM unless the owners moved it) the evening before. */
+function onTime(day: string, sentAt: string, due: string): boolean {
+  const sent = localInstant(addDays(day, -1), due).getTime()
   return Date.parse(sentAt) <= sent
 }
 
@@ -691,8 +692,9 @@ function PlanView({ data }: { data: CrewAdminHome }) {
   const plan = buildPlan({ day, today: data.day, people: data.people, jobs: data.jobs, schedule: data.schedule, tasks: data.tasks, pickups: data.pickups, note })
   const sent = data.reports.filter((r) => r.day === day)
   const last = sent[0]
+  const due = data.settings['crew.planDue'] ?? SETTING_DEFAULTS['crew.planDue']
 
-  // The record for the first 30 days: one plan per working day (Monday to Saturday), by 6 PM the
+  // The record for the first 30 days: one plan per working day (Monday to Saturday), by the due time the
   // night before. It starts with the first plan ever sent: days before the routine existed are not misses.
   const start = data.reports.length ? data.reports.map((r) => r.day).sort()[0] : null
   const record = Array.from({ length: 30 }, (_, i) => addDays(data.day, -i))
@@ -700,7 +702,7 @@ function PlanView({ data }: { data: CrewAdminHome }) {
     .map((d) => {
       const first = data.reports.filter((r) => r.day === d).at(-1)
       const counts = !!start && d >= start && (!!first || d <= data.day)
-      return { day: d, first, counts, ok: !!first && onTime(d, first.createdAt) }
+      return { day: d, first, counts, ok: !!first && onTime(d, first.createdAt, due) }
     })
   const counted = record.filter((r) => r.counts)
   const hits = counted.filter((r) => r.ok).length
@@ -746,7 +748,7 @@ function PlanView({ data }: { data: CrewAdminHome }) {
       <Card className="mt-4 px-4 py-3.5">
         {last ? (
           <p className="flex flex-wrap items-center gap-1.5 text-[14px] text-[var(--color-charcoal)]">
-            <Chip tone={onTime(day, last.createdAt) ? 'ok' : 'warn'}>{onTime(day, last.createdAt) ? 'Sent on time' : 'Sent late'}</Chip>
+            <Chip tone={onTime(day, last.createdAt, due) ? 'ok' : 'warn'}>{onTime(day, last.createdAt, due) ? 'Sent on time' : 'Sent late'}</Chip>
             {firstNameOf(last.sentName)} sent it {dayLabel(localDay(last.createdAt), data.day).toLowerCase()} at {clock12(last.createdAt)}
             {sent.length > 1 ? ` (${sent.length} times)` : ''}.
           </p>
@@ -833,7 +835,7 @@ function PlanView({ data }: { data: CrewAdminHome }) {
           </Button>
         ) : null}
         <p className="text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">
-          Marco gets a notification and reads it here. Every night by 6 PM for the first 30 days; then Marco decides if it can go weekly.
+          Marco gets a notification and reads it here. Every night by {planDueLabel(due)} for the first 30 days; then Marco decides if it can go weekly.
         </p>
       </div>
 
@@ -844,7 +846,7 @@ function PlanView({ data }: { data: CrewAdminHome }) {
             <span className="text-2xl" style={{ fontFamily: 'var(--font-fraunces)' }}>
               {hits}
             </span>{' '}
-            of {counted.length} working {counted.length === 1 ? 'day' : 'days'} had the plan by 6 PM the night before.
+            of {counted.length} working {counted.length === 1 ? 'day' : 'days'} had the plan by {planDueLabel(due)} the night before.
           </p>
         ) : (
           <p className="text-[15px] text-[var(--color-charcoal)]">The record starts with the first plan sent.</p>

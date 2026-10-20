@@ -304,7 +304,10 @@ export default function SettingsScreen({ canEdit: canEditProp }: { canEdit: bool
           </label>
         </Section>
 
-        <Section title="Terms" hint="One term per line. The default is SOP-007's short form (Marco's values, pending counsel's review).">
+        <Section
+          title="Terms"
+          hint="One term per line. The default is SOP-007's short form. Words in braces, like {deposit_pct} or {late_rate}, are filled from Company policies when an estimate starts; keep them and the terms follow the policies."
+        >
           <textarea className={`${INPUT} text-sm`} rows={10} value={s.proposal.terms} onChange={(e) => proposal({ terms: e.target.value })} aria-label="Default terms" />
           <button
             type="button"

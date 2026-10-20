@@ -6,6 +6,7 @@ import { authorizeSales, salesError } from "@/lib/sales/access";
 import { createEstimate, getEstimate, getOpportunity, importPipelineEstimate, SalesError } from "@/lib/sales/store";
 import { localId, newEstimateBody, TEMPLATES, type TemplateKey } from "@/lib/sales/templates";
 import type { EstimateBody } from "@/lib/sales/types";
+import { loadPolicies } from "@/lib/policies/store";
 import { estimateDefaults } from "@/lib/sales/settings";
 import { readBody } from "@/lib/sales/validate";
 
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let sourceEstimateId: string | null = null;
     if ("template" in parsed.data) {
       // Starts from the company settings: markups, terms, how it is presented, signing.
-      body = newEstimateBody(parsed.data.template, o.title, estimateDefaults(gate.settings));
+      body = newEstimateBody(parsed.data.template, o.title, estimateDefaults(gate.settings, (await loadPolicies()).values));
     } else if ("copyOf" in parsed.data) {
       const from = await getEstimate(parsed.data.copyOf);
       if (!from || from.opportunityId !== o.id) throw new SalesError("no such version here", 404);
@@ -60,6 +61,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (!imported) throw new SalesError("no such pipeline estimate", 404);
       body = imported.body;
       body.title = o.title;
+      // The takeoff brings the quantities; the terms are the company's, from settings and policies.
+      body.terms = estimateDefaults(gate.settings, (await loadPolicies()).values).terms;
       name = "From the pipeline";
       sourceEstimateId = parsed.data.pipelineEstimateId;
     }

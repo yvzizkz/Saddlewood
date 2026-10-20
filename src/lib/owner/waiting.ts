@@ -3,6 +3,7 @@ import { addDays, dayShort, localClock, localDay, localInstant, weekdayOf } from
 import type { UnmatchedPurchase } from "@/lib/crew/purchases";
 import { ownersDecide, requestDetail, requestTitle } from "@/lib/crew/requestRules";
 import { SETTING_DEFAULTS, type AnswersFirst } from "@/lib/crew/settings";
+import { planDueLabel } from "@/lib/crew/settingsRules";
 import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewPerson, type CrewReport, type CrewRequest, type CrewTask } from "@/lib/crew/types";
 import { planAsk } from "@/lib/crew/plan";
 import type { Lane } from "./lanes";
@@ -60,13 +61,16 @@ export type WaitingInput = {
   pmLimitCents?: number;
   /** Whose list a request for the owners lands on (requests.answersFirst); "either" follows the decisions lane. */
   answersFirst?: AnswersFirst;
+  /** When the nightly plan is due (crew.planDue, "HH:MM"); PLAN_DUE when not given. */
+  planDue?: string;
 };
 
 /** How many "Which job is this?" names get their own line; the rest fold into one. */
 export const PURCHASE_ITEMS = 5;
 
-/** The plan is due the evening before, by 6 PM (the 30-day routine). */
+/** The plan is due the evening before, by 6 PM (the 30-day routine); owners can move it (crew.planDue). */
 export const PLAN_DUE = "18:00";
+
 /** A promise this close, with work still open on the job, is a signal. */
 export const PROMISE_WINDOW_DAYS = 3;
 /** Marco calls at 14 days past due; Ilene at 7 (the ladder, billing/ladder.ts). */
@@ -127,16 +131,17 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       at: r.createdAt,
     });
   }
-  if (senders.length && weekdayOf(tomorrow) !== 0 && !latest.has(tomorrow) && localClock(now) >= PLAN_DUE) {
+  const planDue = input.planDue && /^\d{2}:\d{2}$/.test(input.planDue) ? input.planDue : PLAN_DUE;
+  if (senders.length && weekdayOf(tomorrow) !== 0 && !latest.has(tomorrow) && localClock(now) >= planDue) {
     const who = senders.length === 1 ? firstNameOf(senders[0].name) : "The supervisor";
     items.push({
       key: `plan-late-${tomorrow}`,
       lane: "decisions",
       kind: "signal",
       title: `${who}'s plan for tomorrow is not in`,
-      detail: "It was due by 6 PM.",
+      detail: `It was due by ${planDueLabel(planDue)}.`,
       href: "/app/crew?view=plan",
-      at: localInstant(today, PLAN_DUE).toISOString(),
+      at: localInstant(today, planDue).toISOString(),
     });
   }
 

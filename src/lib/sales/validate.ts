@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { fillTerms, POLICY_DEFAULTS } from "@/lib/policies/rules";
 import { DEFAULT_PRESENT, DEFAULT_PRICING, DEFAULT_TERMS } from "./templates";
 import { ALLOWANCE_DISPLAYS, ITEM_KIND_KEYS, KIND_KEYS, MARKUP_DISPLAYS, PRESENT_LAYOUTS, SIGNING_MODES, SOURCE_KEYS, STAGE_KEYS, type EstimateBody } from "./types";
 
@@ -100,7 +101,7 @@ const body = z.object({
     .catch([]),
   exclusions: z.array(text(400)).max(40).catch([]),
   clarifications: z.array(text(400)).max(40).catch([]),
-  terms: z.string().max(8000).catch(DEFAULT_TERMS),
+  terms: z.string().max(8000).catch(fillTerms(DEFAULT_TERMS, POLICY_DEFAULTS)),
   validDays: num(1, 365, 30),
   timeline: text(300),
   area: z.coerce.number().min(0).max(1e6).nullable().optional().catch(null),
