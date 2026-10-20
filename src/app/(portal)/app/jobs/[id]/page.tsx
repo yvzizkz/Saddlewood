@@ -24,6 +24,7 @@ import { CO_LABEL, loadChangeOrders } from "@/lib/billing/registers";
 import { EDITABLE_SCHEDULE_KINDS, loadScheduleFeed, SCHEDULE_KIND_LABEL } from "@/lib/schedule/feed";
 import { NewScheduleItem, ScheduleStatusButton } from "@/components/schedule/ScheduleActions";
 import { loadJobFieldOps } from "@/lib/field/ops";
+import { loadSubScorecards } from "@/lib/subs/scorecard";
 import {
   ChecklistCard,
   NewChecklistForm,
@@ -310,15 +311,33 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   }
 
   if (tab === "subs") {
-    const [packages, bills] = await Promise.all([jobPackages(ref), jobBills(ref)]);
+    const [packages, bills, { scorecards }] = await Promise.all([jobPackages(ref), jobBills(ref), loadSubScorecards(today)]);
     const pk: TableRow[] = packages.map((p) => ({ id: p.id, title: p.title || p.trade, trade: p.trade, status: p.status, due: p.dueAt ? localDay(p.dueAt) : null, href: `/app/subs/bids/${p.id}` }));
     const bl: TableRow[] = bills.map((b) => ({ id: b.id, number: b.billNumber, vendor: b.vendorName, trade: b.tradeLabel, status: b.statusLabel, issued: b.issuedOn, due: b.dueOn, amount: b.amountCents, open: b.balanceCents, href: `/app/accounting/payables/bill/${b.id}` }));
+    const jobVendorNames = new Set(bills.map((b) => b.vendorName.toLowerCase()));
+    const jobTrades = new Set([...packages.map((p) => p.trade.toLowerCase()), ...bills.map((b) => b.trade.toLowerCase())]);
+    const relevantScorecards = scorecards.filter(
+      (s) => jobVendorNames.has(s.name.toLowerCase()) || s.trades.some((t) => jobTrades.has(t.toLowerCase())),
+    );
+    const scRows: TableRow[] = (relevantScorecards.length ? relevantScorecards : scorecards.slice(0, 10)).map((s) => ({
+      id: s.subId,
+      name: s.name,
+      trades: s.trades.join(", "),
+      gate: s.readyToMobilize ? "Cleared to mobilize" : `Hold (${s.missing.length} missing)`,
+      coi: s.coiState === "ok" ? `Valid (${s.coiDaysLeft}d)` : s.coiState === "expiring_30d" ? `Expiring (${s.coiDaysLeft}d)` : s.coiState === "expired" ? "Expired" : "Missing",
+      bids: `${s.submittedCount}/${s.invitedCount}`,
+      awards: s.awardedCount,
+      openBills: s.openBillsCents,
+      href: "/app/subs",
+    }));
     return (
-      <JobFrame {...frame}>
+      <JobFrame {...frame} actions={<Link className="text-sm underline" href="/app/subs">Open in Subs & Bids</Link>}>
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Bid packages</p>
         <DataTable rows={pk} columns={[{ key: "title", header: "Package", kind: "text", hrefKey: "href", phone: "title" }, { key: "trade", header: "Trade", kind: "text", filter: true }, { key: "status", header: "Status", kind: "text", filter: true, phone: "value" }, { key: "due", header: "Bids due", kind: "date" }]} searchKeys={["title", "trade"]} name={`${ref.key}-packages`} rowHrefKey="href" empty="No bid packages on this job." />
         <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Sub and vendor bills</p>
         <DataTable rows={bl} columns={[{ key: "number", header: "Bill", kind: "text", hrefKey: "href", phone: "title" }, { key: "vendor", header: "From", kind: "text", filter: true }, { key: "trade", header: "Trade", kind: "text", filter: true }, { key: "status", header: "Status", kind: "text", filter: true }, { key: "issued", header: "Issued", kind: "date", phone: "hide" }, { key: "due", header: "Due", kind: "date" }, { key: "amount", header: "Amount", kind: "money", total: true, phone: "hide" }, { key: "open", header: "Open", kind: "money", total: true, phone: "value" }]} searchKeys={["number", "vendor", "trade", "status"]} name={`${ref.key}-bills`} rowHrefKey="href" initialSort={{ key: "issued", dir: "desc" }} empty="No bills on this job." />
+        <p className="pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Sub compliance & scorecard (SOP-008)</p>
+        <DataTable rows={scRows} columns={[{ key: "name", header: "Sub", kind: "text", hrefKey: "href", phone: "title" }, { key: "trades", header: "Trades", kind: "text", phone: "hide" }, { key: "gate", header: "Mobilization gate", kind: "text", filter: true, phone: "value" }, { key: "coi", header: "COI", kind: "text", filter: true }, { key: "bids", header: "Bids / Invited", kind: "text", phone: "hide" }, { key: "awards", header: "Awards", kind: "count", phone: "hide" }, { key: "openBills", header: "Open AP", kind: "money", total: true }]} searchKeys={["name", "trades", "gate", "coi"]} name={`${ref.key}-sub-scorecard`} rowHrefKey="href" empty="No subs in directory." />
       </JobFrame>
     );
   }
@@ -674,7 +693,30 @@ export default async function JobPage({ params, searchParams }: { params: Promis
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-4">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Watches</p>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Gate 0 Handoff & Watches (SOP-001)</p>
+            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${openWatches.length === 0 && crew.phases.length > 0 ? "bg-[#e7f4ea] text-[#1f6a3b]" : "bg-[#fdf3dc] text-[#8a6100]"}`}>
+              {openWatches.length === 0 && crew.phases.length > 0 ? "Gate 0 cleared" : `${openWatches.length} pre-start watch${openWatches.length === 1 ? "" : "es"} open`}
+            </span>
+          </div>
+          <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-[var(--color-background)] p-2.5 text-xs text-[var(--color-charcoal)]">
+            <div>
+              <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Sale & Award</span>
+              <span className="font-medium">{ref.saleNumber ? `Sale ${ref.saleNumber}` : ref.awarded ? "Awarded" : "Direct job"}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Project Manager</span>
+              <span className="font-medium">{ref.pm.length ? ref.pm.join(", ") : "Unassigned"}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Phases & Schedule</span>
+              <span className="font-medium">{crew.phases.length ? `${crew.phases.length} phases (${crew.phases.filter((p) => p.verified_at).length} verified)` : "No phases yet"}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Contract Sum</span>
+              <span className="font-mono font-medium">{formatValue("money", ref.contractCents)}</span>
+            </div>
+          </div>
           {watches.length ? (
             <ul className="space-y-2 text-sm">
               {watches.map((w) => (

@@ -10,6 +10,7 @@ import { shortDay, stamp, usd } from '@/components/sales/format'
 import { useSalesToast } from '@/components/sales/useSalesToast'
 import { createClient } from '@/lib/supabase/client'
 import type { AwardCheck, Leveling, Readiness } from '@/lib/subs/rules'
+import type { EmailDraftView, WorkOrderView } from '@/lib/subs/scorecard'
 import type { InviteRowView } from '@/lib/subs/store'
 import type { Addendum, BidEvent, BidPackage } from '@/lib/subs/types'
 import { AwardBidSheet, InviteSheet, MailSheet, PackageEditor } from './PackageSheets'
@@ -28,6 +29,8 @@ type Detail = {
   invites: InviteView[]
   events: BidEvent[]
   leveling: Leveling
+  workOrder?: WorkOrderView | null
+  emailDrafts?: { awardDraft: EmailDraftView | null; thankYouDrafts: EmailDraftView[] }
   can: { manage: boolean; award: boolean }
   minBids: number
   minBidsFromCents: number
@@ -227,6 +230,128 @@ export default function PackageScreen({ id }: { id: string }) {
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {/* Frozen Work Order / Subcontract (S7) and Award / Thank-you Drafts (S6). */}
+      {d.workOrder ? (
+        <>
+          <SectionTitle>Work order & subcontract (SOP-008)</SectionTitle>
+          <Card className="p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-xs uppercase tracking-wider text-[var(--color-gold-accessible)]">
+                  {d.workOrder.woNumber} · Frozen Work Order
+                </p>
+                <p className="text-base font-semibold text-[var(--color-charcoal)]">{d.workOrder.subName}</p>
+                <p className="text-xs text-[var(--color-charcoal-light)]">
+                  ROC {d.workOrder.rocLicense} · Bid Rev {d.workOrder.bidRevision} signed by {d.workOrder.signerName}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-mono text-lg font-semibold text-[var(--color-charcoal)]">{usd(d.workOrder.headlineCents)}</p>
+                <Chip tone={d.workOrder.mobilizationGate.canMobilize ? 'ok' : 'warn'}>
+                  {d.workOrder.mobilizationGate.canMobilize ? 'Cleared to mobilize' : 'Hold before mobilization'}
+                </Chip>
+              </div>
+            </div>
+
+            {!d.workOrder.mobilizationGate.canMobilize ? (
+              <div className="mt-3 rounded-xl border border-[#8f6c18]/40 bg-[rgba(212,175,55,0.12)] px-3 py-2 text-xs text-[var(--color-charcoal)]">
+                <span className="font-medium">Pre-mobilization gate (SOP-008):</span> Nobody mobilizes on site before{' '}
+                {d.workOrder.mobilizationGate.blockers.join(', ')}.
+              </div>
+            ) : null}
+
+            <div className="mt-3 grid gap-2 rounded-xl bg-[var(--color-cream)] px-3 py-2.5 text-xs text-[var(--color-charcoal)] md:grid-cols-2">
+              <div>
+                <span className="font-medium">Job site:</span> {d.workOrder.jobAddress || d.workOrder.jobName}
+              </div>
+              <div>
+                <span className="font-medium">Schedule window:</span>{' '}
+                {d.workOrder.workFrom || d.workOrder.workTo
+                  ? `${d.workOrder.workFrom ?? 'TBD'} → ${d.workOrder.workTo ?? 'TBD'}`
+                  : d.workOrder.startOn
+                    ? `Starts ${shortDay(d.workOrder.startOn)} (${d.workOrder.duration || 'per schedule'})`
+                    : 'Per job schedule'}
+              </div>
+              <div>
+                <span className="font-medium">Retainage & waivers:</span> {d.workOrder.retainagePct}% retainage · {d.workOrder.waiverRule}
+              </div>
+              <div>
+                <span className="font-medium">Insurance rule:</span> {d.workOrder.coiRule}
+              </div>
+            </div>
+
+            <ul className="mt-3 divide-y divide-[var(--color-stone)] text-xs text-[var(--color-charcoal)]">
+              {d.workOrder.lines.map((l) => (
+                <li key={l.id} className="flex justify-between gap-3 py-1.5">
+                  <span>
+                    {l.description}
+                    {l.qty !== null ? ` · ${l.qty} ${l.unit}` : ''}
+                  </span>
+                  <span className="font-mono">{l.subCents !== null ? usd(l.subCents) : 'Excluded'}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 font-mono text-[10px] text-[var(--color-charcoal-light)]">
+              WO Hash {d.workOrder.workOrderHash.slice(0, 16)} · Bid Fingerprint {d.workOrder.bidFingerprint.slice(0, 16)}
+            </p>
+          </Card>
+
+          {d.emailDrafts && (d.emailDrafts.awardDraft || d.emailDrafts.thankYouDrafts.length > 0) ? (
+            <Card className="mt-3 space-y-3 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">
+                  Award & thank-you email drafts (review before sending)
+                </p>
+                <Chip tone="quiet">Never auto-sent</Chip>
+              </div>
+              {d.emailDrafts.awardDraft ? (
+                <div className="rounded-xl border border-[var(--color-stone)] bg-white p-3 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-[var(--color-charcoal)]">
+                      Award notice → {d.emailDrafts.awardDraft.subName} ({d.emailDrafts.awardDraft.to})
+                    </span>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 font-medium text-[var(--color-teal)]"
+                      onClick={() => {
+                        const draft = d.emailDrafts!.awardDraft!
+                        void navigator.clipboard?.writeText(`Subject: ${draft.subject}\n\n${draft.body}`)
+                        toast('Award email draft copied for review.', 'ok')
+                      }}
+                    >
+                      <Copy className="size-3.5" aria-hidden="true" /> Copy draft
+                    </button>
+                  </div>
+                  <p className="mt-1 font-medium text-[var(--color-charcoal)]">{d.emailDrafts.awardDraft.subject}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-[var(--color-charcoal-light)]">{d.emailDrafts.awardDraft.body}</p>
+                </div>
+              ) : null}
+              {d.emailDrafts.thankYouDrafts.map((ty) => (
+                <div key={ty.inviteId} className="rounded-xl border border-[var(--color-stone)] bg-white p-3 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-[var(--color-charcoal)]">
+                      Thank-you draft → {ty.subName} ({ty.to})
+                    </span>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 font-medium text-[var(--color-teal)]"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(`Subject: ${ty.subject}\n\n${ty.body}`)
+                        toast(`Thank-you draft for ${ty.subName} copied.`, 'ok')
+                      }}
+                    >
+                      <Copy className="size-3.5" aria-hidden="true" /> Copy draft
+                    </button>
+                  </div>
+                  <p className="mt-1 font-medium text-[var(--color-charcoal)]">{ty.subject}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-[var(--color-charcoal-light)]">{ty.body}</p>
+                </div>
+              ))}
+            </Card>
+          ) : null}
+        </>
       ) : null}
 
       {/* The leveling sheet. */}

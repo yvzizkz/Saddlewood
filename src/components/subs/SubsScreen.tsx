@@ -6,9 +6,10 @@ import { ChevronRight, Plus, Search } from 'lucide-react'
 
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, Empty, INPUT, ScreenTitle, Segmented } from '@/components/bot/ui'
-import { shortDay, todayPhoenix } from '@/components/sales/format'
+import { shortDay, todayPhoenix, usd } from '@/components/sales/format'
 import { useSalesToast } from '@/components/sales/useSalesToast'
 import { coiDaysLeft, readiness } from '@/lib/subs/rules'
+import type { ComplianceSummary, SubScorecard } from '@/lib/subs/scorecard'
 import { SUB_STATUS_LABEL, type PackageStatus, type Sub } from '@/lib/subs/types'
 import { NewPackageSheet } from './NewPackageSheet'
 import { SubSheet } from './SubSheet'
@@ -39,9 +40,11 @@ export const STATUS_CHIP: Record<PackageStatus, { label: string; tone: 'ok' | 'w
 
 export default function SubsScreen() {
   const { toast } = useSalesToast()
-  const [tab, setTab] = useState<'bids' | 'subs'>('bids')
+  const [tab, setTab] = useState<'bids' | 'subs' | 'scorecard'>('bids')
   const [packages, setPackages] = useState<PackageRow[] | null>(null)
   const [subs, setSubs] = useState<Sub[] | null>(null)
+  const [scorecards, setScorecards] = useState<SubScorecard[] | null>(null)
+  const [complianceSummary, setComplianceSummary] = useState<ComplianceSummary | null>(null)
   const [can, setCan] = useState({ manage: false, award: false })
   const [q, setQ] = useState('')
   const [trade, setTrade] = useState('')
@@ -52,9 +55,14 @@ export default function SubsScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [p, s] = await Promise.all([botApi<{ packages: PackageRow[]; can: typeof can }>('/api/bids'), botApi<{ subs: Sub[] }>('/api/subs')])
+      const [p, s] = await Promise.all([
+        botApi<{ packages: PackageRow[]; can: typeof can }>('/api/bids'),
+        botApi<{ subs: Sub[]; scorecards?: SubScorecard[]; complianceSummary?: ComplianceSummary }>('/api/subs'),
+      ])
       setPackages(p.packages)
       setSubs(s.subs)
+      setScorecards(s.scorecards ?? null)
+      setComplianceSummary(s.complianceSummary ?? null)
       setCan(p.can)
       setError('')
     } catch (e) {
@@ -98,6 +106,7 @@ export default function SubsScreen() {
         options={[
           { value: 'bids', label: 'Bids', count: live.length },
           { value: 'subs', label: 'Directory', count: subs?.length },
+          { value: 'scorecard', label: 'Compliance & Scorecard', count: complianceSummary?.expiredOrMissingCoiCount },
         ]}
       />
       {error ? <p className="mt-3 text-sm text-[#9a2a1f]">{error}</p> : null}
@@ -144,7 +153,7 @@ export default function SubsScreen() {
             </>
           )}
         </div>
-      ) : (
+      ) : tab === 'subs' ? (
         <div className="mt-4 space-y-3">
           {can.manage ? (
             <Button variant="primary" full onClick={() => setEditing('new')}>
@@ -204,7 +213,110 @@ export default function SubsScreen() {
             })
           )}
         </div>
-      )}
+      ) : null}
+
+      {tab === 'scorecard' ? (
+        <div className="mt-4 space-y-3">
+          {complianceSummary ? (
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              <Card className="p-3">
+                <p className="text-[11px] text-[var(--color-charcoal-light)]">Cleared to mobilize</p>
+                <p className="text-lg font-semibold text-[#1f6a3b]">
+                  {complianceSummary.readyCount} / {complianceSummary.totalSubs}
+                </p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-[11px] text-[var(--color-charcoal-light)]">Expired / missing COI</p>
+                <p className={`text-lg font-semibold ${complianceSummary.expiredOrMissingCoiCount ? 'text-[#9a2a1f]' : 'text-[var(--color-charcoal)]'}`}>
+                  {complianceSummary.expiredOrMissingCoiCount}
+                </p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-[11px] text-[var(--color-charcoal-light)]">COI expiring ≤ 30d</p>
+                <p className={`text-lg font-semibold ${complianceSummary.expiring30dCoiCount ? 'text-[#8f6c18]' : 'text-[var(--color-charcoal)]'}`}>
+                  {complianceSummary.expiring30dCoiCount}
+                </p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-[11px] text-[var(--color-charcoal-light)]">Missing W-9 or MSA</p>
+                <p className={`text-lg font-semibold ${complianceSummary.missingW9OrMsaCount ? 'text-[#8f6c18]' : 'text-[var(--color-charcoal)]'}`}>
+                  {complianceSummary.missingW9OrMsaCount}
+                </p>
+              </Card>
+            </div>
+          ) : null}
+
+          {!scorecards ? (
+            <div className="h-24 animate-pulse rounded-2xl bg-[var(--color-cream)]" aria-busy="true" />
+          ) : scorecards.length === 0 ? (
+            <Empty>No subs in the directory yet.</Empty>
+          ) : (
+            scorecards.map((sc) => {
+              const full = subs?.find((x) => x.id === sc.subId) ?? null
+              return (
+                <button key={sc.subId} type="button" onClick={() => full && setEditing(full)} className="block w-full text-left">
+                  <Card className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[var(--color-charcoal)]">{sc.name}</p>
+                        <p className="truncate text-xs text-[var(--color-charcoal-light)]">
+                          {sc.trades.join(', ') || 'No trade'} {sc.rocLicense ? `· ROC ${sc.rocLicense}` : '· No ROC on file'}
+                        </p>
+                      </div>
+                      <Chip tone={sc.readyToMobilize ? 'ok' : sc.coiState === 'expired' ? 'bad' : 'warn'}>
+                        {sc.readyToMobilize ? 'Cleared to mobilize' : 'Hold before start'}
+                      </Chip>
+                    </div>
+
+                    <div className="mt-2.5 grid grid-cols-2 gap-2 rounded-xl bg-[var(--color-cream)] px-3 py-2 text-xs text-[var(--color-charcoal)] md:grid-cols-4">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Bids / Invited</span>
+                        <span className="font-mono font-medium">
+                          {sc.submittedCount} / {sc.invitedCount}
+                          {sc.responseRatePct !== null ? ` (${sc.responseRatePct}%)` : ''}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Awards / Hit rate</span>
+                        <span className="font-mono font-medium">
+                          {sc.awardedCount} won{sc.hitRatePct !== null ? ` (${sc.hitRatePct}%)` : ''}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Open bills</span>
+                        <span className="font-mono font-medium">
+                          {sc.openBillsCount ? `${sc.openBillsCount} · ${usd(sc.openBillsCents)}` : '$0.00'}
+                          {sc.heldBillsCount ? ` (${sc.heldBillsCount} held)` : ''}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-[var(--color-charcoal-light)]">Open punch</span>
+                        <span className="font-mono font-medium">{sc.punchOpenCount}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {sc.coiState === 'ok' ? (
+                        <Chip tone="ok">COI valid ({sc.coiDaysLeft}d left)</Chip>
+                      ) : sc.coiState === 'expiring_30d' ? (
+                        <Chip tone="warn">COI expires in {sc.coiDaysLeft}d</Chip>
+                      ) : sc.coiState === 'expired' ? (
+                        <Chip tone="bad">COI expired ({Math.abs(sc.coiDaysLeft ?? 0)}d ago)</Chip>
+                      ) : (
+                        <Chip tone="bad">No COI</Chip>
+                      )}
+                      <Chip tone={sc.w9OnFile ? 'ok' : 'warn'}>{sc.w9OnFile ? 'W-9 on file' : 'Missing W-9'}</Chip>
+                      <Chip tone={sc.msaSignedOn ? 'ok' : 'warn'}>{sc.msaSignedOn ? 'MSA signed' : 'Missing MSA'}</Chip>
+                      <Chip tone={sc.rocVerified ? 'ok' : 'quiet'}>{sc.rocVerified ? 'ROC verified' : 'ROC unverified'}</Chip>
+                      <Chip tone={sc.achConfirmed ? 'ok' : 'quiet'}>{sc.achConfirmed ? 'ACH phone-verified' : 'ACH unconfirmed'}</Chip>
+                    </div>
+                  </Card>
+                </button>
+              )
+            })
+          )}
+        </div>
+      ) : null}
 
       <SubSheet
         open={editing !== null}

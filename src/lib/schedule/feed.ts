@@ -18,7 +18,8 @@ import { loadPayables, nextFridayDay } from "@/lib/accounting/payables";
 import { loadBillingCalendar, loadOpenReceivables } from "@/lib/accounting/receivables";
 import { addDays, localDay } from "@/lib/crew/time";
 import { jobHref, jobKeyOf, type JobRef } from "@/lib/jobs/hub";
-import type { Role } from "@/lib/roles/seats";
+import { seatHolder, type Role } from "@/lib/roles/seats";
+import { loadPeople, loadSeats } from "@/lib/roles/store";
 
 export type ScheduleKind =
   | "crew"
@@ -213,6 +214,8 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     billingCal,
     openAr,
     payables,
+    seats,
+    rolePeople,
   ] = await Promise.all([
     db.from("schedule_items").select("*").neq("status", "cancelled").order("start_day", { ascending: true }).limit(1000),
     db.from("crew_schedule").select("id,day,email,job_id,job_name,start_time,note,ack,priority").order("day", { ascending: true }).limit(1000),
@@ -225,7 +228,11 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     loadBillingCalendar(today).catch(() => []),
     loadOpenReceivables(today).catch(() => ({ rows: [], today })),
     loadPayables(today).catch(() => ({ rows: [], payments: [], trades: [], fridayCutoff: nextFridayDay(today) })),
+    loadSeats().catch(() => []),
+    loadPeople().catch(() => []),
   ]);
+
+  const holderOf = (r: Role) => seatHolder(r, seats, rolePeople).name;
 
   const refByKey = new Map(refs.map((r) => [r.key, r]));
   const personName = new Map(
@@ -358,7 +365,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       startDay,
       endDay,
       startTime: "",
-      who: meta.jobKey ? (refByKey.get(meta.jobKey)?.pm[0] ?? "PM") : "PM",
+      who: (meta.jobKey ? refByKey.get(meta.jobKey)?.pm[0] : undefined) ?? holderOf("pm"),
       whoEmail: "",
       role: "pm",
       status,
@@ -386,7 +393,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       startDay: day,
       endDay: day,
       startTime: "17:00",
-      who: "Marco",
+      who: holderOf("pm"),
       whoEmail: "",
       role: "pm",
       status: day < today ? "overdue" : "scheduled",
@@ -410,7 +417,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       startDay: c.prepOn,
       endDay: c.prepOn,
       startTime: "16:00",
-      who: "Eli Ramirez",
+      who: holderOf("pm"),
       whoEmail: "",
       role: "pm",
       status: c.prepOn < today ? "overdue" : "scheduled",
@@ -430,7 +437,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       startDay: c.day,
       endDay: c.day,
       startTime: "17:00",
-      who: "Ilene",
+      who: holderOf("finance"),
       whoEmail: "",
       role: "finance",
       status: c.day < today ? "overdue" : "scheduled",
@@ -444,6 +451,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     if (!r.next || !r.dueOn) continue;
     const stepDay = r.daysLate && r.daysLate > 0 ? today : r.dueOn;
     const meta = resolveJobMeta(r.jobId, null, r.job);
+    const role: Role = r.next.includes("marco") ? "decisions" : "finance";
     out.push({
       id: `ar:${r.id}`,
       source: "ar",
@@ -457,9 +465,9 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       startDay: stepDay,
       endDay: stepDay,
       startTime: "09:00",
-      who: r.next.includes("marco") ? "Marco" : "Ilene",
+      who: holderOf(role),
       whoEmail: "",
-      role: r.next.includes("marco") ? "decisions" : "finance",
+      role,
       status: (r.daysLate ?? 0) > 0 ? "overdue" : "scheduled",
       href: `/app/money/${r.id}`,
       editable: false,
@@ -484,7 +492,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       startDay: w.due_on,
       endDay: w.due_on,
       startTime: "",
-      who: "Ilene",
+      who: holderOf("finance"),
       whoEmail: "",
       role: "finance",
       status: w.due_on < today ? "overdue" : "scheduled",
@@ -518,7 +526,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
         startDay: s.coi_expires_on,
         endDay: s.coi_expires_on,
         startTime: "",
-        who: "Ilene",
+        who: holderOf("finance"),
         whoEmail: "",
         role: "finance",
         status: s.coi_expires_on < today ? "overdue" : "scheduled",
@@ -543,7 +551,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     startDay: fri,
     endDay: fri,
     startTime: "16:30",
-    who: "Ilene",
+    who: holderOf("finance"),
     whoEmail: "",
     role: "finance",
     status: "scheduled",
@@ -563,7 +571,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     startDay: fri,
     endDay: fri,
     startTime: "17:00",
-    who: "Ilene",
+    who: holderOf("finance"),
     whoEmail: "",
     role: "finance",
     status: "scheduled",
@@ -586,7 +594,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       startDay: b.dueOn,
       endDay: b.dueOn,
       startTime: "",
-      who: "Ilene",
+      who: holderOf("finance"),
       whoEmail: "",
       role: "finance",
       status: b.dueOn < today ? "overdue" : "scheduled",
@@ -612,7 +620,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       startDay: g.due_date,
       endDay: g.due_date,
       startTime: "",
-      who: g.owner || "Lando",
+      who: g.owner || holderOf("ops"),
       whoEmail: "",
       role: "ops",
       status: g.due_date < today ? "overdue" : "scheduled",

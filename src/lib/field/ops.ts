@@ -183,7 +183,7 @@ export function extractEodWorkItems(input: {
     kind: "co_price" | "decision";
     title: string;
     detail: string;
-    role: "sales" | "decisions";
+    role: "decisions";
     job_id: string | null;
     crew_job_id: string | null;
     due_on: string;
@@ -199,7 +199,7 @@ export function extractEodWorkItems(input: {
       kind: "co_price",
       title: `CO awaiting price · ${input.jobName}: ${asked.slice(0, 130)}`,
       detail: `Directive captured on ${input.day} EOD log (#${input.entryId}). Price before billing cutoff.`,
-      role: "sales",
+      role: "decisions",
       job_id: input.billingJobId ?? null,
       crew_job_id: input.jobId || null,
       due_on: input.day,

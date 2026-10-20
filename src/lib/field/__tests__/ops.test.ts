@@ -81,7 +81,7 @@ describe("field operations helpers", () => {
     expect(items).toHaveLength(2);
     const co = items.find((i) => i.kind === "co_price");
     const dec = items.find((i) => i.kind === "decision");
-    expect(co?.role).toBe("sales");
+    expect(co?.role).toBe("decisions");
     expect(co?.title).toContain("CO awaiting price");
     expect(dec?.role).toBe("decisions");
     expect(dec?.title).toContain("Should we fur out the north niche 1.5in for flush tile?");
