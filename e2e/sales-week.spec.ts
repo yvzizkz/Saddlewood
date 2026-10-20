@@ -25,10 +25,13 @@ test.describe("Sales: the sales & estimating week", () => {
   });
 
   test("Lead with source -> priced estimate -> frozen proposal -> won -> Award builds the job and populates the Gate 0 Handoff Packet", async ({ owner: page }) => {
-    const stamp = Date.now().toString().slice(-5);
-    const streetNum = `74${stamp.slice(0, 2)}`;
-    const address = `${streetNum} E Camelback Rd, Scottsdale, AZ 85251`;
-    const title = `Camelback Suite ${stamp} Framing & Drywall`;
+    const uid = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
+    const streetNum = `7${uid.slice(0, 4)}`;
+    const suite = `Ste ${uid.slice(-4)}`;
+    const jobName = `${streetNum} E Camelback Rd ${suite}`;
+    const address = `${jobName}, Scottsdale, AZ 85251`;
+    const prefix = `C${uid.slice(-5)}`;
+    const title = `Camelback ${suite} Framing & Drywall`;
 
     // 1. Create opportunity with source = "referral"
     const oppRes = await page.request.post("/api/sales", {
@@ -40,8 +43,8 @@ test.describe("Sales: the sales & estimating week", () => {
         valueCents: 1_450_000,
         contact: {
           name: "Devon Sterling",
-          company: `Sterling Retail Group ${stamp} (Synth)`,
-          email: `devon.${stamp}@example.com`,
+          company: `Sterling Retail Group ${uid} (Synth)`,
+          email: `devon.${uid}@example.com`,
           phone: "480-555-0188",
         },
         nextStep: "Walk suite and price framing",
@@ -115,8 +118,8 @@ test.describe("Sales: the sales & estimating week", () => {
     // 5. Award the job (builds client, billing job, field job, phases, deposit draft, and Gate 0 watches)
     const awardRes = await page.request.post(`/api/sales/${opp.id}/award`, {
       data: {
-        jobName: `${streetNum} E Camelback Rd`,
-        prefix: streetNum,
+        jobName,
+        prefix,
         template: "both",
         pmEmail: "eli.pm@example.com",
         deposit: true,
@@ -127,11 +130,24 @@ test.describe("Sales: the sales & estimating week", () => {
     expect(awarded.crewJobId).toBeTruthy();
     expect(awarded.watches).toBeGreaterThanOrEqual(2);
 
-    // 6. Verify the Job Overview page renders the Gate 0 Handoff Packet (SOP-001)
-    await page.goto(`/app/jobs/${awarded.crewJobId}`);
-    await expect(page.getByText(/Gate 0 Handoff & Watches \(SOP-001\)/i)).toBeVisible();
-    await expect(page.getByText(`Sale ${opp.number}`).first()).toBeVisible();
-    await expect(page.getByText("Eli Ramirez").first()).toBeVisible();
-    await expect(page.getByText(/20-day preliminary notice served/i)).toBeVisible();
+    try {
+      // 6. Verify the Job Overview page renders the Gate 0 Handoff Packet (SOP-001)
+      await page.goto(`/app/jobs/${awarded.crewJobId}`);
+      await expect(page.getByText(/Gate 0 Handoff & Watches \(SOP-001\)/i)).toBeVisible();
+      await expect(page.getByText(`Sale ${opp.number}`).first()).toBeVisible();
+      await expect(page.getByText("Eli Ramirez").first()).toBeVisible();
+      await expect(page.getByText(/20-day preliminary notice served/i)).toBeVisible();
+    } finally {
+      // Clean up open watches created by this test so repeated suite runs don't bloat the task feed
+      const detailRes = await page.request.get(`/api/sales/${opp.id}`);
+      if (detailRes.ok()) {
+        const detail = await detailRes.json();
+        for (const w of detail.job?.watches ?? []) {
+          await page.request.post(`/api/sales/${opp.id}/watches`, {
+            data: { id: w.id, done: true },
+          });
+        }
+      }
+    }
   });
 });
