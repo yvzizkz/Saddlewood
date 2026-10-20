@@ -1,6 +1,6 @@
 // Field and crew: a real week on the jobs (docs/SCENARIOS.md §4).
 // Hours by trade, unified schedule + Wednesday 2-week GC look-ahead + will-call
-// delivery, field receipt normalizing into Purchases & Payables reimbursement,
+// delivery, field receipt normalizing into Purchases (reimbursed through the bot),
 // 6 PM EOD daily log directive flowing into Changes & Owner decisions, and
 // pre-cover quality checklists gating phase verification + punch list closeout.
 
@@ -43,7 +43,7 @@ test.describe("Field and crew: the field week", () => {
     await expect(itemRow.getByRole("button", { name: "Reopen" })).toBeVisible();
   });
 
-  test("A field receipt paid out of pocket normalizes into Purchases and creates a crew reimbursement bill in Payables", async ({ owner: page }) => {
+  test("A field receipt paid out of pocket normalizes into Purchases once, with no second reimbursement bill in Payables", async ({ owner: page }) => {
     const desc = `E2E out-of-pocket drywall router bits ${Date.now()}`;
     await page.goto(`/app/jobs/${JOB}?tab=log`);
     await page.getByRole("button", { name: "+ Field receipt (normalizes to Purchases)" }).click();
@@ -65,11 +65,13 @@ test.describe("Field and crew: the field week", () => {
     await purchTable.getByRole("searchbox").fill(desc);
     await expect(purchTable.getByRole("row").filter({ hasText: desc })).toContainText("$64.25");
 
-    // Appears in Accounting > Payables as a crew reimbursement bill
+    await expect(purchTable.getByRole("row").filter({ hasText: desc })).toHaveCount(1);
+
+    // No bill in Payables: the bot books an out-of-pocket receipt to reimburse (one owner, PR #32 review).
     await page.goto("/app/accounting/payables");
     const payTable = page.locator('[data-table="payables-open-mtd"]');
     await payTable.getByRole("searchbox").fill(desc);
-    await expect(payTable.getByRole("row").filter({ hasText: desc })).toContainText("$64.25");
+    await expect(payTable.getByRole("row").filter({ hasText: desc })).toHaveCount(0);
   });
 
   test("6 PM EOD daily log with a field directive creates an unpriced CO on the job and a task in Owner decisions", async ({ owner: page }) => {

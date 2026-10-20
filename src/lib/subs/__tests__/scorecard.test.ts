@@ -345,4 +345,53 @@ describe("subs scorecard & compliance (S1, S6, S7, S8)", () => {
     punchError = { message: "relation work_items error" };
     await expect(loadSubScorecards("2026-10-20")).rejects.toThrow("work_items: relation work_items error");
   });
+
+  it("treats a missing work_items table (0033) or missing location column (0035) as 0 open punch items without throwing", async () => {
+    listSubsMock.mockResolvedValue([BASE_SUB]);
+    loadPayablesMock.mockResolvedValue({
+      rows: [],
+      summary: { openCents: 0, overdueCents: 0, dueThisWeekCents: 0, holdCount: 0 },
+    });
+
+    let punchError: { code?: string; message: string } | null = null;
+    fromMock.mockImplementation((table: string) => {
+      if (table === "bid_invites") {
+        return {
+          select: () => ({
+            limit: async () => ({ data: [{ sub_id: "sub-1", status: "awarded" }], error: null }),
+          }),
+        };
+      }
+      if (table === "work_items") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                limit: async () => ({ data: null, error: punchError }),
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    punchError = { code: "42P01", message: 'relation "public.work_items" does not exist' };
+    const missingTable = await loadSubScorecards("2026-10-20", { includeBills: false });
+    expect(missingTable.scorecards).toHaveLength(1);
+    expect(missingTable.scorecards[0].punchOpenCount).toBe(0);
+
+    punchError = { code: "PGRST205", message: "Could not find the table 'public.work_items' in the schema cache" };
+    const missingTableCache = await loadSubScorecards("2026-10-20", { includeBills: false });
+    expect(missingTableCache.scorecards[0].punchOpenCount).toBe(0);
+
+    punchError = { code: "42703", message: "column work_items.location does not exist" };
+    const missingColumn = await loadSubScorecards("2026-10-20", { includeBills: false });
+    expect(missingColumn.scorecards).toHaveLength(1);
+    expect(missingColumn.scorecards[0].punchOpenCount).toBe(0);
+
+    punchError = { code: "PGRST204", message: "Could not find the 'location' column of 'work_items' in the schema cache" };
+    const missingColumnCache = await loadSubScorecards("2026-10-20", { includeBills: false });
+    expect(missingColumnCache.scorecards[0].punchOpenCount).toBe(0);
+  });
 });

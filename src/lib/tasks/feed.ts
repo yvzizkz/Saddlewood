@@ -267,7 +267,15 @@ export function feedForSeat(items: FeedItem[], jobs: Set<string> | null, mine: (
   if (jobs === null) return items;
   // Work with no job shows when it is theirs, or was the PM's or the field's before it moved up overdue.
   const ours = (i: FeedItem) => mine(i) || i.role === "pm" || i.role === "field_lead";
-  return items.filter((i) => i.source !== "waiting" && i.source !== "ops" && i.source !== "bill" && (i.jobKey ? jobs.has(i.jobKey) : ours(i)));
+  return items.filter((i) => i.source !== "waiting" && i.source !== "ops" && i.source !== "bill" && !isPayables(i) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)));
+}
+
+/**
+ * Payables work, owners only: a sub's waiver owed before we pay it (wvi<bill>,
+ * with the sub bill's amount), or anything that opens a bill in Payables.
+ */
+function isPayables(i: FeedItem): boolean {
+  return i.id.startsWith("wvi") || i.href.startsWith("/app/accounting/payables");
 }
 
 /** Whether this seat closes or moves the item here: owners any work item; a PM work items with the PM's or the field lead's seat. */

@@ -5,6 +5,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { addDays, localDay } from "@/lib/crew/time";
 import { listTrades, resolveTrade, type Trade } from "./trades";
+import { readAll } from "@/lib/supabase/paged";
 
 export type BillStatus =
   | "draft"
@@ -170,24 +171,33 @@ export async function loadPayables(today = localDay()): Promise<{
   fridayCutoff: string;
   /** Migration 0031 is not applied: no bills to show, and nothing is wrong with the page. */
   missing: boolean;
+  /** More bills or payments than the read cap (paged.ts): totals are short, and the page says so. */
+  capped: boolean;
 }> {
   const db = getSupabaseAdmin();
-  const [billsRes, payRes, subsRes, crewJobsRes, billingJobsRes, trades] = await Promise.all([
-    db.from("bills").select("*").neq("status", "void").order("issued_on", { ascending: false }),
-    db.from("bill_payments").select("*").is("voided_at", null).order("paid_on", { ascending: false }),
+  // Paged: PostgREST hands back at most max_rows (1000) per request.
+  const reads = Promise.all([
+    readAll<DbBillRow>((from, to) => db.from("bills").select("*").neq("status", "void").order("issued_on", { ascending: false }).order("id", { ascending: true }).range(from, to), "bills"),
+    readAll<DbBillPaymentRow>((from, to) => db.from("bill_payments").select("*").is("voided_at", null).order("paid_on", { ascending: false }).order("id", { ascending: true }).range(from, to), "bill_payments"),
+  ]);
+  const [paged, subsRes, crewJobsRes, billingJobsRes, trades] = await Promise.all([
+    reads.then(
+      (r) => ({ ok: true as const, r }),
+      (e: unknown) => ({ ok: false as const, e }),
+    ),
     db.from("subs").select("id,name,coi_expires_on,w9_on_file"),
     db.from("crew_jobs").select("id,name"),
     db.from("jobs").select("id,name,crew_job_id"),
     listTrades(),
   ]);
 
-  if (missingPayables(billsRes.error) || missingPayables(payRes.error)) {
-    return { rows: [], payments: [], trades, fridayCutoff: nextFridayDay(today), missing: true };
+  if (!paged.ok) {
+    if (missingPayables(paged.e)) return { rows: [], payments: [], trades, fridayCutoff: nextFridayDay(today), missing: true, capped: false };
+    throw paged.e;
   }
-  if (billsRes.error) throw new Error(`bills: ${billsRes.error.message}`);
-  if (payRes.error) throw new Error(`bill_payments: ${payRes.error.message}`);
+  const [billsRead, payRead] = paged.r;
 
-  const payments: BillPaymentItem[] = ((payRes.data ?? []) as DbBillPaymentRow[]).map((p) => ({
+  const payments: BillPaymentItem[] = payRead.rows.map((p) => ({
     id: p.id,
     billId: p.bill_id,
     paidOn: p.paid_on,
@@ -217,7 +227,7 @@ export async function loadPayables(today = localDay()): Promise<{
 
   const fridayCutoff = nextFridayDay(today);
 
-  const rows = ((billsRes.data ?? []) as DbBillRow[]).map((b): PayableRow => {
+  const rows = billsRead.rows.map((b): PayableRow => {
     const amountCents = Number(b.amount_cents) || 0;
     const retainageCents = Number(b.retainage_cents) || 0;
     const paidCents = paidByBill.get(b.id) ?? 0;
@@ -305,7 +315,7 @@ export async function loadPayables(today = localDay()): Promise<{
     };
   });
 
-  return { rows, payments, trades, fridayCutoff, missing: false };
+  return { rows, payments, trades, fridayCutoff, missing: false, capped: billsRead.capped || payRead.capped };
 }
 
 export async function loadPayableBill(id: string): Promise<{ missing: true } | {

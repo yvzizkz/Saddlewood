@@ -94,6 +94,7 @@ function toDb(r: PurchaseRow, at: string) {
 }
 
 const CHUNK = 500;
+export const MANUAL_KEY_BATCH = 100;
 
 /** A line as a person left it: the trade they set (0030) and the job they put it on (0042). */
 export type ManualEdit = { source_key: string; trade: string; job_id: string | null; trade_manual: boolean; job_manual?: boolean };
@@ -119,14 +120,22 @@ export function keepManual(rows: PurchaseRow[], edits: ManualEdit[]): PurchaseRo
   });
 }
 
-async function manualEdits(keys: string[]): Promise<ManualEdit[]> {
-  const db = getSupabaseAdmin();
-  const full = await db.from("purchases").select("source_key, trade, job_id, trade_manual, job_manual").in("source_key", keys).or("trade_manual.eq.true,job_manual.eq.true");
+async function manualEditsBatch(db: ReturnType<typeof getSupabaseAdmin>, batch: string[]): Promise<ManualEdit[]> {
+  const full = await db.from("purchases").select("source_key, trade, job_id, trade_manual, job_manual").in("source_key", batch).or("trade_manual.eq.true,job_manual.eq.true");
   if (!full.error) return (full.data ?? []) as ManualEdit[];
   // Before 0042 there is no job_manual: keep the manual trades.
-  const trades = await db.from("purchases").select("source_key, trade, job_id, trade_manual").in("source_key", keys).eq("trade_manual", true);
+  const trades = await db.from("purchases").select("source_key, trade, job_id, trade_manual").in("source_key", batch).eq("trade_manual", true);
   if (trades.error) fail("purchases manual edits", trades.error.message);
   return (trades.data ?? []) as ManualEdit[];
+}
+
+async function manualEdits(keys: string[]): Promise<ManualEdit[]> {
+  const db = getSupabaseAdmin();
+  const out: ManualEdit[] = [];
+  for (let i = 0; i < keys.length; i += MANUAL_KEY_BATCH) {
+    out.push(...(await manualEditsBatch(db, keys.slice(i, i + MANUAL_KEY_BATCH))));
+  }
+  return out;
 }
 
 /**

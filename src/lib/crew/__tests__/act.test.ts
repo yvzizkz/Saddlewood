@@ -45,6 +45,14 @@ const { db, notify, auth, mail, geocoder } = vi.hoisted(() => {
   };
 });
 
+// The field sync (field/ops.ts) as a recorder: which receipts reached Purchases, and with what amount.
+const { synced } = vi.hoisted(() => ({ synced: [] as { entryId: number; amountDollars: number | null }[] }));
+vi.mock("@/lib/field/ops", async (orig) => ({
+  ...(await orig<typeof import("@/lib/field/ops")>()),
+  syncReceiptEntryToPurchases: async (i: { entryId: number; amountDollars: number | null }) => void synced.push({ entryId: i.entryId, amountDollars: i.amountDollars }),
+  syncEodDirectivesAndDecisions: async () => undefined,
+}));
+
 vi.mock("../geocode", () => ({
   geocodeAddress: async (address: string) => {
     geocoder.asked.push(address);
@@ -658,8 +666,11 @@ describe("answering what was asked", () => {
     await crew(arnold, { kind: "receipt.add", jobId: "powell", files: [file()], clientId: cid() }, at("12:00"));
     db.questions.push({ id: 52, email: ARNOLD, kind: "amount", status: "open", ref: { entry: db.entries[0].id }, askedBy: "bot", body: "?", answer: "" });
     expect(await crew(arnold, { kind: "answer", id: 52, answer: "around forty" }, at("13:00"))).toMatchObject({ ok: false, status: 400 });
+    synced.length = 0;
     expect(await crew(arnold, { kind: "answer", id: 52, answer: "$146.61" }, at("13:00"))).toEqual({ ok: true });
     expect(db.entries[0].data).toMatchObject({ amount: 146.61 });
+    // The answer puts the receipt's line in Purchases (it had none at $0).
+    expect(synced).toEqual([{ entryId: db.entries[0].id, amountDollars: 146.61 }]);
   });
 
   it("cannot answer someone else's question, or the same one twice", async () => {

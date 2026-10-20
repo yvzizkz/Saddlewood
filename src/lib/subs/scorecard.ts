@@ -138,6 +138,12 @@ export function computeSubScorecards(
   return { scorecards, summary };
 }
 
+export function missingWorkItems(e: { code?: string; message?: string } | null | undefined): boolean {
+  if (!e) return false;
+  if (e.code && /^(42P01|42703|PGRST204|PGRST205)$/i.test(e.code)) return true;
+  return /does not exist|schema cache|could not find the (table|relation|column)/i.test(e.message ?? "");
+}
+
 export async function loadSubScorecards(
   today = phoenixToday(),
   opts?: { includeBills?: boolean },
@@ -150,12 +156,14 @@ export async function loadSubScorecards(
     includeBills
       ? loadPayables(today).catch(() => ({ rows: [], summary: { openCents: 0, overdueCents: 0, dueThisWeekCents: 0, holdCount: 0 } }))
       : Promise.resolve({ rows: [], summary: { openCents: 0, overdueCents: 0, dueThisWeekCents: 0, holdCount: 0 } }),
-    db.from("work_items").select("title, detail, location, assignee, status").eq("kind", "punch").eq("status", "open").limit(2000),
+    Promise.resolve(
+      db.from("work_items").select("title, detail, location, assignee, status").eq("kind", "punch").eq("status", "open").limit(2000),
+    ).catch((e: unknown) => ({ data: null, error: e as { code?: string; message?: string } })),
   ]);
   if (invitesRes.error) throw new Error(`bid_invites: ${invitesRes.error.message}`);
-  if (punchRes.error) throw new Error(`work_items: ${punchRes.error.message}`);
+  if (punchRes.error && !missingWorkItems(punchRes.error)) throw new Error(`work_items: ${punchRes.error.message}`);
   const openPunchByAssignee = new Map<string, number>();
-  for (const p of (punchRes.data ?? []) as { title?: string; detail?: string; location?: string; assignee?: string; status: string }[]) {
+  for (const p of (punchRes.error ? [] : (punchRes.data ?? [])) as { title?: string; detail?: string; location?: string; assignee?: string; status: string }[]) {
     const key = [p.assignee, p.title, p.detail, p.location].filter(Boolean).join(" ").trim();
     if (!key) continue;
     openPunchByAssignee.set(key, (openPunchByAssignee.get(key) ?? 0) + 1);
