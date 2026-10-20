@@ -1,7 +1,9 @@
 import type { Overview } from "@/lib/billing/overview";
 import { addDays, dayShort, localClock, localDay, localInstant, weekdayOf } from "@/lib/crew/time";
-import { firstNameOf, isReportedDone, type CrewJob, type CrewPerson, type CrewReport, type CrewTask } from "@/lib/crew/types";
 import type { UnmatchedPurchase } from "@/lib/crew/purchases";
+import { ownersDecide, requestDetail, requestTitle } from "@/lib/crew/requestRules";
+import { SETTING_DEFAULTS, type AnswersFirst } from "@/lib/crew/settings";
+import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewPerson, type CrewReport, type CrewRequest, type CrewTask } from "@/lib/crew/types";
 import { planAsk } from "@/lib/crew/plan";
 import type { Lane } from "./lanes";
 
@@ -31,6 +33,8 @@ export type WaitingItem = {
   href: string;
   /** When it started waiting, if known. */
   at: string | null;
+  /** A material request (0023): Home shows Approve / Deny / Talk to me on the card itself, and an amount field when `estCents` is null. */
+  request?: { id: number; estCents: number | null; talk: boolean };
 };
 
 export type WaitingInput = {
@@ -48,6 +52,12 @@ export type WaitingInput = {
   owners?: string[];
   /** Home Depot register names with no job yet (0022), biggest spend first. */
   purchases?: UnmatchedPurchase[];
+  /** Material requests (0023) still moving, with who is on each job and the PM limit, so only the owners' ones land here. */
+  requests?: CrewRequest[];
+  jobPeople?: CrewJobPerson[];
+  pmLimitCents?: number;
+  /** Whose list a request for the owners lands on (requests.answersFirst); "either" follows the decisions lane. */
+  answersFirst?: AnswersFirst;
 };
 
 /** How many "Which job is this?" names get their own line; the rest fold into one. */
@@ -201,6 +211,28 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       detail: clip(`${job.promiseNote || "Promised to the client"} · ${plural(open, "task", "tasks")} still open`),
       href: "/app/crew?view=schedule",
       at: null,
+    });
+  }
+
+  // ---- material requests the owners decide (0023) ----------------------------------
+  // The PM on the job decides up to the PM limit; the owners get what is over
+  // it, and anything on a job with no PM. "Talk to me" keeps it here.
+  const pmLimit = input.pmLimitCents ?? SETTING_DEFAULTS["requests.pmLimitCents"];
+  const first = input.answersFirst ?? "either";
+  const askedFirst = first === "marco" ? "Marco" : first === "lando" ? "Lando" : undefined;
+  for (const r of input.requests ?? []) {
+    if (!ownersDecide(r, input.jobPeople ?? [], pmLimit)) continue;
+    const asker = nameOf(r.askedBy);
+    items.push({
+      key: `request-${r.id}`,
+      lane: "decisions",
+      who: askedFirst && owners.has(askedFirst) ? askedFirst : undefined,
+      kind: "decision",
+      title: requestTitle(r, asker),
+      detail: clip(`${requestDetail(r)}${r.talk ? ` · ${firstNameOf(r.decidedBy) || "you"} asked to talk` : ""}`),
+      href: "/app/crew",
+      at: r.askedAt,
+      request: { id: r.id, estCents: r.estCents, talk: r.talk },
     });
   }
 

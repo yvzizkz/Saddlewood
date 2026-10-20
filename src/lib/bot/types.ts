@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { AppSettings } from "@/lib/crew/settings";
 import type { Lane } from "@/lib/owner/lanes";
 import type { WaitingItem } from "@/lib/owner/waiting";
 
@@ -596,6 +597,8 @@ export type BotHome = {
   waiting: WaitingItem[];
   /** Whose lane is whose (src/lib/owner/lanes.ts). Owners only; null for everyone else. */
   lanes: { mine: Lane[]; holders: Record<Lane, { name: string; backup: boolean }> } | null;
+  /** The owners' editable settings (src/lib/crew/settings.ts), for the Settings card under More. Owners only; null for everyone else. */
+  settings?: AppSettings | null;
 };
 
 // ---- small shared helpers --------------------------------------------------

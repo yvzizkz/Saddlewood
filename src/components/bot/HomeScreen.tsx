@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, Lock, Paperclip } from 'lucide-react'
 
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { RequestDecideCard } from '@/components/crew/RequestCards'
 import { useBot } from './BotProvider'
 import DraftSheet from './DraftSheet'
 import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle } from './ui'
@@ -429,7 +430,7 @@ function GiveTaskSheet({ to, onClose }: { to: { email: string; name: string } | 
 }
 
 export default function HomeScreen() {
-  const { home, error } = useBot()
+  const { home, error, refresh, toast } = useBot()
   const [openDraft, setOpenDraft] = useState<number | null>(null)
   const [closing, setClosing] = useState<BotLedgerItem | null>(null)
   const [giving, setGiving] = useState<{ email: string; name: string } | null>(null)
@@ -526,9 +527,24 @@ export default function HomeScreen() {
 
       {myDecisions.length ? (
         <Card className="mb-3 divide-y divide-[var(--color-stone)] overflow-hidden">
-          {myDecisions.map((i) => (
-            <WaitingRow key={i.key} item={i} />
-          ))}
+          {myDecisions.map((i) =>
+            i.request ? (
+              <RequestDecideCard
+                key={i.key}
+                id={i.request.id}
+                title={i.title}
+                detail={i.detail}
+                estCents={i.request.estCents}
+                talk={i.request.talk}
+                onDone={(note) => {
+                  if (note) toast(note, 'ok')
+                  void refresh()
+                }}
+              />
+            ) : (
+              <WaitingRow key={i.key} item={i} />
+            ),
+          )}
         </Card>
       ) : null}
 

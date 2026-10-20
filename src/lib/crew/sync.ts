@@ -1,6 +1,7 @@
 import { sendPush } from "@/lib/bot/push";
 import { MSG } from "./messages";
 import { laneAddresses, notifyCrew, ownerAddresses } from "./notify";
+import { applyMacRequests } from "./requests";
 import {
   getEntry,
   getJob,
@@ -22,10 +23,10 @@ import type { CrewSync } from "./types";
 // owner told the bot to) a schedule line or a task. Every write is safe to
 // repeat: the Mac sends a report again when it does not hear back.
 
-export type CrewApplied = { entries: number; questions: number; seen: number; shifts: number; schedule: number; tasks: number; pushed: number };
+export type CrewApplied = { entries: number; questions: number; seen: number; shifts: number; schedule: number; tasks: number; pushed: number; requests: number };
 
 export async function applyCrewSync(post: CrewSync, nowDate = new Date()): Promise<CrewApplied> {
-  const applied: CrewApplied = { entries: 0, questions: 0, seen: 0, shifts: 0, schedule: 0, tasks: 0, pushed: 0 };
+  const applied: CrewApplied = { entries: 0, questions: 0, seen: 0, shifts: 0, schedule: 0, tasks: 0, pushed: 0, requests: 0 };
   const today = localDay(nowDate);
   const people = await listPeople();
   const active = new Map(people.filter((p) => p.active).map((p) => [p.email, p]));
@@ -90,6 +91,10 @@ export async function applyCrewSync(post: CrewSync, nowDate = new Date()): Promi
     applied.tasks += 1;
     await notifyCrew(person, MSG.newTask(t.title), "crew-task");
   }
+
+  // Material needs the Mac read out of an end-of-day memo (0023): one request
+  // per entry, so a report sent twice asks once.
+  if (post.requests.length) applied.requests = await applyMacRequests(post.requests, active);
 
   if (post.notify.length) {
     try {

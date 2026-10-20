@@ -1,7 +1,9 @@
 import type { BotCrewLateItem, BotPeople } from "@/lib/bot/types";
 import { addDays, dayShort, clockText, weekdayOf } from "@/lib/crew/time";
+import { pmDecides } from "@/lib/crew/requestRules";
 import { inScope, scopeFrom, type JobScope } from "@/lib/crew/scope";
-import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
+import { SETTING_DEFAULTS } from "@/lib/crew/settings";
+import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewRequest, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
 import { lanesOf } from "./lanes";
 import type { WaitingItem } from "./waiting";
 
@@ -30,6 +32,9 @@ export type MorningInput = {
   late?: BotCrewLateItem[];
   /** The jobs by id and name, to tell whose a late item is (it names the job, not the id). */
   jobs?: Pick<CrewJob, "id" | "name">[];
+  /** Material requests (0023) still open: a PM hears how many wait on them; the owners' are already in `waiting`. */
+  requests?: CrewRequest[];
+  pmLimitCents?: number;
 };
 
 function plural(n: number, one: string, many: string): string {
@@ -123,6 +128,9 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     const toCheck = tasks.filter((t) => isReportedDone(t) && t.email !== p.email).length;
     const dueToday = tasks.filter((t) => isOpen(t) && t.due === day && !supervisorEmails.has(t.email)).length;
     const mineToday = input.tasks.filter((t) => isOpen(t) && t.email === p.email && !!t.due && t.due <= day).length;
+    // Material requests (0023) waiting on this PM: on their jobs, not their own, within their limit.
+    const pmLimit = input.pmLimitCents ?? SETTING_DEFAULTS["requests.pmLimitCents"];
+    const requests = p.perms.includes("requests.approve") ? (input.requests ?? []).filter((r) => inScope(scope, r.jobId) && pmDecides(r, p.email, pmLimit)).length : 0;
     const lines = [
       crewLine(day, theirs),
       cant ? `${plural(cant, "person", "people")} can't make it` : "",
@@ -130,6 +138,7 @@ export function buildMorning(input: MorningInput): MorningNote[] {
       toCheck ? `${plural(toCheck, "task", "tasks")} to check` : "",
       dueToday ? `${plural(dueToday, "task", "tasks")} due today` : "",
       mineToday ? `${plural(mineToday, "hand-off", "hand-offs")} due from you` : "",
+      requests ? `${plural(requests, "material request", "material requests")} waiting` : "",
       lateClause(recentLate(input, scope)),
     ].filter(Boolean);
     notes.push(crewNote(p, { en: "Your day", es: "Tu día" }, { en: lines.join(" · "), es: lines.join(" · ") }, "/app/crew", tag));

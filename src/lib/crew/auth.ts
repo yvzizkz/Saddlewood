@@ -136,6 +136,12 @@ export const ACT_NEEDS: Record<AdminAct["kind"], Capability | "owner"> = {
   "report.answer": "owner",
   // A member answers for a job in their scope (checked in runAdminAct); "ignore" (jobId null) stays with the owners.
   "purchase.assign": "money.view",
+  // Material requests (0023): a PM decides up to the owners' limit, in scope; settings are the owners'.
+  "request.add": "requests.approve",
+  "request.decide": "requests.approve",
+  "request.order": "requests.approve",
+  "request.cancel": "requests.approve",
+  "settings.set": "owner",
 };
 
 export function mayRun(m: Manager, kind: AdminAct["kind"]): boolean {

@@ -2,6 +2,7 @@ import { threadKey } from "@/lib/bot/queries";
 import type { BotFileRef } from "@/lib/bot/types";
 import { MSG, say } from "./messages";
 import { notifyOwners, notifySupervisors } from "./notify";
+import { cancelOwnRequest, createRequestFromEntry, mirrorPickupToRequest } from "./requests";
 import {
   ackSchedule,
   answerQuestion,
@@ -266,7 +267,7 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       // Typed, or said: a voice memo (an audio file) stands in for the typed answer.
       const memo = act.files.find(isAudioRef) ?? null;
       if (act.done.length < 2 && !memo) return bad(400, say(lang, MSG.eodNeedDone));
-      const res = await addEntry(person, nowDate, {
+      const { res, entry } = await saveEntry(person, nowDate, {
         kind: "eod",
         day,
         jobId: job.id,
@@ -287,6 +288,9 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       });
       // The form is the answer to "how did today go?".
       if (res.ok) await closeQuestions(email, "eod", "filed", day).catch(() => 0);
+      // "What do you need for tomorrow?" is a material request (0023): one per
+      // entry, so the same form sent twice asks once. Never fails the entry.
+      if (res.ok && entry && act.needs.trim().length >= 2) await createRequestFromEntry(person, entry, act.needs);
       return res;
     }
 
@@ -441,6 +445,8 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
         { statusIn: ["staged", "picked", "problem"] },
       );
       if (!saved) return bad(409, say(lang, MSG.noPickup));
+      // A pickup made from a material request (0023) carries its status back to it.
+      await mirrorPickupToRequest(pickup.id, act.status);
       if (act.status !== "picked") {
         const what = `${pickup.supplier}${pickup.jobName ? ` → ${pickup.jobName}` : ""}`;
         await notifySupervisors(
@@ -465,6 +471,11 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       return ok();
     }
 
+    case "request.cancel": {
+      const res = await cancelOwnRequest(person, act.id, act.note, nowDate);
+      return res.ok ? ok() : bad(res.status, say(lang, MSG.noRequest));
+    }
+
     case "prefs": {
       await patchPerson(email, { lang: act.lang });
       return ok();
@@ -473,12 +484,17 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
 }
 
 async function addEntry(person: CrewPersonRow, nowDate: Date, e: Omit<NewEntry, "email">): Promise<ActResult> {
+  return (await saveEntry(person, nowDate, e)).res;
+}
+
+/** The same, handing back the row (the end of day reads its own entry to make a material request from it). */
+async function saveEntry(person: CrewPersonRow, nowDate: Date, e: Omit<NewEntry, "email">): Promise<{ res: ActResult; entry: CrewEntry | null }> {
   const { email, lang } = person;
-  if (!ownFiles(e.files, email)) return bad(400, say(lang, MSG.notYours));
-  if ((await countEntries(email, localDay(nowDate))) >= MAX_ENTRIES_PER_DAY) return bad(429, say(lang, MSG.tooMany));
+  if (!ownFiles(e.files, email)) return { res: bad(400, say(lang, MSG.notYours)), entry: null };
+  if ((await countEntries(email, localDay(nowDate))) >= MAX_ENTRIES_PER_DAY) return { res: bad(429, say(lang, MSG.tooMany)), entry: null };
   const { entry, existed } = await insertEntry({ ...e, email });
   if (!existed) await announce(person, entry);
-  return ok();
+  return { res: ok(), entry };
 }
 
 /** What an owner should hear about the moment it is sent, without waiting for the evening brief. */

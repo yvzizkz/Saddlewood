@@ -5,6 +5,7 @@ import { buildHome, ownerNames, whoIs } from "@/lib/bot/home";
 import { pushConfig } from "@/lib/bot/push";
 import { failStale, hasStale, listInFlight, listRecentActions, readState } from "@/lib/bot/queries";
 import { crewSummary } from "@/lib/crew/queries";
+import { readSettings } from "@/lib/crew/settings";
 import { loadWaiting } from "@/lib/owner/load";
 
 // Everything the app's Home, Duties and More screens show, in one read: what
@@ -31,9 +32,9 @@ export async function GET(request: NextRequest) {
     // The crew at a glance and what is waiting on whom, for an owner. Never
     // worth failing Home over.
     const owner = whoIs(email, state.sections.people).role === "owner";
-    const [crew, waiting] = owner
-      ? await Promise.all([crewSummary().catch(() => null), loadWaiting(ownerNames(state.sections.people)).catch(() => [])])
-      : [null, []];
+    const [crew, waiting, settings] = owner
+      ? await Promise.all([crewSummary().catch(() => null), loadWaiting(ownerNames(state.sections.people)).catch(() => []), readSettings().catch(() => null)])
+      : [null, [], null];
     const home = buildHome({
       email,
       sections: state.sections,
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
       push: { available: !!config, publicKey: config?.publicKey ?? null },
       crew,
       waiting,
+      settings,
     });
     return NextResponse.json(home, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

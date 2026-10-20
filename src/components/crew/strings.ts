@@ -188,6 +188,17 @@ const EN = {
   pickupSaved: 'Got it.',
   pickupAnyRunner: 'For any runner',
 
+  // material requests (what "needs" on the end of day becomes)
+  requests: 'Your requests',
+  reqAsked: 'Waiting',
+  reqApproved: 'Approved',
+  reqDenied: 'Not approved',
+  reqOrdered: 'Ordered',
+  reqPicked: 'Picked up',
+  reqDelivered: 'Delivered',
+  reqCancelled: 'Cancelled',
+  reqTalk: (by: string) => `${by} wants to talk to you about it`,
+
   // sent list
   sentToday: 'Sent today',
   sentRecently: 'Sent this week',
@@ -437,6 +448,16 @@ const ES: Strings = {
   deliveredPhotoHint: 'Para entregado se necesita una foto del material en la obra.',
   pickupSaved: 'Listo.',
   pickupAnyRunner: 'Para cualquier mandadero',
+
+  requests: 'Tus solicitudes',
+  reqAsked: 'En espera',
+  reqApproved: 'Aprobada',
+  reqDenied: 'No aprobada',
+  reqOrdered: 'Pedida',
+  reqPicked: 'Recogida',
+  reqDelivered: 'Entregada',
+  reqCancelled: 'Cancelada',
+  reqTalk: (by) => `${by} quiere hablar contigo de esto`,
 
   sentToday: 'Enviado hoy',
   sentRecently: 'Enviado esta semana',

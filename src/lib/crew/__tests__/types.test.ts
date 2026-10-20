@@ -115,7 +115,7 @@ describe("what the Mac sends back", () => {
   });
 
   it("treats a report with nothing in it as nothing", () => {
-    expect(crewSyncSchema.parse({})).toEqual({ entries: [], questions: [], seen: [], shifts: [], schedule: [], tasks: [], notify: [] });
+    expect(crewSyncSchema.parse({})).toEqual({ entries: [], questions: [], seen: [], shifts: [], schedule: [], tasks: [], notify: [], requests: [] });
   });
 });
 

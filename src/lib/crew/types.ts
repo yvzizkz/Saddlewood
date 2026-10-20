@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { fileRefSchema, listOf, stored, type BotFileRef } from "@/lib/bot/types";
 import type { PurchasesToday, UnmatchedPurchase } from "./purchases";
+import type { AppSettings } from "./settings";
 import { isClock, isDay } from "./time";
 
 // The crew side of the app: what a field worker sends in, what an owner does
@@ -43,6 +44,7 @@ export const CAPABILITIES = [
   { key: "jobs.manage", area: "crew", label: "Add, rename and close jobs" },
   { key: "pickups.stage", area: "crew", label: "Stage pickups for the runner" },
   { key: "plan.send", area: "crew", label: "Send the nightly plan to the owners" },
+  { key: "requests.approve", area: "crew", label: "Decide material requests up to the PM limit, and place the order" },
   { key: "hours.view", area: "crew", label: "See everyone's hours" },
   { key: "hours.edit", area: "crew", label: "Fix hours, decide time fixes, payroll export" },
   { key: "projects.view", area: "projects", label: "Projects: every job's status, promises, what is stuck, the plans" },
@@ -319,6 +321,47 @@ export type CrewPickup = {
   createdAt: string;
 };
 
+export const REQUEST_STATUSES = ["asked", "approved", "denied", "ordered", "picked", "delivered", "cancelled"] as const;
+export type CrewRequestStatus = (typeof REQUEST_STATUSES)[number];
+/** A request still moving: not settled one way or the other. */
+export const LIVE_REQUEST: readonly CrewRequestStatus[] = ["asked", "approved", "ordered", "picked"];
+
+/**
+ * Material the field asked for (migration 0023): from an end of day's "needs",
+ * the Mac's reading of a voice memo, or a PM or owner by hand. Decided under
+ * the owners' limits (src/lib/crew/settings.ts), then ordered into a will-call
+ * pickup for the runner; the pickup's picked / delivered mirror back here.
+ */
+export type CrewRequest = {
+  id: number;
+  kind: "material";
+  jobId: string;
+  jobName: string;
+  trade: string;
+  items: string;
+  qty: string;
+  /** The estimate in cents; null until someone puts a number on it. */
+  estCents: number | null;
+  status: CrewRequestStatus;
+  /** The seat that asked. */
+  askedBy: string;
+  askedAt: string;
+  /** The end of day it came from (crew_entries.id), when it did. */
+  entryId: number | null;
+  decidedBy: string;
+  decidedAt: string | null;
+  decisionNote: string;
+  /** "Talk to me" was answered: still asked, and the asker was told. */
+  talk: boolean;
+  supplier: string;
+  orderRef: string;
+  store: string;
+  /** The will-call pickup made when it was ordered. */
+  pickupId: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** The plan the lead sends the owners in the evening. */
 export type CrewReport = {
   id: number;
@@ -373,6 +416,8 @@ export type CrewHome = {
   entries: CrewEntry[];
   /** Pickups for this person to fetch (runners, and anyone a pickup names). */
   pickups: CrewPickup[];
+  /** Their own material requests: the open ones, and what was settled in the last week. */
+  requests: CrewRequest[];
   push: { available: boolean; publicKey: string | null };
 };
 
@@ -407,6 +452,10 @@ export type CrewAdminHome = {
   narrowed: boolean;
   /** Home Depot register names waiting for "Which job is this?" (0022); only with money.view. */
   unmatchedPurchases: UnmatchedPurchase[];
+  /** Material requests on the jobs shown: open, and settled in the last week. */
+  requests: CrewRequest[];
+  /** The owners' settings as they stand (limits, who answers first, the far-from-job distance). */
+  settings: AppSettings;
 };
 
 export type CrewFeed = {
@@ -424,6 +473,8 @@ export type CrewFeed = {
   questions: CrewQuestion[];
   /** `day`'s Home Depot purchases per job, with price flags (0022). */
   purchasesToday: PurchasesToday[];
+  /** Material requests of the last seven days, for the evening brief. */
+  requests: CrewRequest[];
 };
 
 // ---- limits -------------------------------------------------------------------
@@ -470,6 +521,8 @@ const breakMin = z.number().int().min(0).max(240).default(0);
 const priority = z.number().int().min(1).max(5).nullable().default(null);
 const payRate = z.number().min(0).max(500).nullable().default(null);
 const groupId = z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, "bad group");
+/** A material estimate in whole cents; null is "no number yet". */
+const estCents = z.number().int().min(0).max(100_000_000).nullable();
 
 // ---- what a crew member sends -------------------------------------------------
 
@@ -546,6 +599,8 @@ export const crewActSchema = z.discriminatedUnion("kind", [
     files,
   }),
   z.object({ kind: z.literal("schedule.ack"), id, ack: z.enum(["ok", "cant"]), note: text(300) }),
+  /** Take back a material request of their own that is still asked. */
+  z.object({ kind: z.literal("request.cancel"), id, note: text(300) }),
   z.object({ kind: z.literal("prefs"), lang: z.enum(CREW_LANGS) }),
 ]);
 export type CrewAct = z.infer<typeof crewActSchema>;
@@ -745,6 +800,37 @@ export const adminActSchema = z.discriminatedUnion("kind", [
    * line with that name is filed. jobId null = not a job, set it aside (owners only).
    */
   z.object({ kind: z.literal("purchase.assign"), alias: z.string().trim().min(1, "which name?").max(120), jobId: jobId.nullable() }),
+  // ---- material requests (0023) ----
+  /** A PM or an owner asks for material by hand. */
+  z.object({
+    kind: z.literal("request.add"),
+    jobId,
+    items: z.string().trim().min(2, "say what is needed").max(1500),
+    qty: text(120),
+    trade: text(60),
+    estCents: estCents.optional(),
+  }),
+  /** Approve, deny (with a note) or "talk to me" (keeps it open). An estimate may be put on it at the same time. */
+  z.object({
+    kind: z.literal("request.decide"),
+    id,
+    decision: z.enum(["approve", "deny", "talk"]),
+    note: text(600),
+    estCents: estCents.optional(),
+  }),
+  /** The order is placed and staged for will-call: makes the runner's pickup. */
+  z.object({
+    kind: z.literal("request.order"),
+    id,
+    supplier: z.string().trim().min(2, "say where it is").max(80),
+    store: text(200),
+    orderRef: text(80),
+    /** The day to fetch it; tomorrow when not given. */
+    day: day.optional(),
+  }),
+  z.object({ kind: z.literal("request.cancel"), id, note: z.string().trim().min(2, "say why").max(300) }),
+  /** An owner changes a setting (src/lib/crew/settings.ts holds the whitelist). */
+  z.object({ kind: z.literal("settings.set"), key: z.string().trim().min(1).max(60), value: z.union([z.number(), z.string().trim().max(40)]) }),
 ]);
 export type AdminAct = z.infer<typeof adminActSchema>;
 export type AdminActInput = z.input<typeof adminActSchema>;
@@ -805,6 +891,15 @@ const syncNotifySchema = z.object({
   tag: stored(60).default(""),
 });
 
+/** A material need the Mac read out of an end of day (a voice memo, usually). One request per entry, however often it is sent. */
+const syncRequestSchema = z.object({
+  entryId: z.number().int().min(1),
+  jobId: optionalJobId,
+  jobName: stored(80).default(""),
+  items: stored(1500).refine((v) => v.trim().length >= 2),
+  trade: stored(60).default(""),
+});
+
 export const crewSyncSchema = z.object({
   entries: listOf(syncEntrySchema),
   questions: listOf(syncQuestionSchema),
@@ -814,6 +909,8 @@ export const crewSyncSchema = z.object({
   schedule: listOf(syncScheduleSchema),
   tasks: listOf(syncTaskSchema),
   notify: listOf(syncNotifySchema),
+  /** Material requests read out of end-of-day memos. Settings are never the Mac's to send: owners only. */
+  requests: listOf(syncRequestSchema),
 });
 export type CrewSync = z.infer<typeof crewSyncSchema>;
 

@@ -6,7 +6,7 @@ import { Camera, ClipboardCheck, MapPin, MessageSquare, Package, Receipt, type L
 import { Button, Card, Chip, Empty, INPUT, ScreenTitle, SectionTitle } from '@/components/bot/ui'
 import { eodDone } from '@/lib/crew/eod'
 import { addDays, clock12, clockText, dayLabel, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
-import { firstNameOf, isReportedDone, parseAmount, type CrewEntry, type CrewPickup, type CrewQuestion, type CrewScheduleItem, type CrewTask } from '@/lib/crew/types'
+import { firstNameOf, isReportedDone, parseAmount, type CrewEntry, type CrewPickup, type CrewQuestion, type CrewRequest, type CrewScheduleItem, type CrewTask } from '@/lib/crew/types'
 import { useCrew } from './CrewProvider'
 import { CantSheet, EodSheet, NoteSheet, PickupSheet, ProgressSheet, PunchSheet, ReceiptSheet, TaskSheet, type PunchMode } from './CrewSheets'
 import type { CrewStrings } from './strings'
@@ -23,6 +23,17 @@ type Open =
   | { kind: 'pickup'; pickup: CrewPickup }
   | { kind: 'cant'; id: number }
   | null
+
+/** A material request's status in the worker's words (strings.ts), and its colour. */
+const REQUEST_WORDS: Record<CrewRequest['status'], { key: 'reqAsked' | 'reqApproved' | 'reqDenied' | 'reqOrdered' | 'reqPicked' | 'reqDelivered' | 'reqCancelled'; tone: 'ok' | 'warn' | 'bad' | 'quiet' }> = {
+  asked: { key: 'reqAsked', tone: 'warn' },
+  approved: { key: 'reqApproved', tone: 'ok' },
+  denied: { key: 'reqDenied', tone: 'bad' },
+  ordered: { key: 'reqOrdered', tone: 'quiet' },
+  picked: { key: 'reqPicked', tone: 'quiet' },
+  delivered: { key: 'reqDelivered', tone: 'ok' },
+  cancelled: { key: 'reqCancelled', tone: 'quiet' },
+}
 
 function greetingFor(now: string, t: CrewStrings): string {
   const hour = Number(localClock(now).slice(0, 2))
@@ -425,6 +436,38 @@ export default function TodayScreen() {
             {openTasks.map((task) => (
               <TaskRow key={task.id} task={task} onOpen={() => show({ kind: 'task', task })} />
             ))}
+          </Card>
+        </>
+      ) : null}
+
+      {home.requests.length ? (
+        <>
+          <SectionTitle count={home.requests.filter((r) => r.status === 'asked' || r.status === 'approved').length}>{t.requests}</SectionTitle>
+          <Card className="divide-y divide-[var(--color-stone)]">
+            {home.requests.map((r) => {
+              const st = REQUEST_WORDS[r.status]
+              return (
+                <div key={r.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="line-clamp-2 text-[15px] leading-snug text-[var(--color-charcoal)]">
+                      {r.items}
+                      {r.qty ? ` (${r.qty})` : ''}
+                    </p>
+                    <p className="mt-0.5 line-clamp-2 text-[12px] text-[var(--color-charcoal-light)]">
+                      {[
+                        r.jobName,
+                        r.status === 'asked' && r.talk ? t.reqTalk(firstNameOf(r.decidedBy) || 'Marco') : '',
+                        (r.status === 'denied' || r.status === 'cancelled') && r.decisionNote ? r.decisionNote : '',
+                        r.status === 'ordered' || r.status === 'picked' ? r.supplier : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                  <Chip tone={st.tone}>{t[st.key]}</Chip>
+                </div>
+              )
+            })}
           </Card>
         </>
       ) : null}

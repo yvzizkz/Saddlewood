@@ -1,6 +1,8 @@
 import { moneyOverview } from "@/lib/billing/overview";
 import { listUnmatchedPurchases } from "@/lib/crew/purchaseQueries";
-import { listJobs, listPeople, listReports, listTasks } from "@/lib/crew/queries";
+import { listJobPeople, listJobs, listPeople, listReports, listTasks } from "@/lib/crew/queries";
+import { listRequests } from "@/lib/crew/requestQueries";
+import { readSettings, SETTING_DEFAULTS } from "@/lib/crew/settings";
 import { addDays, localDay } from "@/lib/crew/time";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { buildWaiting, type WaitingItem } from "./waiting";
@@ -29,7 +31,7 @@ function quiet<T>(what: string, p: Promise<T>, fallback: T): Promise<T> {
 
 export async function loadWaiting(owners: string[], now: Date = new Date()): Promise<WaitingItem[]> {
   const today = localDay(now);
-  const [people, reports, tasks, jobs, hours, money, purchases] = await Promise.all([
+  const [people, reports, tasks, jobs, hours, money, purchases, requests, jobPeople, settings] = await Promise.all([
     quiet("crew people", listPeople(), []),
     quiet("plans", listReports(addDays(today, -1)), []),
     quiet("tasks", listTasks({ closedSince: now.toISOString() }), []),
@@ -37,6 +39,24 @@ export async function loadWaiting(owners: string[], now: Date = new Date()): Pro
     quiet("hours", hoursCounts(), { timefixes: 0, reviews: 0 }),
     quiet("money", moneyOverview(today), null),
     quiet("purchases", listUnmatchedPurchases(), []),
+    quiet("requests", listRequests({ since: now.toISOString() }), []),
+    quiet("job people", listJobPeople(), []),
+    quiet("settings", readSettings(), { ...SETTING_DEFAULTS }),
   ]);
-  return buildWaiting({ now, people, reports, tasks, jobs, timefixes: hours.timefixes, reviews: hours.reviews, money, owners, purchases });
+  return buildWaiting({
+    now,
+    people,
+    reports,
+    tasks,
+    jobs,
+    timefixes: hours.timefixes,
+    reviews: hours.reviews,
+    money,
+    owners,
+    purchases,
+    requests,
+    jobPeople,
+    pmLimitCents: settings["requests.pmLimitCents"],
+    answersFirst: settings["requests.answersFirst"],
+  });
 }

@@ -24,6 +24,7 @@ const { db, notify, auth, mail, geocoder } = vi.hoisted(() => {
     pickups: [] as Row[],
     reports: [] as Row[],
     phases: [] as Row[],
+    requests: [] as Row[],
     jobPeople: [] as { jobId: string; email: string; role: string }[],
     billing: [] as { id: string; name: string; client: string; prefix: string; crewJobId: string | null }[],
     seq: 0,
@@ -34,6 +35,8 @@ const { db, notify, auth, mail, geocoder } = vi.hoisted(() => {
       owners: [] as { title: string; body: string }[],
       leads: [] as { title: string; body: string }[],
       crew: [] as { email: string; body: string; title?: string; url?: string }[],
+      /** Raw pushes (material requests to the owners go straight to sendPush). */
+      push: [] as { to: string[]; title: string; body: string }[],
     },
     auth: { users: [] as { id: string; email: string; app_metadata: Record<string, unknown>; banned?: string }[] },
     mail: { sent: [] as { to: string; subject: string; text: string }[], links: [] as string[] },
@@ -288,7 +291,45 @@ vi.mock("../queries", () => {
   };
 });
 
-vi.mock("@/lib/bot/queries", () => ({ threadKey: () => KEY }));
+vi.mock("@/lib/bot/queries", () => ({ threadKey: () => KEY, readState: async () => ({ sections: { people: {} }, bridge: {} }) }));
+
+vi.mock("@/lib/bot/push", () => ({
+  sendPush: async (to: string[], n: { title: string; body: string }) => {
+    notify.push.push({ to, title: n.title, body: n.body });
+    return { sent: to.length };
+  },
+}));
+
+// Material requests (0023) and the owners' settings, stood in for in memory like the crew tables above.
+vi.mock("../requestQueries", () => ({
+  listRequests: async () => db.requests,
+  getRequest: async (id: number) => db.requests.find((r) => r.id === id) ?? null,
+  getRequestByPickup: async (pickupId: number) => db.requests.find((r) => r.pickupId === pickupId) ?? null,
+  insertRequest: async (r: Record<string, unknown>) => {
+    const prior = r.entryId !== null ? db.requests.find((x) => x.entryId === r.entryId) : undefined;
+    if (prior) return { request: prior, existed: true };
+    const row = { id: ++db.seq, kind: "material", status: "asked", askedAt: "x", decidedBy: "", decidedAt: null, decisionNote: "", talk: false, supplier: "", orderRef: "", store: "", pickupId: null, createdAt: "x", updatedAt: "x", ...r };
+    db.requests.push(row);
+    return { request: row, existed: false };
+  },
+  patchRequest: async (id: number, patch: Record<string, unknown>, only?: { statusIn?: string[] }) => {
+    const row = db.requests.find((r) => r.id === id && (!only?.statusIn || only.statusIn.includes(r.status as string)));
+    if (!row) return null;
+    const map: Record<string, string> = { est_cents: "estCents", decided_by: "decidedBy", decided_at: "decidedAt", decision_note: "decisionNote", order_ref: "orderRef", pickup_id: "pickupId" };
+    for (const [k, v] of Object.entries(patch)) row[map[k] ?? k] = v;
+    return row;
+  },
+}));
+
+vi.mock("../settings", async () => {
+  const rules = await import("../settingsRules");
+  return {
+    ...rules,
+    readSettings: async () => ({ ...rules.SETTING_DEFAULTS }),
+    writeSetting: async () => {},
+    clearSettingsCache: () => {},
+  };
+});
 
 vi.mock("../notify", () => ({
   notifyOwners: async (n: { title: string; body: string }) => void notify.owners.push(n),
@@ -379,7 +420,7 @@ beforeEach(() => {
   db.groups.clear();
   db.groups.set("crew", { id: "crew", name: "Crew", perms: ["clock", "receipts"], builtin: true });
   db.groups.set("lead", { id: "lead", name: "Supervisor", perms: [], builtin: true });
-  for (const k of ["shifts", "entries", "schedule", "tasks", "questions", "pickups", "reports"] as const) db[k].length = 0;
+  for (const k of ["shifts", "entries", "schedule", "tasks", "questions", "pickups", "reports", "requests"] as const) db[k].length = 0;
   db.phases = [];
   db.jobPeople = [];
   db.billing = [];
@@ -387,6 +428,7 @@ beforeEach(() => {
   notify.owners.length = 0;
   notify.leads.length = 0;
   notify.crew.length = 0;
+  notify.push.length = 0;
   auth.users.length = 0;
   mail.sent.length = 0;
   mail.links.length = 0;

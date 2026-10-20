@@ -25,10 +25,12 @@ import {
 import type { Manager } from "./auth";
 import { listUnmatchedPurchases, loadPurchasesToday } from "./purchaseQueries";
 import type { PurchasesToday, UnmatchedPurchase } from "./purchases";
+import { listRequests } from "./requestQueries";
 import { inScope, visibleCrewJobs } from "./scope";
 import { stageJobs } from "./stages";
+import { readSettings } from "./settings";
 import { addDays, isDay, localDay, weekStart } from "./time";
-import type { BillingJobRef, Capability, CrewAdminHome, CrewJobPerson, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewShift, OwnShift } from "./types";
+import type { BillingJobRef, Capability, CrewAdminHome, CrewJobPerson, CrewEntry, CrewFeed, CrewHome, CrewPerson, CrewQuestion, CrewRequest, CrewShift, OwnShift } from "./types";
 
 // What each side gets in one read. A crew member gets only what is theirs; an
 // owner gets everyone's; the Mac gets the last few days plus whatever it has
@@ -66,7 +68,7 @@ function byId<T extends { id: number }>(rows: T[]): T[] {
 export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], now = new Date()): Promise<CrewHome> {
   const day = localDay(now);
   const email = person.email;
-  const [jobs, shifts, open, schedule, tasks, questions, entries, pickups] = await Promise.all([
+  const [jobs, shifts, open, schedule, tasks, questions, entries, pickups, requests] = await Promise.all([
     listJobs(),
     listShifts({ email, fromDay: addDays(weekStart(day), -7) }),
     openShift(email),
@@ -75,6 +77,8 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
     listQuestions({ email, since: now.toISOString() }),
     listEntries({ email, fromDay: addDays(day, -7), limit: 60 }),
     listPickups({ fromDay: addDays(day, -1), email }),
+    // Before migration 0023 the table is not there: their day still loads.
+    listRequests({ email, since: new Date(now.getTime() - 7 * DAY_MS).toISOString() }).catch(() => []),
   ]);
 
   // A job's note can hold a gate code. Only the people headed there see it.
@@ -101,6 +105,7 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
     entries,
     // A pickup that names nobody is for the runners; one that names someone is theirs.
     pickups: pickups.filter((p) => p.email === email || person.perms.includes("pickups.run")),
+    requests,
     push,
   };
 }
@@ -120,7 +125,7 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
   const week = weekParam && isDay(weekParam) ? weekStart(weekParam) : weekStart(day);
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS).toISOString();
   const scope = await visibleCrewJobs(viewer);
-  const [people, allJobs, weekShifts, recentShifts, open, allEntries, allSchedule, allTasks, questions, suggested, allPickups, allReports, groups, jobPeople, billingJobs, unmatchedPurchases] = await Promise.all([
+  const [people, allJobs, weekShifts, recentShifts, open, allEntries, allSchedule, allTasks, questions, suggested, allPickups, allReports, groups, jobPeople, billingJobs, unmatchedPurchases, allRequests, settings] = await Promise.all([
     listPeople(),
     listJobs(),
     hours ? listShifts({ fromDay: week, toDay: addDays(week, 6), includeVoid: fixes }) : Promise.resolve([] as CrewShiftRow[]),
@@ -138,11 +143,14 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     viewer.role === "owner" ? listBillingJobs().catch(() => [] as BillingJobRef[]) : Promise.resolve([] as BillingJobRef[]),
     // Which job is this? (0022): for anyone who sees money. The tab must open before the migration is applied, so a missing table is an empty list.
     can("money.view") ? listUnmatchedPurchases().catch(() => [] as UnmatchedPurchase[]) : Promise.resolve([] as UnmatchedPurchase[]),
+    // Material requests (0023): before the migration the table is missing, and the tab still opens.
+    listRequests({ since: weekAgo }).catch(() => [] as CrewRequest[]),
+    readSettings(),
   ]);
   // A project manager sees only the jobs they are on, and the plans they sent.
   const mine = <T extends { jobId: string }>(rows: T[]) => rows.filter((r) => inScope(scope, r.jobId));
   const jobs = allJobs.filter((j) => inScope(scope, j.id));
-  const [entries, schedule, tasks, pickups] = [mine(allEntries), mine(allSchedule), mine(allTasks), mine(allPickups)];
+  const [entries, schedule, tasks, pickups, requests] = [mine(allEntries), mine(allSchedule), mine(allTasks), mine(allPickups), mine(allRequests)];
   const reports = scope === null ? allReports : allReports.filter((r) => r.sentBy === viewer.email);
   const names = new Set(jobs.map((j) => j.name.toLowerCase()));
   return {
@@ -169,6 +177,8 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
     billingJobs,
     narrowed: scope !== null,
     unmatchedPurchases,
+    requests,
+    settings,
   };
 }
 
@@ -185,7 +195,7 @@ async function suggestedJobs(): Promise<string[]> {
 export async function crewFeed(now = new Date()): Promise<CrewFeed> {
   const day = localDay(now);
   const since = new Date(now.getTime() - 3 * DAY_MS).toISOString();
-  const [people, jobs, shifts, open, recent, unfiled, schedule, tasks, questions, unseen] = await Promise.all([
+  const [people, jobs, shifts, open, recent, unfiled, schedule, tasks, questions, unseen, requests] = await Promise.all([
     listPeople(),
     listJobs(),
     listShifts({ fromDay: addDays(day, -3) }),
@@ -196,6 +206,8 @@ export async function crewFeed(now = new Date()): Promise<CrewFeed> {
     listTasks({ closedSince: since }),
     listQuestions({ since }),
     listUnseenAnswers(),
+    // The last seven days of material requests, for the evening brief (empty before migration 0023).
+    listRequests({ since: new Date(now.getTime() - 7 * DAY_MS).toISOString() }).catch(() => [] as CrewRequest[]),
   ]);
   // Today's Home Depot trips per job (0022). The feed must not fail over a missing purchases table.
   const purchasesToday: PurchasesToday[] = await loadPurchasesToday(day, jobs).catch(() => []);
@@ -238,5 +250,6 @@ export async function crewFeed(now = new Date()): Promise<CrewFeed> {
     tasks,
     questions: byId<CrewQuestion>([...questions, ...unseen]).sort((a, b) => a.id - b.id),
     purchasesToday,
+    requests,
   };
 }

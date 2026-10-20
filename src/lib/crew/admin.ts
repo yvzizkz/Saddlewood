@@ -10,6 +10,8 @@ import { notifyCrew, notifyOwners } from "./notify";
 import { buildPlan } from "./plan";
 import { relinkPurchases, upsertAlias } from "./purchaseQueries";
 import { normalizeJobName } from "./purchases";
+import { getRequest } from "./requestQueries";
+import { mirrorPickupToRequest, runRequestAct } from "./requests";
 import {
   answerReport,
   cancelQuestion,
@@ -321,6 +323,13 @@ async function jobsOfAct(act: AdminAct): Promise<(string | null | undefined)[] |
       return [(await getEntry(act.id))?.jobId];
     case "purchase.assign":
       return act.jobId ? [act.jobId] : null;
+    // Material requests (0023): a PM decides and orders only on the jobs they are on.
+    case "request.add":
+      return [act.jobId];
+    case "request.decide":
+    case "request.order":
+    case "request.cancel":
+      return [(await getRequest(act.id))?.jobId];
     default:
       return null;
   }
@@ -759,7 +768,10 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
         ...(act.note !== undefined ? { note: act.note } : {}),
         ...(act.day !== undefined ? { day: act.day } : {}),
       });
-      return saved ? ok() : bad(404, "That pickup is gone.");
+      if (!saved) return bad(404, "That pickup is gone.");
+      // A pickup made from a material request (0023) carries its status back to it.
+      if (act.status !== undefined) await mirrorPickupToRequest(pickup.id, act.status);
+      return ok();
     }
 
     case "group.save": {
@@ -926,5 +938,12 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       const lines = `${linked} ${linked === 1 ? "line" : "lines"}`;
       return { ok: true, linked, note: job ? `"${act.alias}" is ${job.name}: ${lines} filed.` : `"${act.alias}" set aside: ${lines} ignored.` };
     }
+    // Material requests and the owners' settings (0023) live in requests.ts.
+    case "request.add":
+    case "request.decide":
+    case "request.order":
+    case "request.cancel":
+    case "settings.set":
+      return runRequestAct(owner, act, nowDate);
   }
 }
