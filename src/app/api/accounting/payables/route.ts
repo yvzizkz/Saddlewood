@@ -3,9 +3,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { localDay } from "@/lib/crew/time";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { clearHold, paymentBlock, SETTABLE_STATUSES, waiverCollectedFor, type BillFacts, type Hold } from "@/lib/accounting/payablesRules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Owners act on a bill: set its status, clear one hold, record a payment out.
+// The rules (SOP-004) are in lib/accounting/payablesRules.ts: a held, void or
+// expired-COI bill is never paid, a sub is paid only with the payer's word
+// that the lien waiver for this payment is in hand, and a payment never
+// records a waiver.
+
+type BillRow = { id: string; kind: string; status: string; waiver_status: string; amount_cents: number; sub_id: string | null };
+
+async function factsOf(db: ReturnType<typeof getSupabaseAdmin>, billId: string): Promise<{ bill: BillRow; facts: BillFacts } | null> {
+  const { data, error } = await db.from("bills").select("id,kind,status,waiver_status,amount_cents,sub_id").eq("id", billId).maybeSingle();
+  if (error) throw new Error(`bills read: ${error.message}`);
+  if (!data) return null;
+  const bill = data as BillRow;
+  let coiExpired = false;
+  if (bill.sub_id) {
+    const { data: sub, error: subErr } = await db.from("subs").select("coi_expires_on").eq("id", bill.sub_id).maybeSingle();
+    if (subErr) throw new Error(`subs read: ${subErr.message}`);
+    const on = (sub as { coi_expires_on: string | null } | null)?.coi_expires_on ?? null;
+    coiExpired = !!on && on < localDay();
+  }
+  return { bill, facts: { kind: bill.kind, status: bill.status, waiverStatus: bill.waiver_status, coiExpired } };
+}
 
 export async function PATCH(request: NextRequest) {
   const viewer = await getViewer();
@@ -28,27 +52,48 @@ export async function PATCH(request: NextRequest) {
   }
 
   const db = getSupabaseAdmin();
+  const found = await factsOf(db, billId);
+  if (!found) return NextResponse.json({ ok: false, error: "No such bill." }, { status: 404 });
+  const { bill, facts } = found;
 
   if (action === "update_bill") {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (typeof body.status === "string") patch.status = body.status;
-    if (body.waiverReceived === true) {
-      patch.waiver_status = "conditional_received";
-    }
-    if (body.clearHold === true) {
-      patch.status = "scheduled";
-      patch.approved_by = actor;
-      patch.approved_at = new Date().toISOString();
+    if (typeof body.clearHold === "string") {
+      const hold = body.clearHold as Hold;
+      if (!["waiver", "coi", "approval"].includes(hold)) return NextResponse.json({ ok: false, error: "Which hold: waiver, coi or approval?" }, { status: 400 });
+      const cleared = clearHold(facts, hold);
+      if ("error" in cleared) return NextResponse.json({ ok: false, error: cleared.error }, { status: 409 });
+      Object.assign(patch, cleared.patch);
+      if (hold === "approval") {
+        patch.approved_by = actor;
+        patch.approved_at = new Date().toISOString();
+      }
+    } else if (typeof body.status === "string") {
+      if (!(SETTABLE_STATUSES as string[]).includes(body.status)) {
+        return NextResponse.json({ ok: false, error: `A bill can be set to ${SETTABLE_STATUSES.join(", ")}.` }, { status: 400 });
+      }
+      if ((body.status === "open" || body.status === "scheduled") && paymentBlock({ ...facts, status: "open" })) {
+        return NextResponse.json({ ok: false, error: `Clear the hold first: ${paymentBlock({ ...facts, status: "open" })}` }, { status: 409 });
+      }
+      patch.status = body.status;
+    } else {
+      return NextResponse.json({ ok: false, error: "Nothing to change." }, { status: 400 });
     }
     const { error } = await db.from("bills").update(patch).eq("id", billId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, status: patch.status ?? bill.status });
   }
 
   if (action === "record_payment") {
+    const blocked = paymentBlock(facts);
+    if (blocked) return NextResponse.json({ ok: false, error: blocked }, { status: 409 });
     const amountCents = Math.round(Number(body.amountCents ?? 0));
     if (!Number.isFinite(amountCents) || amountCents <= 0) {
       return NextResponse.json({ ok: false, error: "amountCents must be positive" }, { status: 400 });
+    }
+    const waiverCollected = waiverCollectedFor(bill.kind, body.waiverCollected);
+    if (waiverCollected === null) {
+      return NextResponse.json({ ok: false, error: "Confirm the sub's lien waiver for this payment is in hand (SOP-004)." }, { status: 400 });
     }
     const method = typeof body.method === "string" ? body.method : "melio";
     const reference = typeof body.reference === "string" ? body.reference.trim() : "";
@@ -59,31 +104,20 @@ export async function PATCH(request: NextRequest) {
       amount_cents: amountCents,
       method,
       reference,
-      waiver_collected: true,
+      waiver_collected: waiverCollected,
       recorded_by: actor,
       note: `Recorded by ${actor}`,
     });
     if (payErr) return NextResponse.json({ ok: false, error: payErr.message }, { status: 500 });
 
-    const [billRes, allPayRes] = await Promise.all([
-      db.from("bills").select("amount_cents").eq("id", billId).maybeSingle(),
-      db.from("bill_payments").select("amount_cents").eq("bill_id", billId).is("voided_at", null),
-    ]);
-    const totalBill = Number((billRes.data as { amount_cents?: number } | null)?.amount_cents ?? 0);
-    const totalPaid = ((allPayRes.data ?? []) as { amount_cents: number }[]).reduce(
-      (a, r) => a + (Number(r.amount_cents) || 0),
-      0,
-    );
-    const nextStatus = totalPaid >= totalBill && totalBill > 0 ? "paid" : "partial";
+    const { data: paid, error: paidErr } = await db.from("bill_payments").select("amount_cents").eq("bill_id", billId).is("voided_at", null);
+    if (paidErr) return NextResponse.json({ ok: false, error: paidErr.message }, { status: 500 });
+    const totalPaid = ((paid ?? []) as { amount_cents: number }[]).reduce((a, r) => a + (Number(r.amount_cents) || 0), 0);
+    const nextStatus = totalPaid >= bill.amount_cents && bill.amount_cents > 0 ? "paid" : "partial";
 
-    await db
-      .from("bills")
-      .update({
-        status: nextStatus,
-        waiver_status: nextStatus === "paid" ? "final_received" : "conditional_received",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", billId);
+    // The status only: a payment is not a waiver, and a final waiver is recorded when it comes in.
+    const { error: upErr } = await db.from("bills").update({ status: nextStatus, updated_at: new Date().toISOString() }).eq("id", billId);
+    if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
 
     return NextResponse.json({ ok: true, status: nextStatus, totalPaid });
   }
