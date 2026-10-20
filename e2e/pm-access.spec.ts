@@ -5,9 +5,9 @@
 import { cents, expect, hours, PM, signIn, test as base } from "./support/env";
 
 const test = base.extend<{ pm: import("@playwright/test").Page }>({
-  pm: async ({ context, page }, use) => {
+  pm: async ({ context, page }, provide) => {
     await signIn(context, PM, { crew: true });
-    await use(page);
+    await provide(page);
   },
 });
 

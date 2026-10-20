@@ -58,9 +58,9 @@ export const PM = "eli.pm@example.com";
 
 /** The page as an owner (Lando's local seat). */
 export const test = base.extend<{ owner: Page }>({
-  owner: async ({ context, page }, use) => {
+  owner: async ({ context, page }, provide) => {
     await signIn(context, OWNER);
-    await use(page);
+    await provide(page);
   },
 });
 export { expect } from "@playwright/test";
