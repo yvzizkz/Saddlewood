@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { HardHat, Home, ListChecks, Menu, MessageSquare, Wallet, type LucideIcon } from 'lucide-react'
+import { HardHat, Home, ListChecks, Menu, MessageSquare, TrendingUp, Wallet, type LucideIcon } from 'lucide-react'
 
 import { OnboardingFlow } from '@/components/auth/OnboardingFlow'
 import { BotProvider, useBot } from './BotProvider'
@@ -18,6 +18,8 @@ type Tab = { href: string; label: string; icon: LucideIcon; ownersOnly?: boolean
 
 const TABS: Tab[] = [
   { href: '/app', label: 'Home', icon: Home },
+  // Every prospect from the first call to the signed job, and its estimates.
+  { href: '/app/sales', label: 'Sales', icon: TrendingUp },
   { href: '/app/ask', label: 'Ask', icon: MessageSquare },
   // The field crew: who is on the clock, what came in, the schedule, hours.
   { href: '/app/crew', label: 'Crew', icon: HardHat, ownersOnly: true },
@@ -81,7 +83,7 @@ function TabBar() {
               key={tab.href}
               href={tab.href}
               aria-current={active ? 'page' : undefined}
-              className="relative flex h-14 flex-1 flex-col items-center justify-center gap-1"
+              className="relative flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1"
               style={{ color: active ? 'var(--color-teal)' : 'var(--color-charcoal-light)' }}
             >
               {active ? <span aria-hidden="true" className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--color-gold)]" /> : null}
@@ -99,7 +101,7 @@ function TabBar() {
                   </>
                 ) : null}
               </span>
-              <span className="text-[11px] font-medium leading-none">{tab.label}</span>
+              <span className="whitespace-nowrap text-[11px] font-medium leading-none">{tab.label}</span>
             </Link>
           )
         })}

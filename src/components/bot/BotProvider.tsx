@@ -171,6 +171,11 @@ export function BotProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** The bot app's context when this screen sits in it, else null (Sales screens also run in the crew shell). */
+export function useBotOptional(): Ctx | null {
+  return useContext(BotContext)
+}
+
 export function useBot(): Ctx {
   const ctx = useContext(BotContext)
   if (!ctx) throw new Error('useBot must be used inside <BotProvider>')

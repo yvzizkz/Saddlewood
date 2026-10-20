@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { CalendarDays, Clock, Home, Menu, Users, type LucideIcon } from 'lucide-react'
+import { CalendarDays, Clock, Home, Menu, TrendingUp, Users, type LucideIcon } from 'lucide-react'
 
 import { OnboardingFlow, resolveOnboardingRole } from '@/components/auth/OnboardingFlow'
 import { Dot } from '@/components/bot/ui'
@@ -27,6 +27,8 @@ const TABS: Tab[] = [
 ]
 
 const CREW_TAB: Tab = { href: '/app/crew', label: (t) => t.tabCrew, icon: Users }
+// A seat whose group has Sales on (sales.view): the pipeline and the estimate builder.
+const SALES_TAB: Tab = { href: '/app/sales', label: (t) => t.tabSales, icon: TrendingUp }
 
 function useKeyboardOpen(): boolean {
   const [open, setOpen] = useState(false)
@@ -60,7 +62,8 @@ function TabBar() {
   const { home, t } = useCrew()
   const keyboardOpen = useKeyboardOpen()
   const badge = home?.questions.length ?? 0
-  const tabs = home?.me.perms.includes('crew.view') ? [...TABS.slice(0, 3), CREW_TAB, TABS[3]] : TABS
+  const perms = home?.me.perms ?? []
+  const tabs = [...TABS.slice(0, 3), ...(perms.includes('crew.view') ? [CREW_TAB] : []), ...(perms.includes('sales.view') ? [SALES_TAB] : []), TABS[3]]
   if (keyboardOpen) return null
   return (
     <nav aria-label="App" className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--color-stone)] bg-[var(--color-background)] pb-safe">

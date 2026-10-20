@@ -9,9 +9,11 @@ import { keyBytes, useInstall } from '@/components/bot/MoreScreen'
 import { Button, Card, Empty, ScreenTitle, SectionTitle, Segmented } from '@/components/bot/ui'
 import { createClient } from '@/lib/supabase/client'
 import { crewApi, useCrew } from './CrewProvider'
+import { ReferJob } from './ReferJob'
 
 // The crew's settings: language, getting the app onto the home screen,
-// notifications, signing out.
+// notifications, signing out. And one thing that is not a setting: sending
+// the office a lead someone gave them on the job.
 
 function InstallCard() {
   const { t } = useCrew()
@@ -169,6 +171,7 @@ export default function CrewMoreScreen() {
         ]}
       />
 
+      <ReferJob />
       <InstallCard />
       <NotificationsCard />
       <PasskeyCard lang={lang} />
