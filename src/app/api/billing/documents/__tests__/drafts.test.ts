@@ -311,3 +311,13 @@ describe("POST .../issue and .../void", () => {
     expect(voidDocument).not.toHaveBeenCalled();
   });
 });
+
+describe("PATCH .../<id> on a progress draw", () => {
+  it("answers 409 with the reason when the draft is a progress draw", async () => {
+    updateDraft.mockRejectedValueOnce(new DocumentError("This is a progress draw: its lines come from the job's percent complete. Discard it on the job's Money tab and make the draw again.", 409));
+    const res = await change(req("PATCH", `/api/billing/documents/${ID}`, { snapshot: { lines: [{ description: "Framing", amountCents: 500000 }] } }), ctx());
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/progress draw/);
+  });
+});
+
