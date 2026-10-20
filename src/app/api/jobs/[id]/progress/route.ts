@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireOwner } from "@/lib/crew/auth";
 import { getJobRef } from "@/lib/jobs/hub";
-import { createDrawDraft, loadProgress, previewDraw, ProgressError, setOpening } from "@/lib/billing/progressStore";
+import { createDrawDraft, discardDraw, loadProgress, previewDraw, ProgressError, setOpening } from "@/lib/billing/progressStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 //   POST { action: "preview", pcts }      the draw the percents make, nothing saved
 //   POST { action: "draw", pcts }         the draft invoice, and what it bills per line
 //   POST { action: "opening", pcts }      percents billed before the app, before the first draw
+//   POST { action: "discard" }            throw away the draft draw (issue it from the card or Billing instead)
 
 async function billingJob(id: string): Promise<string | NextResponse> {
   const ref = await getJobRef(id);
@@ -47,11 +48,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const made = await createDrawDraft(job, pcts, owner.email);
       return NextResponse.json({ ok: true, documentId: made.documentId, number: made.number, dueCents: made.draw.dueCents });
     }
+    if (body?.action === "discard") {
+      const number = await discardDraw(job);
+      return NextResponse.json({ ok: true, discarded: number });
+    }
     if (body?.action === "opening") {
       await setOpening(job, pcts, owner.email);
       return NextResponse.json({ ok: true });
     }
-    return NextResponse.json({ ok: false, error: "Which action: preview, draw or opening?" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Which action: preview, draw, discard or opening?" }, { status: 400 });
   } catch (e) {
     if (e instanceof ProgressError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
     throw e;
