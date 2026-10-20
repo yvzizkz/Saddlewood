@@ -56,7 +56,10 @@ test.describe("Owner: the owner's week", () => {
       await page.goto("/app/departments/finance");
       await expect(page.getByText(/held by\s*Lando/)).toBeVisible();
       await page.goto("/app/tasks");
-      await expect(page.locator('[data-table="tasks-mine"]').getByRole("row").filter({ hasText: "Invoice package for" }).first()).toBeVisible();
+      // Search, don't scan: "Mine" runs past the table's first page once Lando holds two seats.
+      const mine = page.locator('[data-table="tasks-mine"]');
+      await mine.getByRole("searchbox").fill("Invoice package for");
+      await expect(mine.getByRole("row").filter({ hasText: "Invoice package for" }).first()).toBeVisible();
     } finally {
       await seat("Ilene");
     }

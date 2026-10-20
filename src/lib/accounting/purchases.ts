@@ -3,6 +3,7 @@
 // Server-only.
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { readAll } from "@/lib/supabase/paged";
 import { listUnmatchedPurchases } from "@/lib/crew/purchaseQueries";
 import { tripKey as computeTripKey, type UnmatchedPurchase } from "@/lib/crew/purchases";
 import { listTrades, resolveTrade, type Trade } from "./trades";
@@ -68,24 +69,30 @@ export async function loadPurchases(
   trades: Trade[];
   jobs: { id: string; name: string; billingJobId: string | null }[];
   unmatched: UnmatchedPurchase[];
+  /** More lines than the read cap (paged.ts): totals are short, and the page says so. */
+  capped: boolean;
 }> {
   const db = getSupabaseAdmin();
-  const [purchRes, crewJobsRes, billingJobsRes, trades, unmatchedRes] = await Promise.all([
-    db
-      .from("purchases")
-      .select("*")
-      .gte("purchased_on", fromDay)
-      .lte("purchased_on", toDay)
-      .order("purchased_on", { ascending: false })
-      .order("source_key", { ascending: true })
-      .limit(5000),
+  const [purchRead, crewJobsRes, billingJobsRes, trades, unmatchedRes] = await Promise.all([
+    // Paged: PostgREST hands back at most max_rows (1000) per request, whatever .limit() asks.
+    readAll<DbPurchaseRow>(
+      (from, to) =>
+        db
+          .from("purchases")
+          .select("*")
+          .gte("purchased_on", fromDay)
+          .lte("purchased_on", toDay)
+          .order("purchased_on", { ascending: false })
+          .order("source_key", { ascending: true })
+          .range(from, to),
+      "purchases",
+    ),
     db.from("crew_jobs").select("id,name,active").order("name"),
     db.from("jobs").select("id,name,crew_job_id"),
     listTrades(),
     listUnmatchedPurchases({ limit: 50 }).catch(() => ({ names: [], older: 0, olderCents: 0, newestOn: null })),
   ]);
 
-  if (purchRes.error) throw new Error(`purchases: ${purchRes.error.message}`);
 
   const billingByCrewId = new Map<string, string>();
   for (const bj of (billingJobsRes.data ?? []) as { id: string; name: string; crew_job_id: string | null }[]) {
@@ -101,7 +108,7 @@ export async function loadPurchases(
     }));
   const jobNameMap = new Map(jobs.map((j) => [j.id, j.name]));
 
-  const rows = ((purchRes.data ?? []) as DbPurchaseRow[]).map((r): PurchaseItemRow => {
+  const rows = purchRead.rows.map((r): PurchaseItemRow => {
     const qty = Number(r.qty) || 0;
     const cents = Number(r.line_total_cents) || 0;
     const t = resolveTrade(r.trade || "general", trades);
@@ -151,6 +158,7 @@ export async function loadPurchases(
     trades,
     jobs,
     unmatched: unmatchedRes.names,
+    capped: purchRead.capped,
   };
 }
 
