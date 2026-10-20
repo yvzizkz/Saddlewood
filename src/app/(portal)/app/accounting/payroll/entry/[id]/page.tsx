@@ -8,7 +8,7 @@ import { when } from "@/components/money/format";
 import { hrefOf } from "@/lib/analytics/drill";
 import { listTrades, resolveTrade } from "@/lib/accounting/trades";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
-import { getJob, getPerson, getShift } from "@/lib/crew/queries";
+import { getJob, getPerson, getShift, withJobDistance } from "@/lib/crew/queries";
 import { clockText, localClock, weekStart, workedMinutes } from "@/lib/crew/time";
 
 export const dynamic = "force-dynamic";
@@ -32,13 +32,14 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const n = Number(id);
   if (!Number.isInteger(n)) notFound();
-  const shift = await getShift(n);
-  if (!shift) notFound();
-  const [person, job, trades] = await Promise.all([getPerson(shift.email), getJob(shift.jobId), listTrades()]);
+  const rawShift = await getShift(n);
+  if (!rawShift) notFound();
+  const [person, job, trades] = await Promise.all([getPerson(rawShift.email), getJob(rawShift.jobId), listTrades()]);
+  const [shift] = withJobDistance([rawShift], job ? [job] : []);
 
   const minutes = workedMinutes(shift);
   const rate = person?.payRate ?? null;
-  const trade = resolveTrade(person?.trade, trades);
+  const trade = resolveTrade(shift.trade || person?.trade, trades);
   const week = { p: "custom", from: weekStart(shift.day), to: shift.day };
   const name = person?.name || shift.email;
 

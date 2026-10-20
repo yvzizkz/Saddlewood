@@ -541,9 +541,10 @@ type ShiftRow = {
   edits: unknown;
   client_in: string | null;
   client_out: string | null;
+  trade?: string | null;
 };
 
-export type CrewShiftRow = CrewShift & { clientIn: string | null; clientOut: string | null };
+export type CrewShiftRow = CrewShift & { clientIn: string | null; clientOut: string | null; trade?: string | null };
 
 function toShift(r: ShiftRow): CrewShiftRow {
   return {
@@ -563,6 +564,7 @@ function toShift(r: ShiftRow): CrewShiftRow {
     review: r.review,
     status: r.status === "void" ? "void" : "ok",
     edits: Array.isArray(r.edits) ? (r.edits as ShiftEdit[]) : [],
+    trade: r.trade ?? null,
     // Figured against the job once the jobs are in hand (withJobDistance); a row alone does not know where its job is.
     fromJobM: { in: null, out: null },
     clientIn: r.client_in,

@@ -11,7 +11,7 @@ export const SETTABLE_STATUSES: BillStatusValue[] = ["draft", "needs_approval", 
 
 export type Hold = "waiver" | "coi" | "approval";
 
-export type BillFacts = { kind: string; status: string; waiverStatus: string; coiExpired: boolean };
+export type BillFacts = { kind: string; status: string; waiverStatus: string; coiExpired: boolean; coiMissing?: boolean };
 
 /** Why this bill can't be paid now, or null when it can. */
 export function paymentBlock(b: BillFacts): string | null {
@@ -21,7 +21,9 @@ export function paymentBlock(b: BillFacts): string | null {
   if (b.status === "disputed") return "This bill is disputed.";
   if (b.status === "needs_approval") return "The PM hasn't approved this bill yet.";
   if (b.status === "hold_waiver" || b.waiverStatus === "missing") return "The lien waiver hasn't been received (SOP-004).";
-  if (b.status === "hold_coi" || b.coiExpired) return "The sub's COI is expired; renew it before paying.";
+  if (b.status === "hold_coi" || b.coiExpired || b.coiMissing) {
+    return b.coiMissing ? "The sub's COI is missing; add it before paying." : "The sub's COI is expired; renew it before paying.";
+  }
   return null;
 }
 
@@ -40,7 +42,7 @@ export function holdsOf(b: BillFacts): Hold[] {
   const out: Hold[] = [];
   if (b.status === "needs_approval") out.push("approval");
   if (b.status === "hold_waiver" || b.waiverStatus === "missing") out.push("waiver");
-  if (b.status === "hold_coi" || b.coiExpired) out.push("coi");
+  if (b.status === "hold_coi" || b.coiExpired || b.coiMissing) out.push("coi");
   return out;
 }
 
@@ -54,7 +56,9 @@ const STATUS_OF: Record<Hold, BillStatusValue> = { approval: "needs_approval", w
 export function clearHold(b: BillFacts, hold: Hold): { patch: { status: BillStatusValue; waiver_status?: string } } | { error: string } {
   const standing = holdsOf(b);
   if (!standing.includes(hold)) return { error: "That hold isn't on this bill." };
-  if (hold === "coi" && b.coiExpired) return { error: "The sub's COI is still expired. Renew it on the sub first." };
+  if (hold === "coi" && (b.coiExpired || b.coiMissing)) {
+    return { error: b.coiMissing ? "The sub's COI is still missing. Add it on the sub first." : "The sub's COI is still expired. Renew it on the sub first." };
+  }
   const after: BillFacts = {
     ...b,
     waiverStatus: hold === "waiver" ? "conditional_received" : b.waiverStatus,
