@@ -63,4 +63,10 @@ Each scenario drives the screens a person in that seat would use, writes through
 
 ## What an owner, a PM and finance can and can't do today
 
-Filled in from the runs; see the latest results at the bottom of the Phase 3 PR.
+From the runs on 2026-10-20: `npx playwright test` passes 16/16, twice in a row (Finance 6, Owner 5, PM access 5).
+
+| Seat | Can, end to end in the app | Can't yet (gap → where it goes) |
+|---|---|---|
+| **Owner** | Read every department's figures and what waits on it; price, sign and bill a CO from the job page; move a seat and see the work follow; hand a task to a role and watch it move up when overdue; close it; see the job page agree with Receivables to the cent | Record a payment from a P-number match in the app; it still goes through Joist (bot path). Approve and send an invoice package in one step: the package is a checklist and a task today, and sending is the Bill screen |
+| **Finance** | See each client's cutoff and what must go with the invoice; get told to bill a signed CO; record a lien waiver on the invoice (gap fixed in this phase); read AR with aging, proof and the ladder; split Melio's fee from the gross; see Friday's pay run and the holds; export payroll that matches the table | Record a sub's incoming waiver from a screen: the API takes it (`POST /api/waivers` direction in), the bill page has no button yet → step 7 (agy, subs and compliance). SOV percent-complete billing → still open in Phase 2 step 6 |
+| **PM** | Open Overview, Payroll hours, Purchases, Receivables and Billing on his own jobs; open his own invoices read-only; reach it from crew More | See pay, labor dollars or margin (by policy, unless an owner switches them on); Payables; Jobs, Departments, Tasks (owners' screens, so a PM can't create or close tasks in the app yet) → next: open Tasks and the job page to PM seats on their jobs |
