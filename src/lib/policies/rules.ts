@@ -91,9 +91,9 @@ export const DECISIONS: DecisionDef[] = [
     title: "Late interest",
     question: "When does late interest start, and at what rate?",
     recommendation: "1.5% a month, starting 10 days after the due date.",
-    why: "It matches SOP-007, gives the client a grace period after the bill is actually due, and is the easier reading to defend. The Mac's contract generator counts from the invoice date and should be changed to match.",
+    why: "It matches SOP-007, gives the client a grace period after the bill is actually due, and is the easier reading to defend.",
     sources: "SOP-007 §1 (10 days after the due date) vs bot/contract.py (10 days from the invoice date); app spec decision #1.",
-    liveIn: "The default proposal terms (Sales) are filled from these numbers.",
+    liveIn: "The default proposal terms (Sales), and the Mac's contract generator (bot/contract.py).",
     laterIn: "Past-due statements once billing runs from the app.",
     policies: [
       {
@@ -119,7 +119,7 @@ export const DECISIONS: DecisionDef[] = [
     recommendation: "A signed change order from $1,000. Under that, log it and bill it on the next invoice.",
     why: "SOP-002 is approved and says to bill them; logging without billing gives the work away, and small extras add up over a job. The 20% markup and 50% at signing from $5,000 are SOP-007's values.",
     sources: "SOP-002 (approved: bill on the next invoice) vs the PM charter and plan (documented only); SOP-007 §1 (20% OH&P, 50% at signing from $5,000).",
-    liveIn: "The change-order markup fills the default proposal terms (Sales).",
+    liveIn: "The default proposal terms (markup) and the Mac's contract generator (markup, the $1,000 and $5,000 lines, how small extras are handled).",
     laterIn: "Change orders from the field (L4).",
     policies: [
       { key: "policy.extras.coFromCents", label: "Signed change order from", recommended: 100_000, control: { type: "money" } },
@@ -171,7 +171,7 @@ export const DECISIONS: DecisionDef[] = [
     recommendation: "10% at signing, plus all special-order materials before ordering; refunded on cancellation less costs incurred and 10%.",
     why: "SOP-007's own cancellation term. A non-refundable deposit is harder to defend if a homeowner cancels early, and the costs-plus-10% term already covers our exposure. Counsel to confirm with the residential template.",
     sources: "SOP-007 §1 (cancellation: costs plus 10%) vs bot/contract.py (deposit non-refundable).",
-    liveIn: "The default proposal terms (Sales) are filled from these.",
+    liveIn: "The default proposal terms (Sales), and the Mac's contract generator (bot/contract.py).",
     laterIn: "The deposit invoice the Award step drafts (L2).",
     policies: [
       { key: "policy.deposit.pct", label: "Deposit at signing", recommended: 10, control: { type: "percent", max: 100 } },
@@ -197,9 +197,9 @@ export const DECISIONS: DecisionDef[] = [
     question: "How long must a sub warrant their work?",
     recommendation: "2 years, and never shorter than what we give the client.",
     why: "We give the client 2 years of workmanship. A 1-year sub warranty leaves the second year on us.",
-    sources: "SOP-008 (2 years, never shorter than the client's) vs bot/contract.py (1 year on non-residential).",
+    sources: "SOP-008 §2 (the sub MSA: 2 years, never shorter than the client's). Separate question: bot/contract.py gives Saddlewood's own warranty as 1 year on commercial and sub agreements, where SOP-007 says 2.",
     liveIn: "",
-    laterIn: "Sub work orders, and the Mac's contract generator once it reads these.",
+    laterIn: "Sub work orders.",
     policies: [
       { key: "policy.subs.warrantyYears", label: "Sub warranty", recommended: 2, control: { type: "years", max: 10 } },
       { key: "policy.subs.matchClient", label: "Never shorter than the client's warranty", recommended: true, control: yesNo },

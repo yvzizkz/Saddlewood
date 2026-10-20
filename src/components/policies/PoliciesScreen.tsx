@@ -233,7 +233,7 @@ export default function PoliciesScreen() {
             ))}
           </div>
           <p className="mt-6 text-xs leading-relaxed text-[var(--color-charcoal-light)]">
-            Legal points (contract content, deposits, interest, liens) are for counsel to confirm, as SOP-007 says. The Mac&apos;s contract generator (bot/contract.py) still has its own values for late interest, the deposit and sub warranty until it is changed to read these.
+            Legal points (contract content, deposits, interest, liens) are for counsel to confirm, as SOP-007 says. The Mac&apos;s contract generator (bot/contract.py) reads the deposit, late interest and change-order policies when it drafts; if the site cannot be reached it uses the recommendations and says so on the draft.
           </p>
         </>
       )}

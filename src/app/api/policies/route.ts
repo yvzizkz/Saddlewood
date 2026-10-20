@@ -8,8 +8,9 @@ import { loadPolicies, PolicyError, savePolicy } from "@/lib/policies/store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Company policies: office staff read them, an owner changes them, signed in
-// (never the agent token: these are the owners' rules).
+// Company policies: office staff read them, an owner changes them, signed in.
+// The Mac's agent token may read them (bot/contract.py drafts its terms from
+// them) and never change them: these are the owners' rules.
 
 async function seat(request: NextRequest): Promise<{ email: string; name: string; owner: boolean } | NextResponse> {
   const who = await authorizeOps(request);
@@ -24,6 +25,11 @@ async function seat(request: NextRequest): Promise<{ email: string; name: string
 }
 
 export async function GET(request: NextRequest) {
+  const who = await authorizeOps(request);
+  if (who?.via === "token") {
+    const { values } = await loadPolicies();
+    return NextResponse.json({ ok: true, values, canEdit: false });
+  }
   const s = await seat(request);
   if (s instanceof NextResponse) return s;
   const { values, changed } = await loadPolicies();
