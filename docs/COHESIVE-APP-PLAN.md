@@ -391,7 +391,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
 7. **Subs and compliance:**
    - work order document (S7), compliance register with COI and W-9 watches (S8), sub scorecard (S1);
    - award emails as drafts (S6).
-8. **Department homes** (§6.2):
+8. ✅ **Department homes** (§6.2): `/app/departments` and `/app/departments/[role]` (`src/lib/departments/home.ts`). The Ops board itself still lives at `/internal/ops`; the Ops home links to it.
    - Owner desk (decisions with `rule?`, A6);
    - Ops in the app (A13, friction log ranking);
    - Sales KPIs by source;
@@ -405,7 +405,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - `/internal/activity` and `/internal/bid-log` placeholders go;
    - Money's purchase search becomes Accounting › Purchases.
    - Never the four batch-2 prototypes (they wait for their bot scripts).
-10. **PM access:** Accounting sections for `money.view` seats scoped to their jobs, no cost or pay. Field lead seat.
+10. ✅ **PM access:** `src/lib/accounting/access.ts`. A `money.view` seat sees Receivables, Billing, Purchases and Payroll hours on its own jobs. Pay and cost show only if `policy.pm.laborCost` / `policy.pm.margin` are on, never Payables, and invoices are read-only. Still to do: a field-lead seat. Accounting sections for `money.view` seats scoped to their jobs, no cost or pay. Field lead seat.
 11. Each step: tests, lint, build, screenshots at 390 px and on desktop.
 
 ### Phase 3: scenario testing, every department's real week (one PR)
