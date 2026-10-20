@@ -57,15 +57,31 @@ test.describe("Powell: schedule-of-values progress draws", () => {
       });
       expect(dupRes.status()).toBe(409);
 
-      // 5. Issue Draw #1 and record Powell's check payment ($20,750)
-      const issue1 = await page.request.post(`/api/billing/documents/${draw1Id}/issue`, {
-        data: {},
-      });
-      expect(issue1.ok()).toBeTruthy();
+      // 4b. A mistyped draft is discarded from the card: back to where it was, nothing voided.
+      await page.goto(`/app/jobs/${POWELL}?tab=money`);
+      await expect(card.getByText(/is a draft, not sent/)).toBeVisible();
+      await card.getByRole("button", { name: "Discard draw" }).click();
+      await expect(card.getByText(/is a draft, not sent/)).toHaveCount(0);
+      await expect(card).toContainText("Billed to date $298,500.00 of $420,000.00");
+      drawDocs.splice(drawDocs.indexOf(draw1Id), 1);
+
+      // Draw #1 again, then issue it from the card.
+      await card.getByLabel("Main Residence & Casita Framing percent complete").fill("95");
+      await card.getByLabel("Drywall Hang, Tape & Level 4 Finish percent complete").fill("85");
+      expect(cents(await card.locator('[data-draw="due"]').textContent())).toBe(2_075_000);
+      await makeBtn.click();
+      await page.waitForURL(/\/app\/money\/[0-9a-f-]{36}$/i);
+      const draw1 = page.url().split("/").pop()!;
+      drawDocs.push(draw1);
+      await page.goto(`/app/jobs/${POWELL}?tab=money`);
+      await card.getByRole("button", { name: "Issue it" }).click();
+      await expect(card.getByText(/is a draft, not sent/)).toHaveCount(0);
+
+      // 5. Record Powell's check payment ($20,750) against the issued draw
 
       const payRes = await page.request.post("/api/billing/payments", {
         data: {
-          documentId: draw1Id,
+          documentId: draw1,
           amountCents: 2_075_000,
           method: "check",
           receivedOn: "2026-10-20",
@@ -93,11 +109,14 @@ test.describe("Powell: schedule-of-values progress draws", () => {
       const draw2Id = page.url().split("/").pop()!;
       drawDocs.push(draw2Id);
 
-      const issue2 = await page.request.post(`/api/billing/documents/${draw2Id}/issue`, {
-        data: {},
-      });
-      expect(issue2.ok()).toBeTruthy();
+      await page.goto(`/app/jobs/${POWELL}?tab=money`);
+      await card.getByRole("button", { name: "Issue it" }).click();
+      await expect(card.getByText(/is a draft, not sent/)).toHaveCount(0);
+      await expect(card.getByRole("button", { name: `Void draw ${(await (await page.request.get(`/api/jobs/${POWELL}/progress`)).json()).lastIssued.number}` })).toBeVisible();
+      expect(draw2Id).toBeTruthy();
     } finally {
+      // A draft left behind by a failure is discarded; issued draws are voided.
+      await page.request.post(`/api/jobs/${POWELL}/progress`, { data: { action: "discard" } });
       for (const pid of paymentIds) {
         await page.request.post(`/api/billing/payments/${pid}/void`, {
           data: { reason: "e2e cleanup" },

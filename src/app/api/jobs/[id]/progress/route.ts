@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { jobForWrite, workSeat } from "@/lib/jobs/access";
 import { loadPeople } from "@/lib/roles/store";
-import { createDrawDraft, clearReport, loadProgress, previewDraw, ProgressError, saveReport, setClientCutoff, setOpening } from "@/lib/billing/progressStore";
+import { clearReport, createDrawDraft, discardDraw, loadProgress, previewDraw, ProgressError, saveReport, setClientCutoff, setOpening } from "@/lib/billing/progressStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 //   POST { action: "preview", pcts }        the draw the percents make, nothing saved
 //   POST { action: "report", pcts, note }   the PM's percent complete (owners or the job's PM); bills nothing
 //   POST { action: "draw", pcts }           the draft invoice, and what it bills per line (owners)
+//   POST { action: "discard" }              throw away the draft draw (owners; issue it from the card instead)
 //   POST { action: "opening", pcts }        percents billed before the app, before the first draw (owners)
 
 async function billingJob(id: string): Promise<{ seat: NonNullable<Awaited<ReturnType<typeof workSeat>>>; job: string } | NextResponse> {
@@ -58,6 +59,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const made = await createDrawDraft(job, pcts, owner.email);
       return NextResponse.json({ ok: true, documentId: made.documentId, number: made.number, dueCents: made.draw.dueCents });
     }
+    if (body?.action === "discard") {
+      const number = await discardDraw(job);
+      return NextResponse.json({ ok: true, discarded: number });
+    }
     if (body?.action === "opening") {
       await setOpening(job, pcts, owner.email);
       return NextResponse.json({ ok: true });
@@ -70,7 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await setClientCutoff(job, body.cutoffDay ?? null);
       return NextResponse.json({ ok: true });
     }
-    return NextResponse.json({ ok: false, error: "Which action: preview, draw or opening?" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Which action: preview, report, draw, discard or opening?" }, { status: 400 });
   } catch (e) {
     if (e instanceof ProgressError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
     throw e;

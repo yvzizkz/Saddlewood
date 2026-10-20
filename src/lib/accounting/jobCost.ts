@@ -40,7 +40,7 @@ export type JobTotals = {
 
 export const CATEGORY_LABEL: Record<CostLine["category"], string> = { labor: "Labor", materials: "Materials", subs: "Subs and vendors" };
 
-export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lines: CostLine[]; jobs: JobTotals[]; laborWithoutRate: number }> {
+export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lines: CostLine[]; jobs: JobTotals[]; laborWithoutRate: number; payablesMissing: boolean }> {
   const db = getSupabaseAdmin();
   const [jobsRes, crewRes, labor, purchases, payables, docs] = await Promise.all([
     db.from("jobs").select("id,name,crew_job_id,billing"),
@@ -123,5 +123,5 @@ export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lin
     t.billedCents += Number(d.total_cents);
     t.collectedCents += paid.get(d.id) ?? 0;
   }
-  return { lines, jobs: [...totals.values()], laborWithoutRate: labor.ratesMissing };
+  return { lines, jobs: [...totals.values()], laborWithoutRate: labor.ratesMissing, payablesMissing: payables.missing };
 }

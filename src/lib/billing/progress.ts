@@ -5,7 +5,10 @@
 // complete to date on each line; this period is that share of the line less
 // what earlier draws already billed on it. Retainage, when the client's
 // profile holds some, comes off as its own line, so the invoice total is what
-// is due now. Guards: a percent is 0 to 100, never lower than the last draw
+// is due now. A deposit the client already paid (Award's deposit invoice) is
+// credited back across the draws in proportion to what each one bills of what
+// is left, the last draw taking the rest, so a job billed to 100% bills the
+// contract once, deposit included. Guards: a percent is 0 to 100, never lower than the last draw
 // (a reduction is a credit, not a smaller draw), and nothing bills past the
 // line.
 
@@ -34,6 +37,8 @@ export type Draw = {
   grossCents: number;
   retainagePct: number;
   retainageCents: number;
+  /** The deposit credited on this draw ("Less deposit applied"). */
+  depositCents: number;
   /** What the invoice asks for now. */
   dueCents: number;
   contractCents: number;
@@ -46,11 +51,28 @@ export function shareOf(scheduledCents: number, pct: number): number {
   return Math.round((scheduledCents * pct) / 100);
 }
 
+/** The job's deposit (an issued deposit invoice) and how much of it earlier draws credited back. */
+export type DepositState = { cents: number; appliedCents: number };
+
+/**
+ * The deposit to credit on a draw of `grossCents`: the deposit not yet
+ * credited, in proportion to what this draw bills of what was left to bill;
+ * all of it when the draw bills the rest of the contract.
+ */
+export function depositCredit(dep: DepositState | null | undefined, grossCents: number, contractCents: number, billedBeforeCents: number): number {
+  if (!dep) return 0;
+  const remaining = dep.cents - dep.appliedCents;
+  const left = contractCents - billedBeforeCents;
+  if (remaining <= 0 || grossCents <= 0 || left <= 0) return 0;
+  if (grossCents >= left) return remaining;
+  return Math.min(remaining, Math.round((remaining * grossCents) / left));
+}
+
 /**
  * The draw for the percents asked (key → percent to date). Lines not asked keep
  * their last percent and bill nothing this period.
  */
-export function computeDraw(lines: ProgressLine[], asked: Record<string, number>, retainagePct = 0): Draw {
+export function computeDraw(lines: ProgressLine[], asked: Record<string, number>, retainagePct = 0, deposit?: DepositState | null): Draw {
   const errors: string[] = [];
   const out: DrawLine[] = lines.map((l) => {
     const raw = asked[l.key];
@@ -66,13 +88,16 @@ export function computeDraw(lines: ProgressLine[], asked: Record<string, number>
   const pct = Math.max(0, Math.min(100, retainagePct || 0));
   const retainage = Math.round((gross * pct) / 100);
   if (gross < 0) errors.push("This draw comes to less than nothing. Issue a credit instead.");
+  const contract = lines.reduce((a, l) => a + l.scheduledCents, 0);
+  const credit = depositCredit(deposit, gross, contract, lines.reduce((a, l) => a + l.billedToDateCents, 0));
   return {
     lines: out,
     grossCents: gross,
     retainagePct: pct,
     retainageCents: retainage,
-    dueCents: gross - retainage,
-    contractCents: lines.reduce((a, l) => a + l.scheduledCents, 0),
+    depositCents: credit,
+    dueCents: gross - retainage - credit,
+    contractCents: contract,
     billedToDateCents: out.reduce((a, l) => a + l.toDateCents, 0),
     errors,
   };
@@ -88,6 +113,7 @@ export function drawInvoiceLines(d: Draw): { description: string; amountCents: n
       note: `${l.pct}% complete to date of ${(l.scheduledCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}; ${(l.billedToDateCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} billed before`,
     }));
   if (d.retainageCents > 0) lines.push({ description: `Retainage held (${d.retainagePct}%)`, amountCents: -d.retainageCents });
+  if (d.depositCents > 0) lines.push({ description: "Less deposit applied", amountCents: -d.depositCents });
   return lines;
 }
 

@@ -1,10 +1,31 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const { fromMock, listSubsMock, loadPayablesMock } = vi.hoisted(() => ({
+  fromMock: vi.fn(),
+  listSubsMock: vi.fn(),
+  loadPayablesMock: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: () => ({ from: fromMock }),
+}));
+vi.mock("@/lib/accounting/payables", () => ({
+  loadPayables: loadPayablesMock,
+}));
+vi.mock("../store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../store")>();
+  return {
+    ...actual,
+    listSubs: listSubsMock,
+  };
+});
 
 import {
   buildAwardEmailDrafts,
   buildWorkOrder,
   classifyCoi,
   computeSubScorecards,
+  loadSubScorecards,
 } from "../scorecard";
 import type { PackageDetail } from "../store";
 import type { Sub } from "../types";
@@ -250,5 +271,78 @@ describe("subs scorecard & compliance (S1, S6, S7, S8)", () => {
     expect(drafts.awardDraft!.body).toContain("$11,500.00");
     expect(drafts.thankYouDrafts).toHaveLength(1);
     expect(drafts.thankYouDrafts[0].subName).toBe("Sonoran Drywall Inc");
+  });
+
+  it("omits openBillsCents, openBillsCount, and heldBillsCount when includeBills is false (non-owner)", () => {
+    const bills = [
+      { vendorName: "Desert Peak Drywall LLC", balanceCents: 420_000, status: "hold" },
+    ];
+    const { scorecards } = computeSubScorecards(
+      [BASE_SUB],
+      [],
+      bills,
+      new Map(),
+      "2026-10-20",
+      { includeBills: false },
+    );
+    expect(scorecards).toHaveLength(1);
+    expect(scorecards[0].openBillsCents).toBeUndefined();
+    expect(scorecards[0].openBillsCount).toBeUndefined();
+    expect(scorecards[0].heldBillsCount).toBeUndefined();
+  });
+
+  it("loadSubScorecards counts open punches from public.work_items and throws on work_items query error", async () => {
+    listSubsMock.mockResolvedValue([BASE_SUB]);
+    loadPayablesMock.mockResolvedValue({
+      rows: [{ vendorName: "Desert Peak Drywall LLC", balanceCents: 120_000, status: "ready" }],
+      summary: { openCents: 120_000, overdueCents: 0, dueThisWeekCents: 0, holdCount: 0 },
+    });
+
+    let punchError: { message: string } | null = null;
+    fromMock.mockImplementation((table: string) => {
+      if (table === "bid_invites") {
+        return {
+          select: () => ({
+            limit: async () => ({ data: [{ sub_id: "sub-1", status: "awarded" }], error: null }),
+          }),
+        };
+      }
+      if (table === "work_items") {
+        return {
+          select: () => ({
+            eq: (col1: string, val1: string) => ({
+              eq: (col2: string, val2: string) => ({
+                limit: async () => {
+                  expect(col1).toBe("kind");
+                  expect(val1).toBe("punch");
+                  expect(col2).toBe("status");
+                  expect(val2).toBe("open");
+                  if (punchError) return { data: null, error: punchError };
+                  return {
+                    data: [
+                      { title: "Skim drywall seam in foyer", detail: "Desert Peak Drywall LLC", location: "Foyer", assignee: "field_lead", status: "open" },
+                      { title: "Fix framing header", detail: "", location: "Garage", assignee: "field_lead", status: "open" },
+                    ],
+                    error: null,
+                  };
+                },
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table ${table} (must not query non-existent job_punch_items)`);
+    });
+
+    const ownerView = await loadSubScorecards("2026-10-20", { includeBills: true });
+    expect(ownerView.scorecards[0].punchOpenCount).toBe(2);
+    expect(ownerView.scorecards[0].openBillsCents).toBe(120_000);
+
+    const nonOwnerView = await loadSubScorecards("2026-10-20", { includeBills: false });
+    expect(nonOwnerView.scorecards[0].punchOpenCount).toBe(2);
+    expect(nonOwnerView.scorecards[0].openBillsCents).toBeUndefined();
+
+    punchError = { message: "relation work_items error" };
+    await expect(loadSubScorecards("2026-10-20")).rejects.toThrow("work_items: relation work_items error");
   });
 });

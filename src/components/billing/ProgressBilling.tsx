@@ -14,7 +14,16 @@ import { Button } from '@/components/bot/ui'
 import { formatValue } from '@/lib/analytics/format'
 import { computeDraw, shareOf, type PmReport, type ProgressLine } from '@/lib/billing/progress'
 
-type State = { lines: ProgressLine[]; retainagePct: number; openDraft: { id: string; number: string } | null; draws: number; opening: Record<string, number>; report: PmReport | null }
+type State = {
+  lines: ProgressLine[]
+  retainagePct: number
+  openDraft: { id: string; number: string } | null
+  lastIssued: { id: string; number: string } | null
+  draws: number
+  opening: Record<string, number>
+  deposit: { cents: number; appliedCents: number; number: string } | null
+  report: PmReport | null
+}
 
 export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: string; mode?: 'owner' | 'report' }) {
   const reporting = mode === 'report'
@@ -46,7 +55,7 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
   }, [jobKey])
 
   const asked = useMemo(() => Object.fromEntries(Object.entries(pcts).filter(([, v]) => v.trim() !== '').map(([k, v]) => [k, Number(v)])), [pcts])
-  const draw = useMemo(() => (state ? computeDraw(state.lines, openingMode ? {} : asked, state.retainagePct) : null), [state, asked, openingMode])
+  const draw = useMemo(() => (state ? computeDraw(state.lines, openingMode ? {} : asked, state.retainagePct, state.deposit) : null), [state, asked, openingMode])
 
   // What was billed before the app (Joist), so this total and the invoices below reconcile.
   const before = state ? state.lines.reduce((a, l) => a + (state.opening[l.key] ? shareOf(l.scheduledCents, state.opening[l.key]) : 0), 0) : 0
@@ -76,6 +85,28 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
     }
   }
 
+  // The draft draw and the last issued one, acted on from here: issue (it gets its client link;
+  // sending is on Billing), discard (nothing was sent), void (with a reason).
+  const act = async (what: 'issue' | 'discard' | 'void') => {
+    setBusy(what)
+    setError('')
+    let res: Response
+    if (what === 'discard') {
+      res = await fetch(`/api/jobs/${encodeURIComponent(jobKey)}/progress`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'discard' }) })
+    } else if (what === 'issue') {
+      res = await fetch(`/api/billing/documents/${state.openDraft!.id}/issue`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    } else {
+      const reason = window.prompt(`Why void draw ${state.lastIssued!.number}?`)?.trim()
+      if (!reason) return setBusy(null)
+      res = await fetch(`/api/billing/documents/${state.lastIssued!.id}/void`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) })
+    }
+    const json = await res.json().catch(() => null)
+    setBusy(null)
+    if (!res.ok || !json?.ok) return setError(json?.error ?? 'Could not do that.')
+    await load()
+    router.refresh()
+  }
+
   return (
     <section aria-label="Progress billing" className="rounded-2xl border border-[var(--color-stone)] bg-white p-4">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -84,6 +115,7 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
           Billed to date {formatValue('money', draw.lines.reduce((a, l) => a + l.billedToDateCents, 0))} of {formatValue('money', draw.contractCents)}
           {before ? ` (${formatValue('money', before)} of it before the app)` : ''}
           {state.retainagePct ? ` · ${state.retainagePct}% retainage` : ''}
+          {state.deposit ? ` · deposit ${state.deposit.number} ${formatValue('money', state.deposit.cents)}, ${formatValue('money', state.deposit.appliedCents)} credited` : ''}
         </p>
       </div>
       {state.report ? (
@@ -95,13 +127,21 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
       ) : null}
       {sent ? <p className="mb-3 text-sm text-[#1f6a3b]">Sent. The owners will bill from it.</p> : null}
       {state.openDraft && !reporting ? (
-        <p className="mb-3 rounded-lg bg-[rgba(212,175,55,0.16)] px-3 py-2 text-sm text-[#6b5212]">
-          Draw {state.openDraft.number} is still a draft.{' '}
-          <a className="underline" href={`/app/money/${state.openDraft.id}`}>
-            Open it
-          </a>{' '}
-          to send or void before starting another.
-        </p>
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-[rgba(212,175,55,0.16)] px-3 py-2 text-sm text-[#6b5212]">
+          <span>
+            Draw{' '}
+            <a className="underline" href={`/app/money/${state.openDraft.id}`}>
+              {state.openDraft.number}
+            </a>{' '}
+            is a draft, not sent. Issue it to bill it, or discard it to start over.
+          </span>
+          <Button variant="primary" busy={busy === 'issue'} onClick={() => act('issue')}>
+            Issue it
+          </Button>
+          <Button variant="quiet" busy={busy === 'discard'} onClick={() => act('discard')}>
+            Discard draw
+          </Button>
+        </div>
       ) : null}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -153,6 +193,14 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
                   {formatValue('money', draw.grossCents)}
                 </td>
               </tr>
+              {draw.depositCents ? (
+                <tr>
+                  <td colSpan={4}>Less deposit applied</td>
+                  <td className="text-right tabular-nums" data-draw="deposit">
+                    −{formatValue('money', draw.depositCents)}
+                  </td>
+                </tr>
+              ) : null}
               {draw.retainageCents ? (
                 <tr>
                   <td colSpan={4}>Retainage held ({draw.retainagePct}%)</td>
@@ -206,8 +254,13 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
               Make the draft invoice
             </Button>
             {state.draws === 0 ? (
-              <Button variant="quiet" onClick={() => (setOpeningMode(true), setPcts({}))}>
+              <Button variant="quiet" onClick={() => (setOpeningMode(true), setPcts(Object.fromEntries(Object.entries(state.opening).map(([k, v]) => [k, String(v)]))))}>
                 Billed before the app?
+              </Button>
+            ) : null}
+            {state.lastIssued && !state.openDraft ? (
+              <Button variant="quiet" busy={busy === 'void'} onClick={() => act('void')}>
+                Void draw {state.lastIssued.number}
               </Button>
             ) : null}
           </>

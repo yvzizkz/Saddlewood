@@ -320,7 +320,11 @@ export default async function JobPage({ params, searchParams }: { params: Promis
 
   if (tab === "subs") {
     // Sub and vendor bills are Payables: owners only.
-    const [packages, bills, { scorecards }] = await Promise.all([jobPackages(ref), owner ? jobBills(ref) : Promise.resolve([]), loadSubScorecards(today)]);
+    const [packages, bills, { scorecards }] = await Promise.all([
+      jobPackages(ref),
+      owner ? jobBills(ref) : Promise.resolve([]),
+      loadSubScorecards(today, { includeBills: owner }),
+    ]);
     const pk: TableRow[] = packages.map((p) => ({ id: p.id, title: p.title || p.trade, trade: p.trade, status: p.status, due: p.dueAt ? localDay(p.dueAt) : null, href: subsSeat ? `/app/subs/bids/${p.id}` : null }));
     const bl: TableRow[] = bills.map((b) => ({ id: b.id, number: b.billNumber, vendor: b.vendorName, trade: b.tradeLabel, status: b.statusLabel, issued: b.issuedOn, due: b.dueOn, amount: b.amountCents, open: b.balanceCents, href: `/app/accounting/payables/bill/${b.id}` }));
     const jobVendorNames = new Set(bills.map((b) => b.vendorName.toLowerCase()));
@@ -336,7 +340,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       coi: s.coiState === "ok" ? `Valid (${s.coiDaysLeft}d)` : s.coiState === "expiring_30d" ? `Expiring (${s.coiDaysLeft}d)` : s.coiState === "expired" ? "Expired" : "Missing",
       bids: `${s.submittedCount}/${s.invitedCount}`,
       awards: s.awardedCount,
-      openBills: s.openBillsCents,
+      openBills: s.openBillsCents ?? null,
       href: subsSeat ? "/app/subs" : null,
     }));
     return (
@@ -413,18 +417,25 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   if (tab === "schedule") {
     const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
     const allSched = await loadScheduleFeed(refs, today);
-    const jobSched = allSched.filter((i) => i.jobKey === ref.key || (!i.jobKey && i.client && i.client === ref.client));
-    const table: TableRow[] = jobSched.map((i) => ({
-      id: i.id,
-      day: i.startDay,
-      time: i.startTime ? clockText(i.startTime) : "All day",
-      title: i.title,
-      detail: i.detail,
-      kind: i.kindLabel || SCHEDULE_KIND_LABEL[i.kind],
-      who: i.who || seatHolder(i.role, seats, people).name,
-      status: i.status,
-      href: i.href,
-    }));
+    const jobSched = allSched
+      .filter((i) => i.jobKey === ref.key || (!i.jobKey && i.client && i.client === ref.client))
+      .filter((i) => owner || i.source !== "pay");
+    const table: TableRow[] = jobSched.map((i) => {
+      const deadHref =
+        (!subsSeat && i.source === "bid") ||
+        (!owner && Boolean(i.href?.startsWith("/app/schedule")));
+      return {
+        id: i.id,
+        day: i.startDay,
+        time: i.startTime ? clockText(i.startTime) : "All day",
+        title: i.title,
+        detail: i.detail,
+        kind: i.kindLabel || SCHEDULE_KIND_LABEL[i.kind],
+        who: i.who || seatHolder(i.role, seats, people).name,
+        status: i.status,
+        href: deadHref ? null : i.href,
+      };
+    });
     const editableItems = jobSched.filter((i) => i.editable && i.itemId);
     return (
       <JobFrame {...frame} actions={owner ? <Link className="text-sm underline" href={hrefOf("/app/schedule", { job: ref.key })}>Open in Schedule</Link> : undefined}>

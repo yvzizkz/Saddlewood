@@ -156,17 +156,30 @@ test.describe("Field and crew: the field week", () => {
     await card.getByRole("button", { name: "Pass gate" }).click();
     await expect(card.getByRole("button", { name: "Reopen" })).toBeVisible();
 
-    // Add and resolve a room/wall-face punch item
-    const punchTitle = `E2E Skim coat nick ${Date.now()}`;
+    // Add two open room/wall-face punch items on the same job and resolve both (T44)
+    const punchTitle1 = `E2E Skim coat nick ${Date.now()}`;
+    const punchTitle2 = `E2E Corner bead touchup ${Date.now()}`;
     await page.getByRole("button", { name: "+ Punch item" }).click();
-    const punchForm = page.locator("form").filter({ hasText: "Add punch" });
-    await punchForm.getByPlaceholder(/Punch item/i).fill(punchTitle);
-    await punchForm.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — West Wall");
-    await punchForm.getByRole("button", { name: "Add punch" }).click();
+    const punchForm1 = page.locator("form").filter({ hasText: "Add punch" });
+    await punchForm1.getByPlaceholder(/Punch item/i).fill(punchTitle1);
+    await punchForm1.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — West Wall");
+    await punchForm1.getByRole("button", { name: "Add punch" }).click();
 
-    const punchRow = page.locator("li").filter({ hasText: punchTitle });
-    await expect(punchRow).toContainText("Room 104 — West Wall");
-    await punchRow.getByRole("button", { name: "Mark done" }).click();
-    await expect(punchRow.getByRole("button", { name: "Reopen" })).toBeVisible();
+    const punchRow1 = page.locator("li").filter({ hasText: punchTitle1 });
+    await expect(punchRow1).toContainText("Room 104 — West Wall");
+
+    await page.getByRole("button", { name: "+ Punch item" }).click();
+    const punchForm2 = page.locator("form").filter({ hasText: "Add punch" });
+    await punchForm2.getByPlaceholder(/Punch item/i).fill(punchTitle2);
+    await punchForm2.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — East Wall");
+    await punchForm2.getByRole("button", { name: "Add punch" }).click();
+
+    const punchRow2 = page.locator("li").filter({ hasText: punchTitle2 });
+    await expect(punchRow2).toContainText("Room 104 — East Wall");
+
+    await punchRow1.getByRole("button", { name: "Mark done" }).click();
+    await expect(punchRow1.getByRole("button", { name: "Reopen" })).toBeVisible();
+    await punchRow2.getByRole("button", { name: "Mark done" }).click();
+    await expect(punchRow2.getByRole("button", { name: "Reopen" })).toBeVisible();
   });
 });

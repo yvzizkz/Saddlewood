@@ -19,13 +19,19 @@ test("voiding the draw that billed a change order puts it back to bill", async (
     const line = (state.lines as { key: string; description: string }[]).find((l) => l.description.endsWith(title))!;
     const draw = await page.request.post(`/api/jobs/${BELLEVUE}/progress`, { data: { action: "draw", pcts: { [line.key]: 100 } } });
     expect(draw.ok()).toBeTruthy();
-    const { documentId } = await draw.json();
+    const { documentId, number } = await draw.json();
     expect((await page.request.post(`/api/billing/documents/${documentId}/issue`, { data: {} })).ok()).toBeTruthy();
 
     await page.goto(`/app/jobs/${BELLEVUE}?tab=changes`);
     await expect(page.getByRole("listitem").filter({ hasText: title })).toHaveCount(0);
 
-    expect((await page.request.post(`/api/billing/documents/${documentId}/void`, { data: { reason: "e2e: wrong draw" } })).ok()).toBeTruthy();
+    // Void it from the job's progress card, with a reason.
+    await page.goto(`/app/jobs/${BELLEVUE}?tab=money`);
+    const card = page.getByRole("region", { name: "Progress billing" });
+    page.once("dialog", (d) => d.accept("e2e: wrong draw"));
+    await card.getByRole("button", { name: `Void draw ${number}` }).click();
+    await expect(card.getByRole("button", { name: `Void draw ${number}` })).toHaveCount(0);
+    expect(documentId).toBeTruthy();
 
     await page.goto(`/app/jobs/${BELLEVUE}?tab=changes`);
     await expect(page.getByRole("listitem").filter({ hasText: title })).toContainText("Signed, not billed");

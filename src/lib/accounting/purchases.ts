@@ -161,6 +161,8 @@ export type PurchaseTripDetail = {
   store: string;
   orderRef: string;
   rawJobId: string | null;
+  /** The field job the trip is on (for a PM's scope check), or null. */
+  jobId: string | null;
   billingJobId: string | null;
   jobName: string;
   jobNameRaw: string;
@@ -254,6 +256,7 @@ export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<Purchase
     vendor: first.vendor,
     store: first.store,
     orderRef: first.orderRef,
+    jobId: first.rawJobId,
     rawJobId: first.rawJobId,
     billingJobId: first.billingJobId,
     jobName: first.job,

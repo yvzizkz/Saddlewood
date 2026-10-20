@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import AccountingFrame from "@/components/accounting/AccountingFrame";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
-import { loadPayables, type PayableRow } from "@/lib/accounting/payables";
+import { loadPayables } from "@/lib/accounting/payables";
+import { payablesRows, type ApRow, type Measure } from "@/lib/accounting/payablesView";
+import PayablesMissing from "@/components/accounting/PayablesMissing";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
-import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
+import { periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { ComplianceHoldBanner } from "./PayableActions";
 
@@ -16,7 +18,6 @@ export const dynamic = "force-dynamic";
 const PATH = "/app/accounting/payables";
 
 type SP = Record<string, string | string[] | undefined>;
-type Measure = "open" | "billed" | "paid";
 
 export default async function PayablesPage({ searchParams }: { searchParams: Promise<SP> }) {
   if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
@@ -26,11 +27,12 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
   const mParam = one("m");
   const measure: Measure = mParam === "billed" || mParam === "paid" ? mParam : "open";
 
-  const { rows: allRows, fridayCutoff } = await loadPayables();
-  const now = allRows.filter((r) => inRange(r.issuedOn, period.from, period.to));
-  const before = allRows.filter((r) => inRange(r.issuedOn, period.previous.from, period.previous.to));
+  const { rows: allRows, payments, fridayCutoff, missing } = await loadPayables();
+  // Open AP is what is owed now, whenever billed; billed and paid are the period's (paid by the day it went out).
+  const now = payablesRows(allRows, payments, measure, period.from, period.to);
+  const before = measure === "open" ? undefined : payablesRows(allRows, payments, measure, period.previous.from, period.previous.to);
 
-  const spec: DrillSpec<PayableRow> = {
+  const spec: DrillSpec<ApRow> = {
     path: PATH,
     title: "Payables",
     dims: [
@@ -39,26 +41,23 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
       { key: "trade", label: "Trade", plural: "trades", of: (r) => ({ key: r.trade, label: r.tradeLabel }), trades: true },
       { key: "aging", label: "Aging", plural: "aging buckets", of: (r) => ({ key: r.agingBucket, label: r.agingBucket }) },
     ],
-    value:
-      measure === "billed"
-        ? (r) => r.amountCents
-        : measure === "paid"
-          ? (r) => r.paidCents
-          : (r) => r.balanceCents,
-    dayOf: (r) => r.issuedOn,
+    value: (r) => r.value,
+    dayOf: (r) => r.day,
   };
 
-  const d = drill(spec, now, period, sp, { previousRows: before });
+  const d = drill(spec, now, period, sp, before ? { previousRows: before } : undefined);
   if (measure !== "open") {
     for (const o of d.byOptions) o.href = `${o.href}&m=${measure}`;
     for (const s of d.breakdown.slices) if (s.href) s.href = `${s.href}&m=${measure}`;
   }
 
-  const openCents = d.rows.reduce((a, r) => a + r.balanceCents, 0);
-  const billedCents = d.rows.reduce((a, r) => a + r.amountCents, 0);
-  const paidCents = d.rows.reduce((a, r) => a + r.paidCents, 0);
-  const dueFridayCents = d.rows.filter((r) => r.dueByFriday && !r.isOnHold).reduce((a, r) => a + r.balanceCents, 0);
-  const heldBills = d.rows.filter((r) => r.isOnHold && r.balanceCents > 0);
+  // The pay run and the holds are about what is owed now, whichever measure is showing.
+  const unpaid = measure === "open" ? d.rows : allRows.filter((r) => r.balanceCents > 0);
+  const billedCents = payablesRows(allRows, payments, "billed", period.from, period.to).reduce((a, r) => a + r.value, 0);
+  const paidCents = payablesRows(allRows, payments, "paid", period.from, period.to).reduce((a, r) => a + r.value, 0);
+  const headlineCents = d.rows.reduce((a, r) => a + r.value, 0);
+  const dueFridayCents = unpaid.filter((r) => r.dueByFriday && !r.isOnHold).reduce((a, r) => a + r.balanceCents, 0);
+  const heldBills = unpaid.filter((r) => r.isOnHold && r.balanceCents > 0);
   const onHoldCents = heldBills.reduce((a, r) => a + r.balanceCents, 0);
 
   const base = {
@@ -79,7 +78,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
       .join(" · ");
 
     return {
-      id: r.id,
+      id: r.rowId,
       issuedOn: r.issuedOn,
       dueOn: r.dueOn,
       vendor: r.vendorName,
@@ -115,7 +114,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
   const toggleMeasure = (m: Measure) =>
     hrefOf(PATH, { ...d.params, m: m === "open" ? undefined : m });
 
-  const headlineValue = measure === "billed" ? billedCents : measure === "paid" ? paidCents : openCents;
+  const headlineValue = headlineCents;
   const headlineLabel =
     measure === "billed" ? "Bills received" : measure === "paid" ? "Disbursed (Melio / ACH)" : "Open accounts payable";
 
@@ -154,6 +153,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
         </div>
       }
     >
+      {missing ? <PayablesMissing /> : null}
       <KpiHeader
         label={headlineLabel}
         value={headlineValue}
@@ -184,7 +184,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
             label: "Total billed",
             value: billedCents,
             kind: "money",
-            hint: `${d.rows.length} ${d.rows.length === 1 ? "bill" : "bills"}`,
+            hint: `${payablesRows(allRows, payments, "billed", period.from, period.to).length} bills in the period`,
           },
         ]}
         trend={d.trend}

@@ -192,13 +192,14 @@ export type IssuedRow = {
 /** Documents issued in the range (and drafts created in it), for Billing. */
 export async function loadIssued(fromDay: string, toDay: string): Promise<IssuedRow[]> {
   const db = getSupabaseAdmin();
+  const fromIso = `${fromDay}T00:00:00-07:00`;
   const [docs, clients, jobs] = await Promise.all([
     db
       .from("documents")
       .select("id,number,title,kind,status,client_id,job_id,issued_at,created_at,due_date,total_cents")
       .in("kind", ["invoice", "change_order", "statement"])
       .neq("status", "void")
-      .gte("created_at", `${fromDay}T00:00:00-07:00`)
+      .or(`issued_at.gte.${fromIso},and(issued_at.is.null,created_at.gte.${fromIso})`)
       .order("created_at", { ascending: false }),
     db.from("clients").select("id,name"),
     jobNames(),
