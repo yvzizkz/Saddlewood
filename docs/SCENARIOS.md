@@ -21,7 +21,7 @@ Each scenario drives the screens a person in that seat would use, writes through
 | 5 | **Purchasing:** Home Depot run split across jobs, an unmatched register name assigned, a line re-tagged to a trade, export of selected lines | Finance / PM | `e2e/purchasing-week.spec.ts` | **done (4/4)** · agy |
 | 6 | **Subs:** package → invites → leveling → award under $10k by the PM → work order → no-COI block → bill → waiver hold → payment | PM / Finance | `e2e/subs-week.spec.ts` | **done (4/4)** · agy |
 | 7 | **Sales admin:** lead with source → estimate → no follow-up in 5 days escalates → proposal → award builds the job | Sales (Marco covering) | `e2e/sales-week.spec.ts` | **done (2/2)** · agy |
-| 8 | **Powell progress payments:** percent complete on the SOV, a minor extra, invoice, check, roll-forward | Finance | `e2e/powell-draw.spec.ts` | **done (2/2)** · agy |
+| 8 | **Powell progress payments:** percent complete on the SOV, a minor extra, invoice, check, roll-forward | Finance | `e2e/powell-draw.spec.ts`, `e2e/draw-void.spec.ts` | **done (3/3)** · agy, claude |
 
 ## 1. Finance: the AFT billing week (Ilene)
 
@@ -106,10 +106,12 @@ Each scenario drives the screens a person in that seat would use, writes through
 2. **Signed minor extra (Change Order) + client retainage.**
    - Creating, pricing (`$2,500`), and signing a change order on `9146 W Hutton Dr` (`10%` retainage) adds the signed CO to the `Progress billing` schedule.
    - Billing the CO to `100%` previews `$2,500` gross, `−$250` retainage held (`10%`), and `$2,250` due, creates the draft invoice, and automatically marks the CO `billed`.
+3. **Voiding a draw that billed a change order** (`e2e/draw-void.spec.ts`).
+   - Voiding the issued draw puts the CO back to `Signed, not billed` on Changes and back on the schedule at `0%`, ready to bill again. Before the fix it stayed `billed` against a void invoice and dropped off both lists, so its money was never billed.
 
 ## What an owner, a PM and finance can and can't do today
 
-From the runs on 2026-10-20: `npx playwright test` passes **33/33**, twice in a row (Finance 6, Owner 5, PM access 5, Field 5, Purchasing 4, Subs 4, Sales 2, Powell SOV draws 2).
+From the runs on 2026-10-20: `npx playwright test` passes **34/34**, twice in a row (Finance 6, Owner 5, PM access 5, Field 5, Purchasing 4, Subs 4, Sales 2, Powell SOV draws 3).
 
 ### Real bugs caught and fixed by the Phase 3 scenario suite
 1. **Trip detail route 404 (`src/lib/accounting/purchases.ts`):** `loadPurchaseTrip` ran `computeTripKey(decoded)` on an already-computed `tripKey`, stripping the last `:segment` and returning 404 on `/app/accounting/purchases/trip/[key]` links. Fixed to match `trip_key.eq.${decoded}` alongside `tk` and `source_key`.

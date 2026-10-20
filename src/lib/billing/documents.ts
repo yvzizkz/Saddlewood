@@ -371,6 +371,14 @@ export async function voidDocument(id: string, reason: string, now: Date = new D
     .maybeSingle();
   if (error) fail("void document", error.message);
   if (!data) throw new DocumentError("only an issued document can be voided", 409);
+  // A change order this invoice billed (a draw that took it to 100%, or its own
+  // invoice) is owed again: back to signed, so it shows to bill on Changes and the schedule.
+  const { error: coError } = await db
+    .from("change_orders")
+    .update({ status: "signed", billed_document_id: null })
+    .eq("billed_document_id", id)
+    .eq("status", "billed");
+  if (coError) fail("reopen change orders", coError.message);
   return toDocument(data as DocumentRow);
 }
 
