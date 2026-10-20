@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Camera, ClipboardCheck, MapPin, MessageSquare, Package, Receipt, type LucideIcon } from 'lucide-react'
 
 import { Button, Card, Chip, Empty, INPUT, ScreenTitle, SectionTitle } from '@/components/bot/ui'
+import { eodDone } from '@/lib/crew/eod'
 import { addDays, clock12, clockText, dayLabel, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
 import { firstNameOf, isReportedDone, parseAmount, type CrewEntry, type CrewPickup, type CrewQuestion, type CrewScheduleItem, type CrewTask } from '@/lib/crew/types'
 import { useCrew } from './CrewProvider'
@@ -58,7 +59,8 @@ export function entryLine(e: CrewEntry, t: CrewStrings, lang: 'en' | 'es' = 'en'
   if (e.kind === 'progress') {
     return { title: e.body || t.kindProgress, detail: [e.jobName, e.files.length ? t.photos(e.files.length) : ''].filter(Boolean).join(' · ') }
   }
-  if (e.kind === 'eod') return { title: t.eodFiled, detail: [e.jobName, e.body].filter(Boolean).join(' · ') }
+  // Said instead of typed: once the Mac has listened, what it heard stands in for the typed "done".
+  if (e.kind === 'eod') return { title: t.eodFiled, detail: [e.jobName, eodDone(e)].filter(Boolean).join(' · ') }
   if (e.kind === 'timefix') {
     return {
       title: `${t.kindTimefix} · ${dayShort(e.day, lang)}`,

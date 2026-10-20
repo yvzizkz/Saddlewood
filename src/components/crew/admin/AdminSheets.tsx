@@ -6,6 +6,7 @@ import { Copy, Mail, Share2 } from 'lucide-react'
 import { Button, Chip, Field, INPUT, Segmented } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { ago } from '@/lib/bot/view'
+import { eodDone, eodField } from '@/lib/crew/eod'
 import { isFar, milesText } from '@/lib/crew/geo'
 import { priorityLabel, taskStatusWord } from '@/lib/crew/plan'
 import { addDays, clock12, clockText, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
@@ -1123,8 +1124,12 @@ export function EntryCard({ entry, onFix }: { entry: CrewEntry; onFix?: () => vo
   const amount = read ?? typed
   const vendor = (typeof entry.bot.vendor === 'string' && entry.bot.vendor) || text('vendor')
   const botNote = typeof entry.bot.note === 'string' ? entry.bot.note : ''
-  const alarm = entry.kind === 'eod' && (text('safety') || text('asked'))
-  // An end of day said instead of typed: the Mac writes the transcript into `bot` once it has listened.
+  // An end of day said instead of typed: the Mac writes the transcript into `bot`
+  // once it has listened, and what it heard for done, stuck, needs and asked into
+  // `bot.fields`; those fill whatever was not typed (src/lib/crew/eod.ts).
+  const eod = (k: string) => (entry.kind === 'eod' ? eodField(entry, k) : text(k))
+  const body = entry.kind === 'eod' ? eodDone(entry) : entry.body
+  const alarm = entry.kind === 'eod' && (eod('safety') || eod('asked'))
   const memo = entry.kind === 'eod' && entry.files.some((f) => f.type.startsWith('audio/'))
   const transcript = typeof entry.bot.transcript === 'string' ? entry.bot.transcript : ''
 
@@ -1160,16 +1165,16 @@ export function EntryCard({ entry, onFix }: { entry: CrewEntry; onFix?: () => vo
         </p>
       ) : null}
 
-      {entry.body ? <p className="mt-1.5 whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-charcoal)]">{entry.body}</p> : null}
+      {body ? <p className="mt-1.5 whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-charcoal)]">{body}</p> : null}
 
       {entry.kind === 'eod' ? (
         <dl className="mt-2 space-y-1.5">
-          {EOD_FIELDS.filter(([k]) => text(k)).map(([k, label]) => (
+          {EOD_FIELDS.filter(([k]) => eod(k)).map(([k, label]) => (
             <div key={k} className="text-[14px] leading-relaxed">
               <dt className="inline font-medium" style={{ color: k === 'safety' || k === 'asked' ? '#9a2a1f' : 'var(--color-charcoal)' }}>
                 {label}:{' '}
               </dt>
-              <dd className="inline whitespace-pre-wrap text-[var(--color-charcoal)]">{text(k)}</dd>
+              <dd className="inline whitespace-pre-wrap text-[var(--color-charcoal)]">{eod(k)}</dd>
             </div>
           ))}
         </dl>
