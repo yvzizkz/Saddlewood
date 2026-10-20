@@ -1234,7 +1234,10 @@ function Screen() {
       <Segmented label="Crew views" value={view} onChange={setView} options={options} />
       <div className="mt-5">
         {view === 'today' ? <TodayView data={data} show={show} /> : null}
-        {view === 'projects' && can('projects.view') ? <ProjectsView /> : null}
+        {view === 'projects' && can('projects.view') ? (
+          // Keyed on the job count so a job added from here shows up once the sheet saves it.
+          <ProjectsView key={data.jobs.length} onAddJob={isOwner ? () => show({ kind: 'job', job: null }) : undefined} />
+        ) : null}
         {view === 'schedule' ? <ScheduleView data={data} show={show} /> : null}
         {view === 'runner' ? <RunnerView data={data} show={show} /> : null}
         {view === 'plan' ? (

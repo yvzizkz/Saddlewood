@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
 
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, Dot, Empty, SectionTitle, type Tone } from '@/components/bot/ui'
@@ -104,7 +105,8 @@ function Project({ p, money, day, can, onChange }: { p: ProjectCard; money: bool
   )
 }
 
-export default function ProjectsView() {
+/** `onAddJob`: the owner's "+ Job" here too (the Crew screen passes it), so a job is added where jobs are seen. */
+export default function ProjectsView({ onAddJob }: { onAddJob?: () => void } = {}) {
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -136,6 +138,13 @@ export default function ProjectsView() {
   }
   return (
     <div className="space-y-3">
+      {onAddJob ? (
+        <div className="flex justify-end">
+          <Button className="min-h-9 px-3 text-[13px]" onClick={onAddJob}>
+            <Plus className="size-4" aria-hidden="true" /> Job
+          </Button>
+        </div>
+      ) : null}
       {data.narrowed ? <p className="text-[13px] text-[var(--color-charcoal-light)]">The jobs you are on.</p> : null}
       {data.projects.length ? (
         data.projects.map((p) => <Project key={p.id} p={p} money={data.money} day={data.day} can={data.can} onChange={load} />)
