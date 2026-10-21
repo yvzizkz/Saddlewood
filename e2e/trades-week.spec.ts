@@ -37,6 +37,20 @@ test.describe("Our own trades: GC, electrical, plumbing and HVAC", () => {
     expect(bad.plan.crew.template).toBe("gc");
     expect((await page.request.post(`/api/sales/${opp.id}/award`, { data: { template: "roofing" } })).status()).toBe(400);
 
+    // The sheet: whole job picked, then the owner picks the job's trades instead.
+    await page.goto(`/app/sales/${opp.id}`);
+    await page.getByRole("button", { name: /Award the job/ }).first().click();
+    const pick = page.getByRole("group", { name: "Phases to start from" });
+    await expect(pick.getByRole("button", { name: "Whole job (GC)" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText("16, the whole job")).toBeVisible();
+    await pick.getByRole("button", { name: "Electrical" }).click();
+    await pick.getByRole("button", { name: "Plumbing" }).click();
+    await expect(pick.getByRole("button", { name: "Whole job (GC)" })).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByText("14, plumbing and electrical")).toBeVisible();
+    await pick.getByRole("button", { name: "Whole job (GC)" }).click();
+    await expect(page.getByText("16, the whole job")).toBeVisible();
+    await page.keyboard.press("Escape");
+
     const awardRes = await page.request.post(`/api/sales/${opp.id}/award`, { data: { jobName, prefix: `T${uid.slice(-5)}`, deposit: false } });
     expect(awardRes.ok()).toBeTruthy();
     const awarded = await awardRes.json();
@@ -47,7 +61,7 @@ test.describe("Our own trades: GC, electrical, plumbing and HVAC", () => {
       expect(job, "the awarded job is on Projects").toBeTruthy();
       const names = (job.phases as { name: string; trade: string }[]).map((p) => p.name);
       expect(names[0]).toBe("demo");
-      expect(names).toEqual(expect.arrayContaining(["footing and foundation", "plumbing top-out", "electrical rough", "HVAC rough and duct", "MEP rough inspections", "final inspection"]));
+      expect(names).toEqual(expect.arrayContaining(["footing and foundation", "plumbing top-out", "electrical rough", "HVAC rough and duct", "4-way rough inspection", "final inspection"]));
       expect((job.phases as { trade: string }[]).map((p) => p.trade)).toEqual(expect.arrayContaining(["plumbing", "electrical", "hvac"]));
     } finally {
       const detail = await (await page.request.get(`/api/sales/${opp.id}`)).json();
@@ -121,6 +135,12 @@ test.describe("Our own trades: GC, electrical, plumbing and HVAC", () => {
     await page.getByRole("button", { name: /Field receipt/ }).click();
     const tradeSelect = page.getByLabel("Receipt trade");
     for (const t of ["Plumbing", "Electrical", "HVAC", "Framing", "Drywall"]) await expect(tradeSelect.locator("option", { hasText: t }).first()).toBeAttached();
+
+    await page.goto("/app/accounting/purchases");
+    const chips = page.getByRole("group", { name: "Trade" });
+    await expect(chips.getByRole("button", { name: "HVAC" })).toBeVisible();
+    await expect(chips.getByRole("button", { name: "Electrical" })).toBeVisible();
+    await expect(chips.getByRole("button", { name: "Plumbing" })).toBeVisible();
 
     const search = await page.request.get("/api/crew/purchases/search?q=filter&trade=hvac");
     expect(search.status()).toBe(200);

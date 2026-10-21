@@ -95,19 +95,21 @@ export const PHASE_TEMPLATES = Object.fromEntries(TEMPLATE_TRADES.map((t) => [t,
 /**
  * The whole job, when we hold the paper (remodel, addition, custom home):
  * one phase per stage of the build, each under the trade that carries it.
+ * The 4-way rough (framing, plumbing top-out and gas, electrical, mechanical)
+ * is the pre-cover gate: nothing is insulated or boarded before it passes.
  */
 export const GC_TEMPLATE: readonly { name: string; trade: string }[] = [
   { name: "demo", trade: "demo" },
   { name: "plumbing underground", trade: "plumbing" },
   { name: "footing and foundation", trade: "concrete" },
   { name: "footing and underground inspection", trade: "concrete" },
-  { name: "framing", trade: "framing" },
+  { name: "framing and dry-in", trade: "framing" },
   { name: "plumbing top-out", trade: "plumbing" },
   { name: "electrical rough", trade: "electrical" },
   { name: "HVAC rough and duct", trade: "hvac" },
-  { name: "MEP rough inspections", trade: "general" },
-  { name: "framing inspection", trade: "framing" },
+  { name: "4-way rough inspection", trade: "general" },
   { name: "insulation and inspection", trade: "insulation" },
+  { name: "lath inspection and stucco", trade: "general" },
   { name: "drywall", trade: "drywall" },
   { name: "finishes", trade: "general" },
   { name: "MEP trim and startup", trade: "general" },

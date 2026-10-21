@@ -128,6 +128,7 @@ const MEP_ITEMS: Partial<Record<ChecklistStage, [key: string, label: string][]>>
     ["stubouts", "Supply and drain stub-outs at the fixture schedule's heights and centers"],
     ["supply_test", "Water supply rough under pressure test, no drop on the gauge"],
     ["nail_plates", "Nail plates wherever pipe is within 1-1/4 in. of the stud face"],
+    ["shower_pan", "Shower pans and liners flood-tested (2 in. of standing water) before cover"],
   ],
   plumbing_precover: [
     ["topout_signoff", "Top-out inspection signed off by the city or county"],
@@ -143,6 +144,7 @@ const MEP_ITEMS: Partial<Record<ChecklistStage, [key: string, label: string][]>>
     ["final_signoff", "Plumbing final inspection passed"],
   ],
   electrical_rough: [
+    ["ufer", "Ufer (concrete-encased electrode) inspected in the footing before the pour, on new foundations"],
     ["boxes_set", "Boxes set at plan heights and locations, flush with the finish surface"],
     ["wire_secured", "Cable stapled within 12 in. of every box and every 4-1/2 ft, nail plates where needed"],
     ["circuits_plan", "AFCI and GFCI circuits, dedicated appliance circuits and smoke/CO locations per plan"],

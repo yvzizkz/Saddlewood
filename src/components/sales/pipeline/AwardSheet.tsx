@@ -6,6 +6,7 @@ import { Briefcase } from 'lucide-react'
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, Chip, Field, INPUT } from '@/components/bot/ui'
 import { PhasePick } from '@/components/crew/PhasePick'
+import { pickLabel, templatePhases } from '@/lib/crew/phases'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import type { AwardChoices, AwardPlan } from '@/lib/sales/award'
 import { usd } from '../format'
@@ -190,6 +191,7 @@ export function AwardSheet({ opportunityId, open, onClose, onDone, toast }: { op
               <Row label="Client" value={plan.client.name} tag={p.existing.clientId ? 'on file' : 'new'} />
               <Row label="Billing job" value={plan.job.name} tag={p.existing.jobId ? 'on file' : 'new'} />
               <Row label="Field job" value={plan.crew.name} tag={p.existing.crewJobId ? 'on the list' : 'new'} />
+              <Row label="Phases" value={plan.crew.template === 'none' ? 'None' : `${templatePhases(plan.crew.template).length}, ${pickLabel(plan.crew.template)}`} />
               <Row label="Contract" value={usd(plan.job.contractCents)} />
               <div className="my-1 border-t border-[var(--color-stone)] pt-1">
                 <p className="pt-1 text-xs font-medium text-[var(--color-charcoal)]">Schedule of values</p>

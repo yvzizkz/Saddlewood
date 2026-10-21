@@ -80,13 +80,13 @@ describe("picking the job's trades", () => {
 });
 
 describe("the whole-job GC template", () => {
-  it("runs demo, foundation, framing, MEP rough and inspections, insulation, drywall, finishes, final", () => {
+  it("runs demo, foundation, framing, MEP rough and the 4-way inspection, insulation, lath, drywall, finishes, final", () => {
     const list = names("gc");
     expect(list).toEqual(GC_TEMPLATE.map((p) => p.name));
-    const order = ["demo", "footing and foundation", "framing", "MEP rough inspections", "insulation and inspection", "drywall", "finishes", "final inspection"];
+    const order = ["demo", "footing and foundation", "framing and dry-in", "4-way rough inspection", "insulation and inspection", "lath inspection and stucco", "drywall", "finishes", "final inspection"];
     expect(order.map((n) => list.indexOf(n))).toEqual([...order.map((n) => list.indexOf(n))].sort((a, b) => a - b));
     expect(order.every((n) => list.includes(n))).toBe(true);
-    for (const rough of ["plumbing top-out", "electrical rough", "HVAC rough and duct"]) expect(list.indexOf(rough)).toBeLessThan(list.indexOf("MEP rough inspections"));
+    for (const rough of ["plumbing top-out", "electrical rough", "HVAC rough and duct"]) expect(list.indexOf(rough)).toBeLessThan(list.indexOf("4-way rough inspection"));
     expect(list[list.length - 1]).toBe("final inspection");
   });
 
