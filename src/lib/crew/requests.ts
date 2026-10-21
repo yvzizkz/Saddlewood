@@ -4,7 +4,7 @@ import { readState } from "@/lib/bot/queries";
 import { MSG } from "./messages";
 import { notifyCrew } from "./notify";
 import { getEntry, getJob, getPerson, insertPickup, listJobPeople, listPeople, type CrewPersonRow } from "./queries";
-import { getRequest, getRequestByPickup, insertRequest, patchRequest } from "./requestQueries";
+import { getRequest, insertRequest, patchRequest, syncRequestToPickup } from "./requestQueries";
 import { decideRule, dollars, ownersFirst, pmsOnJob, requestDetail, requestTitle } from "./requestRules";
 import { isSettingKey, parseSettingValue, readSettings, writeSetting, type AppSettings } from "./settings";
 import { addDays, localDay } from "./time";
@@ -255,18 +255,16 @@ export async function runRequestAct(owner: Actor, act: RequestAct, nowDate = new
   }
 }
 
-// ---- the pickup mirrors back ---------------------------------------------------------
+// ---- the pickup carries back ---------------------------------------------------------
 
-const MIRROR: Partial<Record<CrewPickupStatus, CrewRequest["status"]>> = { staged: "ordered", picked: "picked", delivered: "delivered" };
-
-/** A pickup made from a request carries its status back: picked, delivered, or staged again. Never fails the pickup. */
+/**
+ * A pickup made from a request carries its status back: staged again,
+ * picked, delivered, or cancelled. Reads work it out from the pickup anyway
+ * (requestFromPickup); this keeps the stored column the same. Never fails the pickup.
+ */
 export async function mirrorPickupToRequest(pickupId: number, status: CrewPickupStatus): Promise<void> {
-  const next = MIRROR[status];
-  if (!next) return;
   try {
-    const r = await getRequestByPickup(pickupId);
-    if (!r || !["ordered", "picked", "delivered"].includes(r.status) || r.status === next) return;
-    await patchRequest(r.id, { status: next }, { statusIn: ["ordered", "picked", "delivered"] });
+    await syncRequestToPickup(pickupId, status);
   } catch (e) {
     console.error("[crew/requests] mirror:", (e as Error).message);
   }
