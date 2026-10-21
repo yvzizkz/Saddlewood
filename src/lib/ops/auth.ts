@@ -1,8 +1,8 @@
-import { timingSafeEqual } from "crypto";
 import type { NextRequest } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { isAllowedEmail, normalizeEmail } from "./allowlist";
+import { agentTokenMatches } from "./token";
 
 // Two ways in, one answer: who is acting.
 //
@@ -10,22 +10,11 @@ import { isAllowedEmail, normalizeEmail } from "./allowlist";
 //    allowlist. This is Marco, Ilene, Lando, or the shared mailboxes.
 // 2. An agent: `Authorization: Bearer <OPS_AGENT_TOKEN>` from the bot or a
 //    Claude session, with an optional `X-Ops-Actor` header naming which one.
-//    Same constant-time compare as /api/estimates/ingest.
+//    Constant-time compare (./token.ts), the same one the proxy uses.
 //
 // Anything else is null and the route answers 401.
 
 export type OpsActor = { actor: string; via: "session" | "token" };
-
-function tokenMatches(request: NextRequest): boolean {
-  const header = request.headers.get("authorization");
-  if (!header || !header.startsWith("Bearer ")) return false;
-  const secret = process.env.OPS_AGENT_TOKEN;
-  if (!secret || secret.length < 16) return false;
-  const a = Buffer.from(header.slice(7).trim(), "utf8");
-  const b = Buffer.from(secret, "utf8");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
 
 function cleanActor(raw: string | null): string {
   const v = (raw ?? "").trim().replace(/[^A-Za-z0-9._@ -]/g, "").slice(0, 64);
@@ -33,7 +22,7 @@ function cleanActor(raw: string | null): string {
 }
 
 export async function authorizeOps(request: NextRequest): Promise<OpsActor | null> {
-  if (tokenMatches(request)) {
+  if (agentTokenMatches(request.headers.get("authorization"))) {
     return { actor: cleanActor(request.headers.get("x-ops-actor")), via: "token" };
   }
   try {
