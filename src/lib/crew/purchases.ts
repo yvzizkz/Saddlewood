@@ -76,6 +76,8 @@ export function normalizeJobName(raw: string): string {
  * the trip, never the transaction alone. A key with no colon is its own trip.
  */
 export function tripKey(sourceKey: string): string {
+  // A receipt filed in the app is one line keyed app:<entry id>: its own trip (0044).
+  if (/^app:\d+$/.test(sourceKey)) return sourceKey;
   const i = sourceKey.lastIndexOf(":");
   return i > 0 ? sourceKey.slice(0, i) : sourceKey;
 }

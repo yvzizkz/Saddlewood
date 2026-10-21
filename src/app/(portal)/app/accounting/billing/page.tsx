@@ -9,7 +9,9 @@ import { drill, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import { loadBillingCalendar, loadIssued, type IssuedRow } from "@/lib/accounting/receivables";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesBillingJob } from "@/lib/accounting/access";
+import { CO_LABEL, loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
+import { jobHref, listJobRefs } from "@/lib/jobs/hub";
 import { localDay } from "@/lib/crew/time";
 
 export const dynamic = "force-dynamic";
@@ -24,13 +26,47 @@ type SP = Record<string, string | string[] | undefined>;
 const KIND: Record<string, string> = { invoice: "Invoice", change_order: "Change order", statement: "Statement" };
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("billing");
+  if (!seat) redirect("/app");
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
   const today = localDay();
 
-  const [rows, calendar] = await Promise.all([loadIssued(period.previous.from, period.to), loadBillingCalendar(today)]);
+  const allRefs = await listJobRefs();
+  // A PM's seat sees its own jobs; everything below is narrowed to them.
+  const refs = allRefs.filter((r) => seesBillingJob(seat, r.billingId));
+  const keys = new Set(refs.map((r) => r.key));
+  const clientsInView = new Set(refs.map((r) => r.clientId).filter(Boolean));
+  const [allRows, allCalendar, allRegister, allWaivers] = await Promise.all([loadIssued(period.previous.from, period.to), loadBillingCalendar(today), loadChangeOrders(allRefs, today), loadWaivers(allRefs)]);
+  const rows = allRows.filter((r) => seesBillingJob(seat, r.jobId));
+  const calendar = seat.owner ? allCalendar : allCalendar.filter((c) => clientsInView.has(c.clientId));
+  const register = allRegister.filter((c) => seat.owner || (c.jobKey !== null && keys.has(c.jobKey)));
+  const waivers = allWaivers.filter((w) => seat.owner || (w.direction === "out" && w.jobKey !== null && keys.has(w.jobKey)));
+  const coRows: TableRow[] = register.map((c) => ({
+    id: c.id,
+    number: c.number,
+    title: c.title,
+    href: seat.owner && c.jobKey ? jobHref(c.jobKey, "changes") : c.documentId ? `/app/money/${c.documentId}` : null,
+    job: c.job,
+    status: CO_LABEL[c.status],
+    requested: c.requestedOn,
+    age: c.ageDays,
+    amount: c.amountCents,
+  }));
+  const waiverRows: TableRow[] = waivers.map((w) => ({
+    id: w.id,
+    covers: w.covers,
+    href: w.coversHref,
+    dir: w.direction === "out" ? "We give (with invoice)" : "We get (from sub)",
+    party: w.party,
+    job: w.job,
+    kind: w.kind.replace(/_/g, " "),
+    status: w.statusLabel,
+    amount: w.amountCents,
+  }));
+  const awaitingPrice = register.filter((c) => c.status === "requested").length;
+  const missingWaivers = waivers.filter((w) => w.status === "missing").length;
   const spec: DrillSpec<IssuedRow> = {
     path: PATH,
     title: "Billing",
@@ -53,7 +89,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     id: r.id,
     number: r.number,
     title: r.title,
-    href: r.status === "draft" ? "/app/bill" : `/app/money/${r.id}`,
+    href: r.status === "draft" ? (seat.owner ? "/app/bill" : null) : `/app/money/${r.id}`,
     kind: KIND[r.kind] ?? r.kind,
     status: r.status === "draft" ? "Draft" : "Issued",
     client: r.client,
@@ -75,15 +111,18 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
   return (
     <AccountingFrame
+      sections={seat.sections}
       title="Billing"
       intro="What went out in the period, and the next billing date for every client with an open job."
       period={period}
       crumbs={[{ label: "Accounting", href: "/app/accounting" }, ...d.crumbs]}
       filters={d.filters}
       actions={
-        <Link href="/app/bill" className="inline-flex min-h-10 items-center rounded-xl bg-[var(--color-teal)] px-4 text-sm font-medium text-white">
-          Bill
-        </Link>
+        seat.owner ? (
+          <Link href="/app/bill" className="inline-flex min-h-10 items-center rounded-xl bg-[var(--color-teal)] px-4 text-sm font-medium text-white">
+            Bill
+          </Link>
+        ) : undefined
       }
     >
       <KpiHeader
@@ -96,7 +135,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         stats={[
           { label: "Issued", value: issued.length, kind: "count" },
           { label: "Change orders", value: cos.reduce((a, r) => a + r.totalCents, 0), kind: "money", hint: `${cos.length} issued` },
-          { label: "Drafts waiting", value: drafts.length, kind: "count", hint: drafts.length ? formatValue("money", drafts.reduce((a, r) => a + r.totalCents, 0)) : undefined, href: drafts.length ? "/app/bill" : undefined },
+          { label: "Drafts waiting", value: drafts.length, kind: "count", hint: drafts.length ? formatValue("money", drafts.reduce((a, r) => a + r.totalCents, 0)) : undefined, href: seat.owner && drafts.length ? "/app/bill" : undefined },
         ]}
         trend={d.trend}
         trendLabel="Billed"
@@ -140,6 +179,53 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </section>
 
       <DataTable rows={tableRows} columns={columns} searchKeys={["number", "title", "client", "job", "kind"]} name={`billing-${period.key}`} rowHrefKey="href" initialSort={{ key: "day", dir: "desc" }} empty="Nothing billed in this period." />
+
+      <section id="changes" aria-label="Change orders" className="space-y-2 pt-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Change orders, every job</p>
+          {awaitingPrice ? <p className="text-xs font-medium text-[#9a2a1f]">{awaitingPrice} awaiting a price</p> : null}
+        </div>
+        <DataTable
+          rows={coRows}
+          columns={[
+            { key: "number", header: "CO", kind: "text", hrefKey: "href", subKey: "title", phone: "title" },
+            { key: "job", header: "Job", kind: "text", filter: true },
+            { key: "status", header: "Where it is", kind: "text", filter: true },
+            { key: "requested", header: "Asked", kind: "date", phone: "hide" },
+            { key: "age", header: "Days open", kind: "count" },
+            { key: "amount", header: "Amount", kind: "money", total: true, phone: "value" },
+          ]}
+          searchKeys={["number", "title", "job", "status"]}
+          name="change-orders"
+          rowHrefKey="href"
+          initialSort={{ key: "age", dir: "desc" }}
+          empty="No change orders yet. Record one from the job's Changes tab."
+        />
+      </section>
+
+      <section id="waivers" aria-label="Lien waivers" className="space-y-2 pt-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Lien waivers, both ways</p>
+          {missingWaivers ? <p className="text-xs font-medium text-[#9a2a1f]">{missingWaivers} missing</p> : null}
+        </div>
+        <DataTable
+          rows={waiverRows}
+          columns={[
+            { key: "covers", header: "For", kind: "text", hrefKey: "href", phone: "title" },
+            { key: "dir", header: "Direction", kind: "text", filter: true },
+            { key: "party", header: "With", kind: "text", filter: true },
+            { key: "job", header: "Job", kind: "text", filter: true, phone: "hide" },
+            { key: "kind", header: "Kind", kind: "text", filter: true, phone: "hide" },
+            { key: "status", header: "Status", kind: "text", filter: true, phone: "value" },
+            { key: "amount", header: "Amount", kind: "money", total: true, phone: "hide" },
+          ]}
+          searchKeys={["covers", "party", "job", "status"]}
+          name="lien-waivers"
+          rowHrefKey="href"
+          initialSort={{ key: "status", dir: "asc" }}
+          empty="No waivers are owed: no client asks for one and no sub bill is open."
+        />
+      </section>
     </AccountingFrame>
   );
 }

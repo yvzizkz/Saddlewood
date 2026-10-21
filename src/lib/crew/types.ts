@@ -548,6 +548,7 @@ export const crewActSchema = z.discriminatedUnion("kind", [
     vendor: text(80),
     /** company: the company's card or account. me: out of the person's own pocket, so they are owed it. */
     paidBy: z.enum(["company", "me"]).default("company"),
+    trade: text(40),
     note: text(600),
     files: z.array(fileRefSchema).min(1, "a receipt needs a photo").max(MAX_ENTRY_FILES),
     clientId,
@@ -568,6 +569,10 @@ export const crewActSchema = z.discriminatedUnion("kind", [
     visits: text(1500),
     safety: text(1500),
     decision: text(1500),
+    weather: text(120),
+    crewCount: z.number().int().min(0).max(100).nullable().default(null),
+    tradesOnSite: text(200),
+    inspections: text(1500),
     files,
     /** How long the voice memo runs, when there is one. */
     memoSeconds: z.number().int().min(1).max(MEMO_MAX_SECONDS).optional(),

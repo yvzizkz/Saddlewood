@@ -1,5 +1,6 @@
 import { generateSignInLink, LINK_HOURS, sendEmail } from "@/lib/auth/magicLink";
 import { buildSignInEmail } from "@/lib/auth/signInEmail";
+import { unpassedChecklistsForPhase } from "@/lib/field/ops";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { ActResult } from "./act";
@@ -558,6 +559,11 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       const phase = await getJobPhase(act.id);
       if (!phase) return bad(404, "That phase is gone.");
       if (phase.verifiedAt) return bad(409, `${phase.verifiedBy || "Someone"} already verified it.`);
+      const openGates = await unpassedChecklistsForPhase(phase.id);
+      if (openGates.length) {
+        const names = openGates.map((g) => `${g.stageLabel}${g.locationLabel ? ` (${g.locationLabel})` : ""}`).join(", ");
+        return bad(409, `Pre-cover quality gate still open on ${phase.name}: ${names}. Pass the checklist first (SOP-009).`);
+      }
       const line = `Verified by ${firstNameOf(owner.name)} (${dayShort(today)})${act.note.trim() ? `: ${act.note.trim()}` : ""}`;
       const saved = await patchJobPhase(
         phase.id,

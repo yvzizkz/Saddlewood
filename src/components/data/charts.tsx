@@ -41,7 +41,7 @@ export function TrendChart({ points, kind, height = 168, label }: { points: Char
   const [hover, setHover] = useState<number | null>(null)
   const n = points.length
   const max = Math.max(0, ...points.map((p) => p.value))
-  const ticks = niceTicks(max)
+  const ticks = niceTicks(max, 4, { integer: kind === 'count' })
   const top = ticks[ticks.length - 1] || 1
   const padL = 44
   const padR = 8

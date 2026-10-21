@@ -9,7 +9,7 @@ import {
   type BotSections,
   type BridgeSeen,
 } from "./types";
-import { laneNames, lanesOf } from "@/lib/owner/lanes";
+import { laneNames, lanesOf, type LaneSeats } from "@/lib/owner/lanes";
 import type { WaitingItem } from "@/lib/owner/waiting";
 
 // Who sees what. The Mac decides who may DO something; this decides who may
@@ -50,6 +50,8 @@ export function buildHome(input: {
   crew?: BotHome["crew"];
   waiting?: WaitingItem[];
   settings?: BotHome["settings"];
+  /** Who holds each lane (role seats, 0032); the decided defaults without it. */
+  laneSeats?: LaneSeats;
   now?: Date;
 }): BotHome {
   const now = input.now ?? new Date();
@@ -103,7 +105,7 @@ export function buildHome(input: {
       health.problems.requests =
         "Requests sent from the app are not being picked up. Taps still work. Fix: on the Mac, check that the launchd job com.saddlewood.bot-app-agent is loaded.";
     }
-    const lanes = { mine: lanesOf(input.email, people), holders: laneNames(people) };
+    const lanes = { mine: lanesOf(input.email, people, input.laneSeats), holders: laneNames(people, input.laneSeats) };
     return { ...base, sections: { ...rest, health }, team, names, inFlight, actions, crew: input.crew ?? null, waiting: input.waiting ?? [], lanes, settings: input.settings ?? null };
   }
 

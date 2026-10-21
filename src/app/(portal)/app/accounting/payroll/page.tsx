@@ -7,7 +7,7 @@ import KpiHeader from "@/components/data/KpiHeader";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { loadLabor, type LaborRow } from "@/lib/accounting/labor";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesCrewJob } from "@/lib/accounting/access";
 import { clockText, localClock } from "@/lib/crew/time";
 
 export const dynamic = "force-dynamic";
@@ -21,13 +21,17 @@ const PATH = "/app/accounting/payroll";
 type SP = Record<string, string | string[] | undefined>;
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("payroll");
+  if (!seat) redirect("/app");
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "today");
-  const measure = one("m") === "cost" ? "cost" : "hours";
+  // Labor dollars only for a seat that may see pay (owners; a PM if the policy says so).
+  const measure = one("m") === "cost" && seat.laborCost ? "cost" : "hours";
 
-  const { rows, ratesMissing } = await loadLabor(period.previous.from, period.to, { withPay: true });
+  const loaded = await loadLabor(period.previous.from, period.to, { withPay: seat.laborCost });
+  const rows = loaded.rows.filter((r) => seesCrewJob(seat, r.jobId));
+  const ratesMissing = seat.owner ? loaded.ratesMissing : 0;
   const now = rows.filter((r) => inRange(r.day, period.from, period.to));
   const before = rows.filter((r) => inRange(r.day, period.previous.from, period.previous.to));
 
@@ -77,7 +81,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     { key: "trade", header: "Trade", kind: "text", filter: true },
     { key: "span", header: "Clock", kind: "text", phone: "hide" },
     { key: "minutes", header: "Hours", kind: "hours", total: true, phone: "value" },
-    { key: "cost", header: "Labor cost", kind: "money", total: true, phone: "detail" },
+    ...(seat.laborCost ? [{ key: "cost", header: "Labor cost", kind: "money", total: true, phone: "detail" } as Column] : []),
     { key: "flags", header: "Notes", kind: "text", phone: "detail" },
   ];
 
@@ -86,11 +90,13 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   return (
     <AccountingFrame
       title="Payroll and labor"
-      intro="Hours from the time clock, less breaks. Labor cost is hours × each person's current pay rate."
+      intro={seat.laborCost ? "Hours from the time clock, less breaks. Labor cost is hours × each person's current pay rate." : "Hours from the time clock on your jobs, less breaks."}
       period={period}
       crumbs={[{ label: "Accounting", href: "/app/accounting" }, ...d.crumbs]}
       filters={d.filters}
+      sections={seat.sections}
       actions={
+        !seat.laborCost ? undefined : (
         <div className="flex rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-1 text-[13px] font-medium" role="group" aria-label="Measure">
           {(["hours", "cost"] as const).map((m) => (
             <Link
@@ -104,6 +110,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             </Link>
           ))}
         </div>
+        )
       }
     >
       <KpiHeader
@@ -114,7 +121,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         upIsGood={measure !== "cost"}
         compareLabel={period.previous.label}
         stats={[
-          measure === "cost" ? { label: "Hours", value: minutes, kind: "hours" } : { label: "Labor cost", value: cost, kind: "money", hint: ratesMissing ? `${ratesMissing} without a rate` : undefined },
+          measure === "cost"
+            ? { label: "Hours", value: minutes, kind: "hours" }
+            : seat.laborCost
+              ? { label: "Labor cost", value: cost, kind: "money", hint: ratesMissing ? `${ratesMissing} without a rate` : undefined }
+              : { label: "Entries", value: d.rows.length, kind: "count" },
           { label: "People", value: people, kind: "count" },
           { label: "Jobs", value: jobs, kind: "count" },
           period.key === "today"

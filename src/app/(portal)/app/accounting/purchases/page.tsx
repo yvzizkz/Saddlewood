@@ -2,13 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import AccountingFrame from "@/components/accounting/AccountingFrame";
+import PurchaseSearch from "@/components/purchases/PurchaseSearch";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
 import { loadPurchases, type PurchaseItemRow } from "@/lib/accounting/purchases";
 import CappedNotice from "@/components/accounting/CappedNotice";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesCrewJob } from "@/lib/accounting/access";
 import { SMALL_TRIP_CENTS } from "@/lib/crew/purchases";
 import { UnmatchedBanner } from "./PurchaseActions";
 
@@ -19,13 +20,19 @@ const PATH = "/app/accounting/purchases";
 type SP = Record<string, string | string[] | undefined>;
 
 export default async function PurchasesPage({ searchParams }: { searchParams: Promise<SP> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("purchases");
+  if (!seat) redirect("/app");
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
   const view = one("view") === "trips" ? "trips" : "items";
 
-  const { rows: allRows, jobs, unmatched, capped } = await loadPurchases(period.previous.from, period.to);
+  const loaded = await loadPurchases(period.previous.from, period.to);
+  // A PM's seat sees the lines on their own jobs; unmatched lines ("Which job is this?") stay with the owners.
+  const allRows = loaded.rows.filter((r) => seesCrewJob(seat, r.rawJobId));
+  const jobs = loaded.jobs.filter((j) => seesCrewJob(seat, j.id));
+  const unmatched = seat.owner ? loaded.unmatched : [];
+  const capped = loaded.capped;
   const now = allRows.filter((r) => inRange(r.purchasedOn, period.from, period.to));
   const before = allRows.filter((r) => inRange(r.purchasedOn, period.previous.from, period.previous.to));
 
@@ -196,6 +203,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
 
   return (
     <AccountingFrame
+      sections={seat.sections}
       title="Purchases and materials"
       intro="Home Depot Pro Xtra, supply-house orders and field receipts — categorized by trade and linked to each project."
       period={period}
@@ -279,6 +287,11 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
         initialSort={{ key: "purchasedOn", dir: "desc" }}
         empty="No purchases recorded in this period."
       />
+      {/* Any purchase, any job, any year (0026); moved here from Money so purchases have one home. */}
+      <section id="find" aria-label="Find a purchase" className="rounded-2xl border border-[var(--color-stone)] bg-white p-4">
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Find any purchase, any year</p>
+        <PurchaseSearch />
+      </section>
     </AccountingFrame>
   );
 }

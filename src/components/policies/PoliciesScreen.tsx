@@ -217,6 +217,11 @@ export default function PoliciesScreen() {
         <p className="text-sm text-[var(--color-charcoal-light)]">
           The decisions that run a job after it is won. Each starts at our recommendation; change any of them here, and the app follows.
         </p>
+        {data?.canEdit ? (
+          <Link href="/app/policies/rights" className="mt-3 inline-flex min-h-10 items-center rounded-xl border border-[var(--color-stone-mid)] bg-white px-3 text-sm font-medium text-[var(--color-charcoal)]">
+            Who decides: roles, seats and limits
+          </Link>
+        ) : null}
       </ScreenTitle>
 
       {data && !data.canEdit ? (

@@ -3,10 +3,10 @@ import { notFound, redirect } from "next/navigation";
 
 import AccountingFrame from "@/components/accounting/AccountingFrame";
 import { Card } from "@/components/bot/ui";
-import { loadPurchaseTrip } from "@/lib/accounting/purchases";
+import { moneySeatForPage, seesCrewJob } from "@/lib/accounting/access";
+import { loadPurchaseTrip, tripInScope } from "@/lib/accounting/purchases";
 import { hrefOf } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { LineTradeSelector, TripJobAndTradeControl } from "../../PurchaseActions";
 
 export const dynamic = "force-dynamic";
@@ -23,15 +23,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default async function PurchaseTripPage({ params }: { params: Promise<{ key: string }> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const seat = await moneySeatForPage("purchases");
+  if (!seat) redirect("/app");
   const { key } = await params;
   const trip = await loadPurchaseTrip(key);
-  if (!trip) notFound();
+  // Every line must be on a job the seat sees, not just the first.
+  if (!trip || !tripInScope(trip, (j) => seesCrewJob(seat, j))) notFound();
 
   return (
     <AccountingFrame
       title={`${trip.vendor} · ${formatValue("date", trip.purchasedOn)}`}
       intro={`${trip.store}${trip.orderRef ? ` · PO ${trip.orderRef}` : ""} · ${trip.lines.length} ${trip.lines.length === 1 ? "item" : "items"}`}
+      sections={seat.sections}
       crumbs={[
         { label: "Accounting", href: "/app/accounting" },
         { label: "Purchases", href: PATH },
@@ -39,12 +42,14 @@ export default async function PurchaseTripPage({ params }: { params: Promise<{ k
         { label: `${formatValue("date", trip.purchasedOn)}${trip.orderRef ? ` (${trip.orderRef})` : ""}`, href: `${PATH}/trip/${encodeURIComponent(trip.tripKey)}` },
       ]}
     >
-      <TripJobAndTradeControl
-        tripKey={trip.tripKey}
-        currentJobId={trip.rawJobId}
-        trades={trip.trades}
-        jobs={trip.jobs}
-      />
+      {seat.owner ? (
+        <TripJobAndTradeControl
+          tripKey={trip.tripKey}
+          currentJobId={trip.rawJobId}
+          trades={trip.trades}
+          jobs={trip.jobs}
+        />
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-4 md:col-span-2">
@@ -77,12 +82,16 @@ export default async function PurchaseTripPage({ params }: { params: Promise<{ k
                       </p>
                     </td>
                     <td className="px-3 py-2.5">
-                      <LineTradeSelector
-                        sourceKey={l.sourceKey}
-                        currentTrade={l.trade}
-                        tradeManual={l.tradeManual}
-                        trades={trip.trades}
-                      />
+                      {seat.owner ? (
+                        <LineTradeSelector
+                          sourceKey={l.sourceKey}
+                          currentTrade={l.trade}
+                          tradeManual={l.tradeManual}
+                          trades={trip.trades}
+                        />
+                      ) : (
+                        <span className="text-xs text-[var(--color-charcoal)]">{l.tradeLabel}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-[var(--color-charcoal)]">
                       {formatValue("count", l.qty)}
@@ -144,7 +153,7 @@ export default async function PurchaseTripPage({ params }: { params: Promise<{ k
                   All purchases from {trip.vendor}
                 </Link>
               </li>
-              {trip.linkedBill ? (
+              {seat.owner && trip.linkedBill ? (
                 <li>
                   <Link
                     className="underline underline-offset-2 font-medium text-[var(--color-teal)]"

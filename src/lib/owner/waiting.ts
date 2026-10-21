@@ -319,7 +319,7 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       kind: "decision",
       title: `${older.count.toLocaleString("en-US")} older Home Depot name${older.count === 1 ? "" : "s"} from before the app`,
       detail: `${dollars(older.cents)} across them; find them with search.`,
-      href: "/app/money",
+      href: "/app/accounting/purchases#find",
       at: null,
     });
   }

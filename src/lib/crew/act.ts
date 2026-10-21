@@ -1,5 +1,6 @@
 import { threadKey } from "@/lib/bot/queries";
 import type { BotFileRef } from "@/lib/bot/types";
+import { syncEodDirectivesAndDecisions, syncReceiptEntryToPurchases } from "@/lib/field/ops";
 import { MSG, say } from "./messages";
 import { notifyOwners, notifySupervisors } from "./notify";
 import { cancelOwnRequest, createRequestFromEntry, mirrorPickupToRequest } from "./requests";
@@ -230,16 +231,33 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
     case "receipt.add": {
       const job = await resolveJob(act.jobId, act.jobName);
       if (!job) return bad(400, say(lang, MSG.jobGone));
-      return addEntry(person, nowDate, {
+      const day = localDay(now);
+      const { res, entry } = await saveEntry(person, nowDate, {
         kind: "receipt",
-        day: localDay(now),
+        day,
         jobId: job.id,
         jobName: job.name,
         body: act.note,
-        data: { amount: act.amount, vendor: act.vendor, paidBy: act.paidBy },
+        data: { amount: act.amount, vendor: act.vendor, paidBy: act.paidBy, ...(act.trade ? { trade: act.trade } : {}) },
         files: act.files,
         clientId: act.clientId,
       });
+      if (res.ok && entry) {
+        await syncReceiptEntryToPurchases({
+          entryId: entry.id,
+          day,
+          jobId: job.id,
+          jobName: job.name,
+          vendor: act.vendor,
+          amountDollars: act.amount,
+          paidBy: act.paidBy,
+          note: act.note,
+          trade: act.trade,
+          personName: person.name,
+          personEmail: person.email,
+        });
+      }
+      return res;
     }
 
     case "progress.add": {
@@ -281,6 +299,10 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
           visits: act.visits,
           safety: act.safety,
           decision: act.decision,
+          ...(act.weather ? { weather: act.weather } : {}),
+          ...(act.crewCount !== null && act.crewCount !== undefined ? { crewCount: act.crewCount } : {}),
+          ...(act.tradesOnSite ? { tradesOnSite: act.tradesOnSite } : {}),
+          ...(act.inspections ? { inspections: act.inspections } : {}),
           ...(memo ? { memo: { path: memo.path, seconds: act.memoSeconds ?? null } } : {}),
         },
         files: act.files,
@@ -291,6 +313,19 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
       // "What do you need for tomorrow?" is a material request (0023): one per
       // entry, so the same form sent twice asks once. Never fails the entry.
       if (res.ok && entry && act.needs.trim().length >= 2) await createRequestFromEntry(person, entry, act.needs);
+      if (res.ok && entry) {
+        await syncEodDirectivesAndDecisions({
+          entryId: entry.id,
+          day,
+          jobId: job.id,
+          jobName: job.name,
+          done: act.done,
+          asked: act.asked,
+          decision: act.decision,
+          stuck: act.stuck,
+          createdBy: person.email,
+        });
+      }
       return res;
     }
 
@@ -370,6 +405,21 @@ export async function runCrewAct(person: CrewPersonRow, act: CrewAct, nowDate = 
         const entry = entryId ? await getEntry(entryId) : null;
         if (entry && entry.email === email && entry.kind === "receipt") {
           await patchEntry(entry.id, { data: { ...entry.data, amount } });
+          // The receipt's purchase line is written once it has an amount (field/ops.ts).
+          const d = entry.data as { vendor?: string; paidBy?: string; trade?: string };
+          await syncReceiptEntryToPurchases({
+            entryId: entry.id,
+            day: entry.day,
+            jobId: entry.jobId,
+            jobName: entry.jobName,
+            vendor: d.vendor ?? "",
+            amountDollars: amount,
+            paidBy: d.paidBy === "me" ? "me" : "company",
+            note: entry.body,
+            trade: d.trade,
+            personName: person.name,
+            personEmail: person.email,
+          });
         }
       }
 

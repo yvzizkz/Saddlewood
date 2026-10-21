@@ -32,6 +32,7 @@ const NAV_NOTES: Record<string, string> = {
 
 const PORTAL_EXTRA: { href: string; label: string; note: string }[] = [
   { href: '/app/sales', label: 'Sales', note: 'Prospects, estimates and proposals, start to finish' },
+  { href: '/app/policies/rights', label: 'Who decides', note: 'Roles, who holds them, and what each may approve' },
   { href: '/internal/trackers', label: 'Progress trackers', note: 'Schedules of values and invoices' },
   { href: '/internal?tab=pending', label: 'Estimates', note: 'Bids waiting for sign-off' },
   { href: '/internal/expenses', label: 'Expenses', note: 'Tag Zelle payments and receipts' },

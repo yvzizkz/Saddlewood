@@ -194,7 +194,11 @@ function PaymentsCard({ home }: { home: BotHome }) {
               {money(p.amount)} from {p.client}
             </p>
             <p className="mt-0.5 text-[13px] text-[var(--color-charcoal-light)]">
-              <span className="font-mono">P{p.n}</span> · invoice {p.invoice} · {p.date}
+              <span className="font-mono">P{p.n}</span> · invoice{' '}
+              <Link href={`/app/accounting/receivables?q=${encodeURIComponent(String(p.invoice))}`} className="underline underline-offset-2">
+                {p.invoice}
+              </Link>{' '}
+              · {p.date}
               {p.evidence ? ` · ${p.evidence}` : ''}
             </p>
             <div className="mt-2.5 flex gap-2">

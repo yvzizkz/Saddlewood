@@ -359,18 +359,19 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
 6. A synthetic local seed (`supabase/seed-cohesive.sql`) that fills every section across Today/WTD/MTD/YTD.
 7. Cross-review at 390 px and on desktop. One draft PR with phone and desktop screenshots.
 
-### Phase 2: every department, one schedule, one task system, the automation gaps (autopilot runs these in order, one PR per two or three steps)
-1. **Job hub** `/app/jobs` + `/app/jobs/[id]`:
+### Phase 2 ✅ (2026-10-20, PR #32): every department, one schedule, one task system, the automation gaps (autopilot runs these in order, one PR per two or three steps)
+1. ✅ **Job hub** `/app/jobs` + `/app/jobs/[id]`:
    - list on the shared blocks (period; by stage, PM or client);
    - job page tabs: Overview · Schedule · Tasks · Money · Labor · Purchases · Subs · Changes · Log · Documents · Crew, each reusing a section filtered to `job=<id>`;
    - `/app/projects` and `/app/crew?view=projects` redirect there.
    - Fix `JobPaperwork.tsx:70`.
    - Stage strip: Sale → Award → Handoff → Build → Billing → Closeout → Warranty.
-2. **Decision-rights table** (§6.1):
+2. **Decision-rights table** (§6.1). ✅ Built differently from the plan: there is no separate rights table. The limits already live in Company policies, and a second copy would drift. So `decisionRights()` reads them from there (`src/lib/roles/seats.ts`), and the new data is only `role_seats` (0032): who holds each role, plus the backup who covers it. The screen is `/app/policies/rights`.
+   - Original plan, kept for reference:
    - `decision_rights` rows (role, action, limit) in Company policies;
    - roles and seats (who holds PM, Finance, Sales admin, Field lead), with cover for empty seats;
    - existing limits (`requests.pmLimitCents`, award limits) read from it.
-3. **One task system** (§6.5):
+3. ✅ **One task system** (§6.5): `work_items` (0033), `src/lib/tasks/feed.ts`, `/app/tasks`, and a Tasks tab on each job page. Still to do: the 7 AM push and Home reading the feed, and PM seats creating and closing items (step 10).
    - `work_items` migration + `src/lib/tasks/feed.ts` over `crew_tasks`, ops cards, bot waiting-on, watches, purchase cards and request approvals;
    - views Mine / My team / Per job / Per department;
    - escalation by service level;
@@ -384,19 +385,19 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - pre-cover `checklists` per phase gating verify;
    - punch items;
    - directives → CO intake.
-6. **Billing completion:**
+6. ✅ (except SOV % billing) **Billing completion:** done as 0040 (`change_orders`, `lien_waivers`), `src/lib/billing/registers.ts`, the registers on Billing and the job's Changes tab, and CO, package and waiver items in the task feed. Still open: ladder config (owner question 1) and SOV % billing.
    - CO register (A2), waiver register, invoice package at cutoff (A3), ladder config (A5);
    - SOV percent-complete billing replacing the Powell tracker path (keep the tracker until it's replaced).
-7. **Subs and compliance:**
+7. ✅ **Subs and compliance** (agy, `a7c0957`): sub scorecard and compliance register on Subs, a frozen work order with a mobilization gate, award and thank-you emails as drafts (never sent automatically), and a Gate 0 handoff card on the job page.
    - work order document (S7), compliance register with COI and W-9 watches (S8), sub scorecard (S1);
    - award emails as drafts (S6).
-8. **Department homes** (§6.2):
+8. ✅ **Department homes** (§6.2): `/app/departments` and `/app/departments/[role]` (`src/lib/departments/home.ts`). The Ops board itself still lives at `/internal/ops`; the Ops home links to it.
    - Owner desk (decisions with `rule?`, A6);
    - Ops in the app (A13, friction log ranking);
    - Sales KPIs by source;
    - PM home;
    - Finance home = Accounting + Compliance.
-9. **Links and duplicates:**
+9. ✅ **Links and duplicates:** done. `/app/money` now redirects to Receivables, its purchase search moved to Purchases (`#find`), and the bot's lanes read `role_seats`.
    - Home PaymentsCard, JobMoneyCard and PurchaseSearch link their invoice and job;
    - `/app/money/[id]` links its job and sale;
    - tracker pages link the job;
@@ -404,10 +405,10 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - `/internal/activity` and `/internal/bid-log` placeholders go;
    - Money's purchase search becomes Accounting › Purchases.
    - Never the four batch-2 prototypes (they wait for their bot scripts).
-10. **PM access:** Accounting sections for `money.view` seats scoped to their jobs, no cost or pay. Field lead seat.
+10. ✅ **PM access:** `src/lib/accounting/access.ts`. A `money.view` seat sees Receivables, Billing, Purchases and Payroll hours on its own jobs. Pay and cost show only if `policy.pm.laborCost` / `policy.pm.margin` are on, never Payables, and invoices are read-only. Still to do: a field-lead seat. Accounting sections for `money.view` seats scoped to their jobs, no cost or pay. Field lead seat.
 11. Each step: tests, lint, build, screenshots at 390 px and on desktop.
 
-### Phase 3: scenario testing, every department's real week (one PR)
+### Phase 3 (in progress; `docs/SCENARIOS.md`, `npm run e2e`): scenario testing, every department's real week (one PR)
 1. Write `docs/SCENARIOS.md` from `docs/KB-OPERATIONS-MODEL.md` and OM §4. One scenario per department week, at least:
    - **Finance:**
      - an AFT billing week: Friday hours, the 23rd cutoff, PM % complete at −3 days, a change order, a conditional waiver, Melio paying the gross less 1%;

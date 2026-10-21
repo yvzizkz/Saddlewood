@@ -16,6 +16,7 @@ export default function AccountingFrame({
   crumbs,
   filters,
   actions,
+  sections,
   children,
 }: {
   title: string
@@ -24,11 +25,13 @@ export default function AccountingFrame({
   crumbs?: Crumb[]
   filters?: FilterChip[]
   actions?: ReactNode
+  /** The sections this seat may open (access.ts); every section when not given. */
+  sections?: string[]
   children: ReactNode
 }) {
   return (
     <div className="px-4 pb-10 pt-4 md:px-8 md:pt-6">
-      <SectionNav />
+      <SectionNav only={sections} />
       <header className="mb-4 mt-4 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-gold-accessible)]">Accounting</p>

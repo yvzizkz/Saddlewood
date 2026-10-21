@@ -94,6 +94,8 @@ describe("numbers", () => {
   it("ticks are round", () => {
     expect(niceTicks(37)).toEqual([0, 10, 20, 30, 40]);
     expect(niceTicks(0)).toEqual([0, 1]);
+    expect(niceTicks(2, 4, { integer: true })).toEqual([0, 1, 2]);
+    expect(niceTicks(9, 4, { integer: true })).toEqual([0, 5, 10]);
   });
 
   it("delta is null with nothing to compare", () => {
@@ -170,5 +172,21 @@ describe("drill", () => {
     const d = drill(spec, rows, period, { p: "wtd", trade: "framing", job: "8009" });
     expect(d.rows).toHaveLength(1);
     expect(d.breakdown.slices[0].href).toBeNull();
+  });
+});
+
+describe("drill inside another page", () => {
+  it("keeps the fixed params on every link", () => {
+    const spec: DrillSpec<{ day: string; t: string; v: number }> = {
+      path: "/app/jobs/8009",
+      title: "Labor",
+      dims: [{ key: "trade", label: "Trade", plural: "trades", of: (r) => ({ key: r.t, label: r.t }) }],
+      value: (r) => r.v,
+      dayOf: (r) => r.day,
+      fixed: { tab: "labor" },
+    };
+    const d = drill(spec, [{ day: "2026-10-20", t: "framing", v: 1 }], resolvePeriod({ p: "wtd" }, TODAY), {});
+    expect(d.crumbs[0].href).toBe("/app/jobs/8009?tab=labor&p=wtd");
+    expect(d.byOptions[0].href).toContain("tab=labor");
   });
 });

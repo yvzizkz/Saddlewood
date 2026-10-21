@@ -105,11 +105,12 @@ export function compact(n: number, opts: { money?: boolean; digits?: number } = 
 }
 
 /** Clean axis ticks: 0 and up to four round steps covering `max`. */
-export function niceTicks(max: number, count = 4): number[] {
+export function niceTicks(max: number, count = 4, opts: { integer?: boolean } = {}): number[] {
   if (!(max > 0)) return [0, 1];
-  const raw = max / count;
+  // Counts never get a tick at 0.5: the step is at least 1.
+  const raw = opts.integer ? Math.max(1, max / count) : max / count;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? 10 * mag;
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).filter((s) => !opts.integer || Number.isInteger(s)).find((s) => s >= raw) ?? 10 * mag;
   const ticks: number[] = [];
   for (let v = 0; v < max + step * 0.999; v += step) ticks.push(Number(v.toPrecision(12)));
   return ticks;

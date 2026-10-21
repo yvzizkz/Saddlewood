@@ -54,7 +54,7 @@ export default function KpiHeader(p: KpiHeaderProps) {
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div>
           <p className="text-xs font-medium text-[var(--color-charcoal-light)]">{p.label}</p>
-          <p className="mt-0.5 text-[40px] font-semibold leading-none tracking-tight text-[var(--color-charcoal)] md:text-5xl">{formatValue(p.kind, p.value)}</p>
+          <p data-kpi="value" className="mt-0.5 text-[40px] font-semibold leading-none tracking-tight text-[var(--color-charcoal)] md:text-5xl">{formatValue(p.kind, p.value)}</p>
           <div className="mt-2">
             <Delta change={p.change} upIsGood={p.upIsGood ?? true} compareLabel={p.compareLabel} />
           </div>
@@ -66,7 +66,7 @@ export default function KpiHeader(p: KpiHeaderProps) {
               const inner = (
                 <>
                   <dt className="text-[11px] text-[var(--color-charcoal-light)]">{s.label}</dt>
-                  <dd className="truncate text-lg font-semibold text-[var(--color-charcoal)]">{v}</dd>
+                  <dd data-stat={s.label} className="truncate text-lg font-semibold text-[var(--color-charcoal)]">{v}</dd>
                   {s.hint ? <dd className="text-[11px] text-[var(--color-charcoal-light)]">{s.hint}</dd> : null}
                 </>
               )

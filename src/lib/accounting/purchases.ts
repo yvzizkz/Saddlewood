@@ -169,6 +169,8 @@ export type PurchaseTripDetail = {
   store: string;
   orderRef: string;
   rawJobId: string | null;
+  /** The field job the trip is on (for a PM's scope check), or null. */
+  jobId: string | null;
   billingJobId: string | null;
   jobName: string;
   jobNameRaw: string;
@@ -276,6 +278,7 @@ export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<Purchase
     vendor: first.vendor,
     store: first.store,
     orderRef: first.orderRef,
+    jobId: first.rawJobId,
     rawJobId: first.rawJobId,
     billingJobId: first.billingJobId,
     jobName: first.job,
@@ -295,4 +298,12 @@ export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<Purchase
     trades,
     jobs,
   };
+}
+
+/**
+ * Whether a seat may open this trip: every line on a job it sees. A trip with
+ * one line on someone else's job (or on no job) is not a PM's to open.
+ */
+export function tripInScope(trip: Pick<PurchaseTripDetail, "lines">, sees: (crewJobId: string | null) => boolean): boolean {
+  return trip.lines.length > 0 && trip.lines.every((l) => sees(l.rawJobId));
 }
