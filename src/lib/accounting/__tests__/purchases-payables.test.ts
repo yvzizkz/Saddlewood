@@ -135,6 +135,8 @@ describe("purchases and payables drill-down", () => {
         retainageCents: 84000,
         paidCents: 0,
         balanceCents: 840000,
+        payableNowCents: 756000,
+        retainageHeldCents: 84000,
         status: "hold_waiver",
         statusLabel: "Hold · Missing waiver",
         isOnHold: true,

@@ -104,7 +104,7 @@ export function ComplianceHoldBanner({ heldBills }: { heldBills: PayableRow[] })
                   <Link href={`/app/accounting/payables/bill/${b.id}`} className="underline underline-offset-2">
                     {b.vendorName} · {b.billNumber}
                   </Link>{" "}
-                  <span className="ml-1.5 font-semibold tabular-nums">{formatValue("money", b.balanceCents)}</span>
+                  <span className="ml-1.5 font-semibold tabular-nums">{formatValue("money", b.payableNowCents)}</span>
                 </p>
                 <p className="text-xs text-[#9a2a1f]">
                   {b.holdReason || b.statusLabel} · {b.job}
@@ -127,7 +127,9 @@ export function BillDetailControls({ bill }: { bill: PayableRow }) {
   const [pending, start] = useTransition();
   const [method, setMethod] = useState("melio");
   const [reference, setReference] = useState("");
-  const [amountDollars, setAmountDollars] = useState((bill.balanceCents / 100).toFixed(2));
+  // What is payable now; retainage is paid only when an owner releases it (below).
+  const [amountDollars, setAmountDollars] = useState(((bill.payableNowCents || bill.retainageHeldCents) / 100).toFixed(2));
+  const [releaseRetainage, setReleaseRetainage] = useState(bill.payableNowCents <= 0);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [waiverInHand, setWaiverInHand] = useState(false);
@@ -149,6 +151,9 @@ export function BillDetailControls({ bill }: { bill: PayableRow }) {
     const cents = Math.round(Number(amountDollars) * 100);
     if (!Number.isFinite(cents) || cents <= 0) return;
     if (isSub && !waiverInHand) return setErr("Check that the lien waiver for this payment is in hand (SOP-004).");
+    if (cents > bill.payableNowCents && !releaseRetainage) {
+      return setErr(`Only ${formatValue("money", bill.payableNowCents)} is payable now; the rest is retainage. Tick "Release retainage" to pay it.`);
+    }
 
     const res = await fetch("/api/accounting/payables", {
       method: "PATCH",
@@ -160,6 +165,7 @@ export function BillDetailControls({ bill }: { bill: PayableRow }) {
         method,
         reference: reference || `${method.toUpperCase()}-${new Date().toISOString().slice(0, 10)}`,
         waiverCollected: isSub ? waiverInHand : undefined,
+        releaseRetainage: cents > bill.payableNowCents && releaseRetainage ? true : undefined,
       }),
     });
     if (res.ok) {
@@ -228,6 +234,12 @@ export function BillDetailControls({ bill }: { bill: PayableRow }) {
           <label className="flex items-center gap-1.5 text-xs text-[var(--color-charcoal)]">
             <input type="checkbox" checked={waiverInHand} onChange={(e) => setWaiverInHand(e.target.checked)} />
             Lien waiver for this payment is in hand
+          </label>
+        ) : null}
+        {bill.retainageHeldCents > 0 ? (
+          <label className="flex items-center gap-1.5 text-xs text-[var(--color-charcoal)]">
+            <input type="checkbox" checked={releaseRetainage} onChange={(e) => setReleaseRetainage(e.target.checked)} />
+            Release retainage ({formatValue("money", bill.retainageHeldCents)} held)
           </label>
         ) : null}
       </form>

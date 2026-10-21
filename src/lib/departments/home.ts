@@ -71,11 +71,12 @@ export async function departmentTiles(role: Role, refs: JobRef[], feed: FeedItem
   if (role === "finance") {
     const wk = weekStart(today);
     const [open, payables, labor, waivers] = await Promise.all([loadOpenReceivables(today), loadPayables(today), loadLabor(wk, today, { withPay: true }), loadWaivers(refs)]);
-    const due = payables.rows.filter((b) => b.balanceCents > 0 && b.dueOn && b.dueOn <= payables.fridayCutoff);
+    // The Friday run pays what is payable now on bills not on hold (retainage waits for its release).
+    const due = payables.rows.filter((b) => b.dueByFriday);
     return {
       tiles: [
         { label: "Owed to us", value: open.rows.reduce((a, r) => a + r.balanceCents, 0), kind: "money", hint: `${open.rows.filter((r) => (r.daysLate ?? 0) > 0).length} past due`, href: "/app/accounting/receivables" },
-        { label: "Friday pay run", value: due.reduce((a, b) => a + b.balanceCents, 0), kind: "money", hint: `${due.length} bills by ${payables.fridayCutoff.slice(5)}`, href: "/app/accounting/payables" },
+        { label: "Friday pay run", value: due.reduce((a, b) => a + b.payableNowCents, 0), kind: "money", hint: `${due.length} bills by ${payables.fridayCutoff.slice(5)}`, href: "/app/accounting/payables" },
         { label: "Payroll this week", value: labor.rows.reduce((a, r) => a + (r.costCents ?? 0), 0), kind: "money", hint: `${(labor.rows.reduce((a, r) => a + r.minutes, 0) / 60).toFixed(1)} h`, href: "/app/accounting/payroll?p=wtd" },
         { label: "Waivers missing", value: waivers.filter((w) => w.status === "missing").length, kind: "count", href: "/app/accounting/billing#waivers", alert: waivers.some((w) => w.status === "missing") },
       ],

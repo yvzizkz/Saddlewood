@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { addDays, localDay } from "@/lib/crew/time";
 import { listTrades, resolveTrade, type Trade } from "./trades";
 import { readAll } from "@/lib/supabase/paged";
+import { splitBalance } from "./payablesRules";
 
 export type BillStatus =
   | "draft"
@@ -51,7 +52,12 @@ export type PayableRow = {
   amountCents: number;
   retainageCents: number;
   paidCents: number;
+  /** Everything still owed, retainage included. */
   balanceCents: number;
+  /** Owed now: the bill less retainage less what was paid. The pay run, Open AP and the pay form count this. */
+  payableNowCents: number;
+  /** Retainage not yet released (paid only when an owner releases it). */
+  retainageHeldCents: number;
   status: BillStatus;
   statusLabel: string;
   isOnHold: boolean;
@@ -231,7 +237,7 @@ export async function loadPayables(today = localDay()): Promise<{
     const amountCents = Number(b.amount_cents) || 0;
     const retainageCents = Number(b.retainage_cents) || 0;
     const paidCents = paidByBill.get(b.id) ?? 0;
-    const balanceCents = b.status === "paid" ? 0 : Math.max(0, amountCents - paidCents);
+    const { balanceCents, payableNowCents, retainageHeldCents } = splitBalance({ amountCents, retainageCents, paidCents, status: b.status });
     const t = resolveTrade(b.trade || "general", trades);
 
     const rawCrewJobId = b.crew_job_id ?? (b.job_id ? (billingJobsById.get(b.job_id)?.crew_job_id ?? null) : null);
@@ -243,9 +249,10 @@ export async function loadPayables(today = localDay()): Promise<{
         : "Shop & Overhead";
 
     const dueOn = b.due_on || b.issued_on;
-    const pastDue = balanceCents > 0 ? daysBetween(dueOn, today) : 0;
-    let agingBucket = "Paid";
-    if (balanceCents > 0) {
+    // Retainage isn't due until it is released: aging counts what is payable now.
+    const pastDue = payableNowCents > 0 ? daysBetween(dueOn, today) : 0;
+    let agingBucket = balanceCents > 0 ? "Retainage held" : "Paid";
+    if (payableNowCents > 0) {
       if (pastDue <= 0) agingBucket = "Current (not yet due)";
       else if (pastDue <= 30) agingBucket = "1–30 days past due";
       else if (pastDue <= 60) agingBucket = "31–60 days past due";
@@ -301,6 +308,8 @@ export async function loadPayables(today = localDay()): Promise<{
       retainageCents,
       paidCents,
       balanceCents,
+      payableNowCents,
+      retainageHeldCents,
       status: b.status,
       statusLabel: STATUS_LABELS[b.status] ?? b.status,
       isOnHold,
@@ -315,7 +324,7 @@ export async function loadPayables(today = localDay()): Promise<{
       notes: b.note || null,
       agingBucket,
       daysPastDue: Math.max(0, pastDue),
-      dueByFriday: balanceCents > 0 && dueOn <= fridayCutoff && !isOnHold,
+      dueByFriday: payableNowCents > 0 && dueOn <= fridayCutoff && !isOnHold,
       coiStatus,
       coiExpiresAt: sub?.coi_expires_on ?? null,
       w9OnFile: sub ? sub.w9_on_file : null,

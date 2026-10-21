@@ -184,7 +184,7 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
       // SOP-004: a sub invoice unapproved after 10 days is flagged.
       const due = addDays(b.issuedOn, 10);
       out.push({ ...base, id: `b${b.id}`, kind: "approval", title: `Approve ${b.vendorName} ${b.billNumber}`, detail: `${(b.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} · ${b.tradeLabel}`, role: "pm", dueOn: due, ...placeItem("pm", due, 0, today) });
-    } else if (b.isOnHold && b.balanceCents > 0) {
+    } else if (b.isOnHold && b.payableNowCents > 0) {
       out.push({ ...base, id: `b${b.id}`, kind: "compliance", title: `Clear the hold on ${b.vendorName} ${b.billNumber}`, detail: b.holdReason ?? "On hold", role: "finance", dueOn: b.dueOn, ...placeItem("finance", b.dueOn, 0, today) });
     }
   }
