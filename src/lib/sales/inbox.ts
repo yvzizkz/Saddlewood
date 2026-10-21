@@ -6,6 +6,10 @@ import type { LeadItem } from "@/lib/leads/types";
 // (bot/leads.py, GoHighLevel + the KB's phone index) and bid invites nobody
 // has answered (bot/bid_followup.py). One tap tracks it; the external ref
 // keeps the same caller or invite from being tracked twice.
+//
+// The call list is the one the old /internal/leads page showed: its fresh
+// callers first, then the backlog. A caller marked called or texted stays
+// (with the mark) until it is tracked; dismissed ones drop out.
 
 export type InboxItem = {
   ref: string;
@@ -17,7 +21,11 @@ export type InboxItem = {
   detail: string;
   ageDays: number;
   dialUrl?: string;
+  /** A caller someone already called or texted back (from the call list). */
+  status?: "called" | "texted";
 };
+
+export const INBOX_MAX = 30;
 
 export function phoneRef(phone: string): string {
   return `phone:${phone.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "")}`;
@@ -47,17 +55,23 @@ export function leadToInbox(l: LeadItem): InboxItem {
     detail: [l.tags.slice(0, 2).join(", "), l.snippet].filter(Boolean).join(" · ").slice(0, 200),
     ageDays: l.age_days,
     dialUrl: l.dial_url,
+    ...(l.callback_status === "called" || l.callback_status === "texted" ? { status: l.callback_status } : {}),
   };
 }
 
-export async function loadInbox(tracked: Set<string>): Promise<InboxItem[]> {
+export async function loadInbox(tracked: Set<string>): Promise<{ items: InboxItem[]; syncedAt: string | null }> {
   const out: InboxItem[] = [];
+  let syncedAt: string | null = null;
   try {
-    const { state } = await getLeadsState();
-    for (const l of state.fresh_list ?? []) {
-      if (l.callback_status === "dismissed") continue;
+    const leads = await getLeadsState();
+    syncedAt = leads.state.generated || leads.syncedAt;
+    const seen = new Set<string>();
+    for (const l of [...(leads.state.fresh_list ?? []), ...(leads.state.backlog_list ?? [])]) {
+      if (l.callback_status === "dismissed" || !l.phone) continue;
       const item = leadToInbox(l);
-      if (!tracked.has(item.ref)) out.push(item);
+      if (tracked.has(item.ref) || seen.has(item.ref)) continue;
+      seen.add(item.ref);
+      out.push(item);
     }
   } catch (err) {
     console.error("sales inbox, leads:", err);
@@ -72,5 +86,5 @@ export async function loadInbox(tracked: Set<string>): Promise<InboxItem[]> {
   } catch (err) {
     console.error("sales inbox, bids:", err);
   }
-  return out.sort((a, b) => a.ageDays - b.ageDays).slice(0, 20);
+  return { items: out.sort((a, b) => a.ageDays - b.ageDays).slice(0, INBOX_MAX), syncedAt };
 }

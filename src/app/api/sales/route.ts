@@ -20,7 +20,16 @@ export async function GET(request: NextRequest) {
     const today = phoenixToday();
     const tracked = new Set(rows.map((r) => r.externalRef).filter((r): r is string => !!r));
     const inbox = await loadInbox(tracked);
-    return NextResponse.json({ ok: true, today, rows, metrics: metrics(rows, today), inbox, me: gate.who.actor });
+    return NextResponse.json({
+      ok: true,
+      today,
+      rows,
+      metrics: metrics(rows, today),
+      inbox: inbox.items,
+      inboxSyncedAt: inbox.syncedAt,
+      me: gate.who.actor,
+      canSyncLeads: gate.seat.role === "owner" || gate.seat.role === "staff",
+    });
   } catch (err) {
     return salesError(err, "load the pipeline");
   }

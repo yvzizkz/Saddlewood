@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic';
 
 // Who may call this.
 //
-// GET and PATCH are the staff's lead list (/internal/leads): a signed-in
-// address on the allowlist, or the bot with its agent token. The list itself
+// GET and PATCH were the old /internal/leads page's (now the Sales inbox,
+// /app/sales, through /api/sales/inbox): a signed-in address on the
+// allowlist, or the bot with its agent token. Kept for the bot. The list itself
 // is built on the Mac (bot/leads.py) and sent here with PUT, agent token only.
 // "Sync GoHighLevel" (GET ?refresh=true) queues a leads.sync tap for the
 // Mac's app bridge; the page then follows it with GET ?action=<id>.
@@ -235,8 +236,8 @@ export async function POST(request: NextRequest) {
                 <a href="${escapeHtml(lead.sms_url)}" style="background: #1e293b; color: #ffffff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-left: 8px;">
                   💬 1-Tap Text Reply
                 </a>
-                <a href="https://saddlewoodcontracting.com/internal/leads" style="background: #f1f5f9; color: #334155; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-left: 8px;">
-                  Open Leads Portal
+                <a href="https://saddlewoodcontracting.com/app/sales" style="background: #f1f5f9; color: #334155; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-left: 8px;">
+                  Open the Sales inbox
                 </a>
               </div>
             </div>
