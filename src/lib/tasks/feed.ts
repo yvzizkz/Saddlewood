@@ -251,3 +251,27 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
 export function departmentOf(role: Role): string {
   return ROLE_INFO[role].department;
 }
+
+/**
+ * What a project manager's Tasks shows (jobs/access.ts): work on their jobs,
+ * and work with no job that is theirs. Never the owners' waiting list, the ops
+ * board or sub bills (Payables stays with the owners). `jobs` is the URL keys
+ * of the jobs in their view; null = every job (an owner: the feed as is).
+ */
+export function feedForSeat(items: FeedItem[], jobs: Set<string> | null, mine: (i: FeedItem) => boolean): FeedItem[] {
+  if (jobs === null) return items;
+  return items.filter((i) => i.source !== "waiting" && i.source !== "ops" && i.source !== "bill" && !isPayables(i) && (i.jobKey ? jobs.has(i.jobKey) : mine(i)));
+}
+
+/**
+ * Payables work, owners only: a sub's waiver owed before we pay it (wvi<bill>,
+ * with the sub bill's amount), or anything that opens a bill in Payables.
+ */
+function isPayables(i: FeedItem): boolean {
+  return i.id.startsWith("wvi") || i.href.startsWith("/app/accounting/payables");
+}
+
+/** Whether this seat closes or moves the item here: owners any work item; a PM work items with the PM's or the field lead's seat. */
+export function canCloseHere(item: Pick<FeedItem, "editable" | "role">, owner: boolean): boolean {
+  return item.editable && (owner || item.role === "pm" || item.role === "field_lead");
+}

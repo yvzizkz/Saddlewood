@@ -9,18 +9,19 @@ import { CloseTask, NewTask } from "@/components/tasks/TaskActions";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { resolvePeriod } from "@/lib/analytics/period";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { addDays, localDay } from "@/lib/crew/time";
+import { PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
 import { jobHref, listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { departmentOf, isMine, KIND_LABEL, loadFeed, type FeedItem } from "@/lib/tasks/feed";
+import { canCloseHere, departmentOf, feedForSeat, isMine, KIND_LABEL, loadFeed, type FeedItem } from "@/lib/tasks/feed";
 
 export const dynamic = "force-dynamic";
 
 // Every task in the company, wherever it waits: work handed out here, the
 // owners' waiting list, crew tasks, the ops board, bills waiting on approval.
 // Mine, my team's, by job, by department; overdue items move up a role.
+// A project manager sees the same list narrowed to their jobs (jobs/access.ts).
 
 const PATH = "/app/tasks";
 type SP = Record<string, string | string[] | undefined>;
@@ -28,17 +29,19 @@ type SP = Record<string, string | string[] | undefined>;
 const SOURCE: Record<FeedItem["source"], string> = { work: "Handed out", waiting: "Waiting on you", crew: "Crew task", ops: "Ops board", bill: "Payables", billing: "Billing" };
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const viewer = await getViewer();
-  if (!(await viewerIsOwner(viewer)) || viewer.kind !== "staff") redirect("/app");
-  const me = viewer.email;
+  const seat = await workSeat();
+  if (!seat) redirect("/app");
+  const me = seat.email;
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const view = one("view") === "all" ? "all" : "mine";
   const today = localDay();
 
-  const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
-  const feed = await loadFeed(refs, seats, today);
-  const mineAll = feed.filter((i) => isMine(i, me, seats, people));
+  const [allRefs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
+  const refs = allRefs.filter((r) => seesJob(seat, r));
+  const mineOf = (i: FeedItem) => isMine(i, me, seats, people);
+  const feed = feedForSeat(await loadFeed(allRefs, seats, today), seat.owner ? null : new Set(refs.map((r) => r.key)), mineOf);
+  const mineAll = feed.filter(mineOf);
   const scoped = view === "mine" ? mineAll : feed;
 
   // The trend shows what falls due, four weeks back to four weeks ahead.
@@ -94,7 +97,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     { key: "late", header: "Days late", kind: "count" },
     { key: "source", header: "From", kind: "text", filter: true, phone: "hide" },
   ];
-  const myWork = mineAll.filter((i) => i.editable);
+  const myWork = mineAll.filter((i) => canCloseHere(i, seat.owner));
+  const roles = seat.owner ? ROLES : PM_ROLES;
   const opts = (xs: { value: string; label: string }[]) => xs;
 
   return (
@@ -105,12 +109,14 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <h1 className="text-[var(--color-charcoal)]" style={{ fontFamily: "var(--font-fraunces)" }}>
             Tasks
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">Everything waiting on someone, in one list. Work goes to a role; overdue work moves up one.</p>
+          <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">
+            {seat.owner ? "Everything waiting on someone, in one list." : "Everything waiting on someone on your jobs."} Work goes to a role; overdue work moves up one.
+          </p>
         </div>
         <div className="flex rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-1 text-[13px] font-medium" role="group" aria-label="Whose">
           {(["mine", "all"] as const).map((v) => (
             <Link key={v} href={v === "mine" ? PATH : `${PATH}?view=all`} aria-current={view === v ? "true" : undefined} className={`rounded-lg px-3 py-1.5 ${view === v ? "bg-white text-[var(--color-charcoal)] shadow-sm" : "text-[var(--color-charcoal-light)]"}`}>
-              {v === "mine" ? `Mine (${mineAll.length})` : `Everyone (${feed.length})`}
+              {v === "mine" ? `Mine (${mineAll.length})` : `${seat.owner ? "Everyone" : "My jobs"} (${feed.length})`}
             </Link>
           ))}
         </div>
@@ -118,7 +124,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
       <div className="mb-4">
         <NewTask
-          roles={opts(ROLES.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` })))}
+          roles={opts(roles.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` })))}
           jobs={opts(refs.filter((r) => r.active).map((r) => ({ value: r.key, label: r.name })))}
           kinds={opts(Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label })))}
         />
@@ -168,7 +174,12 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
         <DataTable rows={rows} columns={columns} searchKeys={["title", "detail", "who", "job", "kind", "source"]} name={`tasks-${view}`} rowHrefKey="href" initialSort={{ key: "late", dir: "desc" }} empty={view === "mine" ? "Nothing is waiting on you." : "No open tasks."} />
         <p className="text-xs text-[var(--color-charcoal-light)]">
-          Roles and who holds them: <Link className="underline" href="/app/policies/rights">Who decides</Link>. {view === "mine" ? <Link className="underline" href={hrefOf(PATH, { view: "all" })}>See everyone&apos;s</Link> : null}
+          {seat.owner ? (
+            <>
+              Roles and who holds them: <Link className="underline" href="/app/policies/rights">Who decides</Link>.{" "}
+            </>
+          ) : null}
+          {view === "mine" ? <Link className="underline" href={hrefOf(PATH, { view: "all" })}>See everyone&apos;s</Link> : null}
         </p>
       </div>
     </div>

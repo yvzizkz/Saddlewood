@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { localDay } from "@/lib/crew/time";
 import {
   CHECKLIST_STAGE_LABEL,
@@ -10,20 +9,20 @@ import {
   type ChecklistItem,
   type ChecklistStage,
 } from "@/lib/field/ops";
-import { getJobRef } from "@/lib/jobs/hub";
+import { jobForWrite, PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
+import type { Role } from "@/lib/roles/seats";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const STAGES: ChecklistStage[] = ["pre_cover", "pre_board", "pre_tape", "pre_texture", "pre_paint", "final_walk"];
 
 export async function POST(req: Request) {
-  const viewer = await getViewer();
-  if (!(await viewerIsOwner(viewer)) || viewer.kind !== "staff") {
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  }
+  // Owners, and a project manager on their own jobs (jobs/access.ts).
+  const seat = await workSeat();
+  if (!seat) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const action = String(body.action ?? "");
   const jobKey = String(body.job ?? "").trim();
-  const ref = jobKey ? await getJobRef(jobKey) : null;
+  const ref = jobKey ? await jobForWrite(seat, jobKey) : null;
   if (!ref) return NextResponse.json({ error: "Pick a valid job" }, { status: 400 });
   const crewJobId = ref.crewId ?? ref.key;
   const db = getSupabaseAdmin();
@@ -69,7 +68,7 @@ export async function POST(req: Request) {
     const { data, error } = await db
       .from("crew_entries")
       .insert({
-        email: viewer.email,
+        email: seat.email,
         kind: "eod",
         day,
         job_id: crewJobId,
@@ -104,7 +103,7 @@ export async function POST(req: Request) {
       asked,
       decision,
       stuck,
-      createdBy: viewer.email,
+      createdBy: seat.email,
     });
     return NextResponse.json({ ok: true, id: entryId });
   }
@@ -121,7 +120,7 @@ export async function POST(req: Request) {
     const { data, error } = await db
       .from("crew_entries")
       .insert({
-        email: viewer.email,
+        email: seat.email,
         kind: "receipt",
         day,
         job_id: crewJobId,
@@ -146,8 +145,8 @@ export async function POST(req: Request) {
       paidBy,
       note,
       trade,
-      personName: viewer.email,
-      personEmail: viewer.email,
+      personName: seat.email,
+      personEmail: seat.email,
     });
     return NextResponse.json({ ok: true, id: entryId });
   }
@@ -172,7 +171,7 @@ export async function POST(req: Request) {
         escalate_days: 2,
         source: "",
         href: `/app/jobs/${encodeURIComponent(ref.key)}?tab=log`,
-        created_by: viewer.email,
+        created_by: seat.email,
       })
       .select("id")
       .single();
@@ -184,10 +183,9 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const viewer = await getViewer();
-  if (!(await viewerIsOwner(viewer)) || viewer.kind !== "staff") {
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  }
+  // Owners, and a project manager on their own jobs (jobs/access.ts).
+  const seat = await workSeat();
+  if (!seat) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const action = String(body.action ?? "");
   const db = getSupabaseAdmin();
@@ -196,7 +194,7 @@ export async function PATCH(req: Request) {
     const id = Number(body.id ?? 0);
     if (!id) return NextResponse.json({ error: "Missing checklist id" }, { status: 400 });
     const { data: row, error: readErr } = await db.from("checklists").select("*").eq("id", id).maybeSingle();
-    if (readErr || !row) return NextResponse.json({ error: "Checklist not found" }, { status: 404 });
+    if (readErr || !row || !seesJob(seat, { crewId: (row as { job_id: string }).job_id, billingId: null })) return NextResponse.json({ error: "Checklist not found" }, { status: 404 });
     const currentItems: ChecklistItem[] = Array.isArray((row as { items: unknown }).items) ? ((row as { items: ChecklistItem[] }).items) : [];
     const itemKey = typeof body.itemKey === "string" ? body.itemKey : null;
     const updatedItems = itemKey
@@ -218,7 +216,7 @@ export async function PATCH(req: Request) {
       updated_at: new Date().toISOString(),
     };
     if (nextStatus === "passed") {
-      patch.completed_by = viewer.email;
+      patch.completed_by = seat.email;
       patch.completed_at = new Date().toISOString();
     } else {
       patch.completed_by = "";
@@ -235,14 +233,38 @@ export async function PATCH(req: Request) {
     if (!id || !["open", "done", "dropped"].includes(status)) {
       return NextResponse.json({ error: "Bad punch update" }, { status: 400 });
     }
+    const { data: punch } = await db
+      .from("work_items")
+      .select("kind,role,created_by,job_id,crew_job_id")
+      .eq("id", id)
+      .maybeSingle();
+    const on = punch as {
+      kind: string;
+      role: string;
+      created_by: string;
+      job_id: string | null;
+      crew_job_id: string | null;
+    } | null;
+    // A PM closes punch on their own jobs only; non-punch rows or off-job rows are not found.
+    if (
+      !on ||
+      on.kind !== "punch" ||
+      (!seat.owner && !((on.job_id || on.crew_job_id) && seesJob(seat, { billingId: on.job_id, crewId: on.crew_job_id })))
+    ) {
+      return NextResponse.json({ error: "Punch item not found" }, { status: 404 });
+    }
+    if (!seat.owner && !(PM_ROLES.includes(on.role as Role) || on.created_by === seat.email)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { error } = await db
       .from("work_items")
       .update({
         status,
         done_at: status === "open" ? null : new Date().toISOString(),
-        done_by: status === "open" ? "" : viewer.email,
+        done_by: status === "open" ? "" : seat.email,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("kind", "punch");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

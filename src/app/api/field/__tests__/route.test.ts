@@ -1,34 +1,41 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { fromMock, getViewerMock, viewerIsOwnerMock, getJobRefMock } = vi.hoisted(() => ({
+const { fromMock, workSeatMock, jobForWriteMock } = vi.hoisted(() => ({
   fromMock: vi.fn(),
-  getViewerMock: vi.fn(),
-  viewerIsOwnerMock: vi.fn(),
-  getJobRefMock: vi.fn(),
+  workSeatMock: vi.fn(),
+  jobForWriteMock: vi.fn(),
 }));
 
-vi.mock("@/lib/crew/auth", () => ({
-  getViewer: getViewerMock,
-  viewerIsOwner: viewerIsOwnerMock,
-}));
-vi.mock("@/lib/jobs/hub", () => ({
-  getJobRef: getJobRefMock,
-}));
+vi.mock("@/lib/jobs/access", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/jobs/access")>();
+  return {
+    ...actual,
+    workSeat: workSeatMock,
+    jobForWrite: jobForWriteMock,
+  };
+});
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => ({ from: fromMock }),
 }));
 
 import { PATCH, POST } from "../route";
 
-describe("POST/PATCH /api/field — punch items", () => {
+describe("POST/PATCH /api/field — punch items & PM authorization (T44)", () => {
   it("allows creating two open punches on the same job with source = '' (bypassing work_items_source_uidx)", async () => {
-    getViewerMock.mockResolvedValue({ kind: "staff", email: "lando@saddlewoodcontracting.com" });
-    viewerIsOwnerMock.mockResolvedValue(true);
-    getJobRefMock.mockResolvedValue({
-      key: "9146-w-hutton-dr",
-      name: "9146 W Hutton Dr",
-      crewId: "9146-w-hutton-dr",
-      billingId: "20000000-0000-0000-0000-000000000001",
+    workSeatMock.mockResolvedValue({
+      email: "eli@saddlewoodcontracting.com",
+      owner: false,
+      crewJobs: ["8009-n-ironwood-dr"],
+      billingJobs: ["20000000-0000-0000-0000-000000000002"],
+      laborCost: false,
+      margin: false,
+      sections: ["overview"],
+    });
+    jobForWriteMock.mockResolvedValue({
+      key: "8009-n-ironwood-dr",
+      name: "8009 N Ironwood Dr",
+      crewId: "8009-n-ironwood-dr",
+      billingId: "20000000-0000-0000-0000-000000000002",
     });
 
     const inserted: Record<string, unknown>[] = [];
@@ -39,7 +46,6 @@ describe("POST/PATCH /api/field — punch items", () => {
           insert: (row: Record<string, unknown>) => ({
             select: () => ({
               single: async () => {
-                // Simulate work_items_source_uidx: unique (source) WHERE source <> '' AND status = 'open'
                 if (
                   row.source !== "" &&
                   inserted.some((r) => r.source === row.source && r.status !== "done" && r.status !== "dropped")
@@ -56,84 +62,134 @@ describe("POST/PATCH /api/field — punch items", () => {
       throw new Error(`unexpected table ${table}`);
     });
 
-    const req1 = new Request("http://localhost/api/field", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        action: "punch.add",
-        job: "9146-w-hutton-dr",
-        title: "Touch up corner bead at kitchen island",
-        location: "Kitchen",
+    const res1 = await POST(
+      new Request("http://localhost/api/field", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "punch.add",
+          job: "8009-n-ironwood-dr",
+          title: "Touch up corner bead at kitchen island",
+          location: "Kitchen",
+        }),
       }),
-    });
-    const res1 = await POST(req1);
+    );
     expect(res1.status).toBe(200);
 
-    const req2 = new Request("http://localhost/api/field", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        action: "punch.add",
-        job: "9146-w-hutton-dr",
-        title: "Skim coat nick at hallway soffit",
-        location: "Hallway",
+    const res2 = await POST(
+      new Request("http://localhost/api/field", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "punch.add",
+          job: "8009-n-ironwood-dr",
+          title: "Skim coat nick at hallway soffit",
+          location: "Hallway",
+        }),
       }),
-    });
-    const res2 = await POST(req2);
+    );
     expect(res2.status).toBe(200);
-
     expect(inserted).toHaveLength(2);
     expect(inserted[0].source).toBe("");
     expect(inserted[1].source).toBe("");
   });
 
-  it("writes done_at and done_by (not completed_at/completed_by) when closing or dropping a punch", async () => {
-    getViewerMock.mockResolvedValue({ kind: "staff", email: "lando@saddlewoodcontracting.com" });
-    viewerIsOwnerMock.mockResolvedValue(true);
+  it("refuses a PM closing an owner's finance task on their own job via punch.status, while allowing closing a field_lead punch with done_at/done_by", async () => {
+    workSeatMock.mockResolvedValue({
+      email: "eli@saddlewoodcontracting.com",
+      owner: false,
+      crewJobs: ["8009-n-ironwood-dr"],
+      billingJobs: ["20000000-0000-0000-0000-000000000002"],
+      laborCost: false,
+      margin: false,
+      sections: ["overview"],
+    });
 
-    const updates: { id: number; patch: Record<string, unknown> }[] = [];
+    const rowsById: Record<
+      number,
+      { kind: string; role: string; created_by: string; job_id: string | null; crew_job_id: string | null }
+    > = {
+      701: {
+        kind: "task",
+        role: "finance",
+        created_by: "lando@saddlewoodcontracting.com",
+        job_id: "20000000-0000-0000-0000-000000000002",
+        crew_job_id: "8009-n-ironwood-dr",
+      },
+      702: {
+        kind: "punch",
+        role: "finance",
+        created_by: "lando@saddlewoodcontracting.com",
+        job_id: "20000000-0000-0000-0000-000000000002",
+        crew_job_id: "8009-n-ironwood-dr",
+      },
+      703: {
+        kind: "punch",
+        role: "field_lead",
+        created_by: "lando@saddlewoodcontracting.com",
+        job_id: "20000000-0000-0000-0000-000000000002",
+        crew_job_id: "8009-n-ironwood-dr",
+      },
+    };
+
+    const updates: { id: number; kindFilter: string; patch: Record<string, unknown> }[] = [];
     fromMock.mockImplementation((table: string) => {
       if (table === "work_items") {
         return {
+          select: () => ({
+            eq: (_col: string, id: number) => ({
+              maybeSingle: async () => ({ data: rowsById[id] ?? null, error: null }),
+            }),
+          }),
           update: (patch: Record<string, unknown>) => ({
-            eq: async (_col: string, id: number) => {
-              if ("completed_at" in patch || "completed_by" in patch) {
-                return { error: { message: "column completed_at of relation work_items does not exist" } };
-              }
-              updates.push({ id, patch });
-              return { error: null };
-            },
+            eq: (_c1: string, id: number) => ({
+              eq: async (_c2: string, kindVal: string) => {
+                updates.push({ id, kindFilter: kindVal, patch });
+                return { error: null };
+              },
+            }),
           }),
         };
       }
       throw new Error(`unexpected table ${table}`);
     });
 
-    const closeRes = await PATCH(
+    // 1. Non-punch finance task on the PM's own job -> 404 (not a punch item)
+    const finTaskRes = await PATCH(
       new Request("http://localhost/api/field", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "punch.status", id: 501, status: "done" }),
+        body: JSON.stringify({ action: "punch.status", id: 701, status: "done" }),
       }),
     );
-    expect(closeRes.status).toBe(200);
-    expect(updates[0].id).toBe(501);
+    expect(finTaskRes.status).toBe(404);
+    expect(updates).toHaveLength(0);
+
+    // 2. Punch row assigned to finance and created by owner -> 403
+    const finPunchRes = await PATCH(
+      new Request("http://localhost/api/field", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "punch.status", id: 702, status: "done" }),
+      }),
+    );
+    expect(finPunchRes.status).toBe(403);
+    expect(updates).toHaveLength(0);
+
+    // 3. Real field_lead punch on PM's own job -> 200, writes done_at/done_by and chains .eq("kind", "punch")
+    const validPunchRes = await PATCH(
+      new Request("http://localhost/api/field", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "punch.status", id: 703, status: "done" }),
+      }),
+    );
+    expect(validPunchRes.status).toBe(200);
+    expect(updates).toHaveLength(1);
+    expect(updates[0].id).toBe(703);
+    expect(updates[0].kindFilter).toBe("punch");
     expect(updates[0].patch.status).toBe("done");
     expect(typeof updates[0].patch.done_at).toBe("string");
-    expect(updates[0].patch.done_by).toBe("lando@saddlewoodcontracting.com");
-    expect(updates[0].patch).not.toHaveProperty("completed_at");
-    expect(updates[0].patch).not.toHaveProperty("completed_by");
-
-    const dropRes = await PATCH(
-      new Request("http://localhost/api/field", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "punch.status", id: 502, status: "dropped" }),
-      }),
-    );
-    expect(dropRes.status).toBe(200);
-    expect(updates[1].patch.status).toBe("dropped");
-    expect(typeof updates[1].patch.done_at).toBe("string");
-    expect(updates[1].patch.done_by).toBe("lando@saddlewoodcontracting.com");
+    expect(updates[0].patch.done_by).toBe("eli@saddlewoodcontracting.com");
   });
 });

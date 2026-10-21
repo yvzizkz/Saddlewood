@@ -22,8 +22,8 @@ test.describe("PM access: his jobs, no pay, no payables", () => {
     expect(sections).toEqual(["Overview", "Payroll", "Purchases", "Receivables", "Billing"]);
   });
 
-  test("is turned away from Payables, Job costing, Jobs, Departments and Tasks", async ({ pm: page }) => {
-    for (const path of ["/app/accounting/payables", "/app/accounting/job-costing", "/app/jobs", "/app/departments", "/app/tasks"]) {
+  test("is turned away from Payables, Job costing and Departments", async ({ pm: page }) => {
+    for (const path of ["/app/accounting/payables", "/app/accounting/job-costing", "/app/departments"]) {
       await page.goto(path);
       expect(new URL(page.url()).pathname, path).toBe("/app");
     }

@@ -294,7 +294,7 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
       const { data: existingCo, error: coSelErr } = await (crewJobId ? lookup.eq("crew_job_id", crewJobId) : lookup.is("crew_job_id", null)).maybeSingle();
       if (coSelErr) console.error("syncEodDirectivesAndDecisions change_orders lookup failed:", coSelErr);
       if (!existingCo) {
-        const { error: coErr } = await db.from("change_orders").insert({
+        const { error: coInsErr } = await db.from("change_orders").insert({
           job_id: billingJobId,
           crew_job_id: crewJobId,
           title,
@@ -302,7 +302,9 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
           source: "directive",
           requested_by: input.createdBy,
         });
-        if (coErr) console.error("syncEodDirectivesAndDecisions change_orders insert failed:", coErr);
+        if (coInsErr && (coInsErr as { code?: string }).code !== "23505") {
+          console.error("syncEodDirectivesAndDecisions change_orders insert failed:", coInsErr);
+        }
       }
     }
   } catch (err) {

@@ -16,7 +16,7 @@ Each scenario drives the screens a person in that seat would use, writes through
 |---|---|---|---|---|
 | 1 | **Finance:** AFT billing week. Cutoff calendar, CO through to billing, waiver owed and received, AR and Melio fee, Friday pay run, payroll export | Finance (Ilene) | `e2e/finance-week.spec.ts` | **done (6/6)** · claude |
 | 2 | **Owner:** Monday decisions, a CO priced, AR 14+ days, who-decides change moves work, a task handed to the PM and closed, the job page agrees with Accounting | Owner (Marco) | `e2e/owner-week.spec.ts` | **done (5/5)** · claude |
-| 3 | **PM access:** what a project manager can and can't open in Accounting | PM (Eli) | `e2e/pm-access.spec.ts` | **done (5/5)** · claude |
+| 3 | **PM access & week:** what a project manager can and can't open in Accounting; his own Jobs list, job tabs (no labor $/margin/sub bills/draw controls), field change requests, and scoped Tasks (Mine / My jobs) | PM (Eli) | `e2e/pm-access.spec.ts`, `e2e/pm-week.spec.ts` | **done (8/8)** · claude, agy |
 | 4 | **Field and crew:** hours by trade across two jobs, a far punch, a time fix, receipts into Purchases, the 6 PM daily log, a pre-cover checklist that blocks a phase, a will-call pickup | Field lead / crew | `e2e/field-week.spec.ts` | **done (5/5)** · agy |
 | 5 | **Purchasing:** Home Depot run split across jobs, an unmatched register name assigned, a line re-tagged to a trade, export of selected lines | Finance / PM | `e2e/purchasing-week.spec.ts` | **done (4/4)** · agy |
 | 6 | **Subs:** package → invites → leveling → award under $10k by the PM → work order → no-COI block → bill → waiver hold → payment | PM / Finance | `e2e/subs-week.spec.ts` | **done (4/4)** · agy |
@@ -54,12 +54,14 @@ Each scenario drives the screens a person in that seat would use, writes through
    - Done closes it.
 5. **The job page agrees with Accounting.** Job › Money "Open" equals Receivables narrowed to that job.
 
-## 3. PM access (Eli)
+## 3. PM access & week (Eli)
 
 | Can | Can't |
 |---|---|
-| Accounting › Overview, Payroll hours, Purchases, Receivables, Billing, on his jobs only | Payables, Job costing (unless `policy.pm.margin`), Jobs, Departments, Tasks (owners' screens today) |
+| Accounting › Overview, Payroll hours, Purchases, Receivables, Billing, on his jobs only | Payables, Job costing (unless `policy.pm.margin`), Departments |
 | Open his own job's invoice, read only | See pay or labor dollars (unless `policy.pm.laborCost`), record a payment, open another job's invoice (404) |
+| Open `Jobs` (his assigned jobs only, with `Materials on jobs` KPI and no `Margin` column) and every tab on his jobs (`Overview`, `Schedule`, `Log and QA`, `Money`, `Labor`, `Purchases`, `Subs`, `Changes`, `Documents`, `Tasks`, `Crew and phases`) | Open an unassigned job (`404`), see sub/vendor bills, create an SOV draw invoice (`Make the draft invoice`), or price/sign a change order (`403`) |
+| Record a change request on his job's `Changes` tab (`Awaiting price`), hand tasks to `PM` or `Field and crew` on his jobs, and close his own or field-lead tasks from `Tasks` (`Mine` / `My jobs`) | Hand tasks to `Owner`, `Finance`, `Sales`, or `Operations` (`403`), or create/close tasks on an unassigned job (`404`) |
 
 ## 4. Field and crew: the field week (Mateo / Eli)
 
@@ -111,7 +113,7 @@ Each scenario drives the screens a person in that seat would use, writes through
 
 ## What an owner, a PM and finance can and can't do today
 
-From the runs on 2026-10-20: `npx playwright test` passes **34/34**, twice in a row (Finance 6, Owner 5, PM access 5, Field 5, Purchasing 4, Subs 4, Sales 2, Powell SOV draws 3).
+From the runs on 2026-10-20: `npx playwright test` passes **37/37**, twice in a row (Finance 6, Owner 5, PM access & week 8, Field 5, Purchasing 4, Subs 4, Sales 2, Powell SOV draws 3).
 
 ### Real bugs caught and fixed by the Phase 3 scenario suite
 1. **Trip detail route 404 (`src/lib/accounting/purchases.ts`):** `loadPurchaseTrip` ran `computeTripKey(decoded)` on an already-computed `tripKey`, stripping the last `:segment` and returning 404 on `/app/accounting/purchases/trip/[key]` links. Fixed to match `trip_key.eq.${decoded}` alongside `tk` and `source_key`.
@@ -123,4 +125,4 @@ From the runs on 2026-10-20: `npx playwright test` passes **34/34**, twice in a 
 |---|---|---|
 | **Owner** | Read every department's figures and what waits on it; price, sign and bill a CO from the job page; move a seat and see the work follow; hand a task to a role and watch it move up when overdue; close it; see the job page agree with Receivables to the cent | Record a payment from a P-number match in the app; it still goes through Joist (bot path). Approve and send an invoice package in one step: the package is a checklist and a task today, and sending is the Bill screen |
 | **Finance** | See each client's cutoff and what must go with the invoice; get told to bill a signed CO; record a lien waiver on the invoice (gap fixed in this phase); bill SOV progress draws by percent complete with retainage and signed COs (`0041`); read AR with aging, proof and the ladder; split Melio's fee from the gross; see Friday's pay run and the holds; export payroll that matches the table | Record a sub's incoming waiver from a standalone waiver form on the bill page (the bill page toggles `waiver_received`, and `/api/waivers` records directional rows) |
-| **PM** | Open Overview, Payroll hours, Purchases, Receivables and Billing on his own jobs; open his own invoices read-only; reach it from crew More | See pay, labor dollars or margin (by policy, unless an owner switches them on); Payables; Jobs, Departments, Tasks (owners' screens, so a PM can't create or close tasks in the app yet) → next: open Tasks and the job page to PM seats on their jobs |
+| **PM** | Open Overview, Payroll hours, Purchases, Receivables and Billing on his own jobs; open his own invoices read-only; open `Jobs` and his assigned job pages across all 11 tabs; record field logs, punch, checklists, receipts, and change requests (`Awaiting price`); hand tasks to `PM` or `Field and crew` and close them in `Tasks` (`Mine` / `My jobs`); reach `My jobs` and `Tasks` from crew `More` | See pay, labor dollars or margin (by policy, unless an owner switches them on); Payables; Departments; unassigned jobs (`404`); pricing or signing a change order (`403`); creating an SOV draw invoice (`403`) |

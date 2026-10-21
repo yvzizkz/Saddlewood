@@ -136,6 +136,18 @@ describe("field operations helpers", () => {
           insert: async () => ({ error: { code: "23502", message: "work_items insert failed" } }),
         };
       }
+      if (table === "change_orders") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }),
+              }),
+            }),
+          }),
+          insert: async () => ({ error: { code: "23502", message: "change_orders insert failed" } }),
+        };
+      }
       throw new Error(`unexpected table ${table}`);
     });
 

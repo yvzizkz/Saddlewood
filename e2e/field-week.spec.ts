@@ -78,35 +78,38 @@ test.describe("Field and crew: the field week", () => {
     const summary = `E2E Hung 42 sheets Type X in West corridor ${Date.now()}`;
     const directive = `E2E Super asked for 16-ga backing at corridor display ${Date.now()}`;
 
-    await page.goto(`/app/jobs/${JOB}?tab=log`);
-    await page.getByRole("button", { name: "+ File daily log (SOP-006)" }).click();
-    await page.getByPlaceholder("Work performed today (required)").fill(summary);
-    await page.getByPlaceholder("Client / GC directive (creates CO awaiting price)").fill(directive);
-    await page.getByRole("button", { name: "Save daily log" }).click();
+    try {
+      await page.goto(`/app/jobs/${JOB}?tab=log`);
+      await page.getByRole("button", { name: "+ File daily log (SOP-006)" }).click();
+      await page.getByPlaceholder("Work performed today (required)").fill(summary);
+      await page.getByPlaceholder("Client / GC directive (creates CO awaiting price)").fill(directive);
+      await page.getByRole("button", { name: "Save daily log" }).click();
 
-    const logTable = page.locator(`[data-table="${JOB}-daily-logs"]`);
-    await expect(logTable.getByRole("row").filter({ hasText: summary })).toBeVisible();
+      const logTable = page.locator(`[data-table="${JOB}-daily-logs"]`);
+      await expect(logTable.getByRole("row").filter({ hasText: summary })).toBeVisible();
 
-    // Directive automatically created an awaiting_price Change Order on Changes tab
-    await page.goto(`/app/jobs/${JOB}?tab=changes`);
-    const coRow = page.getByRole("listitem").filter({ hasText: directive });
-    await expect(coRow).toContainText("Awaiting price");
+      // Directive automatically created an awaiting_price Change Order on Changes tab
+      await page.goto(`/app/jobs/${JOB}?tab=changes`);
+      const coRow = page.getByRole("listitem").filter({ hasText: directive });
+      await expect(coRow).toContainText("Awaiting price");
 
-    // And a co_price work item in Tasks for Owner decisions
-    await page.goto("/app/tasks?view=all");
-    const tasks = page.locator('[data-table="tasks-all"]');
-    await tasks.getByRole("searchbox").fill(directive);
-    const taskRow = tasks.getByRole("row").filter({ hasText: directive }).first();
-    await expect(taskRow).toContainText("Owner");
-    await expect(taskRow).toContainText("Change order to price");
-
-    // Clean up the CO so reruns stay clean
-    await page.goto(`/app/jobs/${JOB}?tab=changes`);
-    const cleanupRow = page.getByRole("listitem").filter({ hasText: directive });
-    await cleanupRow.getByPlaceholder("$ price").fill("950");
-    await cleanupRow.getByRole("button", { name: "Price it" }).click();
-    await cleanupRow.getByRole("button", { name: "Signed" }).click();
-    await cleanupRow.getByRole("button", { name: "Billed" }).click();
+      // And a co_price work item in Tasks for Owner decisions
+      await page.goto("/app/tasks?view=all");
+      const tasks = page.locator('[data-table="tasks-all"]');
+      await tasks.getByRole("searchbox").fill(directive);
+      const taskRow = tasks.getByRole("row").filter({ hasText: directive }).first();
+      await expect(taskRow).toContainText("Owner");
+      await expect(taskRow).toContainText("Change order to price");
+    } finally {
+      // Clean up the CO via API even if an assertion above fails so reruns stay clean
+      const listRes = await page.request.get(`/api/change-orders?job=${JOB}`);
+      if (listRes.ok()) {
+        const { rows } = (await listRes.json()) as { rows: { id: number; title: string; status: string }[] };
+        for (const r of rows.filter((c) => c.title.includes(directive) && c.status !== "void")) {
+          await page.request.patch("/api/change-orders", { data: { id: r.id, status: "void" } });
+        }
+      }
+    }
   });
 
   test("Pre-cover quality checklist blocks phase verification until passed, and punch items track by room and wall face", async ({ owner: page }) => {
@@ -139,17 +142,30 @@ test.describe("Field and crew: the field week", () => {
     await card.getByRole("button", { name: "Pass gate" }).click();
     await expect(card.getByRole("button", { name: "Reopen" })).toBeVisible();
 
-    // Add and resolve a room/wall-face punch item
-    const punchTitle = `E2E Skim coat nick ${Date.now()}`;
+    // Add two open room/wall-face punch items on the same job and resolve both (T44)
+    const punchTitle1 = `E2E Skim coat nick ${Date.now()}`;
+    const punchTitle2 = `E2E Corner bead touchup ${Date.now()}`;
     await page.getByRole("button", { name: "+ Punch item" }).click();
-    const punchForm = page.locator("form").filter({ hasText: "Add punch" });
-    await punchForm.getByPlaceholder(/Punch item/i).fill(punchTitle);
-    await punchForm.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — West Wall");
-    await punchForm.getByRole("button", { name: "Add punch" }).click();
+    const punchForm1 = page.locator("form").filter({ hasText: "Add punch" });
+    await punchForm1.getByPlaceholder(/Punch item/i).fill(punchTitle1);
+    await punchForm1.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — West Wall");
+    await punchForm1.getByRole("button", { name: "Add punch" }).click();
 
-    const punchRow = page.locator("li").filter({ hasText: punchTitle });
-    await expect(punchRow).toContainText("Room 104 — West Wall");
-    await punchRow.getByRole("button", { name: "Mark done" }).click();
-    await expect(punchRow.getByRole("button", { name: "Reopen" })).toBeVisible();
+    const punchRow1 = page.locator("li").filter({ hasText: punchTitle1 });
+    await expect(punchRow1).toContainText("Room 104 — West Wall");
+
+    await page.getByRole("button", { name: "+ Punch item" }).click();
+    const punchForm2 = page.locator("form").filter({ hasText: "Add punch" });
+    await punchForm2.getByPlaceholder(/Punch item/i).fill(punchTitle2);
+    await punchForm2.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — East Wall");
+    await punchForm2.getByRole("button", { name: "Add punch" }).click();
+
+    const punchRow2 = page.locator("li").filter({ hasText: punchTitle2 });
+    await expect(punchRow2).toContainText("Room 104 — East Wall");
+
+    await punchRow1.getByRole("button", { name: "Mark done" }).click();
+    await expect(punchRow1.getByRole("button", { name: "Reopen" })).toBeVisible();
+    await punchRow2.getByRole("button", { name: "Mark done" }).click();
+    await expect(punchRow2.getByRole("button", { name: "Reopen" })).toBeVisible();
   });
 });

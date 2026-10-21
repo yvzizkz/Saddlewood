@@ -12,7 +12,8 @@ import { chromium } from "@playwright/test";
 
 const BASE = process.env.BASE ?? "http://localhost:3100";
 const DIR = process.env.SHOTS_DIR ?? "/tmp/shots";
-const EMAIL = "lando@saddlewoodcontracting.com";
+const EMAIL = process.env.SHOTS_EMAIL ?? "lando@saddlewoodcontracting.com";
+const CREW = process.env.SHOTS_CREW === "1";
 const PASSWORD = "local-only-pass-1";
 
 const env = Object.fromEntries(
@@ -44,7 +45,9 @@ const sizes = [
 ];
 for (const [label, viewport] of sizes) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2 });
-  await ctx.addCookies([{ name: "sb-127-auth-token", value, domain: "localhost", path: "/" }]);
+  const cookies = [{ name: "sb-127-auth-token", value, domain: "localhost", path: "/" }];
+  if (CREW) cookies.push({ name: "sw_crew", value: "1", domain: "localhost", path: "/" });
+  await ctx.addCookies(cookies);
   // The owner onboarding sheet is seen once per address; mark it seen.
   await ctx.addInitScript((email) => localStorage.setItem(`sw_onboarded:${email}`, "1"), EMAIL);
   const page = await ctx.newPage();

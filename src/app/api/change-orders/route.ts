@@ -5,7 +5,7 @@ import { nextChangeOrderNumber } from "@/lib/billing/numbering";
 import { CO_STATUS, type CoStatus } from "@/lib/billing/registers";
 import { requireOwner } from "@/lib/crew/auth";
 import { isDay } from "@/lib/crew/time";
-import { getJobRef } from "@/lib/jobs/hub";
+import { jobForWrite, workSeat } from "@/lib/jobs/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 // The change-order register (0040). Record a request (from a directive, T&M or
 // the client), price it, and move it along: sent, signed, billed. Owners
 // price and approve (SOP-002, Who decides); the document itself is still made
-// and sent from Billing like any other.
+// and sent from Billing like any other. A project manager records the request
+// on their own jobs (the day it is asked for, SOP-002); pricing it is not theirs.
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
@@ -29,17 +30,17 @@ const NEXT: Record<CoStatus, CoStatus[]> = {
 };
 
 export async function POST(request: NextRequest) {
-  const owner = await requireOwner(request);
-  if (!owner) return NextResponse.json({ ok: false, error: "owners only" }, { status: 403 });
+  const seat = await workSeat();
+  if (!seat) return NextResponse.json({ ok: false, error: "owners and project managers only" }, { status: 403 });
   const b = ((await request.json().catch(() => null)) ?? {}) as { job?: string; title?: string; detail?: string; source?: string };
   const title = text(b.title, 200);
   if (!title) return NextResponse.json({ ok: false, error: "Say what the change is." }, { status: 400 });
-  const job = b.job ? await getJobRef(b.job) : null;
-  if (!job) return NextResponse.json({ ok: false, error: "Which job?" }, { status: 400 });
+  const job = b.job ? await jobForWrite(seat, b.job) : null;
+  if (!job) return NextResponse.json({ ok: false, error: "Which job?" }, { status: seat.owner || !b.job ? 400 : 404 });
   const source = ["request", "directive", "tm", "field", "client"].includes(b.source ?? "") ? b.source : "request";
   const { data, error } = await getSupabaseAdmin()
     .from("change_orders")
-    .insert({ job_id: job.billingId, crew_job_id: job.crewId, title, detail: text(b.detail, 2000), source, requested_by: owner.email })
+    .insert({ job_id: job.billingId, crew_job_id: job.crewId, title, detail: text(b.detail, 2000), source, requested_by: seat.email })
     .select("id")
     .single();
   if (error) throw new Error(`change_orders insert: ${error.message}`);
