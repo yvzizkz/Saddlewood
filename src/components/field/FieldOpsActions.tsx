@@ -12,7 +12,7 @@ import {
   type ChecklistRow,
   type ChecklistStage,
   type ChecklistTrade,
-} from "@/lib/field/ops";
+} from "@/lib/field/checklists";
 import { onSite, toggleOnSite } from "@/lib/field/tradesOnSite";
 
 export function ChecklistCard({ checklist }: { checklist: ChecklistRow }) {
