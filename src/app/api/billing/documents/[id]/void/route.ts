@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeBillingWrite } from "@/lib/billing/access";
 import { getDocument, voidDocument } from "@/lib/billing/documents";
+import { paidByDocument } from "@/lib/billing/payments";
 import { answerError, bad, isId, notFound, present, readBody } from "@/lib/billing/http";
 
 export const runtime = "nodejs";
@@ -32,6 +33,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!doc) return notFound();
     if (doc.status === "draft") return bad("a draft was never sent, so there is nothing to void; change it instead", 409);
     if (doc.status === "void") return bad("this document is already void", 409);
+    // Money that stands against it would be left pointing at nothing: those payments are voided first.
+    if (((await paidByDocument([id])).get(id)?.total ?? 0) > 0) return bad("payments stand against this document; void them first", 409);
     const voided = await voidDocument(id, reason);
     return NextResponse.json({ ok: true, document: present(voided) });
   } catch (err) {

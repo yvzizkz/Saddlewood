@@ -44,6 +44,8 @@ vi.mock("@/lib/billing/documents", () => ({
 }));
 const getSendGroup = vi.fn();
 vi.mock("@/lib/billing/sendGroups", () => ({ getSendGroup: (...a: unknown[]) => getSendGroup(...a) }));
+const paidByDocument = vi.fn();
+vi.mock("@/lib/billing/payments", () => ({ paidByDocument: (...a: unknown[]) => paidByDocument(...a) }));
 
 import { POST as create } from "../route";
 import { GET as look, PATCH as change } from "../[id]/route";
@@ -87,6 +89,7 @@ const asAgent = { authorization: `Bearer ${AGENT}`, "x-ops-actor": "billing.py" 
 
 beforeEach(() => {
   user = LANDO;
+  paidByDocument.mockReset().mockResolvedValue(new Map());
   readState.mockReset().mockResolvedValue({ sections: { people: OWNERS }, bridge: {} });
   createDraft.mockReset().mockImplementation(async (input: Record<string, unknown>) => ({ ...DRAFT, ...input, id: ID, status: "draft" }));
   getDocument.mockReset().mockResolvedValue(DRAFT);
@@ -298,6 +301,15 @@ describe("POST .../issue and .../void", () => {
     expect(res.status).toBe(200);
     expect(voidDocument).toHaveBeenCalledWith(ID, "wrong amount");
     expect((await res.json()).document).toMatchObject({ status: "void", voidReason: "wrong amount" });
+  });
+
+  it("does not void a document money still stands against", async () => {
+    getDocument.mockResolvedValue(ISSUED);
+    paidByDocument.mockResolvedValue(new Map([[ID, { total: 50_000, byLine: new Map() }]]));
+    const res = await voidIt(req("POST", `/api/billing/documents/${ID}/void`, { reason: "wrong amount" }), ctx());
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/void them first/);
+    expect(voidDocument).not.toHaveBeenCalled();
   });
 
   it("does not void a draft (never sent) or a void one", async () => {

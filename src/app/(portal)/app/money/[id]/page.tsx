@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Card, Chip, Empty, ScreenTitle, SectionTitle } from "@/components/bot/ui";
 import { day, money, when } from "@/components/money/format";
 import RecordPayment from "@/components/money/RecordPayment";
+import VoidButton from "@/components/money/VoidButton";
 import WaiverPanel from "@/components/billing/WaiverPanel";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getDocument, listEvents } from "@/lib/billing/documents";
@@ -169,10 +170,22 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
                 </div>
                 {pm.voidedAt ? <Chip tone="bad">Void</Chip> : null}
               </div>
+              {seat.owner && !pm.voidedAt ? <VoidButton url={`/api/billing/payments/${pm.id}/void`} what={`this ${money(pm.amountCents)} payment`} label="Void this payment" testId={`void-payment-${pm.id}`} /> : null}
             </Card>
           ))}
         </div>
       )}
+
+      {doc.status === "issued" && seat.owner ? (
+        <div className="mt-6 border-t border-[var(--color-stone)] pt-3">
+          {paidCents > 0 ? (
+            <p className="text-xs text-[var(--color-charcoal-light)]">To void {doc.number}, void its payments first.</p>
+          ) : (
+            <VoidButton url={`/api/billing/documents/${doc.id}/void`} what={doc.number} label={`Void ${doc.number}`} testId="void-document" />
+          )}
+        </div>
+      ) : null}
+      {doc.status === "void" && doc.voidReason ? <p className="mt-4 text-xs text-[#9a2a1f]">Voided: {doc.voidReason}</p> : null}
 
       <SectionTitle count={events.length}>Proof record</SectionTitle>
       {events.length === 0 ? (
