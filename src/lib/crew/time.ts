@@ -67,8 +67,7 @@ export function clock12(at: Instant | null | undefined): string {
   if (at === null || at === undefined || at === "") return "";
   const d = toDate(at);
   if (Number.isNaN(d.getTime())) return "";
-  const [h, m] = localClock(d).split(":").map(Number);
-  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+  return clockText(localClock(d));
 }
 
 /** "06:00" -> "6:00 AM". */

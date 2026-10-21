@@ -2,6 +2,7 @@
 // with them, read from Company policies so no limit lives in two places.
 // The pure parts are client-safe; loadSeats reads the database.
 
+import { OWNER_CALLS_DAY } from "@/lib/billing/ladder";
 import type { BotPeople } from "@/lib/bot/types";
 
 export const ROLES = ["decisions", "sales", "finance", "ops", "pm", "field_lead"] as const;
@@ -89,7 +90,7 @@ export function decisionRights(p: Record<string, unknown>): Right[] {
     { action: "Price and approve a change order", role: "decisions", upToCents: null, condition: "the PM never quotes a price", policyKey: null },
     { action: "Send an invoice or anything a client sees", role: "decisions", upToCents: null, condition: "finance prepares it", policyKey: null },
     { action: "Record or void a payment", role: "decisions", upToCents: null, condition: "owners only (decision 3, 10/19)", policyKey: null },
-    { action: "Run the collection ladder", role: "finance", upToCents: null, condition: "through day 14 late; then the owner calls", policyKey: "policy.ladder.reminders" },
+    { action: "Run the collection ladder", role: "finance", upToCents: null, condition: `until day ${OWNER_CALLS_DAY} late; then the owner calls`, policyKey: "policy.ladder.reminders" },
     { action: "Pay a sub bill", role: "finance", upToCents: null, condition: "approved by the job's PM, conditional waiver in hand", policyKey: null },
     { action: "Move the schedule inside the week", role: "pm", upToCents: null, condition: "no milestone slips", policyKey: null },
     { action: "Pay rates, seats, groups and policies", role: "decisions", upToCents: null, condition: "owners only", policyKey: null },

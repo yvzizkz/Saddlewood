@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AppSettings } from "@/lib/crew/settings";
 import type { Lane } from "@/lib/owner/lanes";
 import type { WaitingItem } from "@/lib/owner/waiting";
+import { clockText } from "@/lib/crew/time";
 
 // The contract between three parties:
 //   the app (people, portal session)      -> /api/bot/{home,messages,actions,...}
@@ -605,15 +606,6 @@ export type BotHome = {
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export function clock12(hhmm: string): string {
-  const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
-  if (!m) return hhmm;
-  const h = Number(m[1]);
-  const suffix = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m[2]} ${suffix}`;
-}
-
 export function ordinal(n: number): string {
   const rem100 = n % 100;
   if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
@@ -621,7 +613,7 @@ export function ordinal(n: number): string {
 }
 
 export function describeCadence(c: { type: CadenceType; time: string; weekday?: number; monthday?: number }): string {
-  const at = clock12(c.time);
+  const at = clockText(c.time);
   switch (c.type) {
     case "daily":
       return `Every day at ${at}`;

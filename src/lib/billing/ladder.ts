@@ -20,6 +20,9 @@ export const LADDER: LadderStep[] = [
   { day: 30, label: "Attorney; lien calendar", who: "marco" },
 ];
 
+/** The day late the owner takes the calls over: the ladder's first step that is Marco's. */
+export const OWNER_CALLS_DAY = LADDER.find((s) => s.who === "marco")?.day ?? 14;
+
 /** Days a document should have been viewed within, before a resend. */
 export const VIEW_WITHIN_BUSINESS_DAYS = 2;
 

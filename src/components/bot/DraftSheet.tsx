@@ -6,7 +6,8 @@ import { Clock, Lock, MessageSquare, Paperclip, Send, X } from 'lucide-react'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { botApi, useBot } from './BotProvider'
 import { Button, Chip, INPUT } from './ui'
-import { clock12, type BotDraft } from '@/lib/bot/types'
+import { type BotDraft } from '@/lib/bot/types'
+import { clockText } from '@/lib/crew/time'
 import { ago, canApprove, dayTime } from '@/lib/bot/view'
 
 // Read the whole draft, then send it, time it, or kill it. Sending an email to
@@ -253,7 +254,7 @@ export default function DraftSheet({ draft, onClose }: { draft: BotDraft | null;
                     disabled={!/^\d{2}:\d{2}$/.test(at)}
                     onClick={() => run({ kind: 'draft.schedule', payload: { n: draft.n, at } })}
                   >
-                    <Clock className="size-4" aria-hidden="true" /> Approve, and send at {clock12(at)}
+                    <Clock className="size-4" aria-hidden="true" /> Approve, and send at {clockText(at)}
                   </Button>
                 </div>
               ) : (

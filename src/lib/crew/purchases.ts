@@ -55,12 +55,15 @@ export function normalizeJobName(raw: string): string {
  * (hd:20260812:674:0:6220:1 -> hd:20260812:674:0:6220). Home Depot
  * transaction numbers repeat across stores and days, so the whole prefix is
  * the trip, never the transaction alone. A key with no colon is its own trip.
+ *
+ * The same rule is the stored purchases.trip_key column (generated, 0044);
+ * e2e/purchase-rules-parity.spec.ts holds the two to the same answers.
  */
 export function tripKey(sourceKey: string): string {
   // A receipt filed in the app is one line keyed app:<entry id>: its own trip (0044).
   if (/^app:\d+$/.test(sourceKey)) return sourceKey;
   const i = sourceKey.lastIndexOf(":");
-  return i > 0 ? sourceKey.slice(0, i) : sourceKey;
+  return i >= 0 ? sourceKey.slice(0, i) : sourceKey;
 }
 
 // ---- trades -------------------------------------------------------------------------
@@ -69,7 +72,12 @@ export type TradeRule = { department: string; class: string; trade: string };
 
 const upper = (s: string) => s.trim().replace(/\s+/g, " ").toUpperCase();
 
-/** Exact (department, class), then the department alone, else general. */
+/**
+ * Exact (department, class), then the department alone, else general. The
+ * same lookup runs in SQL when a register alias relinks lines
+ * (purchases_relink, 0042); e2e/purchase-rules-parity.spec.ts holds the two
+ * to the same answers.
+ */
 export function tradeFor(rules: TradeRule[], department: string, cls: string): Trade {
   const d = upper(department);
   const c = upper(cls);
