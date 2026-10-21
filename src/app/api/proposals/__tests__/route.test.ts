@@ -184,22 +184,16 @@ describe('Proposals API Routes', () => {
       expect(json.proposal.id).toBe('prp-001');
     });
 
-    it('PATCH /api/proposals/[id] toggles alternates for the token holder', async () => {
-      toggleProposalAlternateMock.mockResolvedValue({
-        ...dummyProposal,
-        alternates: [{ id: 'alt-1', title: 'ChamClad', amount: 15000, selected: false }],
-      });
-
+    it('PATCH /api/proposals/[id] no longer changes alternates: the link is view-only (410)', async () => {
       const req = new NextRequest(`http://localhost:3000/api/proposals/${SHARE_TOKEN}`, {
         method: 'PATCH',
         body: JSON.stringify({ alternate_id: 'alt-1', selected: false }),
       });
 
       const res = await patchProposal(req, params(SHARE_TOKEN));
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json.proposal.alternates[0].selected).toBe(false);
-      expect(toggleProposalAlternateMock).toHaveBeenCalledWith('prp-001', 'alt-1', false);
+      expect(res.status).toBe(410);
+      expect((await res.json()).error).toMatch(/view-only/);
+      expect(toggleProposalAlternateMock).not.toHaveBeenCalled();
     });
 
     it('PATCH /api/proposals/[id] changes nothing for a visitor who guessed the id', async () => {
@@ -237,43 +231,10 @@ describe('Proposals API Routes', () => {
       expect(updateProposalStatusMock).toHaveBeenCalledWith('prp-001', 'declined');
     });
 
-    it('POST /api/proposals/[id]/accept captures acceptance from the token holder', async () => {
-      acceptProposalMock.mockResolvedValue({
-        ...dummyProposal,
-        status: 'accepted',
-        accepted_by: 'Dean Schifferer',
-        accepted_signature: 'data:image/png;base64,sample',
-      });
-
-      const req = new NextRequest(`http://localhost:3000/api/proposals/${SHARE_TOKEN}/accept`, {
-        method: 'POST',
-        headers: { 'x-forwarded-for': '198.51.100.1' },
-        body: JSON.stringify({
-          name: 'Dean Schifferer',
-          signature: 'data:image/png;base64,sample',
-        }),
-      });
-
-      const res = await acceptProposalRoute(req, params(SHARE_TOKEN));
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json.proposal.status).toBe('accepted');
-      expect(json.proposal.accepted_by).toBe('Dean Schifferer');
-      expect(acceptProposalMock).toHaveBeenCalledWith('prp-001', {
-        name: 'Dean Schifferer',
-        signature: 'data:image/png;base64,sample',
-        ip: '198.51.100.1',
-      });
-    });
-
-    it('POST /api/proposals/[id]/accept refuses a visitor who guessed the id', async () => {
-      const req = new NextRequest('http://localhost:3000/api/proposals/prp-001/accept', {
-        method: 'POST',
-        body: JSON.stringify({ name: 'Somebody Else', signature: 'x' }),
-      });
-
-      const res = await acceptProposalRoute(req, params('prp-001'));
-      expect(res.status).toBe(404);
+    it('POST /api/proposals/[id]/accept records nothing: the link is view-only (410)', async () => {
+      const res = await acceptProposalRoute();
+      expect(res.status).toBe(410);
+      expect((await res.json()).error).toMatch(/call \(480\) 999-6100/);
       expect(acceptProposalMock).not.toHaveBeenCalled();
     });
   });
@@ -313,77 +274,12 @@ describe('Proposals API Routes', () => {
       expect(res.status).toBe(404);
     });
 
-    it('POST /api/proposals/[id]/updates validates and adds update', async () => {
-      addProposalUpdateMock.mockResolvedValue({ proposal: dummyProposal, update });
-
-      const req = new NextRequest(`http://localhost:3000/api/proposals/${SHARE_TOKEN}/updates`, {
-        method: 'POST',
-        body: JSON.stringify({
-          author_name: 'Dean Schifferer',
-          category: 'scope_change',
-          message: 'Add blocking for TV mounts',
-        }),
-      });
-
-      const res = await postUpdate(req, params(SHARE_TOKEN));
-      expect(res.status).toBe(201);
-      const json = await res.json();
-      expect(json.ok).toBe(true);
-      expect(json.update.message).toBe('Add blocking for TV mounts');
-      expect(addProposalUpdateMock.mock.calls[0][0]).toBe('prp-001');
-    });
-
-    it('POST /api/proposals/[id]/updates refuses a category it does not know', async () => {
-      const req = new NextRequest(`http://localhost:3000/api/proposals/${SHARE_TOKEN}/updates`, {
-        method: 'POST',
-        body: JSON.stringify({ author_name: 'X', category: 'toString', message: 'hello' }),
-      });
-
-      const res = await postUpdate(req, params(SHARE_TOKEN));
-      expect(res.status).toBe(400);
-      expect(addProposalUpdateMock).not.toHaveBeenCalled();
-    });
-
-    it('POST /api/proposals/[id]/updates adds nothing for a visitor who guessed the id', async () => {
-      const req = new NextRequest('http://localhost:3000/api/proposals/prp-001/updates', {
-        method: 'POST',
-        body: JSON.stringify({ author_name: 'X', category: 'scope_change', message: 'hello' }),
-      });
-
-      const res = await postUpdate(req, params('prp-001'));
-      expect(res.status).toBe(404);
-      expect(addProposalUpdateMock).not.toHaveBeenCalled();
-    });
-
-    it('the alert email escapes what the sender typed', async () => {
+    it('POST /api/proposals/[id]/updates takes no notes and sends no email: the link is view-only (410)', async () => {
       vi.stubEnv('RESEND_API_KEY', 're_test');
-      addProposalUpdateMock.mockResolvedValue({
-        proposal: dummyProposal,
-        update: {
-          ...update,
-          author_name: '<b>Dean</b>',
-          author_email: 'not an address"><script>',
-          message: '<img src=x onerror=alert(1)>',
-          attachments: [{ id: 'a', name: '<i>plan</i>.pdf', size: 2048, type: 'application/pdf', data_url: '#' }],
-        },
-      });
-
-      const req = new NextRequest(`http://localhost:3000/api/proposals/${SHARE_TOKEN}/updates`, {
-        method: 'POST',
-        body: JSON.stringify({ author_name: 'x', category: 'scope_change', message: 'x' }),
-      });
-
-      const res = await postUpdate(req, params(SHARE_TOKEN));
-      expect(res.status).toBe(201);
-      expect(sendMock).toHaveBeenCalledTimes(1);
-      const mail = sendMock.mock.calls[0][0];
-      expect(mail.html).not.toContain('<img');
-      expect(mail.html).not.toContain('<script');
-      expect(mail.html).not.toContain('<b>Dean</b>');
-      expect(mail.html).not.toContain('<i>plan</i>');
-      expect(mail.html).toContain('&lt;img src=x onerror=alert(1)&gt;');
-      expect(mail.html).toContain('&lt;i&gt;plan&lt;/i&gt;.pdf (2 KB)');
-      expect(mail.replyTo).toBe('info@saddlewoodcontracting.com');
+      const res = await postUpdate();
+      expect(res.status).toBe(410);
+      expect(addProposalUpdateMock).not.toHaveBeenCalled();
+      expect(sendMock).not.toHaveBeenCalled();
     });
 
     it('PATCH /api/proposals/[id]/updates is staff only', async () => {

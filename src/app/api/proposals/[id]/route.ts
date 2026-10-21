@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openProposal } from '@/lib/proposals/access';
-import { updateProposalStatus, toggleProposalAlternate } from '@/lib/proposals/store';
+import { updateProposalStatus } from '@/lib/proposals/store';
+import { viewOnly } from '@/lib/proposals/viewOnly';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,10 +36,9 @@ export async function PATCH(
     }
     const body = await request.json();
 
-    // A client picks alternates on their own proposal.
+    // A client used to pick alternates here; the old links are view-only now.
     if (body.alternate_id !== undefined && body.selected !== undefined) {
-      const updated = await toggleProposalAlternate(access.proposal.id, body.alternate_id, body.selected);
-      return NextResponse.json({ ok: true, proposal: updated });
+      return viewOnly();
     }
 
     // Moving it between draft, sent, accepted and declined is staff work.
