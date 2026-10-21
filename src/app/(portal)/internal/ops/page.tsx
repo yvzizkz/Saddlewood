@@ -18,7 +18,7 @@ import OpsSubnav from '@/components/ops/OpsSubnav';
 import { OPS_DOCS } from '@/content/ops/docs.generated';
 import { listCards } from '@/lib/ops/queries';
 import { OPS_DEPARTMENTS, inferCardDepartment, type OpsCard } from '@/lib/ops/types';
-import { getAccountingState } from '@/lib/expenses/store';
+import { untaggedSpend } from '@/lib/expenses/store';
 import { getContractsState } from '@/lib/contracts/store';
 import { getLeadsState } from '@/lib/leads/store';
 import { countPendingEstimates } from '@/lib/estimates/queries';
@@ -58,8 +58,7 @@ export default async function OpsPage() {
   let pendingEstimatesCount = 0;
 
   try {
-    const acctState = await getAccountingState();
-    pendingExpensesCount = acctState.expenses.filter((e) => e.status === 'pending').length;
+    pendingExpensesCount = (await untaggedSpend(1)).count;
   } catch {
     // fallback
   }
@@ -202,7 +201,7 @@ export default async function OpsPage() {
 
           {/* Expenses Action Item */}
           <Link
-            href="/internal/expenses"
+            href="/app/accounting/purchases#tag-spend"
             className="p-3.5 rounded-xl border border-[var(--color-stone)] bg-white hover:border-[var(--color-teal)] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group"
           >
             <div>
@@ -223,11 +222,11 @@ export default async function OpsPage() {
                 Zelle Tagging & Clearance
               </div>
               <p className="text-[11px] text-[var(--color-charcoal-light)] mt-1">
-                Disbursements from Chase needing project tagging or dismissal.
+                Zelle payments and receipts on no job yet.
               </p>
             </div>
             <div className="flex items-center text-xs font-semibold text-[var(--color-teal)] mt-3 group-hover:translate-x-0.5 transition-transform">
-              <span>Open Expenses</span>
+              <span>Tag spend</span>
               <ArrowRight className="size-3.5 ml-1" />
             </div>
           </Link>

@@ -7,6 +7,7 @@ import { AlertCircle, Check, Tag } from "lucide-react";
 import { formatValue } from "@/lib/analytics/format";
 import type { Trade } from "@/lib/accounting/trades";
 import type { UnmatchedPurchase } from "@/lib/crew/purchases";
+import type { UntaggedSpend } from "@/lib/expenses/store";
 
 export function UnmatchedBanner({
   unmatched,
@@ -108,6 +109,106 @@ export function UnmatchedBanner({
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+const SOURCE_LABEL: Record<string, string> = { zelle: "Zelle", receipt: "Texted receipt", app: "App receipt", hd: "Home Depot", vendor: "Supplier", manual: "Typed in" };
+
+/**
+ * Tag spend: payments and receipts on no job with no name to answer by (a
+ * Zelle payment, a receipt with no job typed). One line at a time; the
+ * register names are answered once each in "Which job is this?" above.
+ */
+export function TagSpend({ rows, count, jobs }: { rows: UntaggedSpend[]; count: number; jobs: { id: string; name: string }[] }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!rows.length) return null;
+
+  const save = async (key: string, val: string) => {
+    setBusyKey(key);
+    setError(null);
+    try {
+      const res = await fetch("/api/accounting/purchases", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(val === "__ignore__" ? { action: "set_aside", sourceKeys: [key] } : { action: "assign_job", sourceKeys: [key], jobId: val }),
+      });
+      if (res.ok) start(() => router.refresh());
+      else setError("Could not save that; try again.");
+    } catch {
+      setError("No connection");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  return (
+    <section id="tag-spend" aria-label="Tag spend" data-testid="tag-spend" className="scroll-mt-20 rounded-2xl border border-[#d6b36a] bg-[#fdf9ef] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Tag className="size-4 shrink-0 text-[var(--color-gold-accessible)]" aria-hidden="true" />
+          <h2 className="text-sm font-semibold text-[var(--color-charcoal)]">
+            Tag spend ({count} {count === 1 ? "payment or receipt" : "payments and receipts"} on no job)
+          </h2>
+        </div>
+        <p className="text-xs text-[var(--color-charcoal-light)]">Zelle payments and receipts land here until they are on a job.</p>
+      </div>
+      {error ? <p className="mt-2 text-sm text-[#9a2a1f]">{error}</p> : null}
+      <ul className="mt-3 divide-y divide-[var(--color-stone)]">
+        {rows.map((r) => {
+          const val = picked[r.sourceKey] ?? "";
+          const isBusy = busyKey === r.sourceKey || pending;
+          const id = `tag-${r.sourceKey.replace(/[^a-z0-9-]/gi, "-")}`;
+          return (
+            <li key={r.sourceKey} data-testid={id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--color-charcoal)]">
+                  {r.description || r.vendor}{" "}
+                  <span className="ml-1.5 font-semibold tabular-nums">{formatValue("money", r.cents)}</span>
+                </p>
+                <p className="text-xs text-[var(--color-charcoal-light)]">
+                  {SOURCE_LABEL[r.source] ?? r.source} · {formatValue("date", r.purchasedOn)}
+                  {r.typed ? <> · filed as &ldquo;{r.typed}&rdquo;</> : null}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="sr-only" htmlFor={id + "-job"}>
+                  Job for {r.description || r.vendor}
+                </label>
+                <select
+                  id={id + "-job"}
+                  value={val}
+                  onChange={(e) => setPicked((p) => ({ ...p, [r.sourceKey]: e.target.value }))}
+                  className="min-h-9 rounded-xl border border-[var(--color-stone-mid)] bg-white px-3 py-1.5 text-sm text-[var(--color-charcoal)]"
+                >
+                  <option value="">Choose a job…</option>
+                  {jobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.name}
+                    </option>
+                  ))}
+                  <option value="__ignore__">Not a job (overhead, personal)</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={!val || isBusy}
+                  onClick={() => save(r.sourceKey, val)}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[var(--color-teal)] px-3 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  <Check className="size-3.5" aria-hidden="true" />
+                  Save
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {count > rows.length ? <p className="mt-2 text-xs text-[var(--color-charcoal-light)]">Showing the newest {rows.length}.</p> : null}
     </section>
   );
 }

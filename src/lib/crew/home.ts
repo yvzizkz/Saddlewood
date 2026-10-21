@@ -1,5 +1,5 @@
 import { signDownload } from "@/lib/bot/queries";
-import { getAccountingState } from "@/lib/expenses/store";
+import { spendJobNames } from "@/lib/expenses/store";
 import {
   getEntry,
   listEntries,
@@ -185,11 +185,10 @@ export async function adminHome(viewer: Manager, weekParam: string | null, now =
   };
 }
 
-/** Project names the expense tracker already files receipts under. */
+/** Names Zelle payments and receipts were filed under that are no job yet (0053). */
 async function suggestedJobs(): Promise<string[]> {
   try {
-    const state = await getAccountingState();
-    return (state.activeProjects ?? []).filter((n): n is string => typeof n === "string" && n.trim().length >= 2).slice(0, 12);
+    return await spendJobNames();
   } catch {
     return [];
   }

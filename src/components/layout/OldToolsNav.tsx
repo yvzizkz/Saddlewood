@@ -10,7 +10,6 @@ const OLD = [
   { href: '/internal', label: 'Pipeline estimates' },
   { href: '/internal/trackers', label: 'Progress trackers' },
   { href: '/internal/contracts', label: 'Contracts (old)' },
-  { href: '/internal/expenses', label: 'Expenses (old)' },
 ]
 
 export default function OldToolsNav() {

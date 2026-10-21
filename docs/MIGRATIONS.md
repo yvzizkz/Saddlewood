@@ -33,6 +33,7 @@ site change that reads them with the server key must be live first.
 | 0050 | `job_history` | 2026-10-20 |
 | 0051 | `estimate_tables_service_role_only` (deploy the site first) | cleanup PR |
 | 0052 | `old_tables_no_public_grants` | cleanup PR |
+| 0053 | `spend_ledger` (after 0042 and 0044; before the site change) | cleanup PR |
 
 ## Production state
 
@@ -57,6 +58,11 @@ where policyname = 'auth_full_access'` (0 once it is in).
 `select count(*) from information_schema.role_table_grants where
 table_schema = 'public' and grantee in ('anon', 'authenticated')` (0 once it
 is in, with 0051).
+0053 lets purchases hold Zelle payments and texted receipts and copies the
+old Expenses row (`progress_trackers` 'accounting-state', left in place) into
+them, skipping the page's five seed payments. Apply it before the site change
+that writes them (/api/expenses). Check it with `select pg_get_constraintdef(oid)
+from pg_constraint where conname = 'purchases_source_check'` (lists 'zelle').
 
 ## Rules
 

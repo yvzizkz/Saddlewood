@@ -10,6 +10,7 @@ import {
   type AliasRule,
   type MaterialBlock,
   type PurchaseRow,
+  type PurchaseSource,
   type PurchasesToday,
   type TradeRule,
   type UnmatchedPurchase,
@@ -27,7 +28,7 @@ function fail(what: string, message: string): never {
 }
 
 type PurchaseDbRow = {
-  source: "hd" | "app";
+  source: PurchaseSource;
   source_key: string;
   purchased_on: string;
   vendor: string;

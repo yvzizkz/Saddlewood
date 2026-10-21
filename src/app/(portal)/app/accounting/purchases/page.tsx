@@ -11,7 +11,8 @@ import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { moneySeatForPage, seesCrewJob } from "@/lib/accounting/access";
 import { SMALL_TRIP_CENTS } from "@/lib/crew/purchases";
-import { DedupeReceiptsButton, UnmatchedBanner } from "./PurchaseActions";
+import { untaggedSpend } from "@/lib/expenses/store";
+import { DedupeReceiptsButton, TagSpend, UnmatchedBanner } from "./PurchaseActions";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,8 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
   const allRows = loaded.rows.filter((r) => seesCrewJob(seat, r.rawJobId));
   const jobs = loaded.jobs.filter((j) => seesCrewJob(seat, j.id));
   const unmatched = seat.owner ? loaded.unmatched : [];
+  // Payments and receipts on no job (0053): owners tag them, as they answer "Which job is this?".
+  const untagged = seat.owner ? await untaggedSpend().catch(() => ({ rows: [], count: 0 })) : { rows: [], count: 0 };
   const capped = loaded.capped;
   const now = allRows.filter((r) => inRange(r.purchasedOn, period.from, period.to));
   const before = allRows.filter((r) => inRange(r.purchasedOn, period.previous.from, period.previous.to));
@@ -205,7 +208,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
     <AccountingFrame
       sections={seat.sections}
       title="Purchases and materials"
-      intro="Home Depot Pro Xtra, supply-house orders and field receipts — categorized by trade and linked to each project."
+      intro="Home Depot Pro Xtra, supply-house orders, field receipts and Zelle payments — categorized by trade and linked to each project."
       period={period}
       crumbs={[{ label: "Accounting", href: "/app/accounting" }, ...d.crumbs]}
       filters={d.filters}
@@ -277,6 +280,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
       />
 
       {unmatched.length > 0 ? <UnmatchedBanner unmatched={unmatched} jobs={jobs} /> : null}
+      <TagSpend rows={untagged.rows} count={untagged.count} jobs={jobs} />
       {seat.owner ? <DedupeReceiptsButton /> : null}
 
       <DataTable

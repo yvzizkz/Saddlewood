@@ -261,7 +261,7 @@ function ExpensesLink({ count }: { count: number }) {
   if (!count) return null
   return (
     <Link
-      href="/internal/expenses"
+      href="/app/accounting/purchases#tag-spend"
       className="mt-3 flex items-center justify-between rounded-2xl border border-[var(--color-stone)] bg-white px-4 py-3.5 active:bg-[var(--color-cream)]"
     >
       <span className="text-[15px] text-[var(--color-charcoal)]">

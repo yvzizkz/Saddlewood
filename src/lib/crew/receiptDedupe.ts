@@ -1,4 +1,4 @@
-import { tripKey } from "./purchases";
+import { RECEIPT_SOURCES, tripKey, type PurchaseSource } from "./purchases";
 
 // One Home Depot trip, counted once.
 //
@@ -21,7 +21,7 @@ const TAX_TYPICAL = 0.083;
 const SLACK_CENTS = 100;
 
 export type DedupeLine = {
-  source: "hd" | "app";
+  source: PurchaseSource;
   sourceKey: string;
   purchasedOn: string;
   vendor: string;
@@ -47,7 +47,7 @@ export function matchReceiptsToTrips(lines: DedupeLine[]): ReceiptMatch[] {
     trips.set(k, t);
   }
   const receipts = lines
-    .filter((l) => l.source === "app" && l.lineTotalCents > 0 && isHomeDepot(l.vendor))
+    .filter((l) => RECEIPT_SOURCES.includes(l.source) && l.lineTotalCents > 0 && isHomeDepot(l.vendor))
     .sort((a, b) => b.lineTotalCents - a.lineTotalCents || a.sourceKey.localeCompare(b.sourceKey));
 
   // Every receipt-trip pair that fits, best first; then take them greedily.
@@ -80,7 +80,7 @@ export function coverChanges(lines: DedupeLine[], matches: ReceiptMatch[]): { se
   const set: ReceiptMatch[] = [];
   const clear: string[] = [];
   for (const l of lines) {
-    if (l.source !== "app") continue;
+    if (!RECEIPT_SOURCES.includes(l.source)) continue;
     const has = typeof l.meta.coveredBy === "string" ? (l.meta.coveredBy as string) : null;
     const should = want.get(l.sourceKey) ?? null;
     if (has === should) continue;

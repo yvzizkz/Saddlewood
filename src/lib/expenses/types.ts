@@ -1,16 +1,9 @@
+// The bot's expense item, as /api/expenses has always taken and returned it
+// (KB accounting.py, receipt_ocr.py, crew.py). Stored as purchases lines (0053).
+
 export type ExpenseSource = 'zelle' | 'receipt' | 'card' | 'manual';
 export type ExpenseDirection = 'out' | 'in';
 export type ExpenseStatus = 'pending' | 'categorized' | 'dismissed';
-
-export type ExpenseCategory =
-  | 'Materials'
-  | 'Subcontractor'
-  | 'Labor'
-  | 'Equipment & Tools'
-  | 'Permits & Fees'
-  | 'Fuel & Travel'
-  | 'Office & Overhead'
-  | 'Other';
 
 export type ExpenseItem = {
   id: string;
@@ -24,7 +17,7 @@ export type ExpenseItem = {
   transactionId?: string;
   status: ExpenseStatus;
   project: string | null;
-  expenseType: ExpenseCategory | string | null;
+  expenseType: string | null;
   decidedBy: string | null;
   decidedAt: string | null;
   clearedVia: 'portal' | 'text' | 'email' | null;
@@ -32,53 +25,4 @@ export type ExpenseItem = {
   receiptUrl?: string | null;
   vendor?: string | null;
   createdAt: string;
-};
-
-export type PurchaseLineItem = {
-  id: string;
-  date: string;
-  vendor: string;
-  description: string;
-  amount: number;
-  project: string;
-  category: string;
-};
-
-export type WeeklyPurchasesSummary = {
-  totalSpend: number;
-  count: number;
-  byProject: Record<
-    string,
-    {
-      total: number;
-      count: number;
-      items: PurchaseLineItem[];
-    }
-  >;
-};
-
-export type EmployeeLaborHours = {
-  name: string;
-  regularHours: number;
-  overtimeHours: number;
-  totalHours: number;
-};
-
-export type ProjectLaborSummary = {
-  project: string;
-  totalHours: number;
-  employees: EmployeeLaborHours[];
-};
-
-export type WeeklyLaborSummary = {
-  totalHours: number;
-  byProject: Record<string, ProjectLaborSummary>;
-};
-
-export type AccountingDashboardState = {
-  expenses: ExpenseItem[];
-  weeklyPurchases: WeeklyPurchasesSummary;
-  weeklyLabor: WeeklyLaborSummary;
-  activeProjects: string[];
-  lastUpdated: string;
 };
