@@ -170,7 +170,8 @@ export async function loadSubScorecards(
   }
   const invites = ((invitesRes.data ?? []) as { sub_id: string; status: string }[]);
   const bills = includeBills
-    ? payables.rows.map((r) => ({ subId: r.subId, vendorName: r.vendorName, balanceCents: r.balanceCents, status: r.status, isOnHold: r.isOnHold }))
+    ? // Open AP per sub is what is payable now, as on Payables (retainage is held apart).
+      payables.rows.map((r) => ({ subId: r.subId, vendorName: r.vendorName, balanceCents: r.payableNowCents, status: r.status, isOnHold: r.isOnHold }))
     : [];
   const { scorecards, summary } = computeSubScorecards(subs, invites, bills, openPunchByAssignee, today, { includeBills });
   return { subs, scorecards, summary };

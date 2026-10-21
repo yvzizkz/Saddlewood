@@ -307,7 +307,7 @@ describe("subs scorecard & compliance (S1, S6, S7, S8)", () => {
   it("loadSubScorecards counts open punches from public.work_items and throws on work_items query error", async () => {
     listSubsMock.mockResolvedValue([BASE_SUB]);
     loadPayablesMock.mockResolvedValue({
-      rows: [{ vendorName: "Desert Peak Drywall LLC", balanceCents: 120_000, status: "ready" }],
+      rows: [{ vendorName: "Desert Peak Drywall LLC", balanceCents: 120_000, payableNowCents: 120_000, status: "ready" }],
       summary: { openCents: 120_000, overdueCents: 0, dueThisWeekCents: 0, holdCount: 0 },
     });
 
