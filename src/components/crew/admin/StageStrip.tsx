@@ -5,7 +5,8 @@ import { ArrowUp, Check, Plus, X } from 'lucide-react'
 
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, INPUT, TONE } from '@/components/bot/ui'
-import { stageText } from '@/lib/crew/phases'
+import { PhasePick } from '@/components/crew/PhasePick'
+import { pickLabel, stageText, type PhaseTemplatePick } from '@/lib/crew/phases'
 import { dayShort } from '@/lib/crew/time'
 import type { AdminActInput, CrewJobPhase, JobStage } from '@/lib/crew/types'
 
@@ -60,8 +61,6 @@ function Problem({ text }: { text: string }) {
   )
 }
 
-const TEMPLATE_LABEL = { framing: 'Framing', drywall: 'Drywall', both: 'Both' } as const
-
 export function StageStrip({
   jobId,
   jobName,
@@ -80,6 +79,8 @@ export function StageStrip({
   act: PhaseActor
 }) {
   const [mode, setMode] = useState<'view' | 'edit'>('view')
+  /** What the phases start from when the job has none: the whole job unless the owner picks trades. */
+  const [pick, setPick] = useState<PhaseTemplatePick>('gc')
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState('')
   /** The phase a tap asked about, before it is verified or unverified. */
@@ -118,12 +119,11 @@ export function StageStrip({
     return (
       <div>
         <p className="mb-1.5 text-[12px] leading-relaxed text-[var(--color-charcoal-light)]">Add phases, and the job has a stage: {jobName} is on the first one nobody has verified.</p>
-        <div className="flex flex-wrap gap-2">
-          {(['framing', 'drywall', 'both'] as const).map((t) => (
-            <Button key={t} className="min-h-9 px-3 text-[13px]" busy={busy === t} onClick={() => run(t, { kind: 'job.phases.template', jobId, template: t })}>
-              {TEMPLATE_LABEL[t]}
-            </Button>
-          ))}
+        <PhasePick value={pick} onChange={(v) => setPick(v === 'none' ? 'gc' : v)} />
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button variant="primary" className="min-h-9 px-3 text-[13px]" busy={busy === 'template'} onClick={() => run('template', { kind: 'job.phases.template', jobId, template: pick })}>
+            Start from {pickLabel(pick)}
+          </Button>
           <Button className="min-h-9 px-3 text-[13px]" onClick={() => setMode('edit')}>
             Write your own
           </Button>

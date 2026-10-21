@@ -1,3 +1,5 @@
+import { SELF_PERFORMED, tradeLabel, type SelfPerformed } from "@/lib/accounting/tradeList";
+
 import { localDay } from "./time";
 import type { CrewJob, CrewJobPhase, CrewJobStaged, JobStage } from "./types";
 
@@ -8,23 +10,165 @@ import type { CrewJob, CrewJobPhase, CrewJobStaged, JobStage } from "./types";
 // it. Everything here is pure, so it is tested without a database; the read
 // that joins it to the jobs is src/lib/crew/stages.ts.
 
+// ---- templates -----------------------------------------------------------------------
+
 /**
- * What a job's list starts with. Marco edits a job's phases in the app once
- * they are on it; these are only the starting point.
+ * Where a step falls in a build, so phases from several trades interleave the
+ * way a job runs (Arizona residential: Scottsdale, Phoenix and Maricopa County
+ * inspect underground before the slab, every rough-in before cover, insulation
+ * before board, and the service before the utility releases power).
  */
-export const PHASE_TEMPLATES = {
-  framing: ["layout", "walls", "roof and ceiling", "backing", "inspection"],
-  drywall: ["hang", "tape", "texture", "punch"],
+export const SLOT = {
+  temp: 5,
+  underground: 10,
+  framing: 20,
+  rough: 30,
+  roughInspection: 40,
+  insulation: 50,
+  drywall: 60,
+  trim: 70,
+  service: 75,
+  final: 80,
 } as const;
-export type PhaseTemplate = keyof typeof PHASE_TEMPLATES;
-export type PhaseTemplatePick = PhaseTemplate | "both";
+
+type Step = readonly [name: string, slot: number];
+
+/**
+ * What a job's list starts with, one template per trade our crews perform
+ * (SELF_PERFORMED in the shared trade list). Marco edits a job's phases in the
+ * app once they are on it; these are only the starting point.
+ */
+const STEPS = {
+  framing: [
+    ["layout", SLOT.framing],
+    ["walls", SLOT.framing],
+    ["roof and ceiling", SLOT.framing],
+    ["backing", SLOT.framing],
+    ["inspection", SLOT.roughInspection],
+  ],
+  plumbing: [
+    ["plumbing underground", SLOT.underground],
+    ["plumbing underground inspection", SLOT.underground],
+    ["top-out", SLOT.rough],
+    ["top-out inspection", SLOT.roughInspection],
+    ["gas pressure test", SLOT.roughInspection],
+    ["set fixtures", SLOT.trim],
+    ["plumbing final", SLOT.final],
+  ],
+  electrical: [
+    ["temp power", SLOT.temp],
+    ["electrical underground", SLOT.underground],
+    ["electrical rough", SLOT.rough],
+    ["electrical rough inspection", SLOT.roughInspection],
+    ["electrical trim", SLOT.trim],
+    ["service (SES) inspection", SLOT.service],
+    ["electrical final", SLOT.final],
+  ],
+  hvac: [
+    ["HVAC rough", SLOT.rough],
+    ["ductwork", SLOT.rough],
+    ["HVAC rough and duct inspection", SLOT.roughInspection],
+    ["set equipment", SLOT.trim],
+    ["startup", SLOT.trim],
+    ["HVAC final", SLOT.final],
+  ],
+  insulation: [
+    ["insulation", SLOT.insulation],
+    ["insulation inspection", SLOT.insulation],
+  ],
+  drywall: [
+    ["hang", SLOT.drywall],
+    ["tape", SLOT.drywall],
+    ["texture", SLOT.drywall],
+    ["punch", SLOT.drywall],
+  ],
+} as const satisfies Record<SelfPerformed, readonly Step[]>;
+
+export type PhaseTemplate = keyof typeof STEPS;
+
+/** The trades with a template, in build order. */
+export const TEMPLATE_TRADES = SELF_PERFORMED.filter((t) => t in STEPS) as readonly PhaseTemplate[];
+
+/** Each trade's phase names, in its own order. */
+export const PHASE_TEMPLATES = Object.fromEntries(TEMPLATE_TRADES.map((t) => [t, STEPS[t].map(([name]) => name)])) as Record<PhaseTemplate, string[]>;
+
+/**
+ * The whole job, when we hold the paper (remodel, addition, custom home):
+ * one phase per stage of the build, each under the trade that carries it.
+ */
+export const GC_TEMPLATE: readonly { name: string; trade: string }[] = [
+  { name: "demo", trade: "demo" },
+  { name: "plumbing underground", trade: "plumbing" },
+  { name: "footing and foundation", trade: "concrete" },
+  { name: "footing and underground inspection", trade: "concrete" },
+  { name: "framing", trade: "framing" },
+  { name: "plumbing top-out", trade: "plumbing" },
+  { name: "electrical rough", trade: "electrical" },
+  { name: "HVAC rough and duct", trade: "hvac" },
+  { name: "MEP rough inspections", trade: "general" },
+  { name: "framing inspection", trade: "framing" },
+  { name: "insulation and inspection", trade: "insulation" },
+  { name: "drywall", trade: "drywall" },
+  { name: "finishes", trade: "general" },
+  { name: "MEP trim and startup", trade: "general" },
+  { name: "MEP finals", trade: "general" },
+  { name: "final inspection", trade: "general" },
+];
+
+/**
+ * What a job's phases start from: "gc" for the whole job, or the job's trades
+ * joined with commas ("framing,drywall"). "both" is kept for framing and
+ * drywall, as the app sent it before there were more trades.
+ */
+export type PhaseTemplatePick = string;
+
+const isTemplateTrade = (t: string): t is PhaseTemplate => (TEMPLATE_TRADES as readonly string[]).includes(t);
+
+/** The trades in a pick, in build order; [] for "gc", null when it is not a pick at all. */
+export function pickTrades(pick: string): PhaseTemplate[] | null {
+  const raw = pick.trim().toLowerCase();
+  if (raw === "gc") return [];
+  const parts = raw === "both" ? ["framing", "drywall"] : raw.split(",").map((t) => t.trim()).filter(Boolean);
+  if (!parts.length || !parts.every(isTemplateTrade)) return null;
+  return TEMPLATE_TRADES.filter((t) => parts.includes(t));
+}
+
+export function isPhasePick(v: unknown): v is PhaseTemplatePick {
+  return typeof v === "string" && pickTrades(v) !== null;
+}
+
+/** The pick for these trades, in build order ("none" for no trade). */
+export function pickFor(trades: readonly string[]): PhaseTemplatePick {
+  const list = TEMPLATE_TRADES.filter((t) => trades.includes(t));
+  return list.length ? list.join(",") : "none";
+}
+
+/** "the whole job" · "framing and drywall" · "plumbing, electrical and HVAC". */
+export function pickLabel(pick: PhaseTemplatePick): string {
+  const trades = pickTrades(pick);
+  if (!trades) return pick;
+  if (!trades.length) return "the whole job";
+  const names = trades.map((t) => tradeLabel(t).replace(/^(?!HVAC)./, (c) => c.toLowerCase()));
+  return names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
 
 /** A phase as the owner's list names it, before it is a row. */
 export type PhaseSpec = { name: string; trade: string; plannedFrom: string | null; plannedTo: string | null };
 
+/**
+ * The phases a pick starts a job with. Several trades interleave by where each
+ * step falls in the build (SLOT); steps in the same slot keep the trades' build
+ * order. An unknown pick gives none.
+ */
 export function templatePhases(pick: PhaseTemplatePick): PhaseSpec[] {
-  const trades: PhaseTemplate[] = pick === "both" ? ["framing", "drywall"] : [pick];
-  return trades.flatMap((trade) => PHASE_TEMPLATES[trade].map((name) => ({ name, trade, plannedFrom: null, plannedTo: null })));
+  const trades = pickTrades(pick);
+  if (!trades) return [];
+  if (!trades.length) return GC_TEMPLATE.map(({ name, trade }) => ({ name, trade, plannedFrom: null, plannedTo: null }));
+  return trades
+    .flatMap((trade) => STEPS[trade].map(([name, slot]) => ({ name, trade, slot })))
+    .map((s, i) => ({ ...s, i }))
+    .sort((a, b) => a.slot - b.slot || a.i - b.i)
+    .map(({ name, trade }) => ({ name, trade, plannedFrom: null, plannedTo: null }));
 }
 
 /** One job's phases out of everyone's, in order. */

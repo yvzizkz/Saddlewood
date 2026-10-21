@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isId } from "@/lib/billing/http";
+import { isPhasePick } from "@/lib/crew/phases";
 import { salesError, salesGate } from "@/lib/sales/access";
 import type { AwardChoices } from "@/lib/sales/award";
 import { awardJob, awardPreview } from "@/lib/sales/awardStore";
@@ -18,7 +19,7 @@ const choicesSchema = z
     packageId: z.string().max(64),
     contractCents: z.number().int().min(1).max(100_000_000_00).nullable(),
     prefix: z.string().trim().max(12).regex(/^[A-Za-z0-9]*$/, "the number prefix is letters and digits only"),
-    template: z.enum(["framing", "drywall", "both", "none"]),
+    template: z.string().max(120).refine((v) => v === "none" || isPhasePick(v), "Which trades?"),
     pmEmail: z.union([z.literal(""), z.string().trim().toLowerCase().email().max(200)]),
     deposit: z.boolean(),
   })

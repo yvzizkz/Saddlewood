@@ -3,16 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import type { ChecklistRow, ChecklistStage } from "@/lib/field/ops";
-
-const STAGE_OPTIONS: { value: ChecklistStage; label: string }[] = [
-  { value: "pre_cover", label: "1. Pre-cover (framing & backing)" },
-  { value: "pre_board", label: "2. Pre-board (insulation & MEP sign-off)" },
-  { value: "pre_tape", label: "3. Pre-tape (screw pattern & beads)" },
-  { value: "pre_texture", label: "4. Pre-texture (skim & inside corners)" },
-  { value: "pre_paint", label: "5. Pre-paint (500W raking-light check)" },
-  { value: "final_walk", label: "6. Final walk (punch & closeout)" },
-];
+import { DEFAULT_TRADES, SELF_PERFORMED, tradeLabel } from "@/lib/accounting/tradeList";
+import {
+  CHECKLIST_SETS,
+  CHECKLIST_STAGE_LABEL,
+  CHECKLIST_TRADES,
+  checklistTradeFor,
+  type ChecklistRow,
+  type ChecklistStage,
+  type ChecklistTrade,
+} from "@/lib/field/ops";
+import { onSite, toggleOnSite } from "@/lib/field/tradesOnSite";
 
 export function ChecklistCard({ checklist }: { checklist: ChecklistRow }) {
   const router = useRouter();
@@ -109,12 +110,25 @@ export function NewChecklistForm({
   phases,
 }: {
   jobKey: string;
-  phases: { id: number; ord: number; name: string }[];
+  phases: { id: number; ord: number; name: string; trade?: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [stage, setStage] = useState<ChecklistStage>("pre_cover");
   const [phaseId, setPhaseId] = useState<string>(phases[0]?.id ? String(phases[0].id) : "");
+  // The checklist follows the trade: the phase's own when it has one (plumbing, electrical, HVAC), else drywall's sequence.
+  const [trade, setTrade] = useState<ChecklistTrade>(checklistTradeFor(phases[0]?.trade));
+  const [stage, setStage] = useState<ChecklistStage>(CHECKLIST_SETS[checklistTradeFor(phases[0]?.trade)][0]);
+
+  function pickTrade(t: ChecklistTrade) {
+    setTrade(t);
+    setStage(CHECKLIST_SETS[t][0]);
+  }
+
+  function pickPhase(id: string) {
+    setPhaseId(id);
+    const ph = phases.find((p) => String(p.id) === id);
+    if (ph?.trade) pickTrade(checklistTradeFor(ph.trade));
+  }
   const [locationLabel, setLocationLabel] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -126,7 +140,7 @@ export function NewChecklistForm({
         onClick={() => setOpen(true)}
         className="rounded-md border border-[var(--color-stone)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--color-charcoal)] hover:border-[var(--color-teal)]"
       >
-        + Pre-cover checklist
+        + Inspection checklist
       </button>
     );
   }
@@ -154,15 +168,22 @@ export function NewChecklistForm({
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-2 rounded-lg border border-[var(--color-stone)] bg-white p-3 text-sm md:grid-cols-5">
-      <select value={stage} onChange={(e) => setStage(e.target.value as ChecklistStage)} className="rounded border border-[var(--color-stone)] px-2.5 py-1.5">
-        {STAGE_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
+    <form onSubmit={submit} className="grid gap-2 rounded-lg border border-[var(--color-stone)] bg-white p-3 text-sm md:grid-cols-6">
+      <select aria-label="Checklist trade" value={trade} onChange={(e) => pickTrade(e.target.value as ChecklistTrade)} className="rounded border border-[var(--color-stone)] px-2.5 py-1.5">
+        {CHECKLIST_TRADES.map((t) => (
+          <option key={t} value={t}>
+            {tradeLabel(t)}
           </option>
         ))}
       </select>
-      <select value={phaseId} onChange={(e) => setPhaseId(e.target.value)} className="rounded border border-[var(--color-stone)] px-2.5 py-1.5">
+      <select aria-label="Checklist stage" value={stage} onChange={(e) => setStage(e.target.value as ChecklistStage)} className="rounded border border-[var(--color-stone)] px-2.5 py-1.5">
+        {CHECKLIST_SETS[trade].map((st) => (
+          <option key={st} value={st}>
+            {CHECKLIST_STAGE_LABEL[st]}
+          </option>
+        ))}
+      </select>
+      <select aria-label="Checklist phase" value={phaseId} onChange={(e) => pickPhase(e.target.value)} className="rounded border border-[var(--color-stone)] px-2.5 py-1.5">
         <option value="">Any phase</option>
         {phases.map((p) => (
           <option key={p.id} value={String(p.id)}>
@@ -201,7 +222,7 @@ export function NewDailyLogForm({ jobKey, today }: { jobKey: string; today: stri
   const [done, setDone] = useState("");
   const [weather, setWeather] = useState("Clear · 88°F");
   const [crewCount, setCrewCount] = useState("3");
-  const [tradesOnSite, setTradesOnSite] = useState("Framing, Drywall");
+  const [tradesOnSite, setTradesOnSite] = useState("");
   const [deliveries, setDeliveries] = useState("");
   const [visits, setVisits] = useState("");
   const [inspections, setInspections] = useState("");
@@ -273,7 +294,25 @@ export function NewDailyLogForm({ jobKey, today }: { jobKey: string; today: stri
         placeholder="Crew count"
         className="rounded border border-[var(--color-stone)] px-2.5 py-1.5"
       />
-      <input value={tradesOnSite} onChange={(e) => setTradesOnSite(e.target.value)} placeholder="Trades on site" className="rounded border border-[var(--color-stone)] px-2.5 py-1.5" />
+      <div className="flex flex-col gap-1">
+        <input value={tradesOnSite} onChange={(e) => setTradesOnSite(e.target.value)} placeholder="Trades on site" aria-label="Trades on site" className="rounded border border-[var(--color-stone)] px-2.5 py-1.5" />
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Our trades on site">
+          {SELF_PERFORMED.map((t) => {
+            const on = onSite(tradesOnSite).includes(tradeLabel(t));
+            return (
+              <button
+                key={t}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setTradesOnSite(toggleOnSite(tradesOnSite, tradeLabel(t)))}
+                className={`rounded-full border px-2 py-0.5 text-[11px] ${on ? "border-[var(--color-teal)] bg-[var(--color-teal)] text-white" : "border-[var(--color-stone)] text-[var(--color-charcoal)]"}`}
+              >
+                {tradeLabel(t)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <input value={deliveries} onChange={(e) => setDeliveries(e.target.value)} placeholder="Deliveries" className="rounded border border-[var(--color-stone)] px-2.5 py-1.5" />
       <input value={visits} onChange={(e) => setVisits(e.target.value)} placeholder="GC / client / architect visits" className="rounded border border-[var(--color-stone)] px-2.5 py-1.5" />
       <input value={inspections} onChange={(e) => setInspections(e.target.value)} placeholder="Inspections" className="rounded border border-[var(--color-stone)] px-2.5 py-1.5" />
@@ -308,7 +347,7 @@ export function NewFieldReceiptForm({ jobKey, today }: { jobKey: string; today: 
   const [vendor, setVendor] = useState("Home Depot");
   const [amount, setAmount] = useState("");
   const [paidBy, setPaidBy] = useState<"company" | "me">("company");
-  const [trade, setTrade] = useState("drywall");
+  const [trade, setTrade] = useState("general");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -366,13 +405,12 @@ export function NewFieldReceiptForm({ jobKey, today }: { jobKey: string; today: 
         <option value="company">Company card</option>
         <option value="me">Worker out-of-pocket (reimburse)</option>
       </select>
-      <select value={trade} onChange={(e) => setTrade(e.target.value)} className="rounded border border-[var(--color-stone)] px-2.5 py-1.5">
-        <option value="drywall">Drywall</option>
-        <option value="framing">Framing</option>
-        <option value="insulation">Insulation</option>
-        <option value="paint">Paint</option>
-        <option value="fasteners">Fasteners</option>
-        <option value="general">General</option>
+      <select aria-label="Receipt trade" value={trade} onChange={(e) => setTrade(e.target.value)} className="rounded border border-[var(--color-stone)] px-2.5 py-1.5">
+        {DEFAULT_TRADES.map((t) => (
+          <option key={t.slug} value={t.slug}>
+            {t.label}
+          </option>
+        ))}
       </select>
       <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Items purchased" className="rounded border border-[var(--color-stone)] px-2.5 py-1.5" />
       <div className="flex items-center gap-2">

@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireBridge, unauthorized } from "@/lib/bot/auth";
 import { listAliases, listTradeMap, upsertPurchases } from "@/lib/crew/purchaseQueries";
 import { SEARCH_MAX_QUERY, SEARCH_MAX_TRIPS, missingSearch, searchPurchases } from "@/lib/crew/purchaseSearch";
-import { MAX_PURCHASE_LINES, TRADES, linkLines, purchaseLineSchema, type PurchaseLine } from "@/lib/crew/purchases";
+import { isTradeSlug, TRADE_SLUGS } from "@/lib/accounting/tradeList";
+import { MAX_PURCHASE_LINES, linkLines, purchaseLineSchema, type PurchaseLine } from "@/lib/crew/purchases";
 import { listJobs } from "@/lib/crew/queries";
 import { isDay } from "@/lib/crew/time";
 
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
   const to = (p.get("to") ?? "").trim();
   const limit = Number(p.get("limit") ?? SEARCH_MAX_TRIPS);
   if (job && !CREW_ID.test(job)) return NextResponse.json({ ok: false, error: "job must be a field job id" }, { status: 400 });
-  if (trade && !(TRADES as readonly string[]).includes(trade)) return NextResponse.json({ ok: false, error: `trade must be one of ${TRADES.join(", ")}` }, { status: 400 });
+  if (trade && !isTradeSlug(trade)) return NextResponse.json({ ok: false, error: `trade must be one of ${TRADE_SLUGS.join(", ")}` }, { status: 400 });
   if ((from && !isDay(from)) || (to && !isDay(to))) return NextResponse.json({ ok: false, error: "from and to are YYYY-MM-DD" }, { status: 400 });
   try {
     const result = await searchPurchases({ q, jobIds: null, jobId: job || null, trade, from: from || null, to: to || null, limit: Number.isFinite(limit) ? limit : SEARCH_MAX_TRIPS });

@@ -208,8 +208,11 @@ describe("searchPurchases", () => {
     expect(typed.filters).toEqual({ from: null, to: null, jobId: "point-loma", jobName: "Point Loma" });
     await searchPurchases({ q: "screws august", jobIds: null, jobId: "bambi", trade: "framing", from: "2026-09-01", to: "2026-09-03", limit: 10, today: TODAY });
     expect(spies.run.mock.calls[2][0]).toEqual({ words: ["screws"], mode: "full-text", jobIds: ["bambi"], trade: "framing", from: "2026-09-01", to: "2026-09-03", trips: 10, lines: 40 });
-    // A trade that is not one of the eight, or a limit out of range, is ignored.
-    await searchPurchases({ q: "screws", jobIds: null, trade: "roofing", limit: 900, today: TODAY });
+    // A trade that is not on the shared list, or a limit out of range, is ignored.
+    await searchPurchases({ q: "screws", jobIds: null, trade: "bananas", limit: 900, today: TODAY });
     expect(spies.run.mock.calls[4][0]).toMatchObject({ trade: "", trips: 50 });
+    // Any trade on the list filters, not only the chips: HVAC and roofing purchases are searchable.
+    await searchPurchases({ q: "screws", jobIds: null, trade: "hvac", today: TODAY });
+    expect(spies.run.mock.calls[6][0]).toMatchObject({ trade: "hvac" });
   });
 });

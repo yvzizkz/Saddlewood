@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, Field, INPUT } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { TradeDatalist } from '@/components/ui/TradeDatalist'
 import type { ScopeSource } from '@/lib/subs/source'
 import { usd } from '@/components/sales/format'
 
@@ -165,7 +166,8 @@ export function NewPackageSheet({ open, onClose, target: given, toast }: { open:
             </div>
             <div className="grid grid-cols-[1fr_2fr] gap-3">
               <Field label="Trade">
-                <input className={INPUT} value={trade} placeholder="insulation" onChange={(e) => setTrade(e.target.value)} />
+                <input className={INPUT} value={trade} list="package-trades" placeholder="Pick or type a trade" onChange={(e) => setTrade(e.target.value)} />
+                <TradeDatalist id="package-trades" lower />
               </Field>
               <Field label="Title">
                 <input className={INPUT} value={title} onChange={(e) => setTitle(e.target.value)} />

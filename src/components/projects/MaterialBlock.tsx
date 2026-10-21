@@ -3,23 +3,13 @@
 import { Chip } from '@/components/bot/ui'
 import { day, money } from '@/components/money/format'
 import PurchaseSearch from '@/components/purchases/PurchaseSearch'
+import { tradeShort } from '@/lib/accounting/tradeList'
 import type { MaterialBlock as Material } from '@/lib/crew/purchases'
 
 // The Material block of a job's money card (0022): the last twelve months of
 // Home Depot on this field job, from /api/crew/projects/money. Read only.
 // Cents come from the server; this only formats them. With the field job
 // known, "Find a purchase" (0026) searches this job, any year.
-
-const TRADE_LABEL: Record<string, string> = {
-  framing: 'Framing',
-  drywall: 'Drywall',
-  electrical: 'Electrical',
-  plumbing: 'Plumbing',
-  paint: 'Paint',
-  tools: 'Tools',
-  rentals: 'Rentals',
-  general: 'General',
-}
 
 export default function MaterialBlock({ m, jobId = '', jobName = '' }: { m: Material; jobId?: string; jobName?: string }) {
   const search = jobId ? <PurchaseSearch jobId={jobId} jobName={jobName} open={false} /> : null
@@ -60,7 +50,7 @@ export default function MaterialBlock({ m, jobId = '', jobName = '' }: { m: Mate
         <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[var(--color-charcoal)]">
           {m.byTrade.map((t) => (
             <li key={t.trade}>
-              <span className="text-[var(--color-charcoal-light)]">{TRADE_LABEL[t.trade] ?? t.trade}</span> {money(t.cents)}
+              <span className="text-[var(--color-charcoal-light)]">{tradeShort(t.trade)}</span> {money(t.cents)}
             </li>
           ))}
         </ul>

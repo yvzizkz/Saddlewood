@@ -1217,6 +1217,19 @@ describe("a job's phases and its stage", () => {
     expect(names("north-lane")).toEqual([]);
   });
 
+  it("starts a job from its own trades or the whole job, and never touches a job's existing phases", async () => {
+    expect(await admin({ kind: "job.phases.template", jobId: "north-lane", template: "plumbing,electrical,hvac" }, at("09:00"))).toMatchObject({ ok: true, note: "20 plumbing, electrical and HVAC phases on North Lane." });
+    expect(db.phases.filter((p) => p.jobId === "north-lane").map((p) => p.trade)).toEqual(expect.arrayContaining(["plumbing", "electrical", "hvac"]));
+    // An old framing/drywall job, one phase verified: the whole-job template goes after it; nothing it had moves or loses its check.
+    await admin({ kind: "job.phases.template", jobId: "powell", template: "both" }, at("09:01"));
+    const layout = db.phases.find((p) => p.jobId === "powell" && p.name === "layout")!;
+    await admin({ kind: "phase.verify", id: layout.id, note: "Walked it" }, at("09:02"));
+    const before = names();
+    expect(await admin({ kind: "job.phases.template", jobId: "powell", template: "gc" }, at("09:03"))).toMatchObject({ ok: true, note: "16 whole-job phases on Powell Residence, after the ones it had." });
+    expect(names().slice(0, before.length)).toEqual(before);
+    expect(names()[before.length]).toBe(`${before.length + 1}:demo`);
+  });
+
   it("sets the list, keeping a verified phase where it is and never dropping it", async () => {
     await admin({ kind: "job.phases.template", jobId: "powell", template: "drywall" }, at("09:00"));
     const hang = db.phases.find((p) => p.name === "hang")!;

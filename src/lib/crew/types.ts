@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { fileRefSchema, listOf, stored, type BotFileRef } from "@/lib/bot/types";
+
+import { isPhasePick } from "./phases";
 import type { PurchasesToday, UnmatchedPurchase } from "./purchases";
 import type { AppSettings } from "./settings";
 import { isClock, isDay } from "./time";
@@ -145,7 +147,7 @@ export type CrewJobPhase = {
   /** 1-based position in the job's list. */
   ord: number;
   name: string;
-  /** 'framing' | 'drywall' | '' (or whatever was typed). */
+  /** A slug from the shared trade list ('framing', 'plumbing', 'hvac'...), or whatever was typed. */
   trade: string;
   plannedFrom: string | null;
   plannedTo: string | null;
@@ -703,7 +705,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
       .max(40),
   }),
   /** Append a template's phases after whatever the job already has. */
-  z.object({ kind: z.literal("job.phases.template"), jobId, template: z.enum(["framing", "drywall", "both"]) }),
+  z.object({ kind: z.literal("job.phases.template"), jobId, template: z.string().max(120).refine(isPhasePick, "Which trades?") }),
   /** Checked it: the phase is done. tasks.verify on that job, owners anywhere. */
   z.object({ kind: z.literal("phase.verify"), id, note: text(300) }),
   /** Take a check back, with why. */
