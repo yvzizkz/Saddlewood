@@ -1,5 +1,6 @@
 import type { Policies } from "@/lib/policies/rules";
 import type { BidLine, BidResponse, PackageLine, Sub } from "./types";
+import { usd } from "@/lib/money";
 
 // The rules of the bid-out, pure so they are tested without a database
 // (SOP-008 §2). Leveling is the honest-comparison rule: a bid is never ranked
@@ -149,7 +150,7 @@ export function canAward(
   const warnings: string[] = [];
   if (a.subStatus !== "approved") warnings.push("the sub is not approved yet");
   if (a.budgetCents > 0 && a.leveledCents > a.budgetCents) warnings.push("the leveled price is over our budget");
-  if (a.leveledCents > limit) warnings.push(`it is over ${dollars(limit)}`);
+  if (a.leveledCents > limit) warnings.push(`it is over ${usd(limit, { whole: true })}`);
   if (a.packageCents >= minFrom && a.bids < minBids) warnings.push(`it has ${a.bids} ${a.bids === 1 ? "bid" : "bids"}; the rule is ${minBids}`);
   // Only an owner goes past the rules. Office staff who are not owners award
   // as a PM with the award switch does (Sales, billing and Policies keep the
@@ -161,9 +162,6 @@ export function canAward(
   return { ok: true, warnings };
 }
 
-function dollars(cents: number): string {
-  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
-}
 
 // ---- dates ------------------------------------------------------------------------------
 

@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import type { Exhibit } from "@/lib/billing/exhibits";
 import type { BillingDocument, DocumentKind } from "@/lib/billing/types";
 import { PrintButton } from "./[token]/PrintButton";
+import { usd } from "@/lib/money";
 
 // What a client sees of one document: the page behind /d/<token>, and the
 // same page behind a draft's preview link, /d/p/<token>. One layout, so a
@@ -20,12 +21,6 @@ export const KIND_LABEL: Record<DocumentKind, string> = {
   notice: "Notice",
 };
 
-function money(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-  });
-}
 
 function day(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -221,7 +216,7 @@ export function DocumentView({
                     <td
                       className={`py-4 text-right font-medium tabular-nums ${line.amountCents < 0 ? "text-gold-accessible" : "text-charcoal"}`}
                     >
-                      {money(line.amountCents)}
+                      {usd(line.amountCents)}
                     </td>
                   </tr>
                   {/* The pieces of a lump line, each with its price, across the full width. */}
@@ -243,7 +238,7 @@ export function DocumentView({
                                 </span>
                               ) : (
                                 <span className="shrink-0 tabular-nums text-charcoal">
-                                  {money(p.amountCents)}
+                                  {usd(p.amountCents)}
                                 </span>
                               )}
                             </li>
@@ -261,7 +256,7 @@ export function DocumentView({
                   Total
                 </td>
                 <td className="pt-5 text-right font-heading text-2xl tabular-nums text-teal">
-                  {money(doc.totalCents)}
+                  {usd(doc.totalCents)}
                 </td>
               </tr>
               {doc.dueDate && (

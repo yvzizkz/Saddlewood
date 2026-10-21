@@ -4,6 +4,7 @@ import type { ClientKind, ContactRole, DocumentLine, DocumentSnapshot } from "@/
 import type { Policies } from "@/lib/policies/rules";
 import type { ProposalSnapshot } from "./presentation";
 import type { Opportunity, OpportunityKind } from "./types";
+import { usd } from "@/lib/money";
 
 // Award: one owner step that turns an accepted proposal into the job (KB
 // docs/JOB-LIFECYCLE-PLAN-2026-10-19.md §6, links L1, L2 and L8). This file is
@@ -139,9 +140,6 @@ export function sovFromProposal(p: ProposalSnapshot, a: Pick<Accepted, "packageI
   return [...base, ...opts];
 }
 
-function money(cents: number): string {
-  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
 
@@ -185,7 +183,7 @@ export function planAward(input: {
   const depCents = depositCents(contractCents, policies);
   if (c.deposit && prefix && depCents > 0) {
     const pct = num(policies["policy.deposit.pct"], 10);
-    const lines: DocumentLine[] = [{ description: `Deposit: ${pct}% of the contract (${money(contractCents)})`, amountCents: depCents }];
+    const lines: DocumentLine[] = [{ description: `Deposit: ${pct}% of the contract (${usd(contractCents)})`, amountCents: depCents }];
     const special = policies["policy.deposit.specialOrders"] !== false;
     deposit = {
       // The first number on a new job; awardStore takes the next free one when the job already has invoices.
@@ -219,12 +217,12 @@ export function planAward(input: {
             kind: "agreement",
             title: "Full agreement signed",
             dueOn: addDays(today, 7),
-            note: `Over ${money(num(policies["policy.contract.agreementOverCents"], 1_000_000))} the accepted proposal is not the contract (Company policies). Nobody starts before it is signed.`,
+            note: `Over ${usd(num(policies["policy.contract.agreementOverCents"], 1_000_000))} the accepted proposal is not the contract (Company policies). Nobody starts before it is signed.`,
           },
     );
   }
   if (deposit) {
-    watches.push({ kind: "deposit", title: "Deposit received", dueOn: addDays(today, 7), note: `${deposit.number}, ${money(deposit.totalCents)}. Before the job is scheduled.` });
+    watches.push({ kind: "deposit", title: "Deposit received", dueOn: addDays(today, 7), note: `${deposit.number}, ${usd(deposit.totalCents)}. Before the job is scheduled.` });
   }
   watches.push({
     kind: "prelim_notice",
