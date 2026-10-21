@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { authorizeSales, phoenixToday, salesError } from "@/lib/sales/access";
+import { authorizeSales, salesError } from "@/lib/sales/access";
 import { loadInbox } from "@/lib/sales/inbox";
 import { metrics } from "@/lib/sales/pipeline";
 import { createOpportunity, listOpportunities, type NewOpportunity } from "@/lib/sales/store";
 import { newOpportunitySchema } from "@/lib/sales/validate";
+import { localDay } from "@/lib/crew/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   if (gate.response) return gate.response;
   try {
     const rows = await listOpportunities();
-    const today = phoenixToday();
+    const today = localDay();
     const tracked = new Set(rows.map((r) => r.externalRef).filter((r): r is string => !!r));
     const inbox = await loadInbox(tracked);
     return NextResponse.json({

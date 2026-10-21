@@ -14,7 +14,7 @@ import type { SalesSeat } from '@/lib/sales/seat'
 import { DEFAULT_SETTINGS, type SignatureFont } from '@/lib/sales/settings'
 import { LOST_REASONS, OPEN_STAGES, STAGE_KEYS, stageInfo, type IssuedProposal, type Opportunity, type SalesEstimate, type SalesEvent, type Stage } from '@/lib/sales/types'
 import { EmailProposalSheet, type EmailDefaults } from './EmailProposalSheet'
-import { ago, shortDay, stamp, todayPhoenix, usd } from './format'
+import { ago, shortDay, stamp, usd } from './format'
 import { CountersignSheet } from './pipeline/CountersignSheet'
 import { DetailsSheet } from './pipeline/DetailsSheet'
 import { contactLine, dialable, kindLabel, lostLabel, needsCountersign, nextMonday, plusDays, proofChip, signatureChips, sourceLabel } from './pipeline/labels'
@@ -22,6 +22,7 @@ import { AwardSheet } from './pipeline/AwardSheet'
 import { JobPaperwork } from './pipeline/JobPaperwork'
 import { NewEstimateSheet } from './pipeline/NewEstimateSheet'
 import { Timeline } from './pipeline/Timeline'
+import { localDay } from '@/lib/crew/time'
 
 // One prospect from the first call to the signed job: reach them in one tap,
 // move the stage, keep the next step dated, start and send estimates, see
@@ -269,7 +270,7 @@ export default function OpportunityScreen({ id }: { id: string }) {
   const [lostReason, setLostReason] = useState<string>('price')
   const [lostWhy, setLostWhy] = useState('')
   const [next, setNext] = useState<{ step: string; on: string } | null>(null)
-  const today = todayPhoenix()
+  const today = localDay()
 
   const load = useCallback(async () => {
     try {

@@ -1,3 +1,5 @@
+import { addDays } from "@/lib/crew/time";
+
 import { allItems, allocate, cents, inPackage, itemDollars, lineSells, priceEstimate, roundUp, type Priced, type Rollup } from "./calc";
 import { DEFAULT_SETTINGS, type SalesSettings } from "./settings";
 import type { AllowanceDisplay, EstimateBody, EstimateItem, MarkupDisplay, Pricing, PresentLayout, Presentation, SigningMode } from "./types";
@@ -138,12 +140,6 @@ export function presentAmounts(
     if (!x.isAllow) lines.set(x.i.id, value[k]);
   });
   return { lines, adjustments: [{ key: "allowance_markup", label: "Overhead and profit on allowances", cents: r.sell - sum() }] };
-}
-
-function addDays(day: string, days: number): string {
-  const d = new Date(`${day}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 export function buildProposal(

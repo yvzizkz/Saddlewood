@@ -1,11 +1,11 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { loadPayables } from "@/lib/accounting/payables";
-import { phoenixToday } from "@/lib/sales/access";
 import { snapshotHash } from "@/lib/sales/signing";
 import type { Policies } from "@/lib/policies/rules";
 import { coiDaysLeft, readiness } from "./rules";
 import { listSubs, type InviteRowView, type PackageDetail } from "./store";
 import type { Sub, SubStatus } from "./types";
+import { localDay } from "@/lib/crew/time";
 
 // Subcontractor Scorecard (S1), Compliance Register (S8), Frozen Work Order /
 // Subcontract (S7), and Award / Thank-You Email Drafts (S6) per SOP-008.
@@ -145,7 +145,7 @@ export function missingWorkItems(e: { code?: string; message?: string } | null |
 }
 
 export async function loadSubScorecards(
-  today = phoenixToday(),
+  today = localDay(),
   opts?: { includeBills?: boolean },
 ): Promise<{ subs: Sub[]; scorecards: SubScorecard[]; summary: ComplianceSummary }> {
   const includeBills = opts?.includeBills ?? true;

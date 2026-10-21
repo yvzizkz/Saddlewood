@@ -6,13 +6,14 @@ import { ChevronRight, Plus, Search } from 'lucide-react'
 
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, Empty, INPUT, ScreenTitle, Segmented } from '@/components/bot/ui'
-import { shortDay, todayPhoenix, usd } from '@/components/sales/format'
+import { shortDay, usd } from '@/components/sales/format'
 import { useSalesToast } from '@/components/sales/useSalesToast'
 import { coiDaysLeft, readiness } from '@/lib/subs/rules'
 import type { ComplianceSummary, SubScorecard } from '@/lib/subs/scorecard'
 import { SUB_STATUS_LABEL, type PackageStatus, type Sub } from '@/lib/subs/types'
 import { NewPackageSheet } from './NewPackageSheet'
 import { SubSheet } from './SubSheet'
+import { localDay } from '@/lib/crew/time'
 
 // Subs and bids (SOP-008): the bid packages out and coming back, and the
 // directory of subs with what each still owes before they can start.
@@ -52,7 +53,7 @@ export default function SubsScreen() {
   const [editing, setEditing] = useState<Sub | 'new' | null>(null)
   const [newPkg, setNewPkg] = useState(false)
   const [error, setError] = useState('')
-  const today = todayPhoenix()
+  const today = localDay()
 
   const load = useCallback(async () => {
     try {

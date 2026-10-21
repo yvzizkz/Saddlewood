@@ -19,6 +19,7 @@ import { ItemSheet } from "./ItemSheet";
 import { PresentPane } from "./PresentPane";
 import { PricePane } from "./PricePane";
 import { useEstimateEditor, type SaveState } from "./useEstimateEditor";
+import { localDay } from "@/lib/crew/time";
 
 // The estimate builder. It takes the whole screen: on a phone one pane at a
 // time with the tabs at the thumb and the price always in view; on a laptop
@@ -63,7 +64,7 @@ export function EstimateBuilder({ estimateId }: { estimateId: string }) {
   const [issuing, setIssuing] = useState(false);
 
   const body = ed.body;
-  const today = ed.loaded?.today ?? new Date().toLocaleDateString("en-CA", { timeZone: "America/Phoenix" });
+  const today = ed.loaded?.today ?? localDay();
   const priced = useMemo(() => (body ? priceEstimate(body) : null), [body]);
   const checks = useMemo(
     () =>

@@ -4,11 +4,11 @@ import { z } from "zod";
 import { getDocumentByToken } from "@/lib/billing/documents";
 import { sendPush } from "@/lib/bot/push";
 import { laneAddresses } from "@/lib/crew/notify";
-import { phoenixToday } from "@/lib/sales/access";
 import { notifyAfterSignature } from "@/lib/sales/mail";
 import { readSignatureInput } from "@/lib/sales/signing";
 import { loadSettings } from "@/lib/sales/settingsStore";
 import { acceptProposal, proposalRecord, SalesError } from "@/lib/sales/store";
+import { localDay } from "@/lib/crew/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       {
         ip: (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim(),
         ua: request.headers.get("user-agent") ?? "",
-        today: phoenixToday(),
+        today: localDay(),
       },
     );
     const who = (signature?.name ?? parsed.data.name).trim();

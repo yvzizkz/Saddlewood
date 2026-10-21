@@ -2,7 +2,7 @@
 // Days are relative to the due date. Negative is before. The company default
 // lives here; a client's billing profile or a job may move the timing later.
 
-import { localDay } from "@/lib/crew/time";
+import { addDays as addDayCount, localDay } from "@/lib/crew/time";
 import type { BillingProfile } from "./types";
 
 export type LadderStep = {
@@ -38,8 +38,9 @@ function dayAt(iso: string): Date {
   return new Date(`${iso.slice(0, 10)}T12:00:00Z`);
 }
 
-export function addDays(iso: string, days: number): string {
-  return new Date(dayAt(iso).getTime() + days * DAY).toISOString().slice(0, 10);
+/** A day plus some days; `iso` may be a timestamp, its date part is used. */
+function addDays(iso: string, days: number): string {
+  return addDayCount(iso.slice(0, 10), days);
 }
 
 /** Whole days from `from` to `to` (calendar days, Phoenix has no daylight time). */

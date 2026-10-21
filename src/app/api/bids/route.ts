@@ -6,7 +6,7 @@ import { subsError, subsGate } from "@/lib/subs/access";
 import { defaultDue } from "@/lib/subs/rules";
 import { createPackage, listInvites, listPackages, packageJob } from "@/lib/subs/store";
 import { readPackageInput } from "@/lib/subs/validate";
-import { phoenixToday } from "@/lib/sales/access";
+import { localDay } from "@/lib/crew/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         };
       }),
       can: gate.seat.can,
-      defaultDue: defaultDue(phoenixToday(), values),
+      defaultDue: defaultDue(localDay(), values),
     });
   } catch (err) {
     return subsError(err, "list the packages");
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   const input = readPackageInput(await request.json().catch(() => null));
   if (!input.ok) return NextResponse.json({ ok: false, error: input.error }, { status: 400 });
   try {
-    if (!input.value.dueAt) input.value.dueAt = defaultDue(phoenixToday(), (await loadPolicies()).values);
+    if (!input.value.dueAt) input.value.dueAt = defaultDue(localDay(), (await loadPolicies()).values);
     return NextResponse.json({ ok: true, package: await createPackage(input.value, gate.who.actor) });
   } catch (err) {
     return subsError(err, "create the package");
