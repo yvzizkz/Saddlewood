@@ -80,11 +80,11 @@ export default async function PayableBillPage({ params }: { params: Promise<{ id
                 {formatValue("date", bill.dueOn)} ({bill.agingBucket})
               </Row>
               <Row label="Bill total">{formatValue("money", bill.amountCents)}</Row>
-              {bill.retainageCents > 0 ? (
-                <Row label="10% Retainage held">{formatValue("money", bill.retainageCents)}</Row>
+              {bill.retainageHeldCents > 0 ? (
+                <Row label="Retainage held">{formatValue("money", bill.retainageHeldCents)}</Row>
               ) : null}
               <Row label="Paid to date">{formatValue("money", bill.paidCents)}</Row>
-              <Row label="Open AP balance">{formatValue("money", bill.balanceCents)}</Row>
+              <Row label="Payable now">{formatValue("money", bill.payableNowCents)}</Row>
               <Row label="Payment terms">{bill.paymentTermsLabel}</Row>
               {bill.holdReason ? (
                 <Row label="Compliance / Approval status">

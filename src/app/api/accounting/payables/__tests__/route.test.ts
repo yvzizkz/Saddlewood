@@ -112,3 +112,20 @@ describe("update_bill", () => {
     expect(db.tables.bills[0]).toMatchObject({ status: "hold_waiver", waiver_status: "missing" });
   });
 });
+
+describe("record_payment and retainage", () => {
+  it("pays what is payable now, refuses retainage until it is released, and records the release", async () => {
+    db.tables.bills.push({ id: "b-ret", kind: "vendor", sub_id: null, status: "open", waiver_status: "not_required", amount_cents: 100_000, retainage_cents: 10_000 });
+    const pay = (amountCents: number, extra: Record<string, unknown> = {}) => PATCH(req({ action: "record_payment", billId: "b-ret", amountCents, ...extra }));
+
+    expect((await pay(100_000)).status).toBe(409);
+    expect((await pay(90_000)).status).toBe(200);
+    expect((await pay(10_000)).status).toBe(409);
+    expect((await pay(20_000, { releaseRetainage: true })).status).toBe(400);
+    const res = await pay(10_000, { releaseRetainage: true });
+    expect(await res.json()).toMatchObject({ ok: true, status: "paid", totalPaid: 100_000 });
+    const notes = db.tables.bill_payments.filter((p) => p.bill_id === "b-ret").map((p) => p.note as string);
+    expect(notes[1]).toMatch(/retainage released by lando@example.com \(100\.00\)/);
+  });
+});
+

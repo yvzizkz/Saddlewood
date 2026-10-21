@@ -7,7 +7,7 @@ import { payablesRows } from "../payablesView";
 // out by the day they went out; and a database without 0031 shows no bills
 // instead of an error.
 
-const bill = (id: string, issuedOn: string, amountCents: number, paidCents: number) => ({ id, issuedOn, amountCents, paidCents, balanceCents: amountCents - paidCents }) as PayableRow;
+const bill = (id: string, issuedOn: string, amountCents: number, paidCents: number) => ({ id, issuedOn, amountCents, paidCents, balanceCents: amountCents - paidCents, payableNowCents: amountCents - paidCents, retainageHeldCents: 0 }) as PayableRow;
 const pay = (id: string, billId: string, paidOn: string, amountCents: number) => ({ id, billId, paidOn, amountCents }) as BillPaymentItem;
 
 const rows = [bill("old", "2026-08-02", 50_000, 0), bill("new", "2026-10-14", 30_000, 10_000), bill("done", "2026-09-01", 20_000, 20_000)];

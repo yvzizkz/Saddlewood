@@ -579,7 +579,8 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     editable: false,
   });
   for (const b of payables.rows) {
-    if (b.balanceCents <= 0 || !b.dueOn) continue;
+    // What is payable on the due day: retainage waits for its release.
+    if (b.payableNowCents <= 0 || !b.dueOn) continue;
     const meta = resolveJobMeta(b.billingJobId, b.rawCrewJobId, b.job);
     out.push({
       id: `ap:${b.id}`,
@@ -590,7 +591,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       job: meta.job,
       client: meta.client,
       title: `Bill due: ${b.vendorName} (${b.billNumber})`,
-      detail: `${(b.balanceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} · ${b.statusLabel}`,
+      detail: `${(b.payableNowCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} · ${b.statusLabel}`,
       startDay: b.dueOn,
       endDay: b.dueOn,
       startTime: "",
