@@ -51,6 +51,14 @@ export async function PATCH(request: NextRequest) {
     const jobKey = typeof body.jobKey === "string" ? body.jobKey.trim() : "";
     if (!jobKey) return NextResponse.json({ ok: false, error: "jobKey is required" }, { status: 400 });
     const jobId = typeof body.jobId === "string" && body.jobId.trim() !== "" ? body.jobId.trim() : null;
+    // clearAlias: forget the rule; the name's lines go back to unanswered (not set aside), except lines placed by hand.
+    if (body.clearAlias === true) {
+      const { error: delErr } = await db.from("job_aliases").delete().eq("alias", jobKey);
+      if (delErr) return NextResponse.json({ ok: false, error: delErr.message }, { status: 500 });
+      const { error: upErr } = await db.from("purchases").update({ job_id: null, meta: {}, updated_at: new Date().toISOString() }).eq("job_key", jobKey).eq("job_manual", false);
+      if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
+      return NextResponse.json({ ok: true, jobId: null, moved: 0 });
+    }
     await upsertAlias(jobKey, jobId, actor);
     const moved = await relinkPurchases(jobKey, jobId);
     return NextResponse.json({ ok: true, jobId, moved });

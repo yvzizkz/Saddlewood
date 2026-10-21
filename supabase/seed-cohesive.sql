@@ -156,10 +156,11 @@ values
       "contractCents": 24850000,
       "cutoffDay": 23,
       "sov": [
-        {"id": "framing", "label": "Structural & Steel Stud Framing", "cents": 11200000, "billedPct": 85},
-        {"id": "insulation", "label": "Thermal & Sound Batt Insulation", "cents": 2450000, "billedPct": 80},
-        {"id": "drywall", "label": "Level 5 Drywall Hang, Tape & Skim", "cents": 11200000, "billedPct": 65}
-      ]
+        {"description": "Structural & Steel Stud Framing", "amountCents": 11200000, "kind": "section"},
+        {"description": "Thermal & Sound Batt Insulation", "amountCents": 2450000, "kind": "section"},
+        {"description": "Level 5 Drywall Hang, Tape & Skim", "amountCents": 11200000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 85, "sov:1": 80, "sov:2": 65}
     }'::jsonb
   ),
   (
@@ -180,10 +181,11 @@ values
       "contractCents": 18600000,
       "cutoffDay": 23,
       "sov": [
-        {"id": "framing", "label": "Wood Framing & Backing", "cents": 8400000, "billedPct": 100},
-        {"id": "drywall", "label": "Drywall & Smooth Finish", "cents": 7200000, "billedPct": 100},
-        {"id": "finish", "label": "Trim, Doors & Cleanup", "cents": 3000000, "billedPct": 90}
-      ]
+        {"description": "Wood Framing & Backing", "amountCents": 8400000, "kind": "section"},
+        {"description": "Drywall & Smooth Finish", "amountCents": 7200000, "kind": "section"},
+        {"description": "Trim, Doors & Cleanup", "amountCents": 3000000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 100, "sov:1": 100, "sov:2": 90}
     }'::jsonb
   ),
   (
@@ -204,9 +206,10 @@ values
       "contractCents": 9420000,
       "cutoffDay": 23,
       "sov": [
-        {"id": "demo", "label": "Selective Demo & Framing", "cents": 5220000, "billedPct": 50},
-        {"id": "drywall", "label": "Drywall Assembly", "cents": 4200000, "billedPct": 25}
-      ]
+        {"description": "Selective Demo & Framing", "amountCents": 5220000, "kind": "section"},
+        {"description": "Drywall Assembly", "amountCents": 4200000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 50, "sov:1": 25}
     }'::jsonb
   ),
   (
@@ -229,11 +232,12 @@ values
       "payWhenPaidDays": 10,
       "cutoffDay": 20,
       "sov": [
-        {"id": "metal-framing", "label": "Commercial Metal Stud Framing & Soffits", "cents": 13800000, "billedPct": 55},
-        {"id": "insulation", "label": "Acoustic & Thermal Batt Insulation", "cents": 3600000, "billedPct": 40},
-        {"id": "drywall", "label": "5/8 Type X & Abuse-Resistant GWB", "cents": 10800000, "billedPct": 30},
-        {"id": "chamclad", "label": "ChamClad Soffit Panel Install (Labor)", "cents": 3000000, "billedPct": 15}
-      ]
+        {"description": "Commercial Metal Stud Framing & Soffits", "amountCents": 13800000, "kind": "section"},
+        {"description": "Acoustic & Thermal Batt Insulation", "amountCents": 3600000, "kind": "section"},
+        {"description": "5/8 Type X & Abuse-Resistant GWB", "amountCents": 10800000, "kind": "section"},
+        {"description": "ChamClad Soffit Panel Install (Labor)", "amountCents": 3000000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 55, "sov:1": 40, "sov:2": 30, "sov:3": 15}
     }'::jsonb
   ),
   (
@@ -253,11 +257,12 @@ values
     '{
       "contractCents": 42000000,
       "sov": [
-        {"id": "framing", "label": "Main Residence & Casita Framing", "cents": 16500000, "billedPct": 90},
-        {"id": "drywall", "label": "Drywall Hang, Tape & Level 4 Finish", "cents": 12500000, "billedPct": 75},
-        {"id": "finish", "label": "Interior Trim, Doors & Paint", "cents": 8500000, "billedPct": 45},
-        {"id": "tile", "label": "Primary Bath & Flooring", "cents": 4500000, "billedPct": 40}
-      ]
+        {"description": "Main Residence & Casita Framing", "amountCents": 16500000, "kind": "section"},
+        {"description": "Drywall Hang, Tape & Level 4 Finish", "amountCents": 12500000, "kind": "section"},
+        {"description": "Interior Trim, Doors & Paint", "amountCents": 8500000, "kind": "section"},
+        {"description": "Primary Bath & Flooring", "amountCents": 4500000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 90, "sov:1": 75, "sov:2": 45, "sov:3": 40}
     }'::jsonb
   ),
   (
@@ -277,10 +282,11 @@ values
     '{
       "contractCents": 13817300,
       "sov": [
-        {"id": "framing", "label": "Addition & Interior Framing", "cents": 5647300, "billedPct": 100},
-        {"id": "drywall", "label": "Drywall & Texture", "cents": 4800000, "billedPct": 60},
-        {"id": "paint", "label": "Interior & Exterior Paint", "cents": 3370000, "billedPct": 20}
-      ]
+        {"description": "Addition & Interior Framing", "amountCents": 5647300, "kind": "section"},
+        {"description": "Drywall & Texture", "amountCents": 4800000, "kind": "section"},
+        {"description": "Interior & Exterior Paint", "amountCents": 3370000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 100, "sov:1": 60, "sov:2": 20}
     }'::jsonb
   ),
   (
@@ -300,9 +306,10 @@ values
     '{
       "contractCents": 16480000,
       "sov": [
-        {"id": "framing", "label": "Custom Home Structural Framing", "cents": 9880000, "billedPct": 85},
-        {"id": "drywall", "label": "Whole-House Drywall", "cents": 6600000, "billedPct": 50}
-      ]
+        {"description": "Custom Home Structural Framing", "amountCents": 9880000, "kind": "section"},
+        {"description": "Whole-House Drywall", "amountCents": 6600000, "kind": "section"}
+      ],
+      "sovOpening": {"sov:0": 85, "sov:1": 50}
     }'::jsonb
   )
 on conflict (id) do update
@@ -1073,6 +1080,18 @@ values
 -- Note: `documents` has a freeze trigger on issued rows and `payments`/`document_events` are append-only,
 -- so we use deterministic UUIDs with ON CONFLICT DO NOTHING.
 
+-- Reset any non-seeded SOV progress draw documents from manual/E2E runs so seeded jobs start at their opening percents
+update public.documents
+   set status = 'void',
+       void_reason = 'seed reset',
+       voided_at = now()
+ where id in (select document_id from public.sov_progress)
+   and status = 'issued';
+
+delete from public.documents
+ where id in (select document_id from public.sov_progress)
+   and status = 'draft';
+
 insert into public.documents (
   id, kind, job_id, client_id, number, title, status, revision,
   snapshot, total_cents, due_date, token, preview_token, issued_at, issued_by, created_by
@@ -1754,5 +1773,232 @@ values
     '/app/jobs/9146-w-hutton-dr?tab=log',
     'seed-cohesive'
   );
+
+-- ---------------------------------------------------------------------------
+-- 10. Sub Contacts, Bid Invites/Responses & Sales Opportunities (`0025`, `0028`)
+-- ---------------------------------------------------------------------------
+
+insert into public.sub_contacts (id, sub_id, name, email, phone, role, is_primary, active)
+values
+  ('d1000001-0000-4000-8000-000000000001', 'd0000001-0000-4000-8000-000000000001', 'Hector Medina', 'bids.medina@example.com', '555-0201', 'Chief Estimator', true, true),
+  ('d1000001-0000-4000-8000-000000000002', 'd0000001-0000-4000-8000-000000000002', 'ryan.mega', 'ap.megaelectric@example.com', '555-0202', 'PM / Estimator', true, true),
+  ('d1000001-0000-4000-8000-000000000003', 'd0000001-0000-4000-8000-000000000003', 'Luis Sonoran', 'estimating.sonoran@example.com', '555-0203', 'Operations', true, true),
+  ('d1000001-0000-4000-8000-000000000004', 'd0000001-0000-4000-8000-000000000004', 'Gabe Desert', 'office.gbdpaint@example.com', '555-0204', 'Owner', true, true),
+  ('d1000001-0000-4000-8000-000000000005', 'd0000001-0000-4000-8000-000000000005', 'Arturo Diaz', 'ad.concrete@example.com', '555-0205', 'Estimator', true, true)
+on conflict (id) do update
+  set name = excluded.name,
+      email = excluded.email,
+      is_primary = excluded.is_primary,
+      active = excluded.active;
+
+-- Bid invites on Package e0000001-0000-4000-8000-000000000001 (Bellevue Insulation, awarded)
+insert into public.bid_invites (
+  id, package_id, sub_id, contact_name, contact_email, token, status, sent_at, viewed_at, level_add_cents, level_note, created_by
+)
+values
+  (
+    'e1000001-0000-4000-8000-000000000001',
+    'e0000001-0000-4000-8000-000000000001',
+    'd0000001-0000-4000-8000-000000000001',
+    'Hector Medina',
+    'bids.medina@example.com',
+    'seed_token_bellevue_medina_0001',
+    'awarded',
+    now() - interval '28 days',
+    now() - interval '27 days',
+    0,
+    '',
+    'seed-cohesive'
+  ),
+  (
+    'e1000001-0000-4000-8000-000000000002',
+    'e0000001-0000-4000-8000-000000000001',
+    'd0000001-0000-4000-8000-000000000003',
+    'Luis Sonoran',
+    'estimating.sonoran@example.com',
+    'seed_token_bellevue_sonoran_0002',
+    'not_awarded',
+    now() - interval '28 days',
+    now() - interval '27 days',
+    120000,
+    'Excluded mineral wool safing at top-of-wall',
+    'seed-cohesive'
+  )
+on conflict (id) do update
+  set status = excluded.status,
+      level_add_cents = excluded.level_add_cents,
+      level_note = excluded.level_note;
+
+update public.bid_packages
+set awarded_invite_id = 'e1000001-0000-4000-8000-000000000001'
+where id = 'e0000001-0000-4000-8000-000000000001';
+
+insert into public.bid_responses (
+  invite_id, revision, lines, total_cents, inclusions, exclusions, start_on, duration, valid_days, deviations, note, signer_name, signer_title, signature, consent, fingerprint
+)
+values
+  (
+    'e1000001-0000-4000-8000-000000000001',
+    1,
+    '[{"lineId": "r19-walls", "cents": 2040000, "note": ""}, {"lineId": "shaft-sound", "cents": 910000, "note": ""}]'::jsonb,
+    2950000,
+    'All R-19 kraft/unfaced batts, sound attenuation mineral wool, and acoustical caulk.',
+    'Spray foam at roof deck.',
+    current_date - 14,
+    '10 working days',
+    45,
+    '',
+    'Includes lift rental.',
+    'Hector Medina',
+    'Chief Estimator',
+    '{"method": "type", "typed": "Hector Medina", "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}'::jsonb,
+    'I confirm this bid on behalf of Medina Pro Drywall LLC.',
+    'fp_seed_bellevue_medina_rev1_2950000'
+  ),
+  (
+    'e1000001-0000-4000-8000-000000000002',
+    1,
+    '[{"lineId": "r19-walls", "cents": 2010000, "note": ""}, {"lineId": "shaft-sound", "cents": 890000, "note": ""}]'::jsonb,
+    2900000,
+    'R-19 and shaft sound batts.',
+    'Top-of-wall fire safing.',
+    current_date - 12,
+    '12 working days',
+    30,
+    'Excludes top-of-wall safing',
+    '',
+    'Luis Sonoran',
+    'Operations',
+    '{"method": "type", "typed": "Luis Sonoran", "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}'::jsonb,
+    'I confirm this bid on behalf of Sonoran Thermal Insulation LLC.',
+    'fp_seed_bellevue_sonoran_rev1_2900000'
+  )
+on conflict (invite_id, revision) do nothing;
+
+-- Sales Opportunities (`sales_opportunities`) for Sales department & Sales week
+insert into public.sales_opportunities (
+  id, number, title, stage, kind, source, contact, address, client_id, job_id,
+  value_cents, probability, owner, next_step, next_step_on, bid_due, notes, tags, created_by
+)
+values
+  (
+    'c2000001-0000-4000-8000-000000008009',
+    '26-0001',
+    'Jury Residence — Workout Room & Home Theater Addition',
+    'won',
+    'addition',
+    'repeat',
+    '{"name": "Brad & Sarah Jury", "company": "A Finer Touch Construction (Synth)", "phone": "480-555-0101", "email": "ap.aft.synth@example.com"}'::jsonb,
+    '8009 N Ironwood Dr, Paradise Valley, AZ 85253',
+    'c0000001-0000-4000-8000-000000000001',
+    'b0000001-0000-4000-8000-000000008009',
+    11850000,
+    100,
+    'Marco',
+    'In production',
+    null,
+    null,
+    'Awarded framing, insulation, and Level 5 drywall package.',
+    array['aft', 'paradise-valley'],
+    'seed-cohesive'
+  ),
+  (
+    'c2000001-0000-4000-8000-000000009146',
+    '26-0002',
+    'Bellevue University AC938 — Franklin Hall TI Framing & Drywall',
+    'won',
+    'commercial_ti',
+    'bid_invite',
+    '{"name": "Kurt Schifferer", "company": "Schifferer Commercial Builders (Synth)", "phone": "602-555-0144", "email": "kurt.schifferer.synth@example.com"}'::jsonb,
+    '9146 W Hutton Dr, Peoria, AZ 85382',
+    'c0000001-0000-4000-8000-000000000002',
+    'b0000001-0000-4000-8000-000000009146',
+    21000000,
+    100,
+    'Marco',
+    'In production',
+    null,
+    null,
+    'Commercial TI metal stud framing, acoustic insulation, and Type X drywall.',
+    array['commercial', 'peoria'],
+    'seed-cohesive'
+  ),
+  (
+    'c2000001-0000-4000-8000-000000007120',
+    '26-0003',
+    'Kierland Commons Suite 210 — Dental Studio TI Framing & Acoustic Ceilings',
+    'proposal_sent',
+    'commercial_ti',
+    'referral',
+    '{"name": "Dr. Elena Vance", "company": "Vance Dental Studio (Synth)", "phone": "480-555-0192", "email": "elena.vance.synth@example.com"}'::jsonb,
+    '7120 E Kierland Blvd, Scottsdale, AZ 85254',
+    null,
+    null,
+    6850000,
+    55,
+    'Marco',
+    'Follow up on revision 1 acoustic soffit option',
+    current_date - 6, -- 6 days overdue -> triggers >5d follow-up escalation!
+    current_date + 4,
+    'Referred by AFT project manager; proposal sent last week.',
+    array['dental-ti', 'scottsdale'],
+    'seed-cohesive'
+  ),
+  (
+    'c2000001-0000-4000-8000-000000005410',
+    '26-0004',
+    'Silverleaf Lot 18 — Guest Casita Framing & Smooth Drywall',
+    'estimating',
+    'custom_home',
+    'call',
+    '{"name": "grant.hale", "company": "Hale Custom Homes (Synth)", "phone": "480-555-0177", "email": "grant.hale.synth@example.com"}'::jsonb,
+    '5410 E Thompson Peak Pkwy, Scottsdale, AZ 85255',
+    null,
+    null,
+    9400000,
+    40,
+    'Marco',
+    'Complete structural wood + steel beam takeoff from S-sheets',
+    current_date + 1,
+    current_date + 5,
+    'Architectural + structural plans uploaded; pricing framing + drywall.',
+    array['custom-home', 'silverleaf'],
+    'seed-cohesive'
+  )
+on conflict (id) do update
+  set title = excluded.title,
+      stage = excluded.stage,
+      source = excluded.source,
+      value_cents = excluded.value_cents,
+      next_step = excluded.next_step,
+      next_step_on = excluded.next_step_on,
+      job_id = excluded.job_id,
+      updated_at = now();
+
+select setval(
+  'public.sales_opportunity_seq',
+  greatest(20, coalesce((select max(substring(number from '-(\d+)$')::bigint) from public.sales_opportunities), 20)),
+  true
+);
+
+insert into public.work_items (
+  kind, title, detail, location, role, assignee, job_id, crew_job_id, due_on, escalate_days, status, source, href, created_by
+)
+values (
+  'follow_up',
+  'Follow up on Proposal · Kierland Commons Suite 210 (26-0003)',
+  'No follow-up in 6 days (SOP-005 5-business-day cadence); escalates to Owner decisions.',
+  '7120 E Kierland Blvd, Scottsdale, AZ 85254',
+  'sales',
+  '',
+  null,
+  null,
+  current_date - 6,
+  5,
+  'open',
+  'seed:sales:followup:26-0003',
+  '/app/sales/c2000001-0000-4000-8000-000000007120',
+  'seed-cohesive'
+);
 
 commit;

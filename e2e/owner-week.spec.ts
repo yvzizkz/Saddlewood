@@ -39,8 +39,11 @@ test.describe("Owner: the owner's week", () => {
     expect(await tile(page, "Change orders to price")).toBe(before);
     // Close it out so reruns start clean.
     await page.goto("/app/jobs/9146-w-hutton-dr?tab=changes");
-    await page.getByRole("listitem").filter({ hasText: title }).getByRole("button", { name: "Signed" }).click();
-    await page.getByRole("listitem").filter({ hasText: title }).getByRole("button", { name: "Billed" }).click();
+    const co = page.getByRole("listitem").filter({ hasText: title });
+    await co.getByRole("button", { name: "Signed" }).click();
+    await expect(co).toContainText("Signed, not billed");
+    await co.getByRole("button", { name: "Billed" }).click();
+    await expect(page.getByRole("listitem").filter({ hasText: title })).toHaveCount(0);
   });
 
   test("moving Finance's seat moves Finance's work, and moving it back returns it", async ({ owner: page }) => {

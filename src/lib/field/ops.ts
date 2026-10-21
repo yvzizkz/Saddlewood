@@ -260,7 +260,7 @@ export async function syncReceiptEntryToPurchases(input: Parameters<typeof build
   }
 }
 
-/** Writes directive (`co_price`) and `ASK:` (`decision`) rows from an EOD log into `work_items`. Never throws to caller. */
+/** Writes directive (`co_price`) and `ASK:` (`decision`) rows from an EOD log into `work_items` and `change_orders`. Never throws to caller. */
 export async function syncEodDirectivesAndDecisions(input: Parameters<typeof extractEodWorkItems>[0]): Promise<void> {
   try {
     const db = getSupabaseAdmin();
@@ -284,6 +284,25 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
         if (insErr && (insErr as { code?: string }).code !== "23505") {
           console.error("syncEodDirectivesAndDecisions work_items insert failed:", insErr);
         }
+      }
+    }
+    const asked = input.asked.trim();
+    const crewJobId = crewJobIdOf(input.jobId);
+    if (asked.length >= 2) {
+      const title = asked.slice(0, 200);
+      const lookup = db.from("change_orders").select("id").eq("title", title);
+      const { data: existingCo, error: coSelErr } = await (crewJobId ? lookup.eq("crew_job_id", crewJobId) : lookup.is("crew_job_id", null)).maybeSingle();
+      if (coSelErr) console.error("syncEodDirectivesAndDecisions change_orders lookup failed:", coSelErr);
+      if (!existingCo) {
+        const { error: coErr } = await db.from("change_orders").insert({
+          job_id: billingJobId,
+          crew_job_id: crewJobId,
+          title,
+          detail: `Directive captured on ${input.day} EOD log (#${input.entryId}).`,
+          source: "directive",
+          requested_by: input.createdBy,
+        });
+        if (coErr) console.error("syncEodDirectivesAndDecisions change_orders insert failed:", coErr);
       }
     }
   } catch (err) {

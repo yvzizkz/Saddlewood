@@ -20,6 +20,7 @@ import { loadPeople, loadSeats } from "@/lib/roles/store";
 import { KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
 import { NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
+import ProgressBilling from "@/components/billing/ProgressBilling";
 import { CO_LABEL, loadChangeOrders } from "@/lib/billing/registers";
 import { EDITABLE_SCHEDULE_KINDS, loadScheduleFeed, SCHEDULE_KIND_LABEL } from "@/lib/schedule/feed";
 import { NewScheduleItem, ScheduleStatusButton } from "@/components/schedule/ScheduleActions";
@@ -269,6 +270,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const payments: TableRow[] = money.collected.map((c) => ({ id: c.id, day: c.receivedOn, number: c.number, method: c.method, reference: c.reference, amount: c.amountCents, fee: c.feeCents || null, href: c.documentId ? `/app/money/${c.documentId}` : null }));
     return (
       <JobFrame {...frame}>
+        {tab === "money" && ref.billingId ? <ProgressBilling jobKey={ref.key} /> : null}
         {tab === "money" ? (
           <dl className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {[
