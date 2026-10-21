@@ -5,6 +5,7 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeJobName, TRADE_SLUGS, tripKey as computeTripKey, type Trade } from "@/lib/crew/purchases";
+import { dedupeReceipts } from "@/lib/crew/purchaseQueries";
 import { localDay } from "@/lib/crew/time";
 import { OTHER_JOB } from "@/lib/crew/types";
 import { jobHref, type JobRef } from "@/lib/jobs/hub";
@@ -196,6 +197,8 @@ export async function syncReceiptEntryToPurchases(input: Parameters<typeof build
     if (ex?.job_manual) row.job_id = ex.job_id ?? null;
     const { error: purchErr } = await db.from("purchases").upsert(row, { onConflict: "source_key" });
     if (purchErr) console.error("syncReceiptEntryToPurchases purchases upsert failed:", purchErr);
+    // The same trip from Pro Xtra counts once: work the marks out again for the day.
+    else await dedupeReceipts([String(purchaseRow.purchased_on)]).catch((err) => console.error("syncReceiptEntryToPurchases dedupe failed:", err));
   } catch (err) {
     console.error("syncReceiptEntryToPurchases unexpected error:", err);
   }

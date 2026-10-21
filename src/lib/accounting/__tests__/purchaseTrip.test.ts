@@ -15,6 +15,7 @@ function from(table: string) {
   const b = {
     select: () => b,
     order: () => b,
+    limit: () => b,
     eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), b),
     or: (expr: string) => (db.orCalls.push(expr), b),
     maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),

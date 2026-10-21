@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
+// The Pro Xtra dedupe after a receipt's upsert has its own tests (receiptDedupe, purchaseQueries).
+const { dedupeMock } = vi.hoisted(() => ({ dedupeMock: vi.fn(async () => ({ covered: 0, cleared: 0, linked: 0 })) }));
+vi.mock("@/lib/crew/purchaseQueries", () => ({ dedupeReceipts: dedupeMock }));
+
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => ({ from: fromMock }),
 }));
@@ -98,6 +102,7 @@ describe("field operations helpers", () => {
     expect(upserts[1]).toMatchObject({ source_key: "app:42", line_total_cents: 6000, trade: "framing", trade_manual: true, job_id: "8009-n-ironwood-dr" });
 
     expect(tables).not.toContain("bills");
+    expect(dedupeMock).toHaveBeenCalledWith([expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)]);
     expect(errSpy).not.toHaveBeenCalled();
     errSpy.mockRestore();
   });

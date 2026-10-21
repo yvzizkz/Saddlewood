@@ -82,6 +82,8 @@ export async function loadPurchases(
           .select("*")
           .gte("purchased_on", fromDay)
           .lte("purchased_on", toDay)
+          // A receipt a Pro Xtra trip covers is not counted twice (receiptDedupe.ts).
+          .is("meta->>coveredBy", null)
           .order("purchased_on", { ascending: false })
           .order("source_key", { ascending: true })
           .range(from, to),
@@ -179,6 +181,10 @@ export type PurchaseTripDetail = {
   totalCents: number;
   lines: PurchaseItemRow[];
   linkedBill: { id: string; billNumber: string; status: string; amountCents: number } | null;
+  /** An app receipt: the Pro Xtra trip that counts it instead (receiptDedupe.ts). */
+  coveredBy: string | null;
+  /** A Pro Xtra trip: the same receipt as filed in the app, left out of totals. */
+  alsoFiled: { sourceKey: string; runner: string | null } | null;
   trades: Trade[];
   jobs: { id: string; name: string; billingJobId: string | null }[];
 };
@@ -215,7 +221,12 @@ export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<Purchase
   if (!rows.length) return null;
   // The bill paid for this trip, by the trip the lines are actually on.
   const tripKeyOfLines = rows[0].trip_key || computeTripKey(rows[0].source_key);
-  const billRes = await db.from("bills").select("id,bill_number,status,amount_cents").eq("purchase_trip_key", tripKeyOfLines).maybeSingle();
+  const [billRes, alsoRes] = await Promise.all([
+    db.from("bills").select("id,bill_number,status,amount_cents").eq("purchase_trip_key", tripKeyOfLines).maybeSingle(),
+    db.from("purchases").select("source_key, meta").eq("meta->>coveredBy", tripKeyOfLines).limit(1).maybeSingle(),
+  ]);
+  const coveredRaw = (rows[0].meta ?? {}).coveredBy;
+  const also = alsoRes.data as { source_key: string; meta: Record<string, unknown> | null } | null;
   const byTripRes = { data: rows };
 
   const billingByCrewId = new Map<string, string>();
@@ -287,6 +298,8 @@ export async function loadPurchaseTrip(keyOrSourceKey: string): Promise<Purchase
     runner: first.runner,
     totalCents,
     lines,
+    coveredBy: typeof coveredRaw === "string" && coveredRaw ? coveredRaw : null,
+    alsoFiled: also ? { sourceKey: also.source_key, runner: typeof also.meta?.runner === "string" ? (also.meta.runner as string) : null } : null,
     linkedBill: billData
       ? {
           id: billData.id,

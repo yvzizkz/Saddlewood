@@ -11,7 +11,7 @@ import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { inRange, periodParams, resolvePeriod } from "@/lib/analytics/period";
 import { moneySeatForPage, seesCrewJob } from "@/lib/accounting/access";
 import { SMALL_TRIP_CENTS } from "@/lib/crew/purchases";
-import { UnmatchedBanner } from "./PurchaseActions";
+import { DedupeReceiptsButton, UnmatchedBanner } from "./PurchaseActions";
 
 export const dynamic = "force-dynamic";
 
@@ -277,6 +277,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
       />
 
       {unmatched.length > 0 ? <UnmatchedBanner unmatched={unmatched} jobs={jobs} /> : null}
+      {seat.owner ? <DedupeReceiptsButton /> : null}
 
       <DataTable
         rows={tableRows}

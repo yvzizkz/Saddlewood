@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { listTrades } from "@/lib/accounting/trades";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
-import { assignPurchases, relinkPurchases, upsertAlias } from "@/lib/crew/purchaseQueries";
+import { assignPurchases, dedupeReceipts, relinkPurchases, upsertAlias } from "@/lib/crew/purchaseQueries";
+import { addDays, localDay } from "@/lib/crew/time";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -74,6 +75,18 @@ export async function PATCH(request: NextRequest) {
     }
     const moved = await assignPurchases({ tripKey, sourceKeys }, jobId);
     return NextResponse.json({ ok: true, jobId, moved });
+  }
+
+  // Count a Home Depot trip once: mark the app receipts Pro Xtra already has,
+  // over a span of days (new purchases do this as they come in; this is for
+  // the ones from before). { from?, to? } YYYY-MM-DD, at most 400 days.
+  if (action === "dedupe_receipts") {
+    const to = typeof body.to === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.to) ? body.to : localDay();
+    const from = typeof body.from === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.from) ? body.from : addDays(to, -365);
+    const days: string[] = [];
+    for (let d = from; d <= to && days.length < 400; d = addDays(d, 1)) days.push(d);
+    const result = await dedupeReceipts(days);
+    return NextResponse.json({ ok: true, from, to: days[days.length - 1] ?? to, ...result });
   }
 
   return NextResponse.json({ ok: false, error: "unsupported action" }, { status: 400 });
