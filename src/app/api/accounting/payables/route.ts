@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { localDay } from "@/lib/crew/time";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { clearHold, paymentBlock, SETTABLE_STATUSES, waiverCollectedFor, type BillFacts, type Hold } from "@/lib/accounting/payablesRules";
+import { clearHold, paymentBlock, SETTABLE_STATUSES, splitBalance, waiverCollectedFor, type BillFacts, type Hold } from "@/lib/accounting/payablesRules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,10 +14,10 @@ export const dynamic = "force-dynamic";
 // that the lien waiver for this payment is in hand, and a payment never
 // records a waiver.
 
-type BillRow = { id: string; kind: string; status: string; waiver_status: string; amount_cents: number; sub_id: string | null };
+type BillRow = { id: string; kind: string; status: string; waiver_status: string; amount_cents: number; retainage_cents: number | null; sub_id: string | null };
 
 async function factsOf(db: ReturnType<typeof getSupabaseAdmin>, billId: string): Promise<{ bill: BillRow; facts: BillFacts } | null> {
-  const { data, error } = await db.from("bills").select("id,kind,status,waiver_status,amount_cents,sub_id").eq("id", billId).maybeSingle();
+  const { data, error } = await db.from("bills").select("id,kind,status,waiver_status,amount_cents,retainage_cents,sub_id").eq("id", billId).maybeSingle();
   if (error) throw new Error(`bills read: ${error.message}`);
   if (!data) return null;
   const bill = data as BillRow;
@@ -99,6 +99,21 @@ export async function PATCH(request: NextRequest) {
     if (waiverCollected === null) {
       return NextResponse.json({ ok: false, error: "Confirm the sub's lien waiver for this payment is in hand (SOP-004)." }, { status: 400 });
     }
+    // Retainage is held: a payment covers what is payable now, and goes into retainage only when an owner releases it.
+    const { data: before, error: beforeErr } = await db.from("bill_payments").select("amount_cents").eq("bill_id", billId).is("voided_at", null);
+    if (beforeErr) return NextResponse.json({ ok: false, error: beforeErr.message }, { status: 500 });
+    const paidBefore = ((before ?? []) as { amount_cents: number }[]).reduce((a, r) => a + (Number(r.amount_cents) || 0), 0);
+    const owed = splitBalance({ amountCents: bill.amount_cents, retainageCents: Number(bill.retainage_cents) || 0, paidCents: paidBefore, status: bill.status });
+    if (amountCents > owed.balanceCents) {
+      return NextResponse.json({ ok: false, error: `That is more than the bill's remaining balance (${(owed.balanceCents / 100).toFixed(2)}).` }, { status: 400 });
+    }
+    const releasing = amountCents > owed.payableNowCents;
+    if (releasing && body.releaseRetainage !== true) {
+      return NextResponse.json(
+        { ok: false, error: `Only ${(owed.payableNowCents / 100).toFixed(2)} is payable now; ${(owed.retainageHeldCents / 100).toFixed(2)} is retainage. Release the retainage to pay it.` },
+        { status: 409 },
+      );
+    }
     const method = typeof body.method === "string" ? body.method : "melio";
     const reference = typeof body.reference === "string" ? body.reference.trim() : "";
 
@@ -110,7 +125,7 @@ export async function PATCH(request: NextRequest) {
       reference,
       waiver_collected: waiverCollected,
       recorded_by: actor,
-      note: `Recorded by ${actor}`,
+      note: releasing ? `Recorded by ${actor}; retainage released by ${actor} (${((amountCents - owed.payableNowCents) / 100).toFixed(2)})` : `Recorded by ${actor}`,
     });
     if (payErr) return NextResponse.json({ ok: false, error: payErr.message }, { status: 500 });
 
