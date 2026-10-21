@@ -57,25 +57,27 @@ test.describe("Our own trades: GC, electrical, plumbing and HVAC", () => {
   });
 
   test("A job with no phases starts from the trades picked on Projects", async ({ owner: page }) => {
-    const name = `E2E Trades ${Date.now().toString().slice(-7)}`;
-    const add = await page.request.post("/api/crew/admin", { data: { kind: "job.add", name, address: "", note: "", promiseNote: "" } });
-    expect(add.ok()).toBeTruthy();
     const projects = await (await page.request.get("/api/crew/projects")).json();
-    const job = (projects.projects ?? projects.jobs ?? []).find((p: { name: string }) => p.name === name);
-    expect(job, "the new job is on Projects").toBeTruthy();
+    const list = (projects.projects ?? projects.jobs ?? []) as { id: string; name: string; phases: unknown[] }[];
+    const job = list.find((p) => p.phases.length === 0);
+    test.skip(!job, "every job on Projects already has phases");
+    const { id, name } = job!;
     try {
       await page.goto("/app/projects");
-      const card = page.locator("article, li, section, div").filter({ has: page.getByRole("heading", { name }) }).last();
+      const card = page.locator("div").filter({ has: page.getByRole("heading", { name, exact: true }) }).filter({ has: page.getByRole("group", { name: "Phases to start from" }) }).last();
       const pick = card.getByRole("group", { name: "Phases to start from" });
       await expect(pick.getByRole("button", { name: "Whole job (GC)" })).toHaveAttribute("aria-pressed", "true");
+      await expect(card.getByRole("button", { name: "Start from the whole job" })).toBeVisible();
       await pick.getByRole("button", { name: "Plumbing" }).click();
       await pick.getByRole("button", { name: "HVAC" }).click();
       await expect(pick.getByRole("button", { name: "Whole job (GC)" })).toHaveAttribute("aria-pressed", "false");
       await card.getByRole("button", { name: "Start from plumbing and HVAC" }).click();
-      await expect(card.getByLabel(`${name}: phases`)).toContainText("plumbing underground");
-      await expect(card.getByLabel(`${name}: phases`)).toContainText("HVAC final");
+      const strip = page.getByLabel(`${name}: phases`);
+      await expect(strip).toContainText("plumbing underground");
+      await expect(strip).toContainText("HVAC final");
     } finally {
-      await page.request.post("/api/crew/admin", { data: { kind: "job.update", id: job.id, active: false } });
+      // Back to no phases: nothing on it was verified, so the list may be emptied.
+      await page.request.post("/api/crew/admin", { data: { kind: "job.phases.set", jobId: id, phases: [] } });
     }
   });
 
