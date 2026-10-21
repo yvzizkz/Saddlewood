@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { isAllowedEmail } from "@/lib/ops/allowlist";
 
 const PatchSchema = z
   .object({
@@ -38,15 +40,18 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; itemId: string }> },
 ) {
   const { id, itemId } = await params;
-  const supabase = await createClient();
+  const session = await createClient();
 
   // Auth check — must run before any DB read.
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  } = await session.auth.getUser();
+  if (!user || !isAllowedEmail(user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Staff only (above). The estimate tables are service-role only (0051),
+  // so the reads and writes go through the server key.
+  const supabase = getSupabaseAdmin();
 
   // Wrap body read so malformed JSON → 400, not 500.
   let body: unknown;
@@ -163,14 +168,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; itemId: string }> },
 ) {
   const { id, itemId } = await params;
-  const supabase = await createClient();
+  const session = await createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  } = await session.auth.getUser();
+  if (!user || !isAllowedEmail(user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Staff only (above). The estimate tables are service-role only (0051),
+  // so the reads and writes go through the server key.
+  const supabase = getSupabaseAdmin();
 
   // Cross-estimate sanity check via the trade.
   const { data: before, error: beforeErr } = await supabase

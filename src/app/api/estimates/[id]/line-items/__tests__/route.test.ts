@@ -5,6 +5,21 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
 
+// The routes check the session, then read and write with the server key
+// (0051). Here the server key hands back the same mock the session used.
+vi.mock('@/lib/supabase/admin', async () => {
+  const server = await import('@/lib/supabase/server')
+  return {
+    getSupabaseAdmin: () => {
+      const r = vi.mocked(server.createClient).mock.settledResults.at(-1)
+      return r && r.type === 'fulfilled' ? r.value : undefined
+    },
+  }
+})
+
+// Only staff on the allowlist get past the session check.
+vi.stubEnv('INTERNAL_ALLOWED_EMAILS', 'marco@example.com')
+
 import { POST } from '../route'
 import { createClient } from '@/lib/supabase/server'
 
