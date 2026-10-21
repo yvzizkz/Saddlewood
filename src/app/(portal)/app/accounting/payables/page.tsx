@@ -1,0 +1,221 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import AccountingFrame from "@/components/accounting/AccountingFrame";
+import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
+import KpiHeader from "@/components/data/KpiHeader";
+import { loadPayables } from "@/lib/accounting/payables";
+import { payablesRows, type ApRow, type Measure } from "@/lib/accounting/payablesView";
+import PayablesMissing from "@/components/accounting/PayablesMissing";
+import CappedNotice from "@/components/accounting/CappedNotice";
+import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
+import { formatValue } from "@/lib/analytics/format";
+import { periodParams, resolvePeriod } from "@/lib/analytics/period";
+import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { ComplianceHoldBanner } from "./PayableActions";
+
+export const dynamic = "force-dynamic";
+
+const PATH = "/app/accounting/payables";
+
+type SP = Record<string, string | string[] | undefined>;
+
+export default async function PayablesPage({ searchParams }: { searchParams: Promise<SP> }) {
+  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  const sp = await searchParams;
+  const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
+  const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
+  const mParam = one("m");
+  const measure: Measure = mParam === "billed" || mParam === "paid" ? mParam : "open";
+
+  const { rows: allRows, payments, fridayCutoff, missing, capped } = await loadPayables();
+  // Open AP is what is owed now, whenever billed; billed and paid are the period's (paid by the day it went out).
+  const now = payablesRows(allRows, payments, measure, period.from, period.to);
+  const before = measure === "open" ? undefined : payablesRows(allRows, payments, measure, period.previous.from, period.previous.to);
+
+  const spec: DrillSpec<ApRow> = {
+    path: PATH,
+    title: "Payables",
+    dims: [
+      { key: "vendor", label: "Vendor / Sub", plural: "vendors", of: (r) => ({ key: r.vendorName, label: r.vendorName }) },
+      { key: "job", label: "Project", plural: "projects", of: (r) => ({ key: r.jobId, label: r.job }) },
+      { key: "trade", label: "Trade", plural: "trades", of: (r) => ({ key: r.trade, label: r.tradeLabel }), trades: true },
+      { key: "aging", label: "Aging", plural: "aging buckets", of: (r) => ({ key: r.agingBucket, label: r.agingBucket }) },
+    ],
+    value: (r) => r.value,
+    dayOf: (r) => r.day,
+  };
+
+  const d = drill(spec, now, period, sp, before ? { previousRows: before } : undefined);
+  if (measure !== "open") {
+    for (const o of d.byOptions) o.href = `${o.href}&m=${measure}`;
+    for (const s of d.breakdown.slices) if (s.href) s.href = `${s.href}&m=${measure}`;
+  }
+
+  // The pay run and the holds are about what is owed now, whichever measure is showing.
+  const unpaid = measure === "open" ? d.rows : allRows.filter((r) => r.balanceCents > 0);
+  const retainageHeldCents = unpaid.reduce((a, r) => a + r.retainageHeldCents, 0);
+  const billedCents = payablesRows(allRows, payments, "billed", period.from, period.to).reduce((a, r) => a + r.value, 0);
+  const paidCents = payablesRows(allRows, payments, "paid", period.from, period.to).reduce((a, r) => a + r.value, 0);
+  const headlineCents = d.rows.reduce((a, r) => a + r.value, 0);
+  // The pay run pays what is payable now; retainage waits for its release.
+  const dueFridayCents = unpaid.filter((r) => r.dueByFriday && !r.isOnHold).reduce((a, r) => a + r.payableNowCents, 0);
+  const heldBills = unpaid.filter((r) => r.isOnHold && r.payableNowCents > 0);
+  const onHoldCents = heldBills.reduce((a, r) => a + r.payableNowCents, 0);
+
+  const base = {
+    ...periodParams(period),
+    ...Object.fromEntries(d.filters.map((f) => [f.dim, f.key])),
+    ...(measure !== "open" ? { m: measure } : {}),
+  };
+
+  const tableRows: TableRow[] = d.rows.map((r) => {
+    const billHref = `${PATH}/bill/${r.id}`;
+    const complianceFlags = [
+      r.holdReason ? r.holdReason : "",
+      r.waiverStatus !== "not_required" ? r.waiverLabel : "",
+      r.coiStatus === "expired" ? "COI expired" : r.coiStatus === "missing" ? "COI missing" : "",
+      r.retainageCents > 0 ? `Retainage ${formatValue("money", r.retainageCents)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    return {
+      id: r.rowId,
+      issuedOn: r.issuedOn,
+      dueOn: r.dueOn,
+      vendor: r.vendorName,
+      vendorSub: `${r.billNumber} · ${r.description}`,
+      vendorHref: hrefOf(PATH, { ...base, vendor: r.vendorName }),
+      billHref,
+      job: r.job,
+      jobHref: hrefOf(PATH, { ...base, job: r.jobId }),
+      trade: r.tradeLabel,
+      tradeHref: hrefOf(PATH, { ...base, trade: r.trade }),
+      status: r.statusLabel,
+      complianceSub: complianceFlags || r.paymentTermsLabel,
+      aging: r.agingBucket,
+      amount: r.amountCents,
+      paid: r.paidCents,
+      balance: r.payableNowCents,
+      retainage: r.retainageHeldCents || null,
+      href: billHref,
+    };
+  });
+
+  const columns: Column[] = [
+    { key: "dueOn", header: "Due", kind: "date", phone: "detail" },
+    { key: "vendor", header: "Vendor / Sub", kind: "text", filter: true, subKey: "vendorSub", hrefKey: "billHref", phone: "title" },
+    { key: "job", header: "Project", kind: "text", filter: true, hrefKey: "jobHref" },
+    { key: "trade", header: "Trade", kind: "text", filter: true, hrefKey: "tradeHref" },
+    { key: "status", header: "Status", kind: "text", filter: true, subKey: "complianceSub" },
+    { key: "aging", header: "Aging", kind: "text", filter: true, phone: "hide" },
+    { key: "amount", header: "Billed", kind: "money", total: true, phone: "hide" },
+    { key: "paid", header: "Paid", kind: "money", total: true, phone: "detail" },
+    { key: "balance", header: "Payable now", kind: "money", total: true, phone: "value" },
+    { key: "retainage", header: "Retainage held", kind: "money", total: true, phone: "hide" },
+  ];
+
+  const toggleMeasure = (m: Measure) =>
+    hrefOf(PATH, { ...d.params, m: m === "open" ? undefined : m });
+
+  const headlineValue = headlineCents;
+  const headlineLabel =
+    measure === "billed" ? "Bills received" : measure === "paid" ? "Disbursed (Melio / ACH)" : "Open accounts payable";
+
+  return (
+    <AccountingFrame
+      title="Accounts payable"
+      intro="Subcontractor progress bills and supplier invoices — gated on PM verification, active COI and conditional lien waivers before the Friday Melio run."
+      period={period}
+      crumbs={[{ label: "Accounting", href: "/app/accounting" }, ...d.crumbs]}
+      filters={d.filters}
+      actions={
+        <div
+          className="flex rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-1 text-[13px] font-medium"
+          role="group"
+          aria-label="Payables measure"
+        >
+          {(
+            [
+              ["open", "Open AP"],
+              ["billed", "Billed"],
+              ["paid", "Paid"],
+            ] as const
+          ).map(([m, label]) => (
+            <Link
+              key={m}
+              href={toggleMeasure(m)}
+              scroll={false}
+              aria-current={measure === m ? "true" : undefined}
+              className={`rounded-lg px-3 py-1.5 ${
+                measure === m ? "bg-white text-[var(--color-charcoal)] shadow-sm" : "text-[var(--color-charcoal-light)]"
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      }
+    >
+      {missing ? <PayablesMissing /> : null}
+      {capped ? <CappedNotice what="bills or payments" /> : null}
+      <KpiHeader
+        label={headlineLabel}
+        value={headlineValue}
+        kind="money"
+        change={d.change}
+        upIsGood={false}
+        compareLabel={period.previous.label}
+        stats={[
+          {
+            label: "Ready for Friday run",
+            value: dueFridayCents,
+            kind: "money",
+            hint: `Due by ${formatValue("date", fridayCutoff)}`,
+          },
+          {
+            label: "On hold (waiver/COI)",
+            value: onHoldCents,
+            kind: "money",
+            hint: heldBills.length > 0 ? `${heldBills.length} blocked` : "All clear",
+          },
+          {
+            label: "Retainage held",
+            value: retainageHeldCents,
+            kind: "money",
+            hint: "Paid when an owner releases it",
+          },
+          {
+            label: "Paid in period",
+            value: paidCents,
+            kind: "money",
+            hint: "Melio / ACH / Check",
+          },
+          {
+            label: "Total billed",
+            value: billedCents,
+            kind: "money",
+            hint: `${payablesRows(allRows, payments, "billed", period.from, period.to).length} bills in the period`,
+          },
+        ]}
+        trend={d.trend}
+        trendLabel={period.grain === "day" ? "Per day" : period.grain === "week" ? "Per week" : "Per month"}
+        breakdown={d.breakdown}
+        byOptions={d.byOptions}
+      />
+
+      {heldBills.length > 0 ? <ComplianceHoldBanner heldBills={heldBills} /> : null}
+
+      <DataTable
+        rows={tableRows}
+        columns={columns}
+        searchKeys={["vendor", "vendorSub", "job", "trade", "status", "complianceSub", "aging"]}
+        name={`payables-${measure}-${period.key}`}
+        rowHrefKey="href"
+        initialSort={{ key: "dueOn", dir: "asc" }}
+        empty="No vendor or subcontractor bills in this period."
+      />
+    </AccountingFrame>
+  );
+}

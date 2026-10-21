@@ -11,6 +11,7 @@ import { readSettings } from "@/lib/crew/settings";
 import { localDay } from "@/lib/crew/time";
 import { loadWaiting } from "@/lib/owner/load";
 import { buildMorning } from "@/lib/owner/morning";
+import { loadLaneSeats } from "@/lib/roles/store";
 
 // The 7 AM "Your day" push. Vercel's cron calls this at 14:00 UTC, which is
 // 7 AM in Phoenix all year (no daylight saving), Monday to Saturday
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
     const notes = buildMorning({
       day,
       owners: sections.people,
+      laneSeats: await loadLaneSeats(),
       people,
       schedule,
       tasks,

@@ -67,8 +67,9 @@ export function JobPaperwork({ opportunityId, job, today, canEdit, onChange, toa
           </Link>
         ) : null}
         {job.crewJobId ? (
-          <Link href="/app/crew?view=jobs" className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--color-stone)] bg-white px-3 text-sm text-[var(--color-teal)]">
-            Field job <ChevronRight className="size-4" aria-hidden="true" />
+          // The job page is the owners' hub; a project manager's seat opens their Projects list.
+          <Link href={canEdit ? `/app/jobs/${encodeURIComponent(job.crewJobId)}` : '/app/projects'} className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--color-stone)] bg-white px-3 text-sm text-[var(--color-teal)]">
+            Job page <ChevronRight className="size-4" aria-hidden="true" />
           </Link>
         ) : null}
         {canEdit ? (

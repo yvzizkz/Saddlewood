@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { subsError, subsGate } from "@/lib/subs/access";
-import { listSubs, saveSub } from "@/lib/subs/store";
+import { loadSubScorecards } from "@/lib/subs/scorecard";
+import { saveSub } from "@/lib/subs/store";
 import { readSubInput } from "@/lib/subs/validate";
 
 export const runtime = "nodejs";
@@ -13,7 +14,16 @@ export async function GET(request: NextRequest) {
   const gate = await subsGate(request);
   if (gate.response) return gate.response;
   try {
-    return NextResponse.json({ ok: true, subs: await listSubs(), can: gate.seat.can, me: { name: gate.seat.name, role: gate.seat.role } });
+    const isOwner = gate.seat.role === "owner";
+    const { subs, scorecards, summary } = await loadSubScorecards(undefined, { includeBills: isOwner });
+    return NextResponse.json({
+      ok: true,
+      subs,
+      scorecards,
+      complianceSummary: summary,
+      can: gate.seat.can,
+      me: { name: gate.seat.name, role: gate.seat.role },
+    });
   } catch (err) {
     return subsError(err, "list the subs");
   }

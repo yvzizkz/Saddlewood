@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Briefcase } from 'lucide-react'
 
 import { botApi } from '@/components/bot/BotProvider'
-import { Button, Chip, Field, INPUT, Segmented } from '@/components/bot/ui'
+import { Button, Chip, Field, INPUT } from '@/components/bot/ui'
+import { PhasePick } from '@/components/crew/PhasePick'
+import { pickLabel, templatePhases } from '@/lib/crew/phases'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import type { AwardChoices, AwardPlan } from '@/lib/sales/award'
 import { usd } from '../format'
@@ -24,13 +26,6 @@ type Preview = {
   conflict: string
   prefixUsedBy: string[]
 }
-
-const TEMPLATES: { value: AwardChoices['template']; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'framing', label: 'Framing' },
-  { value: 'drywall', label: 'Drywall' },
-  { value: 'both', label: 'Both' },
-]
 
 function query(c: Partial<AwardChoices>): string {
   const q = new URLSearchParams()
@@ -182,7 +177,8 @@ export function AwardSheet({ opportunityId, open, onClose, onDone, toast }: { op
 
             <div>
               <p className="mb-1.5 text-xs font-medium text-[var(--color-charcoal)]">Phases to start from</p>
-              <Segmented label="Phases" value={choices.template} onChange={(v) => set({ template: v })} options={TEMPLATES} />
+              <PhasePick value={choices.template} onChange={(v) => set({ template: v })} allowNone />
+              <p className="mt-1 text-[11px] text-[var(--color-charcoal-light)]">Whole job for a remodel, addition or custom home; or pick the trades we perform on it.</p>
             </div>
 
             <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-[var(--color-stone)] bg-white px-3">
@@ -195,6 +191,7 @@ export function AwardSheet({ opportunityId, open, onClose, onDone, toast }: { op
               <Row label="Client" value={plan.client.name} tag={p.existing.clientId ? 'on file' : 'new'} />
               <Row label="Billing job" value={plan.job.name} tag={p.existing.jobId ? 'on file' : 'new'} />
               <Row label="Field job" value={plan.crew.name} tag={p.existing.crewJobId ? 'on the list' : 'new'} />
+              <Row label="Phases" value={plan.crew.template === 'none' ? 'None' : `${templatePhases(plan.crew.template).length}, ${pickLabel(plan.crew.template)}`} />
               <Row label="Contract" value={usd(plan.job.contractCents)} />
               <div className="my-1 border-t border-[var(--color-stone)] pt-1">
                 <p className="pt-1 text-xs font-medium text-[var(--color-charcoal)]">Schedule of values</p>

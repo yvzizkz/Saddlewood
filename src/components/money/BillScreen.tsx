@@ -101,7 +101,7 @@ export default function BillScreen({ initialGroupId }: { initialGroupId: string 
         <ScreenTitle eyebrow="Money" title="Bill" />
         <Empty>{loadError}</Empty>
         <div className="mt-4">
-          <Link href="/app/money" className="text-sm underline text-[var(--color-charcoal)]">Back to Money</Link>
+          <Link href="/app/accounting/billing" className="text-sm underline text-[var(--color-charcoal)]">Back to Billing</Link>
         </div>
       </>
     )
@@ -444,7 +444,7 @@ function Review({ data, notes, reload, back }: { data: Group; notes: PrepareNote
           <p className="text-sm">This went out on {when(sentAt)}{m.emailId ? <span className="text-[var(--color-charcoal-light)]"> · mail id {m.emailId}</span> : null}.</p>
           <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">The documents are issued; their viewings show under Money.</p>
           <div className="mt-3 flex gap-2">
-            <Link href="/app/money" className="inline-flex min-h-11 items-center rounded-xl border border-[var(--color-stone-mid)] bg-white px-4 text-sm font-medium">Money</Link>
+            <Link href="/app/accounting/receivables" className="inline-flex min-h-11 items-center rounded-xl border border-[var(--color-stone-mid)] bg-white px-4 text-sm font-medium">Receivables</Link>
             <Button variant="quiet" onClick={back}>Bill another</Button>
           </div>
         </Card>

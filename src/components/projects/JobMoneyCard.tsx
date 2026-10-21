@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { botApi } from '@/components/bot/BotProvider'
@@ -18,7 +19,7 @@ import MaterialBlock from './MaterialBlock'
 // money. A field job with no billing job yet still gets its material, and
 // this year from Joist and Buildertrend (0050) when the Mac has sent it.
 
-export function JobMoneyFigures({ m }: { m: JobMoney }) {
+export function JobMoneyFigures({ m, canOpen = false }: { m: JobMoney; canOpen?: boolean }) {
   const late = m.open.filter((o) => (o.daysLate ?? 0) >= 1)
   return (
     <>
@@ -52,7 +53,14 @@ export function JobMoneyFigures({ m }: { m: JobMoney }) {
         <ul className="mt-2 space-y-1">
           {late.map((o) => (
             <li key={`${o.number}-${o.title}`} className="text-[13px] text-[var(--color-charcoal)]">
-              <span className="font-medium">{o.number}</span> · {money(o.owedCents)} owed, {o.daysLate} day{o.daysLate === 1 ? '' : 's'} late
+              {canOpen && o.documentId ? (
+                <Link href={`/app/money/${o.documentId}`} className="font-medium underline underline-offset-2">
+                  {o.number}
+                </Link>
+              ) : (
+                <span className="font-medium">{o.number}</span>
+              )}{' '}
+              · {money(o.owedCents)} owed, {o.daysLate} day{o.daysLate === 1 ? '' : 's'} late
               {o.dueOn ? ` (due ${day(o.dueOn)})` : ''}
             </li>
           ))}
@@ -74,7 +82,7 @@ type History = JobHistory & { readAt?: string }
 type Load =
   | { state: 'loading' }
   | { state: 'error'; error: string }
-  | { state: 'ok'; m: JobMoney | null; material: Material | null; history: History | null; crewJobId: string }
+  | { state: 'ok'; m: JobMoney | null; material: Material | null; history: History | null; crewJobId: string; canOpen: boolean }
 
 const NOT_LINKED = 'Money: no billing job linked yet. An owner links it on the Crew tab.'
 
@@ -85,9 +93,9 @@ export default function JobMoneyCard({ billingJobId, crewJobId = '', jobName = '
     if (!billingJobId && !crewJobId) return
     let live = true
     const query = billingJobId ? `job=${encodeURIComponent(billingJobId)}` : `crewJob=${encodeURIComponent(crewJobId)}`
-    botApi<{ ok: true; money: JobMoney | null; material: Material | null; history?: History | null; crewJobId?: string | null }>(`/api/crew/projects/money?${query}`)
+    botApi<{ ok: true; money: JobMoney | null; material: Material | null; history?: History | null; crewJobId?: string | null; canOpen?: boolean }>(`/api/crew/projects/money?${query}`)
       // The field job behind a billing job comes back with the money (0026), so the Material block can search it.
-      .then((d) => live && setLoad({ state: 'ok', m: d.money, material: d.material, history: d.history ?? null, crewJobId: d.crewJobId || crewJobId }))
+      .then((d) => live && setLoad({ state: 'ok', m: d.money, material: d.material, history: d.history ?? null, crewJobId: d.crewJobId || crewJobId, canOpen: Boolean(d.canOpen) }))
       .catch((e: Error) => live && setLoad({ state: 'error', error: e.message }))
     return () => {
       live = false
@@ -114,7 +122,7 @@ export default function JobMoneyCard({ billingJobId, crewJobId = '', jobName = '
         </div>
       ) : (
         <>
-          {load.m ? <JobMoneyFigures m={load.m} /> : <p className="text-[12px] text-[var(--color-charcoal-light)]">{NOT_LINKED}</p>}
+          {load.m ? <JobMoneyFigures m={load.m} canOpen={load.canOpen} /> : <p className="text-[12px] text-[var(--color-charcoal-light)]">{NOT_LINKED}</p>}
           {load.history ? <HistoryBlock h={load.history} /> : null}
           {load.material ? <MaterialBlock m={load.material} jobId={load.crewJobId} jobName={jobName} /> : null}
         </>

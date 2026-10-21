@@ -220,7 +220,7 @@ export default function AskScreen() {
 
   return (
     <div
-      className="fixed inset-x-0 mx-auto flex max-w-xl flex-col"
+      className="fixed inset-x-0 mx-auto flex max-w-xl flex-col md:left-60"
       style={{
         top: 'calc(53px + env(safe-area-inset-top, 0px))',
         bottom: keyboardUp ? keyboard : 'calc(56px + env(safe-area-inset-bottom, 0px))',

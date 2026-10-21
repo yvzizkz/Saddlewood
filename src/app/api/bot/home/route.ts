@@ -7,6 +7,7 @@ import { failStale, hasStale, listInFlight, listRecentActions, readState } from 
 import { crewSummary } from "@/lib/crew/queries";
 import { readSettings } from "@/lib/crew/settings";
 import { loadWaiting } from "@/lib/owner/load";
+import { loadLaneSeats } from "@/lib/roles/store";
 
 // Everything the app's Home, Duties and More screens show, in one read: what
 // the Mac last reported the bot is holding, who is asking it for what right
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
       crew,
       waiting,
       settings,
+      laneSeats: await loadLaneSeats(),
     });
     return NextResponse.json(home, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

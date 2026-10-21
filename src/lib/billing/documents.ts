@@ -204,7 +204,24 @@ async function whyLocked(id: string): Promise<DocumentError> {
  * update is conditional on the row still being an unclaimed draft, so what is
  * mailed is always what was last previewed.
  */
+/**
+ * A progress draw (0041): its lines and total are what sov_progress says it
+ * billed per line, so they can't be edited on the draft, or billed to date
+ * would stop matching what the client was billed. Before 0041 there are no draws.
+ */
+async function isProgressDraw(id: string): Promise<boolean> {
+  const { data, error } = await getSupabaseAdmin().from("sov_progress").select("id").eq("document_id", id).limit(1);
+  if (error) {
+    if (/does not exist|schema cache|could not find the (table|relation)/i.test(error.message)) return false;
+    fail("check progress draw", error.message);
+  }
+  return (data ?? []).length > 0;
+}
+
 export async function updateDraft(id: string, changes: DraftChanges): Promise<BillingDocument> {
+  if ((changes.snapshot !== undefined || changes.jobId !== undefined || changes.kind !== undefined) && (await isProgressDraw(id))) {
+    throw new DocumentError("This is a progress draw: its lines come from the job's percent complete. Discard it on the job's Money tab and make the draw again.", 409);
+  }
   const row: Record<string, unknown> = {};
   if (changes.kind !== undefined) row.kind = changes.kind;
   if (changes.number !== undefined) row.number = normalizeNumber(changes.number);
@@ -371,6 +388,14 @@ export async function voidDocument(id: string, reason: string, now: Date = new D
     .maybeSingle();
   if (error) fail("void document", error.message);
   if (!data) throw new DocumentError("only an issued document can be voided", 409);
+  // A change order this invoice billed (a draw that took it to 100%, or its own
+  // invoice) is owed again: back to signed, so it shows to bill on Changes and the schedule.
+  const { error: coError } = await db
+    .from("change_orders")
+    .update({ status: "signed", billed_document_id: null })
+    .eq("billed_document_id", id)
+    .eq("status", "billed");
+  if (coError) fail("reopen change orders", coError.message);
   return toDocument(data as DocumentRow);
 }
 

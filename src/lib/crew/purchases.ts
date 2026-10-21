@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { QUICK_TRADES, TRADE_SLUGS, type TradeSlug } from "@/lib/accounting/tradeList";
+
 import { addDays, isDay } from "./time";
 
 // Home Depot purchases by job and by trade (migration 0022). The Mac posts the
@@ -10,9 +12,12 @@ import { addDays, isDay } from "./time";
 // in job_aliases under the normalized name. Pure, so every rule here is
 // tested without a database; purchaseQueries.ts reads and writes.
 
-/** The owners' short list. Anything Home Depot sells that is none of these is general. */
-export const TRADES = ["framing", "drywall", "electrical", "plumbing", "paint", "tools", "rentals", "general"] as const;
-export type Trade = (typeof TRADES)[number];
+/** The owners' short list for the quick search chips (the shared list's QUICK_TRADES). */
+export const TRADES = QUICK_TRADES;
+
+/** The full trade list (public.trades, 0029_trades.sql) accepted by trade_map and purchases.trade. */
+export { TRADE_SLUGS };
+export type Trade = TradeSlug;
 
 /** A trip this small is worth noticing: someone drove to the store for a box of screws. */
 export const SMALL_TRIP_CENTS = 7500;
@@ -52,6 +57,8 @@ export function normalizeJobName(raw: string): string {
  * the trip, never the transaction alone. A key with no colon is its own trip.
  */
 export function tripKey(sourceKey: string): string {
+  // A receipt filed in the app is one line keyed app:<entry id>: its own trip (0044).
+  if (/^app:\d+$/.test(sourceKey)) return sourceKey;
   const i = sourceKey.lastIndexOf(":");
   return i > 0 ? sourceKey.slice(0, i) : sourceKey;
 }
@@ -69,7 +76,7 @@ export function tradeFor(rules: TradeRule[], department: string, cls: string): T
   const hit =
     rules.find((r) => upper(r.department) === d && upper(r.class) === c) ??
     rules.find((r) => upper(r.department) === d && r.class.trim() === "");
-  return hit && (TRADES as readonly string[]).includes(hit.trade) ? (hit.trade as Trade) : "general";
+  return hit && (TRADE_SLUGS as readonly string[]).includes(hit.trade) ? (hit.trade as Trade) : "general";
 }
 
 // ---- what the Mac posts ---------------------------------------------------------------

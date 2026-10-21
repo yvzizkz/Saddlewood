@@ -45,6 +45,14 @@ const { db, notify, auth, mail, geocoder } = vi.hoisted(() => {
   };
 });
 
+// The field sync (field/ops.ts) as a recorder: which receipts reached Purchases, and with what amount.
+const { synced } = vi.hoisted(() => ({ synced: [] as { entryId: number; amountDollars: number | null }[] }));
+vi.mock("@/lib/field/ops", async (orig) => ({
+  ...(await orig<typeof import("@/lib/field/ops")>()),
+  syncReceiptEntryToPurchases: async (i: { entryId: number; amountDollars: number | null }) => void synced.push({ entryId: i.entryId, amountDollars: i.amountDollars }),
+  syncEodDirectivesAndDecisions: async () => undefined,
+}));
+
 vi.mock("../geocode", () => ({
   geocodeAddress: async (address: string) => {
     geocoder.asked.push(address);
@@ -658,8 +666,11 @@ describe("answering what was asked", () => {
     await crew(arnold, { kind: "receipt.add", jobId: "powell", files: [file()], clientId: cid() }, at("12:00"));
     db.questions.push({ id: 52, email: ARNOLD, kind: "amount", status: "open", ref: { entry: db.entries[0].id }, askedBy: "bot", body: "?", answer: "" });
     expect(await crew(arnold, { kind: "answer", id: 52, answer: "around forty" }, at("13:00"))).toMatchObject({ ok: false, status: 400 });
+    synced.length = 0;
     expect(await crew(arnold, { kind: "answer", id: 52, answer: "$146.61" }, at("13:00"))).toEqual({ ok: true });
     expect(db.entries[0].data).toMatchObject({ amount: 146.61 });
+    // The answer puts the receipt's line in Purchases (it had none at $0).
+    expect(synced).toEqual([{ entryId: db.entries[0].id, amountDollars: 146.61 }]);
   });
 
   it("cannot answer someone else's question, or the same one twice", async () => {
@@ -1204,6 +1215,19 @@ describe("a job's phases and its stage", () => {
     expect(names()).toEqual(["1:layout", "2:walls", "3:roof and ceiling", "4:backing", "5:inspection", "6:hang", "7:tape", "8:texture", "9:punch"]);
     expect(await admin({ kind: "job.phases.template", jobId: "nope", template: "both" }, at("09:02"))).toMatchObject({ ok: false, status: 404 });
     expect(names("north-lane")).toEqual([]);
+  });
+
+  it("starts a job from its own trades or the whole job, and never touches a job's existing phases", async () => {
+    expect(await admin({ kind: "job.phases.template", jobId: "north-lane", template: "plumbing,electrical,hvac" }, at("09:00"))).toMatchObject({ ok: true, note: "20 plumbing, electrical and HVAC phases on North Lane." });
+    expect(db.phases.filter((p) => p.jobId === "north-lane").map((p) => p.trade)).toEqual(expect.arrayContaining(["plumbing", "electrical", "hvac"]));
+    // An old framing/drywall job, one phase verified: the whole-job template goes after it; nothing it had moves or loses its check.
+    await admin({ kind: "job.phases.template", jobId: "powell", template: "both" }, at("09:01"));
+    const layout = db.phases.find((p) => p.jobId === "powell" && p.name === "layout")!;
+    await admin({ kind: "phase.verify", id: layout.id, note: "Walked it" }, at("09:02"));
+    const before = names();
+    expect(await admin({ kind: "job.phases.template", jobId: "powell", template: "gc" }, at("09:03"))).toMatchObject({ ok: true, note: "16 whole-job phases on Powell Residence, after the ones it had." });
+    expect(names().slice(0, before.length)).toEqual(before);
+    expect(names()[before.length]).toBe(`${before.length + 1}:demo`);
   });
 
   it("sets the list, keeping a verified phase where it is and never dropping it", async () => {

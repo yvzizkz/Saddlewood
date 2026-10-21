@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react'
 import { Loader2, Mic, Search, X } from 'lucide-react'
 
@@ -7,6 +8,7 @@ import { botApi, useBotOptional } from '@/components/bot/BotProvider'
 import { Button, Chip, Empty, INPUT } from '@/components/bot/ui'
 import { day, money } from '@/components/money/format'
 import type { SearchResult, SearchTrip } from '@/lib/crew/purchaseSearch'
+import { tradeShort } from '@/lib/accounting/tradeList'
 import { TRADES } from '@/lib/crew/purchases'
 
 // Find a purchase (0026): the words, a trade chip row, trips as cards with
@@ -16,17 +18,6 @@ import { TRADES } from '@/lib/crew/purchases'
 // jobs). The mic fills the field with what was said when the browser can
 // listen (iOS Safari can). "Ask the bot" sends the words to the owner's own
 // Ask thread, the same POST the Ask screen makes, so the bot answers there.
-
-const TRADE_LABEL: Record<string, string> = {
-  framing: 'Framing',
-  drywall: 'Drywall',
-  electrical: 'Electrical',
-  plumbing: 'Plumbing',
-  paint: 'Paint',
-  tools: 'Tools',
-  rentals: 'Rentals',
-  general: 'General',
-}
 
 /** How many plain lines show before "N more lines" when nothing on the trip was matched (no words, only filters). */
 const PLAIN_LINES = 3
@@ -277,7 +268,7 @@ export default function PurchaseSearch({
                   active ? 'border-[var(--color-teal)] bg-[var(--color-teal)] text-white' : 'border-[var(--color-stone-mid)] bg-white text-[var(--color-charcoal)]'
                 }`}
               >
-                {TRADE_LABEL[t]}
+                {tradeShort(t)}
               </button>
             )
           })}
@@ -351,12 +342,31 @@ function TripCard({ trip, showJob }: { trip: SearchTrip; showJob: boolean }) {
     <li className="rounded-2xl border border-[var(--color-stone)] bg-white px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 text-[13px] text-[var(--color-charcoal-light)]">
-          <span className="font-medium text-[var(--color-charcoal)]">{day(trip.purchasedOn)}</span> · {store}
-          {showJob && trip.jobName ? ` · ${trip.jobName}` : ''}
+          {/* With no job set this is the owners' search (Accounting › Purchases): the trip and its job open their pages. */}
+          {showJob ? (
+            <Link href={`/app/accounting/purchases/trip/${encodeURIComponent(trip.tripKey)}`} className="font-medium text-[var(--color-charcoal)] underline-offset-2 hover:underline">
+              {day(trip.purchasedOn)}
+            </Link>
+          ) : (
+            <span className="font-medium text-[var(--color-charcoal)]">{day(trip.purchasedOn)}</span>
+          )}{' '}
+          · {store}
+          {showJob && trip.jobName ? (
+            <>
+              {' · '}
+              {trip.jobId ? (
+                <Link href={`/app/jobs/${encodeURIComponent(trip.jobId)}`} className="underline underline-offset-2">
+                  {trip.jobName}
+                </Link>
+              ) : (
+                trip.jobName
+              )}
+            </>
+          ) : null}
         </p>
         <p className="shrink-0 text-[14px] font-semibold tabular-nums text-[var(--color-charcoal)]">{money(trip.totalCents)}</p>
       </div>
-      {trip.trades.length ? <p className="mt-0.5 text-[11px] text-[var(--color-charcoal-light)]">{trip.trades.map((t) => TRADE_LABEL[t] ?? t).join(' · ')}</p> : null}
+      {trip.trades.length ? <p className="mt-0.5 text-[11px] text-[var(--color-charcoal-light)]">{trip.trades.map((t) => tradeShort(t)).join(' · ')}</p> : null}
       <ul className="mt-2 space-y-1">
         {[...lead, ...(more ? folded : [])].map((l, i) => (
           <li

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { fileRefSchema, listOf, stored, type BotFileRef } from "@/lib/bot/types";
+
+import { isPhasePick } from "./phases";
 import type { PurchasesToday, UnmatchedPurchase } from "./purchases";
 import type { AppSettings } from "./settings";
 import { isClock, isDay } from "./time";
@@ -145,7 +147,7 @@ export type CrewJobPhase = {
   /** 1-based position in the job's list. */
   ord: number;
   name: string;
-  /** 'framing' | 'drywall' | '' (or whatever was typed). */
+  /** A slug from the shared trade list ('framing', 'plumbing', 'hvac'...), or whatever was typed. */
   trade: string;
   plannedFrom: string | null;
   plannedTo: string | null;
@@ -219,6 +221,7 @@ export type CrewShift = {
   review: string;
   status: "ok" | "void";
   edits: ShiftEdit[];
+  trade?: string | null;
   /**
    * Meters from each punch to the job's address (src/lib/crew/geo.ts): null
    * when the punch or the job has no location, or the phone's fix was too
@@ -547,6 +550,7 @@ export const crewActSchema = z.discriminatedUnion("kind", [
     vendor: text(80),
     /** company: the company's card or account. me: out of the person's own pocket, so they are owed it. */
     paidBy: z.enum(["company", "me"]).default("company"),
+    trade: text(40),
     note: text(600),
     files: z.array(fileRefSchema).min(1, "a receipt needs a photo").max(MAX_ENTRY_FILES),
     clientId,
@@ -567,6 +571,10 @@ export const crewActSchema = z.discriminatedUnion("kind", [
     visits: text(1500),
     safety: text(1500),
     decision: text(1500),
+    weather: text(120),
+    crewCount: z.number().int().min(0).max(100).nullable().default(null),
+    tradesOnSite: text(200),
+    inspections: text(1500),
     files,
     /** How long the voice memo runs, when there is one. */
     memoSeconds: z.number().int().min(1).max(MEMO_MAX_SECONDS).optional(),
@@ -697,7 +705,7 @@ export const adminActSchema = z.discriminatedUnion("kind", [
       .max(40),
   }),
   /** Append a template's phases after whatever the job already has. */
-  z.object({ kind: z.literal("job.phases.template"), jobId, template: z.enum(["framing", "drywall", "both"]) }),
+  z.object({ kind: z.literal("job.phases.template"), jobId, template: z.string().max(120).refine(isPhasePick, "Which trades?") }),
   /** Checked it: the phase is done. tasks.verify on that job, owners anywhere. */
   z.object({ kind: z.literal("phase.verify"), id, note: text(300) }),
   /** Take a check back, with why. */
