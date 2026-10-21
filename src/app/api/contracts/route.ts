@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- old prototype route, goes with cleanup Batch 2
   let body: any;
   try {
     body = await request.json();
