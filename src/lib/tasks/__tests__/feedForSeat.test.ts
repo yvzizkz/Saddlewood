@@ -30,6 +30,7 @@ const feed = [
   item("w2", { jobKey: "4125-camelback", role: "decisions", nowRole: "decisions" }),
   item("w3", { role: "pm" }),
   item("w4", { role: "finance", nowRole: "finance" }),
+  item("pc1", { source: "billing", kind: "billing", role: "pm", nowRole: "decisions", escalated: true }),
   item("q1", { source: "waiting", role: "decisions", nowRole: "decisions" }),
   item("o1", { source: "ops", role: "pm" }),
   item("b1", { source: "bill", kind: "approval", jobKey: "8009-n-ironwood-dr", editable: false }),
@@ -41,9 +42,9 @@ describe("feedForSeat", () => {
     expect(feedForSeat(feed, null, () => false)).toHaveLength(feed.length);
   });
 
-  it("gives a PM their jobs and their own no-job work, never the owners' list, the ops board or bills", () => {
-    const mine = (i: FeedItem) => i.role === "pm";
-    expect(feedForSeat(feed, new Set(["8009-n-ironwood-dr"]), mine).map((i) => i.id)).toEqual(["w1", "w3", "c1"]);
+  it("gives a PM their jobs and their seat's no-job work (also once moved up), never the owners' list, the ops board or bills", () => {
+    const mine = (i: FeedItem) => i.nowRole === "pm";
+    expect(feedForSeat(feed, new Set(["8009-n-ironwood-dr"]), mine).map((i) => i.id)).toEqual(["w1", "w3", "pc1", "c1"]);
   });
 });
 

@@ -7,7 +7,7 @@ import { localDay } from "@/lib/crew/time";
 import type { SovLine } from "@/lib/sales/award";
 import { createDraft, usedNumbers } from "./documents";
 import { nextNumber } from "./numbering";
-import { computeDraw, drawInvoiceLines, shareOf, type DepositState, type Draw, type ProgressLine } from "./progress";
+import { checkReport, computeDraw, drawInvoiceLines, shareOf, type DepositState, type Draw, type PmReport, type ProgressLine } from "./progress";
 import type { BillingProfile } from "./types";
 
 /**
@@ -46,6 +46,8 @@ export type ProgressState = {
   /** Draws made in the app; the opening percents can only be set before the first. */
   draws: number;
   opening: Record<string, number>;
+  /** The PM's percent complete sent since the last draw, if any: the next draw opens with it. */
+  report: PmReport | null;
   /** The latest issued draw, to void from the card if it was wrong. */
   lastIssued: { id: string; number: string } | null;
   /** Award's deposit invoice, once issued, and how much of it draws have credited back. */
@@ -58,7 +60,7 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
   if (error) throw new Error(`jobs: ${error.message}`);
   if (!job) throw new ProgressError("No such job.", 404);
   const j = job as JobRow;
-  const billing = (j.billing ?? {}) as { sov?: (SovLine | Record<string, unknown>)[]; retainagePct?: number; sovOpening?: Record<string, number>; award?: { depositId?: string | null } };
+  const billing = (j.billing ?? {}) as { sov?: (SovLine | Record<string, unknown>)[]; retainagePct?: number; sovOpening?: Record<string, number>; pmReport?: PmReport; award?: { depositId?: string | null } };
   const depositId = billing.award?.depositId ?? null;
   const [client, cos, rows, dep] = await Promise.all([
     j.client_id ? db.from("clients").select("billing").eq("id", j.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
@@ -79,9 +81,11 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
   let openDraft: ProgressState["openDraft"] = null;
   const drawDocs = new Set<string>();
   let depositApplied = 0;
+  let lastDrawAt = 0;
   for (const r of (rows.data ?? []) as R[]) {
     const doc = Array.isArray(r.documents) ? r.documents[0] : r.documents;
     if (!doc || doc.status === "void") continue;
+    lastDrawAt = Math.max(lastDrawAt, Date.parse(doc.created_at) || 0);
     if (doc.status === "draft") openDraft = { id: doc.id, number: doc.number };
     if (doc.status === "issued" && (!lastIssued || Date.parse(doc.created_at) > lastIssued.at)) lastIssued = { ...doc, at: Date.parse(doc.created_at) };
     drawDocs.add(doc.id);
@@ -138,12 +142,31 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
     openDraft,
     draws: drawDocs.size,
     opening,
+    // A report a draw has already used is spent.
+    report: billing.pmReport?.at && Date.parse(billing.pmReport.at) > lastDrawAt ? billing.pmReport : null,
     lastIssued: lastIssued ? { id: (lastIssued as Doc).id, number: (lastIssued as Doc).number } : null,
     deposit: (() => {
       const d = dep.data as { number: string; status: string; total_cents: number } | null;
       return d && d.status === "issued" && Number(d.total_cents) > 0 ? { cents: Number(d.total_cents), appliedCents: depositApplied, number: d.number } : null;
     })(),
   };
+}
+
+/** Save the PM's percent complete for this cycle on the job (the latest one stands). Bills nothing. */
+export async function saveReport(billingJobId: string, pcts: Record<string, number>, note: string, by: { email: string; name: string }): Promise<PmReport> {
+  const state = await loadProgress(billingJobId);
+  const asked: Record<string, number> = {};
+  for (const [k, v] of Object.entries(pcts)) asked[k] = Number(v);
+  const errors = checkReport(state.lines, asked);
+  if (errors.length) throw new ProgressError(errors.join(" "), 400);
+  const at = new Date().toISOString();
+  const report: PmReport = { pcts: asked, note: note.trim().slice(0, 1000), by: by.email, byName: by.name, at, day: localDay(at) };
+  const db = getSupabaseAdmin();
+  const { data } = await db.from("jobs").select("billing").eq("id", billingJobId).maybeSingle();
+  const billing = { ...(((data as { billing?: Record<string, unknown> } | null)?.billing) ?? {}), pmReport: report };
+  const { error } = await db.from("jobs").update({ billing }).eq("id", billingJobId);
+  if (error) throw new Error(`jobs update: ${error.message}`);
+  return report;
 }
 
 /** Set what was billed before the app, per line, once, before the first draw in the app. */
@@ -163,6 +186,34 @@ export async function setOpening(billingJobId: string, pcts: Record<string, numb
   const billing = { ...(((data as { billing?: Record<string, unknown> } | null)?.billing) ?? {}), sovOpening: clean, sovOpeningBy: by, sovOpeningAt: new Date().toISOString() };
   const { error } = await db.from("jobs").update({ billing }).eq("id", billingJobId);
   if (error) throw new Error(`jobs update: ${error.message}`);
+}
+
+/** Clear the PM's percent-complete report on a job (owners only). */
+export async function clearReport(billingJobId: string): Promise<void> {
+  const db = getSupabaseAdmin();
+  const { data } = await db.from("jobs").select("billing").eq("id", billingJobId).maybeSingle();
+  if (!data) throw new ProgressError("No such job.", 404);
+  const billing = { ...(((data as { billing?: Record<string, unknown> }).billing) ?? {}) };
+  delete billing.pmReport;
+  const { error } = await db.from("jobs").update({ billing }).eq("id", billingJobId);
+  if (error) throw new Error(`jobs update: ${error.message}`);
+}
+
+/** Set the billing cutoff day (1–31, or null for 1st & 15th) on a job's client (owners only). */
+export async function setClientCutoff(billingJobId: string, cutoffDay: number | null): Promise<void> {
+  if (cutoffDay !== null && (!Number.isInteger(cutoffDay) || cutoffDay < 1 || cutoffDay > 31)) {
+    throw new ProgressError("Cutoff day must be 1 to 31.", 400);
+  }
+  const db = getSupabaseAdmin();
+  const { data: job } = await db.from("jobs").select("client_id").eq("id", billingJobId).maybeSingle();
+  const clientId = (job as { client_id?: string | null } | null)?.client_id;
+  if (!clientId) throw new ProgressError("This job has no client.", 400);
+  const { data: client } = await db.from("clients").select("billing").eq("id", clientId).maybeSingle();
+  const billing = { ...(((client as { billing?: Record<string, unknown> } | null)?.billing) ?? {}) };
+  if (cutoffDay === null) delete billing.cutoffDay;
+  else billing.cutoffDay = cutoffDay;
+  const { error } = await db.from("clients").update({ billing }).eq("id", clientId);
+  if (error) throw new Error(`clients update: ${error.message}`);
 }
 
 /** Preview a draw: the same math the draft will use. */

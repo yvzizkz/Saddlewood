@@ -210,7 +210,12 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
   for (const c of calendar) {
     if (c.prepOn > addDays(today, 7)) continue;
     const base = { source: "billing" as const, assignee: "", jobKey: null, job: "", since: null, href: "/app/accounting/billing", editable: false };
-    out.push({ ...base, id: `pc${c.clientId}:${c.day}`, kind: "billing", title: `% complete and photos for ${c.client}`, detail: `${c.openJobs} open job${c.openJobs === 1 ? "" : "s"} · bills ${c.day}`, role: "pm", dueOn: c.prepOn, ...placeItem("pm", c.prepOn, 0, today) });
+    // Done once every open job billed by percent complete has the PM's report for this cycle (sent from the job's Money tab).
+    const allIn = c.sovJobs > 0 && c.reported >= c.sovJobs;
+    if (!allIn) {
+      const progress = c.sovJobs ? `${c.reported} of ${c.sovJobs} reported` : `${c.openJobs} open job${c.openJobs === 1 ? "" : "s"}`;
+      out.push({ ...base, id: `pc${c.clientId}:${c.day}`, kind: "billing", title: `% complete and photos for ${c.client}`, detail: `${progress} · bills ${c.day}`, role: "pm", dueOn: c.prepOn, ...placeItem("pm", c.prepOn, 0, today) });
+    }
     out.push({ ...base, id: `pk${c.clientId}:${c.day}`, kind: "billing", title: `Invoice package for ${c.client}`, detail: [c.delivery, ...c.attachments].join(" · "), role: "finance", dueOn: c.day, ...placeItem("finance", c.day, 0, today) });
   }
 
@@ -254,13 +259,15 @@ export function departmentOf(role: Role): string {
 
 /**
  * What a project manager's Tasks shows (jobs/access.ts): work on their jobs,
- * and work with no job that is theirs. Never the owners' waiting list, the ops
+ * and work with no job that is theirs or their seat's (also once it has moved up). Never the owners' waiting list, the ops
  * board or sub bills (Payables stays with the owners). `jobs` is the URL keys
  * of the jobs in their view; null = every job (an owner: the feed as is).
  */
 export function feedForSeat(items: FeedItem[], jobs: Set<string> | null, mine: (i: FeedItem) => boolean): FeedItem[] {
   if (jobs === null) return items;
-  return items.filter((i) => i.source !== "waiting" && i.source !== "ops" && i.source !== "bill" && !isPayables(i) && (i.jobKey ? jobs.has(i.jobKey) : mine(i)));
+  // Work with no job shows when it is theirs, or was the PM's or the field's before it moved up overdue.
+  const ours = (i: FeedItem) => mine(i) || i.role === "pm" || i.role === "field_lead";
+  return items.filter((i) => i.source !== "waiting" && i.source !== "ops" && i.source !== "bill" && !isPayables(i) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)));
 }
 
 /**

@@ -133,7 +133,8 @@ describe("field operations helpers", () => {
               }),
             }),
           }),
-          insert: async () => ({ error: { code: "23502", message: "work_items insert failed" } }),
+          // The insert returns the new id (pm-report's cleanup reads it): insert().select().single().
+          insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { code: "23502", message: "work_items insert failed" } }) }) }),
         };
       }
       if (table === "change_orders") {
@@ -145,7 +146,8 @@ describe("field operations helpers", () => {
               }),
             }),
           }),
-          insert: async () => ({ error: { code: "23502", message: "change_orders insert failed" } }),
+          // The insert returns the new id (pm-report's cleanup reads it): insert().select().single().
+          insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { code: "23502", message: "change_orders insert failed" } }) }) }),
         };
       }
       throw new Error(`unexpected table ${table}`);

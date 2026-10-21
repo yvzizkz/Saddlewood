@@ -4,13 +4,15 @@
 // to date, what this period comes to, retainage, and a button that makes the
 // draw a draft invoice (checked and sent from Billing like any other). The
 // numbers here use the same math the server uses (lib/billing/progress.ts).
+// The job's PM sees it in report mode: they send their percent complete for
+// the cycle, and the owners' next draw opens with it filled in.
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/bot/ui'
 import { formatValue } from '@/lib/analytics/format'
-import { computeDraw, shareOf, type ProgressLine } from '@/lib/billing/progress'
+import { computeDraw, shareOf, type PmReport, type ProgressLine } from '@/lib/billing/progress'
 
 type State = {
   lines: ProgressLine[]
@@ -20,9 +22,13 @@ type State = {
   draws: number
   opening: Record<string, number>
   deposit: { cents: number; appliedCents: number; number: string } | null
+  report: PmReport | null
 }
 
-export default function ProgressBilling({ jobKey }: { jobKey: string }) {
+export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: string; mode?: 'owner' | 'report' }) {
+  const reporting = mode === 'report'
+  const [note, setNote] = useState('')
+  const [sent, setSent] = useState(false)
   const router = useRouter()
   const [state, setState] = useState<State | null>(null)
   const [error, setError] = useState('')
@@ -35,7 +41,13 @@ export default function ProgressBilling({ jobKey }: { jobKey: string }) {
     const json = await res.json().catch(() => null)
     if (!res.ok || !json?.ok) return setError(json?.error ?? 'Could not load the schedule of values.')
     setState(json)
-    setPcts({})
+    // The owners' draw opens with the PM's report, on the lines it moves forward.
+    const r = (json as State).report
+    setPcts(
+      !reporting && r
+        ? Object.fromEntries(Object.entries(r.pcts).filter(([k, v]) => v > ((json as State).lines.find((l) => l.key === k)?.pctToDate ?? 0)).map(([k, v]) => [k, String(v)]))
+        : {},
+    )
   }
   useEffect(() => {
     void load()
@@ -52,14 +64,21 @@ export default function ProgressBilling({ jobKey }: { jobKey: string }) {
   if (!state || !draw) return <p className="p-4 text-sm text-[var(--color-charcoal-light)]">Loading the schedule of values…</p>
   if (!state.lines.length) return <p className="rounded-2xl border border-dashed border-[var(--color-stone-mid)] p-4 text-sm text-[var(--color-charcoal-light)]">No schedule of values on this job. Award writes one from the accepted proposal.</p>
 
-  const post = async (action: 'draw' | 'opening') => {
+  const post = async (action: 'draw' | 'opening' | 'report') => {
     setBusy(action)
     setError('')
-    const res = await fetch(`/api/jobs/${encodeURIComponent(jobKey)}/progress`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, pcts: asked }) })
+    setSent(false)
+    const res = await fetch(`/api/jobs/${encodeURIComponent(jobKey)}/progress`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, pcts: asked, note }) })
     const json = await res.json().catch(() => null)
     setBusy(null)
     if (!res.ok || !json?.ok) return setError(json?.error ?? 'Could not save.')
     if (action === 'draw') router.push(`/app/money/${json.documentId}`)
+    else if (action === 'report') {
+      setSent(true)
+      setNote('')
+      await load()
+      router.refresh()
+    }
     else {
       setOpeningMode(false)
       await load()
@@ -91,7 +110,7 @@ export default function ProgressBilling({ jobKey }: { jobKey: string }) {
   return (
     <section aria-label="Progress billing" className="rounded-2xl border border-[var(--color-stone)] bg-white p-4">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">{openingMode ? 'Billed before the app' : 'Progress billing'}</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">{openingMode ? 'Billed before the app' : reporting ? 'Percent complete for this billing' : 'Progress billing'}</p>
         <p className="text-xs text-[var(--color-charcoal-light)]">
           Billed to date {formatValue('money', draw.lines.reduce((a, l) => a + l.billedToDateCents, 0))} of {formatValue('money', draw.contractCents)}
           {before ? ` (${formatValue('money', before)} of it before the app)` : ''}
@@ -99,7 +118,15 @@ export default function ProgressBilling({ jobKey }: { jobKey: string }) {
           {state.deposit ? ` · deposit ${state.deposit.number} ${formatValue('money', state.deposit.cents)}, ${formatValue('money', state.deposit.appliedCents)} credited` : ''}
         </p>
       </div>
-      {state.openDraft ? (
+      {state.report ? (
+        <p className="mb-3 rounded-lg bg-[rgba(0,138,124,0.1)] px-3 py-2 text-sm text-[var(--color-charcoal)]" data-report="banner">
+          {reporting ? 'You sent your % complete' : `${state.report.byName.replace(/\s*\(.*\)$/, '')}'s % complete`}, {formatValue('date', state.report.day)}
+          {state.report.note ? `: ${state.report.note}` : '.'}
+          {!reporting ? ' The draw below opens with it.' : ' The owners bill from it; send again to change it.'}
+        </p>
+      ) : null}
+      {sent ? <p className="mb-3 text-sm text-[#1f6a3b]">Sent. The owners will bill from it.</p> : null}
+      {state.openDraft && !reporting ? (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-[rgba(212,175,55,0.16)] px-3 py-2 text-sm text-[#6b5212]">
           <span>
             Draw{' '}
@@ -123,7 +150,7 @@ export default function ProgressBilling({ jobKey }: { jobKey: string }) {
               <th className="py-2 pr-3">Line</th>
               <th className="py-2 pr-3 text-right">Scheduled</th>
               <th className="py-2 pr-3 text-right">To date</th>
-              <th className="py-2 pr-3 text-right">{openingMode ? 'Billed before the app' : '% complete'}</th>
+              <th className="py-2 pr-3 text-right">{openingMode ? 'Billed before the app' : reporting ? '% complete now' : '% complete'}</th>
               {!openingMode ? <th className="py-2 text-right">This period</th> : null}
             </tr>
           </thead>
@@ -195,7 +222,24 @@ export default function ProgressBilling({ jobKey }: { jobKey: string }) {
       {draw.errors.length && !openingMode ? <p className="mt-2 text-sm text-[#9a2a1f]">{draw.errors.join(' ')}</p> : null}
       {error ? <p className="mt-2 text-sm text-[#9a2a1f]">{error}</p> : null}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {openingMode ? (
+        {reporting ? (
+          <>
+            <label className="sr-only" htmlFor={`report-note-${jobKey}`}>
+              Note for the owners
+            </label>
+            <input
+              id={`report-note-${jobKey}`}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Note for the owners (photos are in the log)"
+              maxLength={1000}
+              className="min-w-0 flex-1 rounded-lg border border-[var(--color-stone-mid)] px-3 py-2 text-base md:text-sm"
+            />
+            <Button variant="primary" busy={busy === 'report'} disabled={draw.errors.length > 0 || Object.keys(asked).length === 0} onClick={() => post('report')}>
+              Send my % complete
+            </Button>
+          </>
+        ) : openingMode ? (
           <>
             <Button variant="primary" busy={busy === 'opening'} onClick={() => post('opening')}>
               Save what was billed before

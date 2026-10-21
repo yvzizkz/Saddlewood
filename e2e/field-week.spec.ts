@@ -77,13 +77,27 @@ test.describe("Field and crew: the field week", () => {
   test("6 PM EOD daily log with a field directive creates an unpriced CO on the job and a task in Owner decisions", async ({ owner: page }) => {
     const summary = `E2E Hung 42 sheets Type X in West corridor ${Date.now()}`;
     const directive = `E2E Super asked for 16-ga backing at corridor display ${Date.now()}`;
+    let changeOrderId: number | null = null;
+    let workItemIds: number[] = [];
 
     try {
       await page.goto(`/app/jobs/${JOB}?tab=log`);
       await page.getByRole("button", { name: "+ File daily log (SOP-006)" }).click();
       await page.getByPlaceholder("Work performed today (required)").fill(summary);
       await page.getByPlaceholder("Client / GC directive (creates CO awaiting price)").fill(directive);
+      const waitLog = page.waitForResponse(
+        (r) => r.url().includes("/api/field") && r.request().method() === "POST",
+      );
       await page.getByRole("button", { name: "Save daily log" }).click();
+      const logRes = await waitLog;
+      if (logRes.ok()) {
+        const logJson = (await logRes.json()) as {
+          changeOrderId?: number | null;
+          workItemIds?: number[];
+        };
+        changeOrderId = logJson.changeOrderId ?? null;
+        workItemIds = logJson.workItemIds ?? [];
+      }
 
       const logTable = page.locator(`[data-table="${JOB}-daily-logs"]`);
       await expect(logTable.getByRole("row").filter({ hasText: summary })).toBeVisible();
@@ -101,13 +115,15 @@ test.describe("Field and crew: the field week", () => {
       await expect(taskRow).toContainText("Owner");
       await expect(taskRow).toContainText("Change order to price");
     } finally {
-      // Clean up the CO via API even if an assertion above fails so reruns stay clean
-      const listRes = await page.request.get(`/api/change-orders?job=${JOB}`);
-      if (listRes.ok()) {
-        const { rows } = (await listRes.json()) as { rows: { id: number; title: string; status: string }[] };
-        for (const r of rows.filter((c) => c.title.includes(directive) && c.status !== "void")) {
-          await page.request.patch("/api/change-orders", { data: { id: r.id, status: "void" } });
-        }
+      if (changeOrderId !== null) {
+        await page.request.patch("/api/change-orders", {
+          data: { id: changeOrderId, status: "void" },
+        });
+      }
+      for (const wid of workItemIds) {
+        await page.request.patch("/api/tasks", {
+          data: { id: wid, status: "dropped" },
+        });
       }
     }
   });

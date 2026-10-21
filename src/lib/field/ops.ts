@@ -261,7 +261,11 @@ export async function syncReceiptEntryToPurchases(input: Parameters<typeof build
 }
 
 /** Writes directive (`co_price`) and `ASK:` (`decision`) rows from an EOD log into `work_items` and `change_orders`. Never throws to caller. */
-export async function syncEodDirectivesAndDecisions(input: Parameters<typeof extractEodWorkItems>[0]): Promise<void> {
+export async function syncEodDirectivesAndDecisions(
+  input: Parameters<typeof extractEodWorkItems>[0],
+): Promise<{ workItemIds: number[]; changeOrderId: number | null }> {
+  const workItemIds: number[] = [];
+  let changeOrderId: number | null = null;
   try {
     const db = getSupabaseAdmin();
     let billingJobId = input.billingJobId ?? null;
@@ -280,10 +284,15 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
         .maybeSingle();
       if (selErr) console.error("syncEodDirectivesAndDecisions work_items lookup failed:", selErr);
       if (!existing) {
-        const { error: insErr } = await db.from("work_items").insert(item);
+        const { data: inserted, error: insErr } = await db.from("work_items").insert(item).select("id").single();
         if (insErr && (insErr as { code?: string }).code !== "23505") {
           console.error("syncEodDirectivesAndDecisions work_items insert failed:", insErr);
         }
+        if (inserted && typeof (inserted as { id: number }).id === "number") {
+          workItemIds.push((inserted as { id: number }).id);
+        }
+      } else if (typeof (existing as { id: number }).id === "number") {
+        workItemIds.push((existing as { id: number }).id);
       }
     }
     const asked = input.asked.trim();
@@ -294,22 +303,32 @@ export async function syncEodDirectivesAndDecisions(input: Parameters<typeof ext
       const { data: existingCo, error: coSelErr } = await (crewJobId ? lookup.eq("crew_job_id", crewJobId) : lookup.is("crew_job_id", null)).maybeSingle();
       if (coSelErr) console.error("syncEodDirectivesAndDecisions change_orders lookup failed:", coSelErr);
       if (!existingCo) {
-        const { error: coInsErr } = await db.from("change_orders").insert({
-          job_id: billingJobId,
-          crew_job_id: crewJobId,
-          title,
-          detail: `Directive captured on ${input.day} EOD log (#${input.entryId}).`,
-          source: "directive",
-          requested_by: input.createdBy,
-        });
+        const { data: insertedCo, error: coInsErr } = await db
+          .from("change_orders")
+          .insert({
+            job_id: billingJobId,
+            crew_job_id: crewJobId,
+            title,
+            detail: `Directive captured on ${input.day} EOD log (#${input.entryId}).`,
+            source: "directive",
+            requested_by: input.createdBy,
+          })
+          .select("id")
+          .single();
         if (coInsErr && (coInsErr as { code?: string }).code !== "23505") {
           console.error("syncEodDirectivesAndDecisions change_orders insert failed:", coInsErr);
         }
+        if (insertedCo && typeof (insertedCo as { id: number }).id === "number") {
+          changeOrderId = (insertedCo as { id: number }).id;
+        }
+      } else if (typeof (existingCo as { id: number }).id === "number") {
+        changeOrderId = (existingCo as { id: number }).id;
       }
     }
   } catch (err) {
     console.error("syncEodDirectivesAndDecisions unexpected error:", err);
   }
+  return { workItemIds, changeOrderId };
 }
 
 /**

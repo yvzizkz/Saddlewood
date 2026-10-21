@@ -25,25 +25,30 @@ test.describe("Owner: the owner's week", () => {
     const title = `E2E valve move ${Date.now()}`;
     const made = await page.request.post("/api/change-orders", { data: { job: "9146-w-hutton-dr", title, source: "tm" } });
     expect(made.ok()).toBeTruthy();
+    const { id: coId } = (await made.json()) as { id: number };
 
-    await page.reload();
-    expect(await tile(page, "Change orders to price")).toBe(before + 1);
+    try {
+      await page.reload();
+      expect(await tile(page, "Change orders to price")).toBe(before + 1);
 
-    await page.goto("/app/jobs/9146-w-hutton-dr?tab=changes");
-    const row = page.getByRole("listitem").filter({ hasText: title });
-    await row.getByPlaceholder("$ price").fill("2250");
-    await row.getByRole("button", { name: "Price it" }).click();
-    await expect(row).toContainText("Priced, not sent");
+      await page.goto("/app/jobs/9146-w-hutton-dr?tab=changes");
+      const row = page.getByRole("listitem").filter({ hasText: title });
+      await row.getByPlaceholder("$ price").fill("2250");
+      await row.getByRole("button", { name: "Price it" }).click();
+      await expect(row).toContainText("Priced, not sent");
 
-    await page.goto("/app/departments/decisions");
-    expect(await tile(page, "Change orders to price")).toBe(before);
-    // Close it out so reruns start clean.
-    await page.goto("/app/jobs/9146-w-hutton-dr?tab=changes");
-    const co = page.getByRole("listitem").filter({ hasText: title });
-    await co.getByRole("button", { name: "Signed" }).click();
-    await expect(co).toContainText("Signed, not billed");
-    await co.getByRole("button", { name: "Billed" }).click();
-    await expect(page.getByRole("listitem").filter({ hasText: title })).toHaveCount(0);
+      await page.goto("/app/departments/decisions");
+      expect(await tile(page, "Change orders to price")).toBe(before);
+      // Close it out so reruns start clean.
+      await page.goto("/app/jobs/9146-w-hutton-dr?tab=changes");
+      const co = page.getByRole("listitem").filter({ hasText: title });
+      await co.getByRole("button", { name: "Signed" }).click();
+      await expect(co).toContainText("Signed, not billed");
+      await co.getByRole("button", { name: "Billed" }).click();
+      await expect(page.getByRole("listitem").filter({ hasText: title })).toHaveCount(0);
+    } finally {
+      await page.request.patch("/api/change-orders", { data: { id: coId, status: "void" } });
+    }
   });
 
   test("moving Finance's seat moves Finance's work, and moving it back returns it", async ({ owner: page }) => {
