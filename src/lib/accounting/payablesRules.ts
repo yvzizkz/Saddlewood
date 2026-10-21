@@ -69,3 +69,17 @@ export function clearHold(b: BillFacts, hold: Hold): { patch: { status: BillStat
   const status: BillStatusValue = left.length ? STATUS_OF[left[0]] : b.status === "partial" || b.status === "scheduled" ? b.status : "scheduled";
   return { patch: { status, ...(hold === "waiver" ? { waiver_status: "conditional_received" } : {}) } };
 }
+
+/**
+ * What a bill owes, split: what is payable now (the bill less retainage less
+ * what was paid) and the retainage still held. Retainage is paid only when an
+ * owner releases it; until then the pay run, Open AP and the pay form count
+ * payable-now only. A paid or void bill owes nothing.
+ */
+export function splitBalance(b: { amountCents: number; retainageCents: number; paidCents: number; status: string }): { payableNowCents: number; retainageHeldCents: number; balanceCents: number } {
+  if (b.status === "paid" || b.status === "void") return { payableNowCents: 0, retainageHeldCents: 0, balanceCents: 0 };
+  const retainage = Math.max(0, Math.min(b.retainageCents, b.amountCents));
+  const balanceCents = Math.max(0, b.amountCents - b.paidCents);
+  const payableNowCents = Math.max(0, b.amountCents - retainage - b.paidCents);
+  return { payableNowCents, retainageHeldCents: balanceCents - payableNowCents, balanceCents };
+}

@@ -97,8 +97,10 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
   const spend = lines.reduce((a, r) => a + r.lineTotalCents, 0);
   const unassigned = purchases.unmatched.length;
   const openAp = payables.rows.filter((r) => r.balanceCents > 0);
-  const apOpen = openAp.reduce((a, r) => a + r.balanceCents, 0);
-  const dueFriday = openAp.filter((r) => r.dueOn && r.dueOn <= payables.fridayCutoff).reduce((a, r) => a + r.balanceCents, 0);
+  // Payable now: retainage stays held until an owner releases it.
+  const apOpen = openAp.reduce((a, r) => a + r.payableNowCents, 0);
+  const apRetainage = openAp.reduce((a, r) => a + r.retainageHeldCents, 0);
+  const dueFriday = openAp.filter((r) => r.dueByFriday).reduce((a, r) => a + r.payableNowCents, 0);
   const held = openAp.filter((r) => r.holdReason).length;
   const arOpen = open.rows.reduce((a, r) => a + r.balanceCents, 0);
   const late = open.rows.filter((r) => (r.daysLate ?? 0) > 0 && !r.payWhenPaid);
@@ -132,7 +134,7 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
       title: "Payables",
       value: apOpen,
       kind: "money",
-      sub: `${formatValue("money", dueFriday)} due by Friday's pay run (${formatValue("date", payables.fridayCutoff)})`,
+      sub: `${formatValue("money", dueFriday)} due by Friday's pay run (${formatValue("date", payables.fridayCutoff)})${apRetainage ? ` · ${formatValue("money", apRetainage)} retainage held` : ""}`,
       alert: held ? { text: `${held} bill${held === 1 ? "" : "s"} on hold (waiver or COI)`, href: "/app/accounting/payables" } : null,
     },
     {

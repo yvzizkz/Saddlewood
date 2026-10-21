@@ -54,12 +54,14 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
 
   // The pay run and the holds are about what is owed now, whichever measure is showing.
   const unpaid = measure === "open" ? d.rows : allRows.filter((r) => r.balanceCents > 0);
+  const retainageHeldCents = unpaid.reduce((a, r) => a + r.retainageHeldCents, 0);
   const billedCents = payablesRows(allRows, payments, "billed", period.from, period.to).reduce((a, r) => a + r.value, 0);
   const paidCents = payablesRows(allRows, payments, "paid", period.from, period.to).reduce((a, r) => a + r.value, 0);
   const headlineCents = d.rows.reduce((a, r) => a + r.value, 0);
-  const dueFridayCents = unpaid.filter((r) => r.dueByFriday && !r.isOnHold).reduce((a, r) => a + r.balanceCents, 0);
-  const heldBills = unpaid.filter((r) => r.isOnHold && r.balanceCents > 0);
-  const onHoldCents = heldBills.reduce((a, r) => a + r.balanceCents, 0);
+  // The pay run pays what is payable now; retainage waits for its release.
+  const dueFridayCents = unpaid.filter((r) => r.dueByFriday && !r.isOnHold).reduce((a, r) => a + r.payableNowCents, 0);
+  const heldBills = unpaid.filter((r) => r.isOnHold && r.payableNowCents > 0);
+  const onHoldCents = heldBills.reduce((a, r) => a + r.payableNowCents, 0);
 
   const base = {
     ...periodParams(period),
@@ -95,7 +97,8 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
       aging: r.agingBucket,
       amount: r.amountCents,
       paid: r.paidCents,
-      balance: r.balanceCents,
+      balance: r.payableNowCents,
+      retainage: r.retainageHeldCents || null,
       href: billHref,
     };
   });
@@ -109,7 +112,8 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
     { key: "aging", header: "Aging", kind: "text", filter: true, phone: "hide" },
     { key: "amount", header: "Billed", kind: "money", total: true, phone: "hide" },
     { key: "paid", header: "Paid", kind: "money", total: true, phone: "detail" },
-    { key: "balance", header: "Open AP", kind: "money", total: true, phone: "value" },
+    { key: "balance", header: "Payable now", kind: "money", total: true, phone: "value" },
+    { key: "retainage", header: "Retainage held", kind: "money", total: true, phone: "hide" },
   ];
 
   const toggleMeasure = (m: Measure) =>
@@ -175,6 +179,12 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
             value: onHoldCents,
             kind: "money",
             hint: heldBills.length > 0 ? `${heldBills.length} blocked` : "All clear",
+          },
+          {
+            label: "Retainage held",
+            value: retainageHeldCents,
+            kind: "money",
+            hint: "Paid when an owner releases it",
           },
           {
             label: "Paid in period",
