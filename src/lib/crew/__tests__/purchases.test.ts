@@ -89,6 +89,8 @@ describe("tradeFor", () => {
     expect(tradeFor(RULES, "TOOL RENTAL", "")).toBe("rentals");
     expect(tradeFor(RULES, "GARDEN", "SOIL")).toBe("general");
     expect(tradeFor([], "LUMBER", "")).toBe("general");
+    expect(tradeFor([{ department: "BLDG. MATERIALS", class: "INSULATION", trade: "insulation" }], "BLDG. MATERIALS", "INSULATION")).toBe("insulation");
+    expect(tradeFor([{ department: "FLOORING", class: "TILE", trade: "tile" }], "FLOORING", "TILE")).toBe("tile");
     expect(tradeFor([{ department: "LUMBER", class: "", trade: "nonsense" }], "LUMBER", "")).toBe("general");
   });
 });

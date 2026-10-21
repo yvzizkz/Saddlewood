@@ -4,12 +4,15 @@ import { notFound, redirect } from "next/navigation";
 import { Card, Chip, Empty, ScreenTitle, SectionTitle } from "@/components/bot/ui";
 import { day, money, when } from "@/components/money/format";
 import RecordPayment from "@/components/money/RecordPayment";
+import WaiverPanel from "@/components/billing/WaiverPanel";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getDocument, listEvents } from "@/lib/billing/documents";
 import { listExhibits } from "@/lib/billing/exhibits";
 import { paidByDocument, paymentsForDocument } from "@/lib/billing/payments";
 import { describeDevice, summarizeProof } from "@/lib/billing/proof";
 import type { DocumentEvent } from "@/lib/billing/types";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { moneySeatForPage, seesBillingJob } from "@/lib/accounting/access";
+import { getJobRef, jobHref } from "@/lib/jobs/hub";
 
 export const dynamic = "force-dynamic";
 
@@ -52,11 +55,13 @@ function eventLine(e: DocumentEvent): string {
 }
 
 export default async function MoneyDocument({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await viewerIsOwner(await getViewer()))) redirect("/app");
+  // Owners: everything. A PM with money.view: read only, on their own jobs.
+  const seat = await moneySeatForPage("receivables");
+  if (!seat) redirect("/app");
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const doc = await getDocument(id);
-  if (!doc) notFound();
+  if (!doc || !seesBillingJob(seat, doc.jobId)) notFound();
 
   const [events, exhibits, payments, paid] = await Promise.all([listEvents(doc.id), listExhibits(doc.id), paymentsForDocument(doc.id), paidByDocument([doc.id])]);
   const p = paid.get(doc.id);
@@ -64,12 +69,34 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
   const lines = (doc.snapshot.lines ?? []).map((l, index) => ({ index, description: l.description, amountCents: l.amountCents, paidCents: p?.byLine.get(index) ?? 0 }));
   const proof = summarizeProof(events);
   const clientLink = doc.token ? `/d/${doc.token}?copy=1` : null;
+  // Where it belongs: its job (and the sale that won it), so a document is never a dead end.
+  const job = doc.jobId ? await getJobRef(doc.jobId).catch(() => null) : null;
+  // The waiver this invoice owes (the client's profile asks for one) and the register's row for it (0040).
+  const db = getSupabaseAdmin();
+  const [clientRow, waiverRow] = await Promise.all([
+    doc.clientId ? db.from("clients").select("billing").eq("id", doc.clientId).maybeSingle() : Promise.resolve({ data: null }),
+    db.from("lien_waivers").select("id,kind,status,file_url").eq("direction", "out").eq("document_id", doc.id).neq("status", "void").order("id", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const wants = (((clientRow.data as { billing?: { attachments?: string[] } } | null)?.billing?.attachments) ?? []).filter((a) => a === "conditional_waiver" || a === "final_waiver");
+  const heldWaiver = waiverRow.data ? { id: (waiverRow.data as { id: number }).id, kind: (waiverRow.data as { kind: string }).kind, status: (waiverRow.data as { status: string }).status, fileUrl: (waiverRow.data as { file_url: string }).file_url } : null;
 
   return (
     <main className="mx-auto max-w-xl px-4 pb-24 pt-5">
-      <Link href="/app/money" className="text-sm text-[var(--color-teal)]">
-        ← Money
-      </Link>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <Link href="/app/accounting/receivables" className="text-[var(--color-teal)]">
+          ← Receivables
+        </Link>
+        {job && seat.owner ? (
+          <Link href={jobHref(job.key, "money")} className="text-[var(--color-teal)] underline-offset-2 hover:underline">
+            Job: {job.name}
+          </Link>
+        ) : null}
+        {job?.saleId && seat.owner ? (
+          <Link href={`/app/sales/${job.saleId}`} className="text-[var(--color-teal)] underline-offset-2 hover:underline">
+            Sale {job.saleNumber}
+          </Link>
+        ) : null}
+      </div>
       <ScreenTitle eyebrow={doc.kind.replace("_", " ")} title={doc.number}>
         <p className="text-sm text-[var(--color-charcoal-light)]">{doc.title}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -111,7 +138,11 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
         </div>
       </Card>
 
-      {doc.status === "issued" ? (
+      {seat.owner && (doc.kind === "invoice" || doc.kind === "statement") ? (
+        <WaiverPanel documentId={doc.id} amountCents={doc.totalCents} owed={wants.length > 0} held={heldWaiver} finalBill={wants.includes("final_waiver") && !wants.includes("conditional_waiver")} />
+      ) : null}
+
+      {doc.status === "issued" && seat.owner ? (
         <div className="mt-4">
           <RecordPayment documentId={doc.id} lines={lines} hasLines={lines.length > 1} />
         </div>

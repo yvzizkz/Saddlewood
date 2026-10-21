@@ -6,7 +6,8 @@ import { loadPolicies } from "@/lib/policies/store";
 import { phoenixToday } from "@/lib/sales/access";
 import { subsError, subsGate } from "@/lib/subs/access";
 import { canAward, readiness } from "@/lib/subs/rules";
-import { packageDetail, setPackageStatus, updatePackage } from "@/lib/subs/store";
+import { buildAwardEmailDrafts, buildWorkOrder } from "@/lib/subs/scorecard";
+import { listSubs, packageDetail, setPackageStatus, updatePackage } from "@/lib/subs/store";
 import { readPackageInput } from "@/lib/subs/validate";
 
 export const runtime = "nodejs";
@@ -22,9 +23,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { pid } = await params;
   if (!isId(pid)) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   try {
-    const d = await packageDetail(pid);
+    const [d, allSubs, { values }] = await Promise.all([packageDetail(pid), listSubs(), loadPolicies()]);
     if (!d) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-    const { values } = await loadPolicies();
     const today = phoenixToday();
     const bids = d.invites.filter((i) => i.latest).length;
     const role = gate.seat.role === "agent" ? "member" : gate.seat.role;
@@ -39,7 +39,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             : null,
       };
     });
-    return NextResponse.json({ ok: true, ...d, invites, can: gate.seat.can, minBids: values["policy.subs.minBids"], minBidsFromCents: values["policy.subs.minBidsFromCents"] });
+    const subById = new Map(allSubs.map((s) => [s.id, s]));
+    const workOrder = buildWorkOrder(d, subById, values, today);
+    const emailDrafts = buildAwardEmailDrafts(d, workOrder, gate.seat.name);
+    return NextResponse.json({
+      ok: true,
+      ...d,
+      invites,
+      workOrder,
+      emailDrafts,
+      can: gate.seat.can,
+      minBids: values["policy.subs.minBids"],
+      minBidsFromCents: values["policy.subs.minBidsFromCents"],
+    });
   } catch (err) {
     return subsError(err, "load the package");
   }

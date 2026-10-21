@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireSwitch } from "@/lib/crew/auth";
 import { SEARCH_MAX_QUERY, SEARCH_MAX_TRIPS, missingSearch, searchPurchases } from "@/lib/crew/purchaseSearch";
-import { TRADES } from "@/lib/crew/purchases";
+import { isTradeSlug } from "@/lib/accounting/tradeList";
 import { getJob } from "@/lib/crew/queries";
 import { inScope, visibleCrewJobs } from "@/lib/crew/scope";
 import { isDay } from "@/lib/crew/time";
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const from = (p.get("from") ?? "").trim();
     const to = (p.get("to") ?? "").trim();
     if (job && !CREW_ID.test(job)) return bad("Which job?");
-    if (trade && !(TRADES as readonly string[]).includes(trade)) return bad("Which trade?");
+    if (trade && !isTradeSlug(trade)) return bad("Which trade?");
     if ((from && !isDay(from)) || (to && !isDay(to))) return bad("Dates are YYYY-MM-DD.");
     const scope = await visibleCrewJobs(viewer);
     if (job && (!inScope(scope, job) || !(await getJob(job)))) return NextResponse.json({ ok: false, error: "No such job." }, { status: 404 });

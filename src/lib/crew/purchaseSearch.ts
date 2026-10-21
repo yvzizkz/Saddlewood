@@ -1,5 +1,6 @@
+import { isTradeSlug } from "@/lib/accounting/tradeList";
 import { listAliases, runPurchaseSearch } from "./purchaseQueries";
-import { TRADES, normalizeJobName, type AliasRule, type Trade } from "./purchases";
+import { normalizeJobName, type AliasRule } from "./purchases";
 import { listJobs } from "./queries";
 import { addDays, isDay, localDay, weekStart } from "./time";
 
@@ -381,7 +382,7 @@ export async function searchPurchases(params: SearchParams): Promise<SearchResul
   const picked = params.jobId || parsed.jobId;
   // The pick never widens the scope: a job outside it finds nothing.
   const jobIds = picked ? (scope === null || scope.includes(picked) ? [picked] : []) : scope;
-  const trade = params.trade && (TRADES as readonly string[]).includes(params.trade) ? (params.trade as Trade) : "";
+  const trade = params.trade && isTradeSlug(params.trade) ? params.trade : "";
   const from = params.from && isDay(params.from) ? params.from : parsed.from;
   const to = params.to && isDay(params.to) ? params.to : parsed.to;
   const limit = Math.max(1, Math.min(SEARCH_MAX_TRIPS, Math.floor(params.limit ?? SEARCH_MAX_TRIPS) || SEARCH_MAX_TRIPS));

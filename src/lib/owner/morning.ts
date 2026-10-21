@@ -4,7 +4,7 @@ import { pmDecides } from "@/lib/crew/requestRules";
 import { inScope, scopeFrom, type JobScope } from "@/lib/crew/scope";
 import { SETTING_DEFAULTS } from "@/lib/crew/settings";
 import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewRequest, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
-import { lanesOf } from "./lanes";
+import { lanesOf, type LaneSeats } from "./lanes";
 import type { WaitingItem } from "./waiting";
 
 // The 7 AM "Your day" push, one per person (Marco's seat plan, step 4, and the
@@ -19,6 +19,8 @@ export type MorningInput = {
   day: string;
   /** The bot's seats: owners by email. */
   owners: BotPeople;
+  /** Who holds each lane (role seats, 0032); the decided defaults without it. */
+  laneSeats?: LaneSeats;
   people: Pick<CrewPerson, "email" | "name" | "lang" | "active" | "perms">[];
   schedule: CrewScheduleItem[];
   tasks: CrewTask[];
@@ -92,7 +94,7 @@ export function buildMorning(input: MorningInput): MorningNote[] {
   const ownerNamesAll = new Set(Object.values(input.owners).filter((p) => p.role === "owner").map((p) => p.name));
   for (const [email, seat] of Object.entries(input.owners)) {
     if (seat.role !== "owner") continue;
-    const lanes = lanesOf(email, input.owners);
+    const lanes = lanesOf(email, input.owners, input.laneSeats);
     const mine = input.waiting.filter((i) => (i.who && ownerNamesAll.has(i.who) ? i.who === seat.name : lanes.includes(i.lane)));
     const decisions = mine.filter((i) => i.kind === "decision");
     const signals = mine.filter((i) => i.kind === "signal");

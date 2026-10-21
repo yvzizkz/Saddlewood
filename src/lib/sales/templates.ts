@@ -1,3 +1,4 @@
+import { DEFAULT_TRADES, resolveTrade, tradeLabel } from "@/lib/accounting/trades";
 import { fillTerms, POLICY_DEFAULTS } from "@/lib/policies/rules";
 import { RATE_CARD } from "./catalog";
 import type { EstimateBody, EstimateItem, EstimateSection, OpportunityKind, PaymentStep, Presentation, Pricing } from "./types";
@@ -98,6 +99,30 @@ function section(name: string, items: EstimateItem[], note?: string): EstimateSe
   return { id: localId("s"), name, note, items };
 }
 
+/** A section for one of Saddlewood's trades, named from the shared trade list (trades.ts). */
+function tradeSection(tradeKey: "plumbing" | "electrical" | "hvac", items: EstimateItem[], note?: string): EstimateSection {
+  const label = resolveTrade(tradeKey, DEFAULT_TRADES)?.label ?? tradeLabel(tradeKey);
+  return section(label, items, note);
+}
+
+/** Self-performed MEP sections (CR-37 Plumbing, CR-11 Electrical, CR-39 HVAC) for remodel and addition estimates. */
+function mepSections(): EstimateSection[] {
+  return [
+    tradeSection("plumbing", [
+      line("Rough-in and top-out (DWV, water supply, gas)", "LS", "installed"),
+      line("Trim and fixture setting", "EA", "labor"),
+    ]),
+    tradeSection("electrical", [
+      line("Rough-in, circuits and boxes", "LS", "installed"),
+      line("Panel / service and trim-out", "LS", "installed"),
+    ]),
+    tradeSection("hvac", [
+      line("Ductwork, rough-in and registers", "LS", "installed"),
+      line("Equipment set, startup and balance", "LS", "installed"),
+    ]),
+  ];
+}
+
 export type TemplateKey = "quick" | "remodel" | "addition" | "framing_sub" | "service" | "blank";
 
 export const TEMPLATES: { key: TemplateKey; label: string; hint: string }[] = [
@@ -171,7 +196,7 @@ export function newEstimateBody(template: TemplateKey, title: string, defaults?:
         section("Finish carpentry and cabinets", [line("Cabinet install", "LF", "labor"), line("Trim and doors", "LF", "installed")]),
         section("Tile and flooring", [line("Floor tile", "SF", "installed"), line("Wall tile", "SF", "installed")]),
         section("Paint", [line("Paint walls and ceilings", "SF", "sub")]),
-        section("Plumbing and electrical", [line("Plumbing (licensed sub)", "LS", "sub"), line("Electrical (licensed sub)", "LS", "sub")]),
+        ...mepSections(),
         section(
           "Allowances",
           [line("Cabinets allowance", "LS", "allowance"), line("Countertops allowance", "LS", "allowance"), line("Tile material allowance", "LS", "allowance"), line("Plumbing fixtures allowance", "LS", "allowance")],
@@ -194,7 +219,7 @@ export function newEstimateBody(template: TemplateKey, title: string, defaults?:
         section("Framing", [line("Wall framing", "LF", "installed"), line("Roof framing / trusses", "SF", "installed"), line("Sheathing", "SF", "installed")]),
         section("Tie-in to existing house", [line("Remove exterior wall section and header", "LS", "labor"), line("Roof tie-in", "LF", "labor")]),
         section("Exterior envelope", [line("Stucco (sub)", "SF", "sub"), line("Roofing (sub)", "SF", "sub"), line("Windows and exterior doors", "EA", "installed")]),
-        section("MEP", [line("Plumbing (sub)", "LS", "sub"), line("Electrical (sub)", "LS", "sub"), line("HVAC (sub)", "LS", "sub")]),
+        ...mepSections(),
         section("Insulation and drywall", [line("Insulation", "SF", "installed"), line("Drywall hang, tape, finish", "SF", "installed")]),
         section("Finishes", [line("Flooring", "SF", "installed"), line("Trim and doors", "LF", "installed"), line("Paint (sub)", "SF", "sub")]),
         section("Allowances", [line("Finish selections allowance", "LS", "allowance")]),

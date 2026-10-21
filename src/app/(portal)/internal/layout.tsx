@@ -3,8 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { hasCrewRole } from "@/lib/crew/role";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { countPendingEstimates } from "@/lib/estimates/queries";
-import BottomTabBar from "@/components/layout/BottomTabBar";
-import DesktopSidebar from "@/components/layout/DesktopSidebar";
+import AppSidebar from "@/components/layout/AppSidebar";
+import OldToolsNav from "@/components/layout/OldToolsNav";
+import PhoneTabs from "@/components/layout/PhoneTabs";
+import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 
 export default async function InternalLayout({
   children,
@@ -32,15 +34,19 @@ export default async function InternalLayout({
     redirect("/login?error=unauthorized");
   }
 
-  const pendingCount = await countPendingEstimates();
+  const [pendingCount, owner] = await Promise.all([countPendingEstimates(), getViewer().then(viewerIsOwner)]);
+  // The same navigation as the app (components/layout/nav.ts): /internal is
+  // one more set of screens in it, not a second portal.
+  const viewer = { owner, crewAdmin: owner };
 
   return (
     <div className="min-h-screen">
-      <DesktopSidebar pendingCount={pendingCount} />
-      <main className="md:ml-64 pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0">
+      <AppSidebar viewer={viewer} badges={{ "/internal": pendingCount }} />
+      <main className="md:ml-60 pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0">
+        <OldToolsNav />
         {children}
       </main>
-      <BottomTabBar pendingCount={pendingCount} />
+      <PhoneTabs viewer={viewer} />
     </div>
   );
 }

@@ -90,10 +90,15 @@ export function prefixFor(address: string): string {
   return m ? m[1] : "";
 }
 
-/** Where phases start from: our own trades get their template; anything else starts empty. */
+/**
+ * Where phases start from. We are the GC on a remodel, an addition or a custom
+ * home, so the whole-job template; a framing package is our framing; commercial
+ * TI is our framing and drywall. A service call starts empty.
+ */
 export function templateFor(kind: OpportunityKind): PhaseTemplatePick | "none" {
+  if (kind === "remodel" || kind === "addition" || kind === "custom_home") return "gc";
   if (kind === "framing_sub") return "framing";
-  if (kind === "commercial_ti") return "both";
+  if (kind === "commercial_ti") return "framing,drywall";
   return "none";
 }
 
