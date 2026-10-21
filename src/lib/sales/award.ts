@@ -256,7 +256,10 @@ export type JobWatch = {
   dueOn: string | null;
   note: string;
   doneAt: string | null;
+  /** Who ticked it, or what closed it when the records did (byRecord). */
   doneBy: string;
+  /** Closed by the records (the deposit paid in full on Money), not by a tick. */
+  byRecord?: boolean;
   createdBy: string;
   createdAt: string;
 };

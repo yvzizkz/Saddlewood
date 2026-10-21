@@ -21,6 +21,7 @@ import {
 import type { ProposalSnapshot } from "./presentation";
 import { addEvent, getOpportunity, getOpportunityDetail, proposalFromDocument, proposalNumber, SalesError } from "./store";
 import type { Opportunity } from "./types";
+import { RECORD_MARK, REOPENED_MARK, settleWatches } from "./watchRecords";
 
 // Award, carried out (the plan is award.ts). Owners only (the route's gate).
 // Each step finds what an earlier, interrupted run already made before it
@@ -407,10 +408,25 @@ export async function awardJob(opportunityId: string, asked: Partial<AwardChoice
 type WatchRow = { id: number; job_id: string; kind: WatchKind; title: string; due_on: string | null; note: string; done_at: string | null; done_by: string; created_by: string; created_at: string };
 
 function toWatch(r: WatchRow): JobWatch {
-  return { id: r.id, jobId: r.job_id, kind: r.kind, title: r.title, dueOn: r.due_on, note: r.note, doneAt: r.done_at, doneBy: r.done_by, createdBy: r.created_by, createdAt: r.created_at };
+  const byRecord = !!r.done_at && r.done_by.startsWith(RECORD_MARK);
+  return {
+    id: r.id,
+    jobId: r.job_id,
+    kind: r.kind,
+    title: r.title,
+    dueOn: r.due_on,
+    note: r.note,
+    doneAt: r.done_at,
+    doneBy: byRecord ? r.done_by.slice(RECORD_MARK.length) : r.done_at ? r.done_by : "",
+    byRecord,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+  };
 }
 
+/** The watches, after the deposit ones are brought in line with Money (watchRecords.ts). */
 export async function listWatches(filter: { jobId?: string; open?: boolean } = {}): Promise<JobWatch[]> {
+  await settleWatches(filter.jobId ? [filter.jobId] : undefined);
   const db = getSupabaseAdmin();
   let q = db.from("job_watches").select("*").order("created_at", { ascending: true }).limit(2000);
   if (filter.jobId) q = q.eq("job_id", filter.jobId);
@@ -420,12 +436,21 @@ export async function listWatches(filter: { jobId?: string; open?: boolean } = {
   return ((data ?? []) as WatchRow[]).map(toWatch);
 }
 
-/** An owner marks a watch done, or opens it again; who and when are kept. */
+/**
+ * An owner marks a watch done, or opens it again; who and when are kept.
+ * Opening one the records closed is marked, so the records leave it open.
+ */
 export async function setWatchDone(jobId: string, id: number, done: boolean, actor: string, now: Date = new Date()): Promise<JobWatch> {
   const db = getSupabaseAdmin();
+  let reopenedBy = "";
+  if (!done) {
+    const { data: cur, error: curErr } = await db.from("job_watches").select("done_by").eq("id", id).eq("job_id", jobId).maybeSingle();
+    if (curErr) fail("read watch", curErr.message);
+    if ((cur as { done_by: string } | null)?.done_by.startsWith(RECORD_MARK)) reopenedBy = `${REOPENED_MARK}${actor}`;
+  }
   const { data, error } = await db
     .from("job_watches")
-    .update(done ? { done_at: now.toISOString(), done_by: actor } : { done_at: null, done_by: "" })
+    .update(done ? { done_at: now.toISOString(), done_by: actor } : { done_at: null, done_by: reopenedBy })
     .eq("id", id)
     .eq("job_id", jobId)
     .select("*")

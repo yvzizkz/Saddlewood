@@ -102,7 +102,7 @@ export function JobPaperwork({ opportunityId, job, today, canEdit, onChange, toa
                     <p className={`text-sm ${w.doneAt ? 'text-[var(--color-charcoal-light)] line-through' : 'text-[var(--color-charcoal)]'}`}>{w.title}</p>
                     <p className="text-[11px] text-[var(--color-charcoal-light)]">
                       {w.doneAt
-                        ? `Done ${shortDay(w.doneAt)}${w.doneBy ? ` by ${w.doneBy}` : ''}`
+                        ? `Done ${shortDay(w.doneAt)}${w.doneBy ? (w.byRecord ? `: ${w.doneBy}` : ` by ${w.doneBy}`) : ''}`
                         : d
                           ? `${late ? 'Was due' : 'Due'} ${shortDay(d)}`
                           : w.kind === 'prelim_notice'
