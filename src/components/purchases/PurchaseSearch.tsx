@@ -8,6 +8,7 @@ import { botApi, useBotOptional } from '@/components/bot/BotProvider'
 import { Button, Chip, Empty, INPUT } from '@/components/bot/ui'
 import { day, money } from '@/components/money/format'
 import type { SearchResult, SearchTrip } from '@/lib/crew/purchaseSearch'
+import { tradeShort } from '@/lib/accounting/tradeList'
 import { TRADES } from '@/lib/crew/purchases'
 
 // Find a purchase (0026): the words, a trade chip row, trips as cards with
@@ -17,17 +18,6 @@ import { TRADES } from '@/lib/crew/purchases'
 // jobs). The mic fills the field with what was said when the browser can
 // listen (iOS Safari can). "Ask the bot" sends the words to the owner's own
 // Ask thread, the same POST the Ask screen makes, so the bot answers there.
-
-const TRADE_LABEL: Record<string, string> = {
-  framing: 'Framing',
-  drywall: 'Drywall',
-  electrical: 'Electrical',
-  plumbing: 'Plumbing',
-  paint: 'Paint',
-  tools: 'Tools',
-  rentals: 'Rentals',
-  general: 'General',
-}
 
 /** How many plain lines show before "N more lines" when nothing on the trip was matched (no words, only filters). */
 const PLAIN_LINES = 3
@@ -278,7 +268,7 @@ export default function PurchaseSearch({
                   active ? 'border-[var(--color-teal)] bg-[var(--color-teal)] text-white' : 'border-[var(--color-stone-mid)] bg-white text-[var(--color-charcoal)]'
                 }`}
               >
-                {TRADE_LABEL[t]}
+                {tradeShort(t)}
               </button>
             )
           })}
@@ -376,7 +366,7 @@ function TripCard({ trip, showJob }: { trip: SearchTrip; showJob: boolean }) {
         </p>
         <p className="shrink-0 text-[14px] font-semibold tabular-nums text-[var(--color-charcoal)]">{money(trip.totalCents)}</p>
       </div>
-      {trip.trades.length ? <p className="mt-0.5 text-[11px] text-[var(--color-charcoal-light)]">{trip.trades.map((t) => TRADE_LABEL[t] ?? t).join(' · ')}</p> : null}
+      {trip.trades.length ? <p className="mt-0.5 text-[11px] text-[var(--color-charcoal-light)]">{trip.trades.map((t) => tradeShort(t)).join(' · ')}</p> : null}
       <ul className="mt-2 space-y-1">
         {[...lead, ...(more ? folded : [])].map((l, i) => (
           <li

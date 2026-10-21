@@ -6,6 +6,7 @@ import { Package } from 'lucide-react'
 import { botApi } from '@/components/bot/BotProvider'
 import { Button, Card, Chip, Field, INPUT } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { TradeDatalist } from '@/components/ui/TradeDatalist'
 import { REQUEST_STATUS, dollars, requestDetail } from '@/lib/crew/requestRules'
 import { ANSWERS_FIRST, SETTING_KEYS, SETTING_LABELS, type AppSettings, type SettingKey } from '@/lib/crew/settingsRules'
 import { addDays, dayShort } from '@/lib/crew/time'
@@ -277,7 +278,8 @@ export function RequestAddSheet({ jobs, onClose, onDone }: { jobs: CrewJob[]; on
         </Field>
       </div>
       <Field label="Trade (optional)">
-        <input className={INPUT} value={trade} maxLength={60} placeholder="Framing" onChange={(e) => setTrade(e.target.value)} />
+        <input className={INPUT} value={trade} maxLength={60} list="request-trades" placeholder="Pick or type a trade" onChange={(e) => setTrade(e.target.value)} />
+        <TradeDatalist id="request-trades" />
       </Field>
       <Problem text={problem} />
       <Button variant="primary" full busy={busy} onClick={go} className="min-h-12">

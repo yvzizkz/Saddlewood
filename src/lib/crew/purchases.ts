@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { QUICK_TRADES, TRADE_SLUGS, type TradeSlug } from "@/lib/accounting/tradeList";
+
 import { addDays, isDay } from "./time";
 
 // Home Depot purchases by job and by trade (migration 0022). The Mac posts the
@@ -10,33 +12,12 @@ import { addDays, isDay } from "./time";
 // in job_aliases under the normalized name. Pure, so every rule here is
 // tested without a database; purchaseQueries.ts reads and writes.
 
-/** The owners' short list for the quick search chips. */
-export const TRADES = ["framing", "drywall", "electrical", "plumbing", "paint", "tools", "rentals", "general"] as const;
+/** The owners' short list for the quick search chips (the shared list's QUICK_TRADES). */
+export const TRADES = QUICK_TRADES;
 
-/** The full trade list (matching public.trades in 0029_trades.sql) accepted by trade_map and purchases.trade. */
-export const TRADE_SLUGS = [
-  "general",
-  "demo",
-  "concrete",
-  "framing",
-  "roofing",
-  "windows",
-  "plumbing",
-  "electrical",
-  "hvac",
-  "insulation",
-  "drywall",
-  "finish-carpentry",
-  "cabinets",
-  "tile",
-  "flooring",
-  "paint",
-  "landscape",
-  "cleanup",
-  "tools",
-  "rentals",
-] as const;
-export type Trade = (typeof TRADE_SLUGS)[number];
+/** The full trade list (public.trades, 0029_trades.sql) accepted by trade_map and purchases.trade. */
+export { TRADE_SLUGS };
+export type Trade = TradeSlug;
 
 /** A trip this small is worth noticing: someone drove to the store for a box of screws. */
 export const SMALL_TRIP_CENTS = 7500;

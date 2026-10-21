@@ -59,7 +59,7 @@ import {
   type CrewPersonRow,
   type CrewShiftRow,
 } from "./queries";
-import { planPhaseSet, templatePhases } from "./phases";
+import { pickLabel, pickTrades, planPhaseSet, templatePhases } from "./phases";
 import { CREW_ROLE, FORMER_ROLE } from "./role";
 import { inScope, visibleCrewJobs, type ScopeCaller } from "./scope";
 import { addDays, clock12, dayShort, localClock, localDay, localInstant } from "./time";
@@ -551,8 +551,8 @@ export async function runAdminAct(owner: Owner, act: AdminAct, nowDate = new Dat
       const start = have.reduce((m, p) => Math.max(m, p.ord), 0);
       const specs = templatePhases(act.template);
       await insertJobPhases(specs.map((s, i) => ({ jobId: job.id, ord: start + i + 1, ...s, createdBy: owner.name })));
-      const what = act.template === "both" ? "framing and drywall" : act.template;
-      return ok(`${specs.length} ${what} phases on ${job.name}${have.length ? ", after the ones it had" : ""}.`);
+      const what = pickTrades(act.template)?.length ? `${pickLabel(act.template)} phases` : "whole-job phases";
+      return ok(`${specs.length} ${what} on ${job.name}${have.length ? ", after the ones it had" : ""}.`);
     }
 
     case "phase.verify": {

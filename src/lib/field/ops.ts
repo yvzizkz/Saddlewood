@@ -11,80 +11,21 @@ import { jobHref, type JobRef } from "@/lib/jobs/hub";
 import type { FeedItem } from "@/lib/tasks/feed";
 import { placeItem } from "@/lib/tasks/feed";
 
-export type ChecklistStage = "pre_cover" | "pre_board" | "pre_tape" | "pre_texture" | "pre_paint" | "final_walk";
-
-export const CHECKLIST_STAGE_LABEL: Record<ChecklistStage, string> = {
-  pre_cover: "1. Pre-cover (framing & backing)",
-  pre_board: "2. Pre-board (insulation & MEP sign-off)",
-  pre_tape: "3. Pre-tape (screw pattern & beads)",
-  pre_texture: "4. Pre-texture (skim & inside corners)",
-  pre_paint: "5. Pre-paint (500W raking-light check)",
-  final_walk: "6. Final walk (punch & closeout)",
-};
-
-export type ChecklistItem = {
-  key: string;
-  label: string;
-  checked: boolean;
-  note: string;
-};
-
-export type ChecklistRow = {
-  id: number;
-  jobId: string;
-  phaseId: number | null;
-  phaseName: string;
-  stage: ChecklistStage;
-  stageLabel: string;
-  locationLabel: string;
-  items: ChecklistItem[];
-  status: "open" | "passed" | "blocked";
-  note: string;
-  completedBy: string;
-  completedAt: string | null;
-};
-
-export function defaultChecklistItems(stage: ChecklistStage): ChecklistItem[] {
-  switch (stage) {
-    case "pre_cover":
-      return [
-        { key: "studs_backing", label: "Stud spacing, heavy-gauge door bucks & TV/cabinet backing verified", checked: false, note: "" },
-        { key: "mep_clearance", label: "MEP rough-in plates, nail guards & acoustic putty pads installed", checked: false, note: "" },
-        { key: "firestop", label: "Top-of-wall fire caulk & rated shaft clips inspected", checked: false, note: "" },
-        { key: "both_faces_photo", label: "Photos captured of both wall faces with room label visible", checked: false, note: "" },
-      ];
-    case "pre_board":
-      return [
-        { key: "insulation_r", label: "Thermal & sound attenuation batts installed full-cavity with zero voids", checked: false, note: "" },
-        { key: "municipal_signoff", label: "Municipal framing & insulation pre-board inspection signed off", checked: false, note: "" },
-        { key: "both_faces_photo", label: "Photos captured of both insulated wall faces with location label", checked: false, note: "" },
-      ];
-    case "pre_tape":
-      return [
-        { key: "screw_pattern", label: "Screw spacing & dimple depth verified (no torn face paper)", checked: false, note: "" },
-        { key: "beads_straight", label: "Corner bead, L-bead & reveal beads laser-plumb and square", checked: false, note: "" },
-        { key: "both_faces_photo", label: "Photos captured of hung board on both wall faces", checked: false, note: "" },
-      ];
-    case "pre_texture":
-      return [
-        { key: "joints_flat", label: "Butt joints & flats feathered wide with zero crowning", checked: false, note: "" },
-        { key: "inside_corners", label: "Inside corners crisp, sanded and free of buildup", checked: false, note: "" },
-        { key: "both_faces_photo", label: "Photos captured of taped walls prior to texture/skim", checked: false, note: "" },
-      ];
-    case "pre_paint":
-      return [
-        { key: "skim_holiday", label: "Zero holidays, lap marks or pinholes under 500W raking light", checked: false, note: "" },
-        { key: "sanded_dusted", label: "Walls vacuum-sanded and wiped ready for PVA primer", checked: false, note: "" },
-        { key: "both_faces_photo", label: "Photos captured of both wall faces under raking light", checked: false, note: "" },
-      ];
-    case "final_walk":
-      return [
-        { key: "touchups_done", label: "All blue-tape punch touch-ups complete and paint sheen uniform", checked: false, note: "" },
-        { key: "site_clean", label: "Floors, window tracks & fixtures spotless; protection removed", checked: false, note: "" },
-        { key: "closeout_photos", label: "Final completion photos uploaded for billing package", checked: false, note: "" },
-      ];
-  }
-}
+export {
+  CHECKLIST_SETS,
+  CHECKLIST_STAGES,
+  CHECKLIST_STAGE_LABEL,
+  CHECKLIST_TRADES,
+  checklistTradeFor,
+  checklistTradeOf,
+  defaultChecklistItems,
+  isChecklistStage,
+  type ChecklistItem,
+  type ChecklistRow,
+  type ChecklistStage,
+  type ChecklistTrade,
+} from "./checklists";
+import { CHECKLIST_STAGE_LABEL, type ChecklistItem, type ChecklistRow, type ChecklistStage } from "./checklists";
 
 /** A field job id for a foreign key: "Other job" (OTHER_JOB) and none are no job. */
 export function crewJobIdOf(jobId: string | null | undefined): string | null {

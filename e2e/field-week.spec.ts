@@ -131,10 +131,10 @@ test.describe("Field and crew: the field week", () => {
   test("Pre-cover quality checklist blocks phase verification until passed, and punch items track by room and wall face", async ({ owner: page }) => {
     const location = `E2E Corridor North Shaft ${Date.now()}`;
     await page.goto(`/app/jobs/${JOB}?tab=log`);
-    await page.getByRole("button", { name: "+ Pre-cover checklist" }).click();
+    await page.getByRole("button", { name: "+ Inspection checklist" }).click();
 
     const gateForm = page.locator("form").filter({ hasText: "Add gate" });
-    const phaseSelect = gateForm.locator("select").nth(1);
+    const phaseSelect = gateForm.getByLabel("Checklist phase");
     const hangOpt = phaseSelect.locator("option").filter({ hasText: "Hang 5/8 XP Hi-Abuse Drywall" });
     const phaseId = Number(await hangOpt.getAttribute("value"));
     expect(phaseId).toBeGreaterThan(0);

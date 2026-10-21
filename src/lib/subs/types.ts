@@ -1,6 +1,8 @@
 // The shapes behind the sub directory and the bid-out (supabase/migrations/
 // 0028_subs_bids.sql; SOP-008 §1 and §2; KB docs/JOB-LIFECYCLE-PLAN §7).
 
+import { DEFAULT_TRADES } from "@/lib/accounting/tradeList";
+
 export const SUB_STATUSES = ["prospect", "onboarding", "approved", "inactive"] as const;
 export type SubStatus = (typeof SUB_STATUSES)[number];
 
@@ -11,29 +13,18 @@ export const SUB_STATUS_LABEL: Record<SubStatus, string> = {
   inactive: "Inactive",
 };
 
-/** The trades the directory offers first; anything typed is kept as written. */
-export const COMMON_TRADES = [
-  "insulation",
-  "electrical",
-  "plumbing",
-  "hvac",
-  "drywall",
-  "framing",
-  "concrete",
-  "roofing",
-  "stucco",
-  "paint",
-  "tile",
-  "flooring",
-  "cabinets",
-  "countertops",
-  "windows and doors",
-  "fire sprinklers",
-  "low voltage",
-  "landscape",
-  "demolition",
-  "cleaning",
-] as const;
+/** Trades a sub brings that are not on our list (public.trades). */
+const SUB_ONLY_TRADES = ["stucco", "countertops", "fire sprinklers", "low voltage"];
+
+/**
+ * The trades the directory offers first: the shared trade list (in lower case,
+ * as the directory keeps them), less our own bookkeeping lines, then trades only
+ * a sub brings. Anything typed is kept as written.
+ */
+export const COMMON_TRADES: readonly string[] = [
+  ...DEFAULT_TRADES.filter((t) => !["general", "tools", "rentals"].includes(t.slug)).map((t) => t.label.toLowerCase()),
+  ...SUB_ONLY_TRADES,
+];
 
 export type SubContact = {
   id: string;

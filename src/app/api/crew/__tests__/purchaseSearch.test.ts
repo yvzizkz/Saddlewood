@@ -115,7 +115,7 @@ describe("GET /api/crew/purchases/search", () => {
     asOwner();
     expect((await GET(req("/api/crew/purchases/search?q="))).status).toBe(400);
     expect((await GET(req("/api/crew/purchases/search?q=%20%20"))).status).toBe(400);
-    expect((await GET(req("/api/crew/purchases/search?q=screws&trade=roofing"))).status).toBe(400);
+    expect((await GET(req("/api/crew/purchases/search?q=screws&trade=bananas"))).status).toBe(400);
     expect((await GET(req("/api/crew/purchases/search?q=screws&from=yesterday"))).status).toBe(400);
     expect((await GET(req("/api/crew/purchases/search?q=screws&job=../x"))).status).toBe(400);
     expect(spies.run).not.toHaveBeenCalled();
@@ -204,7 +204,7 @@ describe("GET /api/bot/purchases", () => {
     asOwner();
     expect((await botGet(req("/api/bot/purchases?q=drywall"))).status).toBe(401);
     expect((await botGet(req("/api/bot/purchases?q=", bearer))).status).toBe(400);
-    expect((await botGet(req("/api/bot/purchases?q=drywall&trade=roofing", bearer))).status).toBe(400);
+    expect((await botGet(req("/api/bot/purchases?q=drywall&trade=bananas", bearer))).status).toBe(400);
     expect((await botGet(req("/api/bot/purchases?q=drywall&from=August", bearer))).status).toBe(400);
     expect(spies.run).not.toHaveBeenCalled();
   });

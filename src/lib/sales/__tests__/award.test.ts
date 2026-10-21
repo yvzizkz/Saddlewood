@@ -10,6 +10,7 @@ import {
   planAward,
   prefixFor,
   sovFromProposal,
+  templateFor,
   watchDue,
   type Accepted,
   type JobWatch,
@@ -103,7 +104,17 @@ describe("names and numbers", () => {
     expect(clientKindFor("commercial_ti")).toBe("gc");
     expect(clientKindFor("remodel")).toBe("homeowner");
     expect(defaultChoices({ ...OPP, kind: "framing_sub" })).toMatchObject({ deposit: false, template: "framing" });
-    expect(defaultChoices(OPP)).toMatchObject({ deposit: true, template: "none", prefix: "7120" });
+    expect(defaultChoices({ ...OPP, kind: "commercial_ti" })).toMatchObject({ template: "framing,drywall" });
+  });
+
+  it("starts a remodel, an addition and a custom home from the whole-job GC template", () => {
+    // We hold the paper on these (ROC 305762, with our own CR-11, CR-37 and CR-39): every trade is ours to run.
+    expect(defaultChoices(OPP)).toMatchObject({ deposit: true, template: "gc", prefix: "7120" });
+    expect(templateFor("remodel")).toBe("gc");
+    expect(templateFor("addition")).toBe("gc");
+    expect(templateFor("custom_home")).toBe("gc");
+    expect(templateFor("service")).toBe("none");
+    expect(templateFor("other")).toBe("none");
   });
 });
 

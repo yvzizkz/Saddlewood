@@ -4,16 +4,14 @@ import { localDay } from "@/lib/crew/time";
 import {
   CHECKLIST_STAGE_LABEL,
   defaultChecklistItems,
+  isChecklistStage,
   syncEodDirectivesAndDecisions,
   syncReceiptEntryToPurchases,
   type ChecklistItem,
-  type ChecklistStage,
 } from "@/lib/field/ops";
 import { jobForWrite, PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
 import type { Role } from "@/lib/roles/seats";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-
-const STAGES: ChecklistStage[] = ["pre_cover", "pre_board", "pre_tape", "pre_texture", "pre_paint", "final_walk"];
 
 export async function POST(req: Request) {
   // Owners, and a project manager on their own jobs (jobs/access.ts).
@@ -29,8 +27,8 @@ export async function POST(req: Request) {
   const today = localDay();
 
   if (action === "checklist.create") {
-    const stage = String(body.stage ?? "pre_cover") as ChecklistStage;
-    if (!STAGES.includes(stage)) return NextResponse.json({ error: "Invalid checklist stage" }, { status: 400 });
+    const stage = String(body.stage ?? "pre_cover");
+    if (!isChecklistStage(stage)) return NextResponse.json({ error: "Invalid checklist stage" }, { status: 400 });
     const locationLabel = String(body.locationLabel ?? "").trim();
     const phaseId = typeof body.phaseId === "number" && body.phaseId > 0 ? body.phaseId : null;
     const { data, error } = await db
