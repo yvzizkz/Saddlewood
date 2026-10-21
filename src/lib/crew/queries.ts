@@ -300,6 +300,45 @@ export async function linkBillingJob(crewJobId: string, billingJobId: string | n
   return "ok";
 }
 
+/**
+ * A job is one thing with two halves: the field job (crew_jobs, where time,
+ * receipts and purchases land) and the billing job (jobs, where the contract,
+ * bills and the Award checklist live). Called when an owner adds a field job,
+ * so no job exists on one side only: an unlinked billing job with the same
+ * name or address is linked, else a new one is made. "taken" when a billing
+ * job by that name and address is already some other field job's.
+ */
+export async function pairBillingJob(job: { id: string; name: string; address: string }): Promise<"had" | "linked" | "made" | "taken"> {
+  const db = getSupabaseAdmin();
+  const { data: had, error: hErr } = await db.from("jobs").select("id").eq("crew_job_id", job.id).maybeSingle();
+  if (hErr) fail("jobs read", hErr.message);
+  if (had) return "had";
+  const address = job.address.trim();
+  // ilike for case only: a % or _ in a name is a letter, not a wildcard.
+  const exact = (v: string) => v.replace(/[%_\\]/g, (c) => `\\${c}`);
+  let find = db.from("jobs").select("id").is("crew_job_id", null).ilike("name", exact(job.name.trim()));
+  const { data: byName, error: nErr } = await find.limit(1);
+  if (nErr) fail("jobs read", nErr.message);
+  let match = (byName ?? [])[0] as { id: string } | undefined;
+  if (!match && address) {
+    find = db.from("jobs").select("id").is("crew_job_id", null).ilike("address", exact(address));
+    const { data: byAddress, error: aErr } = await find.limit(1);
+    if (aErr) fail("jobs read", aErr.message);
+    match = (byAddress ?? [])[0] as { id: string } | undefined;
+  }
+  if (match) {
+    const { error } = await db.from("jobs").update({ crew_job_id: job.id }).eq("id", match.id);
+    if (error) fail("jobs link", error.message);
+    return "linked";
+  }
+  const { error } = await db.from("jobs").insert({ name: job.name.trim(), address: address || null, status: "active", crew_job_id: job.id });
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) return "taken";
+    fail("jobs insert", error.message);
+  }
+  return "made";
+}
+
 // ---- jobs ---------------------------------------------------------------------
 
 type JobRow = { id: string; name: string; address: string; note: string; active: boolean; promised?: string | null; promise_note?: string; geo?: unknown };

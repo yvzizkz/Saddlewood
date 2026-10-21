@@ -1220,7 +1220,7 @@ function Screen() {
   // The tabs follow the switches: an owner sees all of them.
   const options: { value: View; label: string; count?: number }[] = [
     { value: 'today', label: 'Today', count: needs },
-    ...(can('projects.view') ? [{ value: 'projects' as const, label: 'Projects' }] : []),
+    ...(can('projects.view') ? [{ value: 'projects' as const, label: 'Jobs' }] : []),
     { value: 'schedule', label: 'Schedule' },
     ...(can('pickups.stage') && !isOwner ? [{ value: 'runner' as const, label: 'Runner', count: pickupProblems }] : []),
     { value: 'plan', label: 'Plan', count: can('plan.send') && !isOwner && planDue && new Date().getHours() >= 15 ? 1 : 0 },
@@ -1234,7 +1234,10 @@ function Screen() {
       <Segmented label="Crew views" value={view} onChange={setView} options={options} />
       <div className="mt-5">
         {view === 'today' ? <TodayView data={data} show={show} /> : null}
-        {view === 'projects' && can('projects.view') ? <ProjectsView /> : null}
+        {view === 'projects' && can('projects.view') ? (
+          // Keyed on the job count so a job added from here shows up once the sheet saves it.
+          <ProjectsView key={data.jobs.length} onAddJob={isOwner ? () => show({ kind: 'job', job: null }) : undefined} />
+        ) : null}
         {view === 'schedule' ? <ScheduleView data={data} show={show} /> : null}
         {view === 'runner' ? <RunnerView data={data} show={show} /> : null}
         {view === 'plan' ? (

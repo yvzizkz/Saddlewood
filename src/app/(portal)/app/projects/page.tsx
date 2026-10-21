@@ -14,7 +14,7 @@ export default async function AppProjects() {
   if (viewer.kind !== "crew" && viewer.kind !== "staff") redirect("/app");
   return (
     <div className="px-4 pb-8 pt-6">
-      <ScreenTitle title="Projects" />
+      <ScreenTitle title="Jobs" />
       <ProjectsView />
     </div>
   );
