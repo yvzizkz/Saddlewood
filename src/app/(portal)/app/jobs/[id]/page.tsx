@@ -22,6 +22,7 @@ import { canCloseHere, feedForSeat, isMine, KIND_LABEL, loadFeed } from "@/lib/t
 import { CloseTask, NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
 import ProgressBilling from "@/components/billing/ProgressBilling";
+import AgreementCard from "@/components/jobs/AgreementCard";
 import { CO_LABEL, loadChangeOrders } from "@/lib/billing/registers";
 import { EDITABLE_SCHEDULE_KINDS, loadScheduleFeed, SCHEDULE_KIND_LABEL } from "@/lib/schedule/feed";
 import { NewScheduleItem, ScheduleStatusButton } from "@/components/schedule/ScheduleActions";
@@ -774,6 +775,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
           )}
           {openWatches.length ? <p className="mt-2 text-xs text-[var(--color-charcoal-light)]">{openWatches.length} open</p> : null}
         </Card>
+        {owner && ref.billingId && ref.awarded ? <AgreementCard jobKey={ref.key} /> : null}
         <Card className="p-4">
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Where things are</p>
           <ul className="space-y-2 text-sm">

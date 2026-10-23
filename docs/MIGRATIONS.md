@@ -36,6 +36,7 @@ site change that reads them with the server key must be live first.
 | 0053 | `spend_ledger` (after 0042 and 0044; before the site change) | cleanup PR |
 | 0054 | `bot_payments` (before the site change) | cleanup PR |
 | 0055 | `typed_contract_sov` (right before the deploy; re-run the move after) | cleanup PR |
+| 0057 | `agreement_documents` (before the site change; 0056 is held for T119) | T112 PR |
 
 ## Production state
 
@@ -83,6 +84,11 @@ site finds no schedule on any job and can't make a draw: it fails closed.
 Check it with `select count(*) from public.jobs where billing ?| array['sov',
 'contractCents']` (0) and `select count(*) from public.sov_progress where
 line_key like 'sov:%'` (0).
+0057 only widens `documents_kind_check` to allow kind 'agreement'. Apply it
+before the site change that drafts agreements on the job; until then that
+draft fails on the check and nothing else changes. Check it with
+`select pg_get_constraintdef(oid) from pg_constraint where conname =
+'documents_kind_check'` (lists 'agreement').
 
 ## Rules
 

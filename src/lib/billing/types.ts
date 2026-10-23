@@ -40,7 +40,7 @@ export type BillingAttachment =
   | "insurance_certificate"
   | "w9";
 
-export type DocumentKind = "estimate" | "change_order" | "invoice" | "statement" | "notice";
+export type DocumentKind = "estimate" | "change_order" | "invoice" | "statement" | "notice" | "agreement";
 export type DocumentStatus = "draft" | "issued" | "void";
 
 export type DocumentLine = {
@@ -66,6 +66,17 @@ export type DocumentSnapshot = {
   /** Printed under the lines: terms, how to pay, reference to the contract or estimate. */
   terms?: string;
   note?: string;
+  /** An agreement's words and where its price and scope came from (kind agreement; src/lib/agreements/draft.ts). */
+  agreement?: AgreementSnapshot;
+};
+
+/** Frozen with the agreement: the text as drafted, and the proposal it was drafted from. */
+export type AgreementSnapshot = {
+  v: 1;
+  type: "prime_residential" | "prime_commercial" | "subcontractor";
+  /** Markdown, contract.py's words filled for this job. Never edited by hand. */
+  text: string;
+  proposal: { documentId: string; number: string; revision: number; packageName: string; options: string[] };
 };
 
 export type BillingDocument = {

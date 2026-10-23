@@ -57,6 +57,7 @@ const VIEW_LABEL: Record<DocumentKind, string> = {
   invoice: "View invoice",
   statement: "View statement",
   notice: "View notice",
+  agreement: "View agreement",
 };
 
 /** Shown in a dry run where a draft's link will go: it is made at the moment it is sent. */
