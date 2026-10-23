@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { hasCrewRole } from "@/lib/crew/role";
 import { isAllowedEmail } from "@/lib/ops/allowlist";
 import { STAFF_HOME } from "@/lib/auth/landing";
+import { agentTokenMatches } from "@/lib/ops/token";
 
 // Master security gate for Saddlewood.
 // Public marketing routes remain accessible to everyone.
@@ -63,8 +64,7 @@ export async function proxy(request: NextRequest) {
   // src/lib/subs/access.ts). A sub's own link (/b/<token>) is not here: it
   // checks its token itself.
   if (pathname.startsWith("/api/sales") || pathname.startsWith("/api/subs") || pathname.startsWith("/api/bids")) {
-    const authHeader = request.headers.get("authorization");
-    const token = !!(authHeader && process.env.OPS_AGENT_TOKEN && authHeader === `Bearer ${process.env.OPS_AGENT_TOKEN}`);
+    const token = agentTokenMatches(request.headers.get("authorization"));
     if (!token && (!user || !(isAllowed || isCrew))) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
@@ -77,7 +77,11 @@ export async function proxy(request: NextRequest) {
   // signing link, a phone provider's webhook), so those routes check the
   // caller themselves: src/lib/proposals/access.ts, src/lib/contracts/link.ts
   // and the top of src/app/api/leads/route.ts.
-  // Likewise /api/billing/mail-events: the mail service signs its reports.
+  // Likewise /api/billing/mail-events: the mail service signs its reports,
+  // and /api/estimates/ingest: the estimate pipeline sends its own secret
+  // (PIPELINE_INGEST_SECRET), which the route checks in constant time.
+  // The service-role key is not a way in: no caller sends it.
+  if (pathname === "/api/estimates/ingest") return supabaseResponse;
   if (
     pathname.startsWith("/api/review") ||
     pathname.startsWith("/api/ops") ||
@@ -86,12 +90,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/expenses") ||
     pathname.startsWith("/api/bot/")
   ) {
-    const authHeader = request.headers.get("authorization");
-    if (
-      authHeader &&
-      ((process.env.SUPABASE_SERVICE_ROLE_KEY && authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`) ||
-       (process.env.OPS_AGENT_TOKEN && authHeader === `Bearer ${process.env.OPS_AGENT_TOKEN}`))
-    ) {
+    if (agentTokenMatches(request.headers.get("authorization"))) {
       return supabaseResponse;
     }
     if (!user || !isAllowed) {
