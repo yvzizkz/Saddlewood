@@ -36,6 +36,7 @@ site change that reads them with the server key must be live first.
 | 0053 | `spend_ledger` (after 0042 and 0044; before the site change) | cleanup PR |
 | 0054 | `bot_payments` (before the site change) | cleanup PR |
 | 0055 | `typed_contract_sov` (right before the deploy; re-run the move after) | cleanup PR |
+| 0056 | `one_client_record` (before the site change; owner-approved 2026-10-23) | T119 PR |
 
 ## Production state
 
@@ -83,6 +84,16 @@ site finds no schedule on any job and can't make a draw: it fails closed.
 Check it with `select count(*) from public.jobs where billing ?| array['sov',
 'contractCents']` (0) and `select count(*) from public.sov_progress where
 line_key like 'sov:%'` (0).
+0056 makes `clients` and `client_contacts` the source of a job's client
+details and of a lead's contact. It adds `contact_id` on jobs and
+opportunities and mirror triggers, then links what is there
+(`link_client_records()`, safe to run again). It reads contacts and never
+writes them; the owner approved its trigger on `client_contacts` on
+2026-10-23. Apply it before the site change (Award then writes `contact_id`
+instead of the copied details). The site before it keeps working, since the
+mirrors are the same columns. Check it with `select count(*) from
+information_schema.columns where table_name = 'jobs' and column_name =
+'contact_id'` (1).
 
 ## Rules
 

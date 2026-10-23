@@ -2,7 +2,12 @@
 // proposal -> won -> award builds the job & Gate 0 handoff packet
 // (docs/SCENARIOS.md §7).
 
+import { execSync } from "node:child_process";
+
 import { expect, test } from "./support/env";
+
+const DB = "postgresql://postgres:postgres@127.0.0.1:55322/postgres";
+const sql = (q: string) => execSync(`psql "${DB}" -qAtc ${JSON.stringify(q)}`, { encoding: "utf8" }).trim();
 
 test.describe("Sales: the sales & estimating week", () => {
   test("Sales department home and pipeline show seeded opportunities, source tags, and >5d overdue follow-up escalation", async ({ owner: page }) => {
@@ -129,6 +134,26 @@ test.describe("Sales: the sales & estimating week", () => {
     const awarded = await awardRes.json();
     expect(awarded.crewJobId).toBeTruthy();
     expect(awarded.watches).toBeGreaterThanOrEqual(2);
+
+    // One client record (0056): the job and the lead point at the person Award
+    // put on the client, and the job's client details mirror the records.
+    const linked = sql(
+      `select j.client_id = o.client_id, j.contact_id = o.contact_id, cc.email, j.client_email, j.client_phone, j.client_name = c.name ` +
+        `from public.jobs j join public.sales_opportunities o on o.job_id = j.id join public.clients c on c.id = j.client_id ` +
+        `join public.client_contacts cc on cc.id = j.contact_id where o.id = '${opp.id}'`,
+    );
+    expect(linked).toBe(`t|t|devon.${uid}@example.com|devon.${uid}@example.com|480-555-0188|t`);
+
+    // A different person typed on the lead: it points at nobody, and what was typed stands.
+    const contactOf = () => sql(`select coalesce(contact_id::text, 'none') || '|' || (contact ->> 'email') from public.sales_opportunities where id = '${opp.id}'`);
+    const devon = contactOf().split("|")[0];
+    const other = await page.request.patch(`/api/sales/${opp.id}`, { data: { contact: { name: "Riley Other", email: `riley.${uid}@example.com` } } });
+    expect(other.ok()).toBeTruthy();
+    expect(contactOf()).toBe(`none|riley.${uid}@example.com`);
+    // Devon again: linked to the record, and mirrors it.
+    const back = await page.request.patch(`/api/sales/${opp.id}`, { data: { contact: { name: "Devon S.", email: `DEVON.${uid}@example.com` } } });
+    expect(back.ok()).toBeTruthy();
+    expect(contactOf()).toBe(`${devon}|devon.${uid}@example.com`);
 
     try {
       // 6. Verify the Job Overview page renders the Gate 0 Handoff Packet (SOP-001)

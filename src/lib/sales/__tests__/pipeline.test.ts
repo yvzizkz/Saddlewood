@@ -18,6 +18,7 @@ function row(over: Partial<OpportunityRow> = {}): OpportunityRow {
     contact: { name: 'A' },
     address: '',
     clientId: null,
+    contactId: null,
     jobId: null,
     valueCents: 1000000,
     probability: null,

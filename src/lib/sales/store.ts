@@ -1,3 +1,4 @@
+import { findContact } from "@/lib/clients/contacts";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createDraft, DocumentError, issueDocument, listEvents, recordEvent } from "@/lib/billing/documents";
 import { summarizeProof } from "@/lib/billing/proof";
@@ -51,6 +52,7 @@ type OpportunityDb = {
   contact: Contact | null;
   address: string;
   client_id: string | null;
+  contact_id?: string | null;
   job_id: string | null;
   value_cents: number | string;
   probability: number | null;
@@ -80,6 +82,7 @@ function toOpportunity(r: OpportunityDb): Opportunity {
     contact: { name: "", ...(r.contact ?? {}) },
     address: r.address,
     clientId: r.client_id,
+    contactId: r.contact_id ?? null,
     jobId: r.job_id,
     valueCents: Number(r.value_cents) || 0,
     probability: r.probability,
@@ -364,6 +367,8 @@ export async function createOpportunity(input: NewOpportunity, actor: string, fi
       notes: input.notes?.trim() ?? "",
       external_ref: input.externalRef ?? null,
       client_id: input.clientId ?? null,
+      // The person on that client, when they are on it (0056 mirrors their details).
+      contact_id: input.clientId ? await findContact(input.clientId, input.contact.name, input.contact.email) : null,
       created_by: actor,
     })
     .select("*")
@@ -414,6 +419,13 @@ export async function updateOpportunity(id: string, patch: OpportunityPatch, act
     row.stage_at = now;
     row.closed_at = stageInfo(patch.stage!).open ? null : now;
     if (patch.stage === "lost" && !patch.lostReason && !before.lostReason) throw new SalesError("say why it was lost", 400);
+  }
+  // A new person or a new client: point at that person on the client when
+  // they are on it, else at nobody, so the details typed here stand (0056).
+  if (patch.contact !== undefined || patch.clientId !== undefined) {
+    const clientId = patch.clientId !== undefined ? patch.clientId : before.clientId;
+    const contact = patch.contact ?? before.contact;
+    row.contact_id = clientId ? await findContact(clientId, contact.name, contact.email) : null;
   }
   if (Object.keys(row).length === 0) return before;
   const db = getSupabaseAdmin();
