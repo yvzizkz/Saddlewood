@@ -37,10 +37,12 @@ site change that reads them with the server key must be live first.
 
 ## Production state
 
-As of 2026-10-20: 0050 is applied (it went in before #37 merged); 0029–0035
-and 0040–0045 were not yet applied (0050 does not depend on them). 0051 and
-0052 are not applied. Check before applying anything, since this note can go stale: a migration is in if
-the table it creates exists.
+As of 2026-10-22 (checked live by the KB session): everything through 0050
+is applied, including 0029–0035, 0040–0045 and the 0044 trip_key
+expression. 0051, 0052 and 0053 (the cleanup stack) are not. They go in, in
+order, as the stack merges, each before the code that needs it is live
+(0051 is the exception, after; see above). Check before applying anything,
+since this note can go stale: a migration is in if the table it creates exists.
 
 ```sql
 select t from unnest(array[

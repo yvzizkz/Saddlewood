@@ -1,0 +1,86 @@
+--- a/bot/accounting.py
++++ b/bot/accounting.py
+@@ -379,10 +379,12 @@
+                                 "notes": "Chase Zelle disbursement",
+                                 "createdAt": datetime.datetime.now().isoformat()
+                             })
++                            if sync_portal_expense("add", new_n, who="bot", via="text", expense=txs[-1]):
++                                txs[-1]["portalSynced"] = True
+                             save_state(st)
+-                            sync_portal_expense("add", new_n, who="bot", via="text")
+     finally:
+         c.close()
++    push_unsynced_zelle()
+     return out
+ 
+ 
+@@ -550,7 +552,7 @@
+     return reply_md
+ 
+ 
+-def sync_portal_expense(action, n, project=None, expense_type=None, who="bot", via="text"):
++def sync_portal_expense(action, n, project=None, expense_type=None, who="bot", via="text", expense=None):
+     try:
+         import urllib.request
+         from ops_board import SITE
+@@ -558,14 +560,42 @@
+         if not token:
+             return
+         payload = {"action": action, "n": int(n), "project": project, "expenseType": expense_type, "via": via}
++        if expense is not None:
++            # The site enters a new payment from the whole item (site PR #54); resending it is safe.
++            payload["expense"] = expense
+         req = urllib.request.Request(
+             f"{SITE}/api/expenses",
+             data=json.dumps(payload).encode("utf-8"),
+             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "X-Ops-Actor": who}
+         )
+         urllib.request.urlopen(req, timeout=10)
++        return True
+     except Exception as e:
+         log(f"sync_portal_expense failed: {e}")
++        return False
++
++
++# The old Expenses page's five made-up payments, which it wrote over this file;
++# never sent to the site (the site's migration 0053 skips the same five).
++SEED_ZELLE_IDS = {"25497567655", "25497567891", "25497567112", "25497566840", "25497565902"}
++
++
++def push_unsynced_zelle():
++    """Send the site any Zelle payment it has not taken yet (a send that failed
++    or came before site PR #54). The site keys each one by its id, so a resend
++    never enters it twice. -> how many went through."""
++    st = load_json(STATE, {})
++    txs = st.get("zelle_transactions", [])
++    sent = 0
++    for x in txs:
++        if x.get("source") != "zelle" or x.get("portalSynced") or x.get("status") == "dismissed" or x.get("transactionId") in SEED_ZELLE_IDS:
++            continue
++        if sync_portal_expense("add", x.get("n", 0), who="bot", via="text", expense=x):
++            x["portalSynced"] = True
++            sent += 1
++    if sent:
++        save_state(st)
++    return sent
+ 
+ 
+ def _decide_zelle_dismiss(n, who, prefix="Z"):
+@@ -635,7 +665,7 @@
+         return ("📱 Waiting for project tagging:\n"
+                 + "\n".join(lines)
+                 + "\n\nReply 'Z1 Powell Materials' or 'R1 Powell' to categorize, or 'dismiss Z1' to skip."
+-                + "\nOr review on mobile: https://saddlewoodcontracting.com/internal/expenses")
++                + "\nOr tag them on mobile: https://saddlewoodcontracting.com/app/accounting/purchases#tag-spend")
+ 
+     dm = ZELLE_DISMISS_RE.match(text or "")
+     if dm:
+@@ -783,7 +813,7 @@
+ 4. Ask about what you can't see: unmatched Chase deposits (amount and date).
+ 5. For each pending Zelle disbursement in context (pending_zelle_expenses), list them:
+    "📱 Z<n>: $<amount> to <recipient> on <date> (memo: <memo>)"
+-   "Which project was this for? Reply 'Z1 Powell Materials' or 'dismiss Z1' to skip. Or review on mobile at https://saddlewoodcontracting.com/internal/expenses"
++   "Which project was this for? Reply 'Z1 Powell Materials' or 'dismiss Z1' to skip. Or tag it on mobile at https://saddlewoodcontracting.com/app/accounting/purchases#tag-spend"
+ 6. Summarize weekly material purchases (from weekly_material_purchases) by project.
+ 7. Summarize weekly Buildertrend labor hours (from weekly_labor_hours) by project.
+ 8. One to three concrete suggestions grounded in each client's terms (e.g. AFT:
