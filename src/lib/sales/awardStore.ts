@@ -1,6 +1,8 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createDraft, getDocument, listEvents, usedNumbers } from "@/lib/billing/documents";
+import { contractOf } from "@/lib/billing/jobMoney";
 import { nextNumber } from "@/lib/billing/numbering";
+import { replaceSovLines } from "@/lib/billing/sovLines";
 import { placeJob } from "@/lib/crew/admin";
 import { templatePhases } from "@/lib/crew/phases";
 import { firstShiftDays, getJob, insertJob, insertJobPhases, listJobPeople, listJobPhases, listPeople, setJobPeople } from "@/lib/crew/queries";
@@ -96,8 +98,8 @@ export type AwardPreview = {
   prefixUsedBy: string[];
 };
 
-type JobRow = { id: string; name: string; address: string | null; client_id: string | null; crew_job_id: string | null; number_prefix: string | null; billing: Record<string, unknown> | null };
-const JOB_COLS = "id, name, address, client_id, crew_job_id, number_prefix, billing";
+type JobRow = { id: string; name: string; address: string | null; client_id: string | null; crew_job_id: string | null; number_prefix: string | null; billing: Record<string, unknown> | null; contract_cents: number | null };
+const JOB_COLS = "id, name, address, client_id, crew_job_id, number_prefix, billing, contract_cents";
 
 async function findClient(name: string): Promise<string | null> {
   const db = getSupabaseAdmin();
@@ -377,14 +379,26 @@ export async function awardJob(opportunityId: string, asked: Partial<AwardChoice
   };
   const { data: cur, error: curErr } = await db.from("jobs").select("billing").eq("id", jobId).single();
   if (curErr) fail("read job billing", curErr.message);
-  const billing = { ...((cur as { billing: Record<string, unknown> | null }).billing ?? {}), contractCents: plan.job.contractCents, sov: plan.job.sov, award };
-  const { error: bErr } = await db.from("jobs").update({ billing }).eq("id", jobId);
+  // The schedule of values, unless draws already bill one on this job (it stays: it is what they billed).
+  const { count: draws, error: dErr } = await db.from("sov_progress").select("id", { count: "exact", head: true }).eq("job_id", jobId);
+  if (dErr) fail("read draws", dErr.message);
+  const keptSov = (draws ?? 0) > 0;
+  if (!keptSov) {
+    try {
+      await replaceSovLines(jobId, plan.job.sov, actor);
+    } catch (err) {
+      fail("save schedule of values", err instanceof Error ? err.message : String(err));
+    }
+  }
+  const billing = { ...((cur as { billing: Record<string, unknown> | null }).billing ?? {}), award };
+  const { error: bErr } = await db.from("jobs").update({ billing, contract_cents: plan.job.contractCents }).eq("id", jobId);
   if (bErr) fail("save award", bErr.message);
 
   const parts = [
     `contract $${(plan.job.contractCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
     plan.deposit ? `deposit invoice ${plan.deposit.number} drafted` : "",
     plan.agreementNeeded ? "full agreement needed" : "",
+    keptSov ? "the schedule of values its draws bill on is kept" : "",
   ].filter(Boolean);
   await addEvent(o.id, "job", actor, `Awarded: ${plan.job.name}. ${parts.join("; ")}.`, { award: true, jobId, crewJobId, clientId, depositId });
 
@@ -490,7 +504,7 @@ export async function awardedJob(jobId: string): Promise<AwardedJob | null> {
   if (error) fail("read job", error.message);
   if (!data) return null;
   const job = data as JobRow;
-  const billing = (job.billing ?? {}) as { contractCents?: number; award?: AwardRecord };
+  const billing = (job.billing ?? {}) as { award?: AwardRecord };
   const [watches, depositId, first] = await Promise.all([
     listWatches({ jobId }),
     findDeposit(jobId, billing.award ?? null),
@@ -499,7 +513,7 @@ export async function awardedJob(jobId: string): Promise<AwardedJob | null> {
   return {
     jobId: job.id,
     name: job.name,
-    contractCents: typeof billing.contractCents === "number" ? billing.contractCents : null,
+    contractCents: contractOf(job),
     crewJobId: job.crew_job_id,
     award: billing.award ?? null,
     depositId,

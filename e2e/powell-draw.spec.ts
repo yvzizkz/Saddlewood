@@ -3,7 +3,7 @@
 // single-draft guards, draft -> issue -> check payment -> next draw roll-forward,
 // plus a signed change order joining the schedule with retainage held.
 
-import { cents, expect, test } from "./support/env";
+import { cents, expect, sovKeys, test } from "./support/env";
 
 const POWELL = "3526-emerson-street";
 const BELLEVUE = "9146-w-hutton-dr";
@@ -14,11 +14,12 @@ test.describe("Powell: schedule-of-values progress draws", () => {
     const paymentIds: string[] = [];
 
     try {
+      const sov = await sovKeys(page, POWELL);
       // 1. Set/verify Joist cutover opening percents before the first app draw
       const openRes = await page.request.post(`/api/jobs/${POWELL}/progress`, {
         data: {
           action: "opening",
-          pcts: { "sov:0": 90, "sov:1": 75, "sov:2": 45, "sov:3": 40 },
+          pcts: { [sov[0]]: 90, [sov[1]]: 75, [sov[2]]: 45, [sov[3]]: 40 },
         },
       });
       expect(openRes.ok()).toBeTruthy();
@@ -53,7 +54,7 @@ test.describe("Powell: schedule-of-values progress draws", () => {
 
       // 4. Guard: a second draw is refused with 409 while Draw #1 is still a draft
       const dupRes = await page.request.post(`/api/jobs/${POWELL}/progress`, {
-        data: { action: "draw", pcts: { "sov:2": 65 } },
+        data: { action: "draw", pcts: { [sov[2]]: 65 } },
       });
       expect(dupRes.status()).toBe(409);
 

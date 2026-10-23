@@ -92,3 +92,11 @@ export function cutoffInDays(days = 3): number {
   d.setUTCDate(d.getUTCDate() + days);
   return d.getUTCDate();
 }
+
+/** A job's SOV line keys ("line:<id>", migration 0055), in schedule order. */
+export async function sovKeys(page: Page, job: string): Promise<string[]> {
+  const res = await page.request.get(`/api/jobs/${job}/progress`);
+  if (!res.ok()) throw new Error(`progress for ${job}: ${res.status()}`);
+  const body = (await res.json()) as { lines: { key: string }[] };
+  return body.lines.map((l) => l.key).filter((k) => k.startsWith("line:"));
+}

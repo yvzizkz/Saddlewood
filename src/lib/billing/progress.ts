@@ -1,6 +1,6 @@
 // Progress billing on the schedule of values: the math. Pure and client-safe.
 //
-// Each line of the SOV (Award writes it into jobs.billing.sov) and each signed
+// Each line of the SOV (Award writes it into sov_lines, 0055) and each signed
 // change order is billed by percent complete. A draw asks for the percent
 // complete to date on each line; this period is that share of the line less
 // what earlier draws already billed on it. Retainage, when the client's
@@ -13,7 +13,7 @@
 // line.
 
 export type ProgressLine = {
-  /** Stable id within the job: "sov:<index>" or "co:<change order id>". */
+  /** Stable id: "line:<sov_lines.id>" or "co:<change order id>". */
   key: string;
   description: string;
   /** What the line is worth in all (cents). */

@@ -41,7 +41,7 @@ export function jobKeyOf(ref: { billingId?: string | null; crewId?: string | nul
 export async function listJobRefs(): Promise<JobRef[]> {
   const db = getSupabaseAdmin();
   const [jobs, crew, clients, people, persons, sales] = await Promise.all([
-    db.from("jobs").select("id,name,address,status,client_id,crew_job_id,billing,client_name"),
+    db.from("jobs").select("id,name,address,status,client_id,crew_job_id,billing,contract_cents,client_name"),
     db.from("crew_jobs").select("id,name,address,active"),
     db.from("clients").select("id,name"),
     db.from("crew_job_people").select("job_id,email,role"),
@@ -50,7 +50,7 @@ export async function listJobRefs(): Promise<JobRef[]> {
   ]);
   if (jobs.error) throw new Error(`jobs: ${jobs.error.message}`);
   if (crew.error) throw new Error(`crew_jobs: ${crew.error.message}`);
-  type J = { id: string; name: string; address: string | null; status: string | null; client_id: string | null; crew_job_id: string | null; billing: unknown; client_name: string | null };
+  type J = { id: string; name: string; address: string | null; status: string | null; client_id: string | null; crew_job_id: string | null; billing: unknown; contract_cents: number | null; client_name: string | null };
   type C = { id: string; name: string; address: string; active: boolean };
   const clientName = new Map(((clients.data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]));
   const personName = new Map(((persons.data ?? []) as { email: string; name: string | null }[]).map((p) => [p.email, p.name || p.email]));
@@ -79,7 +79,7 @@ export async function listJobRefs(): Promise<JobRef[]> {
       client: (j.client_id && clientName.get(j.client_id)) || j.client_name || "",
       status: j.status ?? "active",
       active: (j.status ?? "active") !== "closed" && (c ? c.active : true),
-      contractCents: contractOf(j.billing),
+      contractCents: contractOf(j),
       pm: c ? (pms.get(c.id) ?? []) : [],
       saleId: sale?.id ?? null,
       saleNumber: sale?.number ?? null,

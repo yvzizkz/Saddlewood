@@ -251,10 +251,12 @@ export type CutoffRow = {
  */
 export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow[]> {
   const db = getSupabaseAdmin();
-  const [clients, jobs] = await Promise.all([db.from("clients").select("id,name,billing"), db.from("jobs").select("id,client_id,status,billing")]);
+  const [clients, jobs, sovJobs] = await Promise.all([db.from("clients").select("id,name,billing"), db.from("jobs").select("id,client_id,status,billing"), db.from("sov_lines").select("job_id")]);
   if (clients.error) throw new Error(`clients: ${clients.error.message}`);
+  if (sovJobs.error) throw new Error(`sov_lines: ${sovJobs.error.message}`);
+  const hasSov = new Set(((sovJobs.data ?? []) as { job_id: string }[]).map((r) => r.job_id));
   const open = new Map<string, number>();
-  type J = { client_id: string | null; status: string | null; billing: { sov?: unknown[]; pmReport?: { day?: string } } | null };
+  type J = { id: string; client_id: string | null; status: string | null; billing: { pmReport?: { day?: string } } | null };
   const openJobs = ((jobs.data ?? []) as J[]).filter((j) => j.client_id && j.status !== "closed" && j.status !== "lost");
   for (const j of openJobs) open.set(j.client_id!, (open.get(j.client_id!) ?? 0) + 1);
   const out: CutoffRow[] = [];
@@ -262,7 +264,7 @@ export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow
     if (!open.get(c.id)) continue;
     const b = c.billing ?? {};
     const day = nextCutoff(today, b.cutoffDay);
-    const sov = openJobs.filter((j) => j.client_id === c.id && (j.billing?.sov?.length ?? 0) > 0);
+    const sov = openJobs.filter((j) => j.client_id === c.id && hasSov.has(j.id));
     out.push({
       client: c.name,
       clientId: c.id,

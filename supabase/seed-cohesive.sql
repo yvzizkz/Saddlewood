@@ -323,6 +323,10 @@ on conflict (id) do update
       billing = excluded.billing,
       updated_at = now();
 
+-- The contract and SOV above are written the old way; move them into
+-- jobs.contract_cents and sov_lines (0055), keyed line:<id>. Safe to re-run.
+select public.move_billing_sov();
+
 -- ---------------------------------------------------------------------------
 -- 3. Crew People, Job Assignments & Phases
 -- ---------------------------------------------------------------------------

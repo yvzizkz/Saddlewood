@@ -172,8 +172,9 @@ export function summarizeJobMoney(jobId: string, items: MoneyItem[], contractCen
   return { jobId, contractCents, billedCents: billed, paidCents: paid, owedCents: owed, pastDueCents: pastDue, open, asOf: today };
 }
 
-/** The contract figure kept on the job (jobs.billing.contractCents), or null when it is not there. */
-export function contractOf(billing: unknown): number | null {
-  const c = (billing as { contractCents?: unknown } | null)?.contractCents;
-  return typeof c === "number" && Number.isInteger(c) && c >= 0 ? c : null;
+/** The contract figure kept on the job (jobs.contract_cents, 0055), or null when it is not on file. */
+export function contractOf(job: { contract_cents?: unknown } | null | undefined): number | null {
+  const c = job?.contract_cents;
+  const n = typeof c === "string" && /^\d+$/.test(c) ? Number(c) : c;
+  return typeof n === "number" && Number.isSafeInteger(n) && n >= 0 ? n : null;
 }
