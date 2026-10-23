@@ -62,8 +62,9 @@ test.describe("Bot payments: Joist and the app side by side", () => {
 
       // An owner voids it: the bot's resend does not bring it back.
       await page.getByTestId(`void-payment-${pay.id}`).click();
-      await page.getByTestId(`void-payment-${pay.id}-form`).getByRole("textbox").fill("E2E: Joist had it twice");
-      await page.getByRole("button", { name: /^Void this/ }).click();
+      const form = page.getByTestId(`void-payment-${pay.id}-form`);
+      await form.getByRole("textbox").fill("E2E: Joist had it twice");
+      await form.getByRole("button", { name: /^Void this/ }).click();
       await expect(page.getByText("Voided: E2E: Joist had it twice")).toBeVisible();
       const after = await send(P);
       expect(after.status()).toBe(200);
