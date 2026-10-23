@@ -48,8 +48,9 @@ begin
       -- A contact belongs to one client; a job moved to another client drops it.
       new.contact_id := null;
     else
-      new.client_email := nullif(c.email, '');
-      new.client_phone := nullif(c.phone, '');
+      -- Only what the record has: an empty one keeps what the job had.
+      new.client_email := coalesce(nullif(c.email, ''), new.client_email);
+      new.client_phone := coalesce(nullif(c.phone, ''), new.client_phone);
     end if;
   end if;
   return new;
@@ -59,7 +60,10 @@ drop trigger if exists jobs_client_mirror on public.jobs;
 create trigger jobs_client_mirror before insert or update on public.jobs
   for each row execute function public.jobs_client_mirror();
 
--- The opportunity's mirror of its contact (company stays as typed).
+-- The opportunity's mirror of its contact (company stays as typed). Only the
+-- record's non-empty values are copied: an empty one keeps what was typed.
+-- The site unlinks a lead whose typed name or phone differs from the record
+-- (src/lib/clients/contacts.ts linkableContact), so nothing typed is put back.
 create or replace function public.opportunities_contact_mirror() returns trigger
 language plpgsql as $$
 declare
@@ -73,8 +77,8 @@ begin
     if c.client_id is distinct from new.client_id then
       new.contact_id := null;
     else
-      new.contact := (coalesce(new.contact, '{}'::jsonb) - 'email' - 'phone')
-        || jsonb_build_object('name', c.name)
+      new.contact := coalesce(new.contact, '{}'::jsonb)
+        || case when c.name <> '' then jsonb_build_object('name', c.name) else '{}'::jsonb end
         || case when c.email <> '' then jsonb_build_object('email', c.email) else '{}'::jsonb end
         || case when c.phone <> '' then jsonb_build_object('phone', c.phone) else '{}'::jsonb end;
     end if;
@@ -140,11 +144,19 @@ begin
    where o.job_id = j.id and o.client_id is null and j.client_id is not null;
   get diagnostics n_opps_client = row_count;
 
-  -- 3. An opportunity with a client points at its contact, when the client has it.
-  update public.sales_opportunities
-     set contact_id = public.client_contact_match(client_id, contact ->> 'name', contact ->> 'email')
-   where client_id is not null and contact_id is null
-     and public.client_contact_match(client_id, contact ->> 'name', contact ->> 'email') is not null;
+  -- 3. An opportunity with a client points at its contact, when the client has
+  --    it and the record would not write over a name or phone typed on the
+  --    lead (an empty one on either side is fine): the site's linkableContact.
+  update public.sales_opportunities o
+     set contact_id = m.cid
+    from (select o2.id as oid, cc.id as cid, btrim(cc.name) as name, regexp_replace(cc.phone, '\D', '', 'g') as phone
+            from public.sales_opportunities o2
+            join public.client_contacts cc
+              on cc.id = public.client_contact_match(o2.client_id, o2.contact ->> 'name', o2.contact ->> 'email')
+           where o2.client_id is not null and o2.contact_id is null) m
+   where o.id = m.oid
+     and (m.name = '' or btrim(coalesce(o.contact ->> 'name', '')) in ('', m.name))
+     and (m.phone = '' or regexp_replace(coalesce(o.contact ->> 'phone', ''), '\D', '', 'g') in ('', m.phone));
   get diagnostics n_opps_contact = row_count;
 
   -- 4. A job takes its opportunity's contact, else the client's contact its email names.

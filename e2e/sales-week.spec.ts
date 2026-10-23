@@ -150,10 +150,22 @@ test.describe("Sales: the sales & estimating week", () => {
     const other = await page.request.patch(`/api/sales/${opp.id}`, { data: { contact: { name: "Riley Other", email: `riley.${uid}@example.com` } } });
     expect(other.ok()).toBeTruthy();
     expect(contactOf()).toBe(`none|riley.${uid}@example.com`);
-    // Devon again: linked to the record, and mirrors it.
-    const back = await page.request.patch(`/api/sales/${opp.id}`, { data: { contact: { name: "Devon S.", email: `DEVON.${uid}@example.com` } } });
+    // Devon again, as the record has him: linked, and mirrors it.
+    const back = await page.request.patch(`/api/sales/${opp.id}`, { data: { contact: { name: "Devon Sterling", email: `DEVON.${uid}@example.com`, phone: "480-555-0188" } } });
     expect(back.ok()).toBeTruthy();
     expect(contactOf()).toBe(`${devon}|devon.${uid}@example.com`);
+
+    // Details shows the linked person read-only; typing another phone unlinks
+    // the lead and the phone typed stands (never put back by the record).
+    await page.goto(`/app/sales/${opp.id}`);
+    await page.getByRole("button", { name: "Details" }).click();
+    await expect(page.getByTestId("details-contact-linked")).toBeVisible();
+    await expect(page.getByTestId("details-contact-phone")).toHaveAttribute("readonly", "");
+    await page.getByRole("button", { name: "Type other details" }).click();
+    await page.getByTestId("details-contact-phone").fill("602-555-0199");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByTestId("details-contact-linked")).toBeHidden();
+    await expect.poll(() => sql(`select coalesce(contact_id::text, 'none') || '|' || (contact ->> 'phone') from public.sales_opportunities where id = '${opp.id}'`)).toBe("none|602-555-0199");
 
     try {
       // 6. Verify the Job Overview page renders the Gate 0 Handoff Packet (SOP-001)
