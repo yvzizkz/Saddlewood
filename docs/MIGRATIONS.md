@@ -35,12 +35,13 @@ site change that reads them with the server key must be live first.
 | 0052 | `old_tables_no_public_grants` | cleanup PR |
 | 0053 | `spend_ledger` (after 0042 and 0044; before the site change) | cleanup PR |
 | 0054 | `bot_payments` (before the site change) | cleanup PR |
+| 0055 | `typed_contract_sov` (right before the deploy; re-run the move after) | cleanup PR |
 
 ## Production state
 
 As of 2026-10-22 (checked live by the KB session): everything through 0050
 is applied, including 0029–0035, 0040–0045 and the 0044 trip_key
-expression. 0051, 0052, 0053 and 0054 (the cleanup stack) are not. They go in, in
+expression. 0051 through 0055 (the cleanup stack) are not. They go in, in
 order, as the stack merges, each before the code that needs it is live
 (0051 is the exception, after; see above). Check before applying anything,
 since this note can go stale: a migration is in if the table it creates exists.
@@ -71,6 +72,17 @@ P number, one standing row each). Apply it before the site change that
 writes them (/api/bot/payments). Money and Receivables read it with `*`, so
 they keep working without it. Check it with `select count(*) from
 information_schema.columns where table_name = 'payments' and column_name = 'source'` (1).
+0055 moves the contract value to `jobs.contract_cents` and the schedule of
+values to `sov_lines`, and re-keys the draws (`sov_progress.line_key`), the
+opening percents and the PM's report from `sov:<index>` to `line:<id>`. The
+site before it and the site after it each read only their own shape, so
+apply it right before the deploy, and once the deploy is live run
+`select public.move_billing_sov();` again (it picks up a job the old site
+awarded in between; running it twice changes nothing). In between, the old
+site finds no schedule on any job and can't make a draw: it fails closed.
+Check it with `select count(*) from public.jobs where billing ?| array['sov',
+'contractCents']` (0) and `select count(*) from public.sov_progress where
+line_key like 'sov:%'` (0).
 
 ## Rules
 

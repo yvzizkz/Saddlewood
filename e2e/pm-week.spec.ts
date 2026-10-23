@@ -118,9 +118,12 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
     await page.goto("/app/jobs/8009-n-ironwood-dr?tab=tasks", {
       waitUntil: "domcontentloaded",
     });
-    await page.getByRole("button", { name: "New task" }).click();
-
+    // A click before hydration opens nothing (a cold compile): click until the form shows.
     const roleSelect = page.getByLabel("Goes to");
+    await expect(async () => {
+      if (!(await roleSelect.isVisible())) await page.getByRole("button", { name: "New task" }).click();
+      await expect(roleSelect).toBeVisible({ timeout: 1_000 });
+    }).toPass();
     const roleValues = await roleSelect.locator("option").evaluateAll((opts) =>
       opts.map((o) => (o as HTMLOptionElement).value),
     );
