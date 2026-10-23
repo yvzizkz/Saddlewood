@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     project?: string;
     expenseType?: string;
     via?: 'portal' | 'text' | 'email';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- old prototype route, goes with cleanup Batch 2
     expense?: any;
   };
 

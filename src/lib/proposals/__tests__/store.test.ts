@@ -3,7 +3,15 @@ import { matchProposal, matchShareToken } from '../store';
 import type { ProposalItem } from '../types';
 
 describe('Proposal Slug & Short URL Matching', () => {
+  // Fields the matcher never reads; ProposalItem requires them.
+  const unused = {
+    project_address: '',
+    archetype: 'commercial_gc',
+    drawing_basis: { current_rev: '', set_name: '', date: '' },
+  } as const;
+
   const bellevue: ProposalItem = {
+    ...unused,
     id: 'prp-001',
     token: 'bellevue-church-schifferer-ac938',
     proposal_number: 'PRP-2026-001',
@@ -24,6 +32,7 @@ describe('Proposal Slug & Short URL Matching', () => {
   };
 
   const cardinal: ProposalItem = {
+    ...unused,
     id: 'prp-002',
     token: 'jk-cardinal-lot-267-268',
     proposal_number: 'PRP-2026-002',
@@ -44,6 +53,7 @@ describe('Proposal Slug & Short URL Matching', () => {
   };
 
   const moore: ProposalItem = {
+    ...unused,
     id: 'prp-003',
     token: 'moore-buckeye-addition',
     proposal_number: 'PRP-2026-003',

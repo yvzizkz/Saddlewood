@@ -38,6 +38,7 @@ export async function PATCH(
   }
 
   const { id } = await params;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- old prototype route, goes with cleanup Batch 2
   let body: any;
   try {
     body = await request.json();

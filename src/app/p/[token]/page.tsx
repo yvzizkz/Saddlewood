@@ -740,7 +740,7 @@ export default function ClientProposalPage({ params }: Props) {
                   </div>
                 ) : (
                   <span className="text-[11px] text-slate-400">
-                    Routes directly into Saddlewood's estimating queue and Marco's mobile digest.
+                    Routes directly into Saddlewood&rsquo;s estimating queue and Marco&rsquo;s mobile digest.
                   </span>
                 )}
 

@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const contentType = request.headers.get('content-type') || '';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- old prototype route, goes with cleanup Batch 2
     let body: any = {};
     if (contentType.includes('application/x-www-form-urlencoded')) {
       const formData = await request.formData();

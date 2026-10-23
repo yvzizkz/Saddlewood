@@ -405,7 +405,7 @@ export default function ContractsPortalPage() {
                       </div>
 
                       <div className="text-xs text-[var(--color-charcoal-light)] line-clamp-1 italic">
-                        "{c.scope}"
+                        &ldquo;{c.scope}&rdquo;
                       </div>
 
                       {/* Protection Badges */}
