@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Gavel, Phone, Plus, Search, Settings } from 'lucide-react'
+import { Gavel, Phone, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 
 import { botApi } from '@/components/bot/BotProvider'
 import { useSalesToast } from './useSalesToast'
@@ -21,7 +21,15 @@ import { QuickAddSheet } from './pipeline/QuickAddSheet'
 // anything, closed ones too. Callers and bid invites that are not tracked yet
 // wait on top, one tap from the pipeline.
 
-type Data = { today: string; rows: OpportunityRow[]; metrics: Metrics; inbox: InboxItem[]; me: string }
+type Data = {
+  today: string
+  rows: OpportunityRow[]
+  metrics: Metrics
+  inbox: InboxItem[]
+  inboxSyncedAt: string | null
+  me: string
+  canSyncLeads: boolean
+}
 type View = 'today' | 'board' | 'list'
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -186,12 +194,24 @@ function ListView({ data }: { data: Data }) {
   )
 }
 
-function Inbox({ items, onTracked }: { items: InboxItem[]; onTracked: () => void }) {
+type CallStatus = 'pending' | 'called' | 'texted' | 'dismissed'
+type SyncAction = { id: number; status: string; result?: string | null }
+
+function pulledLabel(iso: string | null): string {
+  if (!iso) return 'Call list not pulled yet'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'Call list not pulled yet'
+  return `Call list pulled ${d.toLocaleString('en-US', { timeZone: 'America/Phoenix', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+}
+
+function Inbox({ items, syncedAt, canSync, onChanged }: { items: InboxItem[]; syncedAt: string | null; canSync: boolean; onChanged: () => void }) {
   const router = useRouter()
   const { toast } = useSalesToast()
   const [busy, setBusy] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
-  if (items.length === 0) return null
+  const [syncNote, setSyncNote] = useState('')
+  if (items.length === 0 && !canSync) return null
   const shown = showAll ? items : items.slice(0, 3)
 
   async function track(i: InboxItem) {
@@ -212,48 +232,165 @@ function Inbox({ items, onTracked }: { items: InboxItem[]; onTracked: () => void
       router.push(`/app/sales/${r.opportunity.id}`)
     } catch (e) {
       toast((e as Error).message, 'bad')
-      onTracked()
+      onChanged()
     } finally {
       setBusy(null)
     }
   }
 
+  async function mark(i: InboxItem, status: CallStatus) {
+    if (!i.phone) return
+    setBusy(i.ref)
+    try {
+      await botApi('/api/sales/inbox', { method: 'PATCH', body: JSON.stringify({ phone: i.phone, status }) })
+      toast(status === 'dismissed' ? `${i.who} dismissed` : status === 'pending' ? `${i.who} back to waiting` : `${i.who} marked ${status}`)
+      setOpen(null)
+      onChanged()
+    } catch (e) {
+      toast((e as Error).message, 'bad')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // The call list is built on the office Mac (GoHighLevel plus the company's
+  // email history), so a sync asks the Mac and waits for it.
+  async function sync() {
+    setBusy('sync')
+    setSyncNote('Asking the office Mac to pull from GoHighLevel…')
+    try {
+      const { action } = await botApi<{ action: SyncAction }>('/api/sales/inbox', { method: 'POST', body: JSON.stringify({ sync: true }) })
+      const deadline = Date.now() + 90_000
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2500))
+        const a = await botApi<{ action: SyncAction }>(`/api/sales/inbox?action=${action.id}`).then((r) => r.action).catch(() => null)
+        if (!a) continue
+        if (a.status === 'working') setSyncNote('The Mac is pulling from GoHighLevel…')
+        if (a.status === 'done') {
+          toast(a.result || 'Synced from GoHighLevel')
+          onChanged()
+          return
+        }
+        if (a.status === 'failed' || a.status === 'refused') {
+          toast(a.result || 'The sync did not work', 'bad')
+          return
+        }
+      }
+      toast('The office Mac did not answer. It may be asleep or offline; try again in a minute.', 'bad')
+    } catch (e) {
+      toast((e as Error).message, 'bad')
+    } finally {
+      setBusy(null)
+      setSyncNote('')
+    }
+  }
+
   return (
     <section>
-      <SectionTitle count={items.length}>Not tracked yet</SectionTitle>
-      <Card className="divide-y divide-[var(--color-stone)]">
-        {shown.map((i) => (
-          <div key={i.ref} className="flex items-center gap-3 px-3.5 py-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-cream)] text-[var(--color-gold-accessible)]" aria-hidden="true">
-              {i.from === 'bid' ? <Gavel className="size-4" /> : <Phone className="size-4" />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px] font-medium text-[var(--color-charcoal)]">{i.title}</p>
-              <p className="truncate text-[12px] text-[var(--color-charcoal-light)]">
-                {i.from === 'bid' ? i.who : i.detail || 'Caller'} · {i.ageDays === 0 ? 'today' : `${i.ageDays}d`}
-              </p>
+      <SectionTitle
+        count={items.length}
+        action={
+          canSync ? (
+            <button
+              type="button"
+              className="flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-[var(--color-teal)] disabled:opacity-50"
+              disabled={!!busy}
+              onClick={sync}
+            >
+              <RefreshCw className={`size-3.5 ${busy === 'sync' ? 'animate-spin' : ''}`} aria-hidden="true" />
+              {busy === 'sync' ? 'Syncing…' : 'Sync GoHighLevel'}
+            </button>
+          ) : null
+        }
+      >
+        Not tracked yet
+      </SectionTitle>
+      {canSync ? (
+        <p className="-mt-1 mb-2 text-[11px] text-[var(--color-charcoal-light)]" aria-live="polite">
+          {syncNote || pulledLabel(syncedAt)}
+        </p>
+      ) : null}
+      {items.length === 0 ? (
+        <Card className="px-3.5 py-3">
+          <p className="text-[13px] text-[var(--color-charcoal-light)]">Nobody waiting. Every caller and bid invite is tracked or dismissed.</p>
+        </Card>
+      ) : (
+        <Card className="divide-y divide-[var(--color-stone)]">
+          {shown.map((i) => (
+            <div key={i.ref} className="px-3.5 py-3">
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-cream)] text-[var(--color-gold-accessible)]" aria-hidden="true">
+                  {i.from === 'bid' ? <Gavel className="size-4" /> : <Phone className="size-4" />}
+                </span>
+                {i.from === 'call' && i.phone ? (
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    aria-expanded={open === i.ref}
+                    aria-label={`${i.who}: mark called, texted or dismissed`}
+                    onClick={() => setOpen((o) => (o === i.ref ? null : i.ref))}
+                  >
+                    <InboxText i={i} />
+                  </button>
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <InboxText i={i} />
+                  </div>
+                )}
+                {i.from === 'call' && i.phone ? (
+                  <a
+                    href={i.dialUrl || `tel:${dialable(i.phone)}`}
+                    aria-label={`Call ${i.who}`}
+                    className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--color-stone-mid)] bg-white text-[var(--color-teal)]"
+                  >
+                    <Phone className="size-4" aria-hidden="true" />
+                  </a>
+                ) : null}
+                <Button className="shrink-0 !px-3" busy={busy === i.ref} disabled={!!busy} onClick={() => track(i)}>
+                  Track
+                </Button>
+              </div>
+              {open === i.ref ? (
+                <div className="mt-2 flex flex-wrap gap-2 pl-12">
+                  {(i.status ? (['pending', 'called', 'texted', 'dismissed'] as const) : (['called', 'texted', 'dismissed'] as const))
+                    .filter((st) => st !== i.status)
+                    .map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        disabled={!!busy}
+                        onClick={() => mark(i, st)}
+                        className="min-h-11 rounded-xl border border-[var(--color-stone-mid)] bg-white px-3 text-[13px] font-medium text-[var(--color-charcoal)] disabled:opacity-50"
+                      >
+                        {st === 'pending' ? 'Not yet' : st === 'called' ? 'Called' : st === 'texted' ? 'Texted' : 'Dismiss'}
+                      </button>
+                    ))}
+                </div>
+              ) : null}
             </div>
-            {i.from === 'call' && i.phone ? (
-              <a
-                href={i.dialUrl || `tel:${dialable(i.phone)}`}
-                aria-label={`Call ${i.who}`}
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--color-stone-mid)] bg-white text-[var(--color-teal)]"
-              >
-                <Phone className="size-4" aria-hidden="true" />
-              </a>
-            ) : null}
-            <Button className="shrink-0 !px-3" busy={busy === i.ref} disabled={!!busy} onClick={() => track(i)}>
-              Track
-            </Button>
-          </div>
-        ))}
-      </Card>
+          ))}
+        </Card>
+      )}
       {items.length > 3 ? (
         <button type="button" className="mt-1 min-h-11 w-full text-sm font-medium text-[var(--color-teal)]" onClick={() => setShowAll((v) => !v)}>
           {showAll ? 'Show fewer' : `Show all ${items.length}`}
         </button>
       ) : null}
     </section>
+  )
+}
+
+function InboxText({ i }: { i: InboxItem }) {
+  return (
+    <>
+      <p className="truncate text-[14px] font-medium text-[var(--color-charcoal)]">{i.title}</p>
+      <p className="flex items-center gap-1.5 truncate text-[12px] text-[var(--color-charcoal-light)]">
+        {i.status ? <Chip tone="ok">{i.status === 'called' ? 'Called' : 'Texted'}</Chip> : null}
+        <span className="truncate">
+          {i.from === 'bid' ? i.who : i.detail || 'Caller'} · {i.ageDays === 0 ? 'today' : `${i.ageDays}d`}
+        </span>
+      </p>
+    </>
   )
 }
 
@@ -331,7 +468,7 @@ export default function SalesScreen() {
       {data ? (
         <>
           <MetricsStrip m={data.metrics} />
-          <Inbox items={data.inbox} onTracked={load} />
+          <Inbox items={data.inbox} syncedAt={data.inboxSyncedAt} canSync={data.canSyncLeads} onChanged={load} />
           <div className="mb-3 mt-6">
             <Segmented<View>
               label="View"

@@ -139,7 +139,7 @@ export default async function OpsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* CRM Leads Action Item */}
           <Link
-            href="/internal/leads"
+            href="/app/sales"
             className="p-3.5 rounded-xl border border-[var(--color-stone)] bg-white hover:border-[var(--color-teal)] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group"
           >
             <div>

@@ -9,7 +9,6 @@ import { usePathname } from 'next/navigation'
 const OLD = [
   { href: '/internal', label: 'Pipeline estimates' },
   { href: '/internal/trackers', label: 'Progress trackers' },
-  { href: '/internal/leads', label: 'Leads (old)' },
   { href: '/internal/proposals', label: 'Proposals (old)' },
   { href: '/internal/contracts', label: 'Contracts (old)' },
   { href: '/internal/expenses', label: 'Expenses (old)' },

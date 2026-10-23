@@ -38,7 +38,6 @@ const PORTAL_EXTRA: { href: string; label: string; note: string }[] = [
   { href: '/internal/expenses', label: 'Expenses', note: 'Tag Zelle payments and receipts' },
   { href: '/internal/contracts', label: 'Contracts', note: 'Agreements in review' },
   { href: '/internal/proposals', label: 'Proposals', note: 'Client presentations' },
-  { href: '/internal/leads', label: 'Leads', note: 'Callbacks waiting' },
 ]
 
 export function morePortalLinks(v: NavViewer = { owner: true, crewAdmin: true }): { href: string; label: string; note: string }[] {
