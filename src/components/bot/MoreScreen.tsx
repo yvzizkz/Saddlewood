@@ -37,7 +37,6 @@ const PORTAL_EXTRA: { href: string; label: string; note: string }[] = [
   { href: '/internal?tab=pending', label: 'Estimates', note: 'Bids waiting for sign-off' },
   { href: '/internal/expenses', label: 'Expenses', note: 'Tag Zelle payments and receipts' },
   { href: '/internal/contracts', label: 'Contracts', note: 'Agreements in review' },
-  { href: '/internal/proposals', label: 'Proposals', note: 'Client presentations' },
 ]
 
 export function morePortalLinks(v: NavViewer = { owner: true, crewAdmin: true }): { href: string; label: string; note: string }[] {
