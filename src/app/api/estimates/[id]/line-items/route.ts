@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { isAllowedEmail } from "@/lib/ops/allowlist";
 
 const PostSchema = z.object({
   trade_id: z.string().uuid(),
@@ -17,14 +19,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const supabase = await createClient();
+  const session = await createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  } = await session.auth.getUser();
+  if (!user || !isAllowedEmail(user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Staff only (above). The estimate tables are service-role only (0051),
+  // so the reads and writes go through the server key.
+  const supabase = getSupabaseAdmin();
 
   let body: unknown;
   try {

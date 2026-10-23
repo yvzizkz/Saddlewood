@@ -1,4 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
+
+// The /internal estimate pages call these. The proxy opens those pages to
+// staff on the allowlist only, and the estimate tables are service-role only
+// (0051), so the reads use the server key.
 import { countActiveFlagged } from './flags'
 import type {
   ConfidenceLevel,
@@ -109,7 +113,7 @@ function mapLineItem(row: Row): LineItem {
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
 export async function getEstimateWithTrades(id: string): Promise<EstimateBundle> {
-  const supabase = await createClient()
+  const supabase = getSupabaseAdmin()
 
   const { data: estimateRow, error: estErr } = await supabase
     .from('estimates')
@@ -245,7 +249,7 @@ export async function getEstimateWithTrades(id: string): Promise<EstimateBundle>
 // ─── Dashboard listing ───────────────────────────────────────────────────────
 
 export async function countPendingEstimates(): Promise<number> {
-  const supabase = await createClient()
+  const supabase = getSupabaseAdmin()
   const { count, error } = await supabase
     .from('estimates')
     .select('id', { count: 'exact', head: true })
@@ -255,7 +259,7 @@ export async function countPendingEstimates(): Promise<number> {
 }
 
 export async function listEstimatesForDashboard(): Promise<DashboardEstimateRow[]> {
-  const supabase = await createClient()
+  const supabase = getSupabaseAdmin()
 
   // Step 1: estimates + joined job summary.
   const { data, error } = await supabase

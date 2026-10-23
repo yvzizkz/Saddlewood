@@ -5,6 +5,21 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
 
+// The routes check the session, then read and write with the server key
+// (0051). Here the server key hands back the same mock the session used.
+vi.mock('@/lib/supabase/admin', async () => {
+  const server = await import('@/lib/supabase/server')
+  return {
+    getSupabaseAdmin: () => {
+      const r = vi.mocked(server.createClient).mock.settledResults.at(-1)
+      return r && r.type === 'fulfilled' ? r.value : undefined
+    },
+  }
+})
+
+// Only staff on the allowlist get past the session check.
+vi.stubEnv('INTERNAL_ALLOWED_EMAILS', 'marco@example.com')
+
 import { PATCH, DELETE } from '../route'
 import { createClient } from '@/lib/supabase/server'
 
@@ -410,39 +425,17 @@ describe('PATCH /api/estimates/[id]/line-items/[itemId] — happy path + side ef
     expect(rows[0].old_value).toBe('5.0000')
   })
 
-  it('uses user.id as changed_by when user.email is absent', async () => {
-    const before = {
-      id: ITEM_ID,
-      quantity: '10',
-      material_unit_cost: '1.00',
-      labor_unit_cost: '2.00',
-      trade_id: TRADE_ID,
-    }
-    const after = {
-      id: ITEM_ID,
-      quantity: 11,
-      material_unit_cost: 1.0,
-      labor_unit_cost: 2.0,
-      total: 33,
-      is_manual_override: true,
-    }
-    const mock = makeSupabase({
-      user: { id: 'svc-bot' }, // no email
-      fromResults: [
-        { data: before, error: null },
-        { data: { estimate_id: ESTIMATE_ID }, error: null },
-        { data: after, error: null },
-        { error: null },
-      ],
-    })
+  it('refuses a session with no email: only staff on the allowlist edit estimates', async () => {
+    const mock = makeSupabase({ user: { id: 'svc-bot' } }) // no email
     vi.mocked(createClient).mockResolvedValue(mock.client as never)
 
-    const res = await PATCH(makeRequest({ quantity: 11 }) as never, { params })
+    const res = await PATCH(
+      makeRequest({ quantity: 11 }) as never,
+      { params },
+    )
 
-    expect(res.status).toBe(200)
-    const auditCall = mock.fromCalls[3]
-    const rows = payloadOf(auditCall, 'insert') as Array<Record<string, unknown>>
-    expect(rows[0].changed_by).toBe('svc-bot')
+    expect(res.status).toBe(401)
+    expect(mock.client.from).not.toHaveBeenCalled()
   })
 })
 
