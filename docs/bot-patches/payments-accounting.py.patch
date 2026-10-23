@@ -1,0 +1,99 @@
+--- a/bot/accounting.py
++++ b/bot/accounting.py
+@@ -702,8 +702,65 @@
+                        capture_output=True, text=True, timeout=600)
+     out = (r.stdout or "").strip().splitlines()
+     return out[-1] if out else f"😬 Recording P{p['n']} failed to start: {(r.stderr or '')[-160:]}"
++
++
++def _payment_method(p):
++    """Melio's own, a Chase check deposit, a Zelle; else other."""
++    ev = (p.get("evidence") or "").lower()
++    for word, method in (("melio", "melio"), ("zelle", "zelle"), ("chase", "check"), ("check", "check"), ("ach", "ach"), ("wire", "wire")):
++        if word in ev:
++            return method
++    return "other"
+ 
+ 
++def push_app_payments(now_ts=None):
++    """Every payment recorded in Joist goes to the app's payments too (site PR
++    #56, migration 0054; Lando 10/22: record in both). The site keys it by the
++    P number, so a retry never records it twice; nothing comes back to Joist.
++    Backs off on a refusal (no such invoice in the app, it would overpay) and
++    logs it on the 1st, 5th and 20th try, for a person to look at.
++    -> how many the site took"""
++    import urllib.error
++    import urllib.request
++    try:
++        from ops_board import SITE
++    except Exception:
++        SITE = os.environ.get("OPS_SITE_URL", "https://saddlewoodcontracting.com")
++    token = os.environ.get("OPS_AGENT_TOKEN")
++    if not token:
++        return 0
++    now_ts = now_ts or datetime.datetime.now().timestamp()
++    st = load_json(STATE, {})
++    took = 0
++    changed = False
++    for p in st.get("proposals", []):
++        app = p.get("app") or {}
++        if p.get("status") != "recorded" or app.get("ok") or now_ts < app.get("next", 0):
++            continue
++        body = {"pNumber": int(p["n"]), "invoice": p.get("invoice") or "", "client": p.get("client") or "",
++                "amountCents": int(round(float(p["amount"]) * 100)), "receivedOn": p.get("date") or "",
++                "method": _payment_method(p), "joistId": str(p.get("joist_id") or ""), "evidence": (p.get("evidence") or "")[:300]}
++        req = urllib.request.Request(f"{SITE}/api/bot/payments", data=json.dumps(body).encode("utf-8"), method="POST",
++                                     headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "X-Ops-Actor": "bot"})
++        try:
++            with urllib.request.urlopen(req, timeout=15) as r:
++                res = json.loads(r.read() or b"{}")
++            app.update(ok=True, status=res.get("status", "recorded"), at=datetime.datetime.now().isoformat(timespec="seconds"))
++            took += 1
++        except Exception as e:
++            detail = e.read().decode("utf-8", "replace")[:200] if isinstance(e, urllib.error.HTTPError) else str(e)[:200]
++            app["tries"] = app.get("tries", 0) + 1
++            app["next"] = now_ts + min(6 * 3600, 60 * 2 ** min(app["tries"], 8))
++            app["last"] = detail
++            if app["tries"] in (1, 5, 20):
++                log(f"P{p['n']} not in the app's payments yet (try {app['tries']}): {detail}")
++        p["app"] = app
++        changed = True
++    if changed:
++        save_state(st)
++    return took
++
++
+ def record(n, who):
+     st = load_json(STATE, {})
+     p = next((x for x in st.get("proposals", []) if x["n"] == int(n)), None)
+@@ -732,9 +789,11 @@
+         st = load_json(STATE, {})
+         for x in st["proposals"]:
+             if x["n"] == p["n"]:
+-                x.update(status="recorded", recorded_at=datetime.datetime.now().isoformat(timespec="seconds"))
++                x.update(status="recorded", recorded_at=datetime.datetime.now().isoformat(timespec="seconds"),
++                         joist_id=p["joist_id"])
+         save_state(st)
+         log(f"recorded P{p['n']} {fmt(p['amount'])} on joist {p['joist_id']} ({who})")
++        push_app_payments()
+         return (f"✅ Recorded {fmt(p['amount'])} on {p['invoice']} ({p['client']}). "
+                 f"Joist now shows {fmt(money(after.get('amount_outstanding')))} still owed.")
+     except Exception as e:
+@@ -883,6 +942,7 @@
+     has signed off on the test (the flag file bot/accounting_live_ok exists);
+     otherwise it falls back to the test config."""
+     import poll
++    push_app_payments()
+     cfg = load_json(CONFIG, {"mode": "test", "recipients": ["Lando"]})
+     if live_if_ok:
+         if os.path.exists(LIVE_OK):
+@@ -1024,6 +1084,9 @@
+         who = a[a.index("--who") + 1] if "--who" in a else "Lando"
+         print(record(a[a.index("--record") + 1], who))
+         return 0
++    if "--push-payments" in a:
++        print(f"{push_app_payments()} payment(s) sent to the app")
++        return 0
+     if "--form-test" in a:
+         return form_test()
+     return checkin(dry="--dry-run" in a, live_if_ok="--live-if-ok" in a)
