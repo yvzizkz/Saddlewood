@@ -4,20 +4,20 @@ import { NextRequest } from 'next/server';
 const {
   getContractsStateMock,
   saveContractsStateMock,
-  draftContractMock,
   updateContractMock,
+  ContractTermsErrorMock,
 } = vi.hoisted(() => ({
   getContractsStateMock: vi.fn(),
   saveContractsStateMock: vi.fn(),
-  draftContractMock: vi.fn(),
   updateContractMock: vi.fn(),
+  ContractTermsErrorMock: class extends Error {},
 }));
 
 vi.mock('@/lib/contracts/store', () => ({
   getContractsState: getContractsStateMock,
   saveContractsState: saveContractsStateMock,
-  draftContract: draftContractMock,
   updateContract: updateContractMock,
+  ContractTermsError: ContractTermsErrorMock,
 }));
 
 // No session in tests: server client reports no user
@@ -37,7 +37,7 @@ describe('Contracts API Routes', () => {
     vi.stubEnv('OPS_AGENT_TOKEN', TOKEN);
     getContractsStateMock.mockReset();
     saveContractsStateMock.mockReset();
-    draftContractMock.mockReset();
+    updateContractMock.mockReset();
     updateContractMock.mockReset();
 
     getContractsStateMock.mockResolvedValue({
@@ -107,62 +107,40 @@ describe('Contracts API Routes', () => {
     expect(res.status).toBe(401);
   });
 
-  it('validates required fields on contract draft', async () => {
+  it('no longer drafts an agreement on the site: 410, nothing saved', async () => {
     const req = new NextRequest('http://localhost/api/contracts', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ client_name: 'Test' }), // missing amount & scope
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_name: 'Powell Residence', amount: 45000, scope: 'Framing' }),
     });
     const res = await POST(req);
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.ok).toBe(false);
+    expect(res.status).toBe(410);
+    expect((await res.json()).error).toMatch(/drafted on the job/);
+    expect(saveContractsStateMock).not.toHaveBeenCalled();
   });
 
-  it('successfully drafts a new contract with required legal protections', async () => {
-    draftContractMock.mockResolvedValueOnce({
-      id: 'cnt-002',
-      n: 2,
-      contract_number: 'SWC-2026-002',
-      type: 'prime_residential',
-      client_name: 'Powell Residence',
-      amount: 45000,
-      scope: 'Framing, Drywall & HVAC Coordination',
-      status: 'draft',
-      protections: {
-        manufacturerDefectCarveOut: true,
-        latePaymentPenalties: true,
-        zeroVerbalChangeOrders: true,
-        preliminaryLienNotice: true,
-        limitedWorkmanshipWarranty: true,
-      },
-    });
-
+  it("still saves the bot's own draft (contract.py, action draft), words and all", async () => {
+    getContractsStateMock.mockResolvedValueOnce({ contracts: [], next_number: 4, lastUpdated: '' });
+    const contract = { id: 'cnt-004', contract_number: 'SWC-2026-004', client_name: 'Test', amount: 1000, scope: 'Drywall', contract_text: '# PRIME RESIDENTIAL CONSTRUCTION AGREEMENT' };
     const req = new NextRequest('http://localhost/api/contracts', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        'Content-Type': 'application/json',
-        'X-Ops-Actor': 'Marco',
-      },
-      body: JSON.stringify({
-        client_name: 'Powell Residence',
-        project_address: '3526 Emerson St',
-        amount: 45000,
-        scope: 'Framing, Drywall & HVAC Coordination',
-      }),
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'draft', contract }),
     });
-
     const res = await POST(req);
-    expect(res.status).toBe(201);
-    const data = await res.json();
-    expect(data.ok).toBe(true);
-    expect(data.contract.id).toBe('cnt-002');
-    expect(data.contract.protections.manufacturerDefectCarveOut).toBe(true);
-    expect(data.contract.protections.latePaymentPenalties).toBe(true);
+    expect(res.status).toBe(200);
+    expect(saveContractsStateMock.mock.calls[0][0].contracts).toEqual([contract]);
+  });
+
+  it('answers 409 when a PATCH would change the terms of a drafted agreement', async () => {
+    updateContractMock.mockRejectedValueOnce(new ContractTermsErrorMock('amount can\'t change on a drafted agreement; draft it again on the job'));
+    const req = new NextRequest('http://localhost/api/contracts/cnt-001', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: 1 }),
+    });
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'cnt-001' }) });
+    expect(res.status).toBe(409);
   });
 
   it('updates contract status via PATCH [id]', async () => {
