@@ -1,11 +1,9 @@
 --- a/bot/accounting.py
 +++ b/bot/accounting.py
-@@ -702,8 +702,65 @@
-                        capture_output=True, text=True, timeout=600)
-     out = (r.stdout or "").strip().splitlines()
+@@ -704,6 +704,71 @@ def _decide(n, verb, who):
      return out[-1] if out else f"😬 Recording P{p['n']} failed to start: {(r.stderr or '')[-160:]}"
-+
-+
+ 
+ 
 +def _payment_method(p):
 +    """Melio's own, a Chase check deposit, a Zelle; else other."""
 +    ev = (p.get("evidence") or "").lower()
@@ -13,14 +11,18 @@
 +        if word in ev:
 +            return method
 +    return "other"
- 
- 
++
++
 +def push_app_payments(now_ts=None):
 +    """Every payment recorded in Joist goes to the app's payments too (site PR
 +    #56, migration 0054; Lando 10/22: record in both). The site keys it by the
 +    P number, so a retry never records it twice; nothing comes back to Joist.
 +    Backs off on a refusal (no such invoice in the app, it would overpay) and
 +    logs it on the 1st, 5th and 20th try, for a person to look at.
++    Only payments this code recorded go (record() marks them app.due). Ones
++    recorded in Joist before it was installed were already entered on Money by
++    hand, so the first run marks them app.status 'pre-cutover' and never sends
++    them; later runs find nothing new to mark.
 +    -> how many the site took"""
 +    import urllib.error
 +    import urllib.request
@@ -36,8 +38,12 @@
 +    took = 0
 +    changed = False
 +    for p in st.get("proposals", []):
++        if p.get("status") == "recorded" and "app" not in p:
++            p["app"] = {"ok": True, "status": "pre-cutover", "at": datetime.datetime.now().isoformat(timespec="seconds")}
++            changed = True
++            continue
 +        app = p.get("app") or {}
-+        if p.get("status") != "recorded" or app.get("ok") or now_ts < app.get("next", 0):
++        if p.get("status") != "recorded" or not app.get("due") or app.get("ok") or now_ts < app.get("next", 0):
 +            continue
 +        body = {"pNumber": int(p["n"]), "invoice": p.get("invoice") or "", "client": p.get("client") or "",
 +                "amountCents": int(round(float(p["amount"]) * 100)), "receivedOn": p.get("date") or "",
@@ -66,20 +72,20 @@
  def record(n, who):
      st = load_json(STATE, {})
      p = next((x for x in st.get("proposals", []) if x["n"] == int(n)), None)
-@@ -732,9 +789,11 @@
+@@ -732,9 +797,11 @@ def record(n, who):
          st = load_json(STATE, {})
          for x in st["proposals"]:
              if x["n"] == p["n"]:
 -                x.update(status="recorded", recorded_at=datetime.datetime.now().isoformat(timespec="seconds"))
 +                x.update(status="recorded", recorded_at=datetime.datetime.now().isoformat(timespec="seconds"),
-+                         joist_id=p["joist_id"])
++                         joist_id=p["joist_id"], app={"due": True})
          save_state(st)
          log(f"recorded P{p['n']} {fmt(p['amount'])} on joist {p['joist_id']} ({who})")
 +        push_app_payments()
          return (f"✅ Recorded {fmt(p['amount'])} on {p['invoice']} ({p['client']}). "
                  f"Joist now shows {fmt(money(after.get('amount_outstanding')))} still owed.")
      except Exception as e:
-@@ -883,6 +942,7 @@
+@@ -883,6 +950,7 @@ def checkin(dry=False, live_if_ok=False):
      has signed off on the test (the flag file bot/accounting_live_ok exists);
      otherwise it falls back to the test config."""
      import poll
@@ -87,7 +93,7 @@
      cfg = load_json(CONFIG, {"mode": "test", "recipients": ["Lando"]})
      if live_if_ok:
          if os.path.exists(LIVE_OK):
-@@ -1024,6 +1084,9 @@
+@@ -1024,6 +1092,9 @@ def main():
          who = a[a.index("--who") + 1] if "--who" in a else "Lando"
          print(record(a[a.index("--record") + 1], who))
          return 0

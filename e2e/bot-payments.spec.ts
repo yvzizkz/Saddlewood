@@ -47,6 +47,15 @@ test.describe("Bot payments: Joist and the app side by side", () => {
       expect((await send({ ...P, pNumber: p + 2, amountCents: Number(open) })).status()).toBe(409);
       expect(sql(`select count(*) from payments where external_ref in ('P${p + 1}', 'P${p + 2}')`)).toBe("0");
 
+      // Someone already entered it on Money by hand: a possible duplicate, for a person to reconcile.
+      sql(`with m as (insert into payments (client_id, received_on, amount_cents, method, reference, recorded_by)
+             select client_id, '${localDay()}', 1200, 'check', 'E2E-DUP-${p}', 'e2e' from documents where id = '${docId}' returning id)
+           insert into payment_allocations (payment_id, document_id, amount_cents) select id, '${docId}', 1200 from m`);
+      const dup = await send({ ...P, pNumber: p + 3, amountCents: 1_200 });
+      expect(dup.status()).toBe(409);
+      expect(await dup.json()).toMatchObject({ status: "possible_duplicate", error: expect.stringContaining("E2E-DUP-") });
+      expect(sql(`select count(*) from payments where external_ref = 'P${p + 3}'`)).toBe("0");
+
       // Money says whose it is.
       await page.goto(`/app/money/${docId}`);
       await expect(page.getByText(`From Joist · P${p}`)).toBeVisible();
@@ -61,7 +70,8 @@ test.describe("Bot payments: Joist and the app side by side", () => {
       expect((await after.json())).toMatchObject({ status: "voided", paymentId: pay.id });
       expect(rows()).toBe("1");
     } finally {
-      sql(`set session_replication_role = replica; delete from payment_allocations where payment_id in (select id from payments where external_ref in ('P${p}', 'P${p + 1}', 'P${p + 2}')); delete from payments where external_ref in ('P${p}', 'P${p + 1}', 'P${p + 2}');`);
+      const mine = `external_ref in ('P${p}', 'P${p + 1}', 'P${p + 2}', 'P${p + 3}') or reference = 'E2E-DUP-${p}'`;
+      sql(`set session_replication_role = replica; delete from payment_allocations where payment_id in (select id from payments where ${mine}); delete from payments where ${mine};`);
     }
   });
 

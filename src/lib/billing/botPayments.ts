@@ -6,6 +6,10 @@
 // applied to the issued invoice with that number. Safe to send again: a P
 // number already standing is answered with its row, and one an owner voided
 // stays voided. Nothing here writes back to Joist.
+//
+// A Joist payment someone already entered on Money by hand is refused as a
+// possible duplicate (same invoice, same amount, received within a week), so
+// a person reconciles it instead of the invoice being paid twice.
 
 import { z } from "zod";
 
@@ -40,7 +44,48 @@ export type BotPaymentResult =
   | { status: "recorded" | "already"; payment: Payment }
   /** An owner voided the app's row: it stays voided, and the bot stops sending it. */
   | { status: "voided"; paymentId: string }
-  | { status: "no_invoice" | "ambiguous" | "overpays"; detail: string };
+  | { status: "no_invoice" | "ambiguous" | "overpays" | "possible_duplicate"; detail: string };
+
+/** How far apart, in days, a Money entry and the bot's received date can be and still look like the same payment. */
+export const DUPLICATE_WINDOW_DAYS = 7;
+
+/** A payment a person recorded on Money, as it stands on this invoice. */
+export type MoneyEntry = { id: string; receivedOn: string; amountCents: number; onInvoiceCents: number; reference: string };
+
+const dayNumber = (d: string) => Date.parse(`${d}T12:00:00Z`) / 86_400_000;
+
+/** The Money entry that looks like this bot payment (same amount, within the window), or null. */
+export function possibleDuplicate(entries: MoneyEntry[], p: Pick<BotPayment, "amountCents" | "receivedOn">): MoneyEntry | null {
+  return (
+    entries.find(
+      (e) => (e.amountCents === p.amountCents || e.onInvoiceCents === p.amountCents) && Math.abs(dayNumber(e.receivedOn) - dayNumber(p.receivedOn)) <= DUPLICATE_WINDOW_DAYS,
+    ) ?? null
+  );
+}
+
+/** Standing payments recorded on Money (source 'app') that are applied to this document. */
+async function moneyEntries(documentId: string): Promise<MoneyEntry[]> {
+  const db = getSupabaseAdmin();
+  const { data: allocs, error } = await db.from("payment_allocations").select("payment_id, amount_cents").eq("document_id", documentId);
+  if (error) throw new Error(`payment_allocations read failed: ${error.message}`);
+  const onInvoice = new Map<string, number>();
+  for (const a of (allocs ?? []) as { payment_id: string; amount_cents: number | string }[]) onInvoice.set(a.payment_id, (onInvoice.get(a.payment_id) ?? 0) + Number(a.amount_cents));
+  if (!onInvoice.size) return [];
+  const { data: rows, error: perr } = await db
+    .from("payments")
+    .select("id, received_on, amount_cents, reference")
+    .in("id", [...onInvoice.keys()])
+    .eq("source", "app")
+    .is("voided_at", null);
+  if (perr) throw new Error(`payments read failed: ${perr.message}`);
+  return ((rows ?? []) as { id: string; received_on: string; amount_cents: number | string; reference: string }[]).map((r) => ({
+    id: r.id,
+    receivedOn: r.received_on,
+    amountCents: Number(r.amount_cents),
+    onInvoiceCents: onInvoice.get(r.id) ?? 0,
+    reference: r.reference,
+  }));
+}
 
 const ref = (n: number) => `P${n}`;
 
@@ -82,6 +127,14 @@ export async function recordBotPayment(p: BotPayment, actor: string): Promise<Bo
   if (docs.length === 0) return { status: "no_invoice", detail: `no issued invoice ${number} in the app` };
   if (docs.length > 1) return { status: "ambiguous", detail: `${docs.length} issued invoices are numbered ${number}` };
   const doc = docs[0];
+
+  const twin = possibleDuplicate(await moneyEntries(doc.id), p);
+  if (twin) {
+    return {
+      status: "possible_duplicate",
+      detail: `possible duplicate: ${number} already has ${(twin.amountCents / 100).toFixed(2)} received ${twin.receivedOn} entered on Money${twin.reference ? ` (${twin.reference})` : ""}, payment ${twin.id}. If it is the same payment, void the Money entry and the bot's next send records it; if not, enter this one on Money too`,
+    };
+  }
 
   const paid = (await paidByDocument([doc.id])).get(doc.id)?.total ?? 0;
   const balance = Number(doc.total_cents) - paid;
