@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { readAll } from "@/lib/supabase/paged";
 import type { SearchMode, SearchRow } from "./purchaseSearch";
 import {
   FLAG_LOOKBACK_DAYS,
@@ -15,6 +16,7 @@ import {
   type UnmatchedPurchase,
   type UnmatchedPurchases,
 } from "./purchases";
+import { coverChanges, matchReceiptsToTrips, type DedupeLine } from "./receiptDedupe";
 import { addDays } from "./time";
 
 // Every read and write of the purchase tables (migration 0022). Service-role
@@ -152,7 +154,85 @@ export async function upsertPurchases(rows: PurchaseRow[]): Promise<number> {
     const { error } = await db.from("purchases").upsert(kept.map((r) => toDb(r, at)), { onConflict: "source_key" });
     if (error) fail("purchases upsert", error.message);
   }
+  // A Pro Xtra trip and the same receipt filed in the app count once. The
+  // upsert above replaced each line's meta, so the marks are worked out again.
+  try {
+    await dedupeReceipts([...new Set(rows.map((r) => r.purchasedOn))]);
+  } catch (err) {
+    console.error("purchases dedupe:", err);
+  }
   return rows.length;
+}
+
+/**
+ * Mark the app receipts a Pro Xtra trip covers on these days (receiptDedupe.ts):
+ * meta.coveredBy = <trip key>, so totals leave them out; clear a mark that no
+ * longer holds. A covered trip on no job (and not set by hand) takes the job
+ * the receipt was filed under. -> how many marks were set and cleared, and
+ * how many trip lines got a job.
+ *
+ * Every line of those days is read, a page at a time (PostgREST returns at
+ * most max_rows per request): a trip cut short would total wrong, miss its
+ * receipt, and clear a mark that holds. If a read hits readAll's cap
+ * (`capped`), no mark is set or cleared and no job is linked.
+ */
+export async function dedupeReceipts(days: string[]): Promise<{ covered: number; cleared: number; linked: number; capped: boolean }> {
+  const out = { covered: 0, cleared: 0, linked: 0, capped: false };
+  const ds = days.filter(Boolean);
+  if (!ds.length) return out;
+  const db = getSupabaseAdmin();
+  const lines: DedupeLine[] = [];
+  type R = Pick<PurchaseDbRow, "source" | "source_key" | "purchased_on" | "vendor" | "line_total_cents" | "job_id" | "meta">;
+  for (let i = 0; i < ds.length; i += MANUAL_KEY_BATCH) {
+    const batch = ds.slice(i, i + MANUAL_KEY_BATCH);
+    const { rows, capped } = await readAll<R>(
+      (from, to) =>
+        db
+          .from("purchases")
+          .select("source, source_key, purchased_on, vendor, line_total_cents, job_id, meta")
+          .in("purchased_on", batch)
+          .order("purchased_on", { ascending: true })
+          .order("source_key", { ascending: true })
+          .range(from, to),
+      "purchases dedupe read",
+    );
+    if (capped) {
+      console.error(`purchases dedupe: more lines than one read takes on ${batch[0]}..${batch[batch.length - 1]}; marks left as they are`);
+      return { ...out, capped: true };
+    }
+    for (const r of rows) {
+      lines.push({ source: r.source, sourceKey: r.source_key, purchasedOn: r.purchased_on, vendor: r.vendor, lineTotalCents: r.line_total_cents, jobId: r.job_id, meta: r.meta ?? {} });
+    }
+  }
+  const matches = matchReceiptsToTrips(lines);
+  const { set, clear } = coverChanges(lines, matches);
+  const metaOf = new Map(lines.map((l) => [l.sourceKey, l.meta]));
+  const at = new Date().toISOString();
+  for (const m of set) {
+    const { error } = await db.from("purchases").update({ meta: { ...metaOf.get(m.appKey), coveredBy: m.tripKey }, updated_at: at }).eq("source_key", m.appKey);
+    if (error) fail("purchases dedupe mark", error.message);
+    out.covered += 1;
+  }
+  for (const key of clear) {
+    const rest = { ...metaOf.get(key) };
+    delete rest.coveredBy;
+    const { error } = await db.from("purchases").update({ meta: rest, updated_at: at }).eq("source_key", key);
+    if (error) fail("purchases dedupe clear", error.message);
+    out.cleared += 1;
+  }
+  for (const m of matches) {
+    if (!m.jobId) continue;
+    const { data, error } = await db
+      .from("purchases")
+      .update({ job_id: m.jobId, updated_at: at })
+      .eq("trip_key", m.tripKey)
+      .is("job_id", null)
+      .eq("job_manual", false)
+      .select("source_key");
+    if (error) fail("purchases dedupe link", error.message);
+    out.linked += (data ?? []).length;
+  }
+  return out;
 }
 
 /** Put one trip, or some lines, on a job (null = no job) by hand: the alias rule for the register name is not touched. */
@@ -165,7 +245,8 @@ export async function assignPurchases(target: { tripKey?: string; sourceKeys?: s
 
 export async function listPurchases(filter: { jobId?: string; fromDay: string; toDay?: string; skus?: string[]; limit?: number }): Promise<PurchaseRow[]> {
   const db = getSupabaseAdmin();
-  let q = db.from("purchases").select(COLS).gte("purchased_on", filter.fromDay);
+  // A receipt a Pro Xtra trip covers is not counted twice (receiptDedupe.ts).
+  let q = db.from("purchases").select(COLS).gte("purchased_on", filter.fromDay).is("meta->>coveredBy", null);
   if (filter.toDay) q = q.lte("purchased_on", filter.toDay);
   if (filter.jobId) q = q.eq("job_id", filter.jobId);
   if (filter.skus) {

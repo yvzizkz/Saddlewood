@@ -17,6 +17,7 @@ function from(table: string) {
   const b = {
     select: () => b,
     order: () => b,
+    limit: () => b,
     eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), b),
     or: () => {
       throw new Error("no filter expressions: keys are compared with .eq() only");

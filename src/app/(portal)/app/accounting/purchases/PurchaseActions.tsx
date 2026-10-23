@@ -269,3 +269,55 @@ export function TripJobAndTradeControl({
     </div>
   );
 }
+
+/**
+ * Owners: count each Home Depot trip once for the past year. New purchases
+ * are checked as they come in; this catches the receipts filed before that.
+ */
+export function DedupeReceiptsButton() {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+
+  const run = async () => {
+    setBusy(true);
+    setNote("");
+    try {
+      const res = await fetch("/api/accounting/purchases", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dedupe_receipts" }),
+      });
+      const d = (await res.json().catch(() => null)) as { ok?: boolean; covered?: number; cleared?: number; linked?: number; error?: string } | null;
+      if (!res.ok || !d?.ok) {
+        setNote(d?.error || "Could not check the receipts");
+        return;
+      }
+      setNote(
+        d.covered || d.cleared
+          ? `${d.covered} receipt${d.covered === 1 ? "" : "s"} matched to a Pro Xtra trip${d.cleared ? `, ${d.cleared} unmatched` : ""}${d.linked ? `, ${d.linked} trip line${d.linked === 1 ? "" : "s"} put on the receipt's job` : ""}.`
+          : "No receipt is counted twice.",
+      );
+      start(() => router.refresh());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-sm">
+      <button
+        type="button"
+        onClick={run}
+        disabled={busy || pending}
+        className="min-h-11 rounded-xl border border-[var(--color-stone-mid)] bg-white px-3 font-medium text-[var(--color-charcoal)] disabled:opacity-50"
+      >
+        {busy ? "Checking…" : "Find receipts filed twice"}
+      </button>
+      <span className="text-[var(--color-charcoal-light)]" aria-live="polite">
+        {note}
+      </span>
+    </div>
+  );
+}

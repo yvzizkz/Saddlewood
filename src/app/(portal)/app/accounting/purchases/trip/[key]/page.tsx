@@ -51,6 +51,32 @@ export default async function PurchaseTripPage({ params }: { params: Promise<{ k
         />
       ) : null}
 
+      {trip.coveredBy ? (
+        <div className="mb-4" data-testid="trip-covered">
+          <Card className="p-4">
+            <p className="text-sm text-[var(--color-charcoal)]">
+              Pro Xtra has this receipt too. It is counted once, in the{" "}
+              <Link className="font-medium underline underline-offset-2" href={`${PATH}/trip/${encodeURIComponent(trip.coveredBy)}`}>
+                Home Depot trip
+              </Link>
+              ; totals leave this copy out.
+            </p>
+          </Card>
+        </div>
+      ) : trip.alsoFiled ? (
+        <div className="mb-4" data-testid="trip-also-filed">
+          <Card className="p-4">
+            <p className="text-sm text-[var(--color-charcoal)]">
+              {trip.alsoFiled.runner ?? "The crew"} also filed this receipt in the app (
+              <Link className="font-medium underline underline-offset-2" href={`${PATH}/trip/${encodeURIComponent(trip.alsoFiled.sourceKey)}`}>
+                see it
+              </Link>
+              ). It is counted once, here.
+            </p>
+          </Card>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-4 md:col-span-2">
           <div className="mb-3 flex items-baseline justify-between">

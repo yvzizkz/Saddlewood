@@ -55,6 +55,12 @@ function from(table: string) {
       filters.push((r) => set.has(r[col]));
       return b;
     },
+    // .is("meta->>coveredBy", null): a receipt a Pro Xtra trip covers is left out.
+    is(col: string, v: null) {
+      const [c, key] = col.split("->>");
+      filters.push((r) => ((key ? (r[c] as Record<string, unknown> | undefined)?.[key] : r[c]) ?? null) === v);
+      return b;
+    },
     order: () => b,
     limit(n: number) {
       limit = n;
