@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 // (migration 0054). The bot's token only. Safe to send again.
 //
 //   201 recorded · 200 already recorded, or voided by an owner (stop sending)
-//   404 no issued invoice with that number · 409 two of them, or it would
-//   overpay what the app shows open (a person looks; nothing was written)
+//   404 no issued invoice with that number · 409 two of them, it would
+//   overpay what the app shows open, or a possible duplicate of a payment
+//   entered on Money by hand (a person looks; nothing was written)
 
 export async function POST(request: NextRequest) {
   const actor = await requireBridge(request);
