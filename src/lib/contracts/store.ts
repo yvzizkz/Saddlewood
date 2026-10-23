@@ -157,7 +157,8 @@ export async function getContractsState(): Promise<ContractDashboardState> {
 
   let contracts: ContractItem[] = state.contracts || [];
   if (contracts.length === 0) {
-    contracts = localContracts.length > 0 ? localContracts : SEED_CONTRACTS;
+    // A copy: a save must never change the seed rows held in memory.
+    contracts = localContracts.length > 0 ? localContracts : structuredClone(SEED_CONTRACTS);
   } else if (localContracts.length > 0) {
     const existingIds = new Set(contracts.map((c) => c.id || c.contract_number));
     for (const lc of localContracts) {
@@ -259,4 +260,40 @@ export async function updateContract(
   state.contracts[index] = updated;
   await saveContractsState(state, actor);
   return updated;
+}
+
+/** What a client's signature adds to the agreement's words (POST /api/contracts/<id>/sign). */
+export const SIGNATURE_MARK = 'DIGITALLY SIGNED & EXECUTED';
+
+/**
+ * A client signs: the status, who signed and when, and the signature block
+ * appended to its words, in one save. The only change to contract_text the
+ * terms check lets through, and only the sign route calls it: the words
+ * before the block stay exactly as drafted. Signing twice changes nothing.
+ * -> null when there is no such contract.
+ */
+export async function signContract(
+  id: string,
+  signing: { signerName: string; at: Date; block: string },
+  actor: string
+): Promise<{ contract: ContractItem; already: boolean } | null> {
+  const state = await getContractsState();
+  const index = state.contracts.findIndex((c) => c.id === id);
+  if (index === -1) return null;
+  const current = state.contracts[index];
+  if (current.status === 'signed') return { contract: current, already: true };
+  if (!signing.block.includes(SIGNATURE_MARK)) throw new Error('a signature block must carry the signature mark');
+
+  const text = current.contract_text ?? '';
+  const updated: ContractItem = {
+    ...current,
+    status: 'signed',
+    signed_by: signing.signerName,
+    signed_at: signing.at.toISOString(),
+    contract_text: text.includes(SIGNATURE_MARK) ? text : text + signing.block,
+    updated_at: new Date().toISOString(),
+  };
+  state.contracts[index] = updated;
+  await saveContractsState(state, actor);
+  return { contract: updated, already: false };
 }

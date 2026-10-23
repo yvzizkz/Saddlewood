@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findBySignToken } from '@/lib/contracts/link';
-import { getContractsState, updateContract } from '@/lib/contracts/store';
+import { SIGNATURE_MARK, getContractsState, signContract } from '@/lib/contracts/store';
 import type { ContractItem } from '@/lib/contracts/types';
 import { authorizeOps } from '@/lib/ops/auth';
 
@@ -107,31 +107,20 @@ export async function POST(
 
     const auditTrail = `Electronically executed by ${signerName.trim()} (${signerEmail || 'No email provided'}) on ${now.toISOString()} | IP: ${ip} | User-Agent: ${userAgent.slice(0, 80)}`;
 
-    const updated = await updateContract(
-      contract.id,
-      {
-        status: 'signed',
-        signed_by: signerName.trim(),
-        signed_at: now.toISOString(),
-      },
-      `client:${signerName.trim()}`
-    );
-
-    // Append signature block text if not already present
-    if (updated && !updated.contract_text.includes('DIGITALLY SIGNED & EXECUTED')) {
-      const signatureFooter = `\n\n=======================================================\nDIGITALLY SIGNED & EXECUTED\nSigner: ${signerName.trim()}\nTimestamp: ${now.toUTCString()}\nAudit Verification: ${auditTrail}\n=======================================================`;
-      await updateContract(
-        contract.id,
-        {
-          contract_text: updated.contract_text + signatureFooter,
-        },
-        'system'
-      );
+    // Signed, and the signature block on its words, in one save (signContract):
+    // the words above the block are never touched.
+    const block = `\n\n=======================================================\n${SIGNATURE_MARK}\nSigner: ${signerName.trim()}\nTimestamp: ${now.toUTCString()}\nAudit Verification: ${auditTrail}\n=======================================================`;
+    const signed = await signContract(contract.id, { signerName: signerName.trim(), at: now, block }, `client:${signerName.trim()}`);
+    if (!signed) {
+      return NextResponse.json({ ok: false, error: 'Contract not found' }, { status: 404 });
+    }
+    if (signed.already) {
+      return NextResponse.json({ ok: true, contract: signed.contract, message: 'Contract is already signed.' });
     }
 
     return NextResponse.json({
       ok: true,
-      contract: updated,
+      contract: signed.contract,
       auditTrail,
     });
   } catch (error) {
