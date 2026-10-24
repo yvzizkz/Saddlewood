@@ -19,18 +19,36 @@ const COLS = "source, source_key, purchased_on, vendor, order_ref, job_name_raw,
 
 type Row = SpendRow & { job_manual: boolean; department: string; class: string; sku: string; qty: number | string };
 
-/** Link the lines (alias, job name, trade) and store them, keeping what a person set by hand. */
+/**
+ * Link the lines (alias, job name, trade) and store them, keeping what a
+ * person set by hand. linkLines derives "ignored" from the alias rules only,
+ * so a line already dismissed ("Z12 dismiss") gets it back here when it is
+ * still on no job: a resend never returns it to Tag spend.
+ */
 async function store(lines: PurchaseLine[]): Promise<void> {
   const [aliases, rules, jobs] = await Promise.all([listAliases(), listTradeMap(), listJobs()]);
   const { rows } = linkLines(lines, aliases, rules, jobs.filter((j) => j.active));
-  await upsertPurchases(rows);
+  await upsertPurchases(keepDismissed(lines, rows));
+}
+
+/** Rows whose line came in dismissed, and is on no job, stay dismissed. Pure, for tests. */
+export function keepDismissed<T extends { sourceKey: string; jobId: string | null; meta: Record<string, unknown> }>(lines: PurchaseLine[], rows: T[]): T[] {
+  const dismissed = new Set(lines.filter((l) => l.meta?.ignored === true).map((l) => l.sourceKey));
+  return rows.map((r) => (dismissed.has(r.sourceKey) && r.jobId === null ? { ...r, meta: { ...r.meta, ignored: true } } : r));
+}
+
+/** The ids the bot gives item number n. */
+export function byNumber(n: number): string[] {
+  return [`z-${n}`, `r-${n}`];
 }
 
 async function find(ref: ReturnType<typeof expenseRef>): Promise<Row | null> {
   if (!ref) return null;
   const db = getSupabaseAdmin();
   let q = db.from("purchases").select(COLS).in("source", SPEND_SOURCES);
-  q = "id" in ref ? q.eq("meta->>expenseId", ref.id) : q.eq("meta->>n", String(ref.n));
+  // By number: the bot's ids carry it (Z12 is z-12, R7 is r-7), so match the
+  // id, never a stored n an older page may have renumbered.
+  q = "id" in ref ? q.eq("meta->>expenseId", ref.id) : q.in("meta->>expenseId", byNumber(ref.n));
   const { data, error } = await q.order("created_at", { ascending: false }).limit(1);
   if (error) throw new Error(`purchases read failed: ${error.message}`);
   return ((data ?? [])[0] as Row | undefined) ?? null;
@@ -76,8 +94,9 @@ export async function addExpense(expense: unknown): Promise<AddResult> {
   if (input.kind === "bad") return { ok: false, error: input.error };
   if (input.kind === "app") return { ok: true, item: expense as ExpenseItem, created: false };
   const before = await find({ id: String(input.line.meta.expenseId) });
-  // A resend keeps the job an owner or a "Z12 ..." text has given it since.
-  const line = before ? { ...input.line, jobNameRaw: before.job_name_raw || input.line.jobNameRaw, meta: { ...before.meta, ...input.line.meta } } : input.line;
+  // A resend keeps the job an owner or a "Z12 ..." text has given it since,
+  // and what was decided about it (category, decidedBy, a dismissal).
+  const line = before ? { ...input.line, jobNameRaw: before.job_name_raw || input.line.jobNameRaw, meta: { ...input.line.meta, ...before.meta } } : input.line;
   await store([line]);
   return { ok: true, item: await reread(line.sourceKey), created: !before };
 }

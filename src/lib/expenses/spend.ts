@@ -48,8 +48,8 @@ export function spendLine(e: unknown): SpendInput {
   const recipient = text(x.recipient, 80);
   const memo = text(x.memo, 160);
   const meta: Record<string, unknown> = { expenseId: id };
-  const n = Number(x.n);
-  if (Number.isInteger(n) && n > 0) meta.n = n;
+  // The bot's number is the one its id carries (z-12 is Z12), whatever n says.
+  meta.n = Number(id.slice(id.indexOf("-") + 1));
   if (recipient) meta.recipient = recipient;
   for (const [k, max] of [["expenseType", 60], ["receiptUrl", 300], ["notes", 600], ["decidedBy", 120]] as const) {
     const v = text(x[k], max);

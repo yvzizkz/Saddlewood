@@ -47,6 +47,7 @@ describe("POST /api/bot/payments", () => {
       [{ status: "no_invoice", detail: "no issued invoice 8009-14 in the app" }, 404],
       [{ status: "ambiguous", detail: "2 issued invoices" }, 409],
       [{ status: "overpays", detail: "would overpay" }, 409],
+      [{ status: "possible_duplicate", detail: "possible duplicate: 8009-14 already has 500.00 received 2026-10-19 entered on Money" }, 409],
     ];
     for (const [result, code] of cases) {
       recordBotPayment.mockResolvedValueOnce(result);
