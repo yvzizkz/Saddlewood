@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canCloseHere, feedForSeat, withoutMoney, type FeedItem } from "../feed";
+import { canCloseHere, feedForSeat, forFieldLead, withoutMoney, type FeedItem } from "../feed";
 
 // A project manager's Tasks: their jobs, their own no-job work, and never the
 // owners' waiting list, the ops board or sub bills.
@@ -83,5 +83,19 @@ describe("withoutMoney", () => {
       item("w6", { href: "/app/money/12" }),
     ];
     expect(withoutMoney(xs).map((i) => i.id)).toEqual(["w1", "w2", "w3", "w4", "q1", "o1", "c1"]);
+  });
+});
+
+describe("forFieldLead", () => {
+  it("drops the PM's work with no job, keeps the lead's own and the field lead's seat's, and every job item", () => {
+    const xs = [
+      item("pmfree", { role: "pm", nowRole: "pm", detail: "$4,800 deposit to chase" }),
+      item("leadfree", { role: "field_lead", nowRole: "field_lead" }),
+      item("handed", { role: "pm", assignee: "arnold@x.com" }),
+      item("onjob", { role: "pm", jobKey: "8009-n-ironwood-dr" }),
+      item("pc2", { source: "billing", kind: "billing", jobKey: "8009-n-ironwood-dr" }),
+    ];
+    const mine = (i: FeedItem) => i.assignee === "arnold@x.com";
+    expect(forFieldLead(xs, mine).map((i) => i.id)).toEqual(["leadfree", "handed", "onjob"]);
   });
 });

@@ -19,7 +19,7 @@ import { jobBills, jobCrew, jobLabor, jobMoney, jobPackages, jobPurchases, jobWa
 import { listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { canCloseHere, feedForSeat, isMine, KIND_LABEL, loadFeed, withoutMoney } from "@/lib/tasks/feed";
+import { canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
 import { CloseTask, NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
 import ProgressBilling from "@/components/billing/ProgressBilling";
@@ -366,7 +366,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   if (tab === "tasks") {
     const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
     const seated = feedForSeat(await loadFeed(refs, seats, today), owner ? null : new Set([ref.key]), (i) => isMine(i, seat.email, seats, people)).filter((i) => i.jobKey === ref.key);
-    const items = seat.money ? seated : withoutMoney(seated);
+    const items = seat.money ? seated : forFieldLead(seated, (i) => isMine(i, seat.email, seats, people));
     const closable = items.filter((i) => canCloseHere(i, owner));
     const table: TableRow[] = items.map((i) => ({
       id: i.id,

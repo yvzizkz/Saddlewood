@@ -21,6 +21,7 @@ const DOLLARS = /\$\s?\d/;
 let before = "";
 let mine = "";
 let other = "";
+let pmFree = "";
 
 const test = base.extend<{ lead: Page }>({
   lead: async ({ context, page }, provide) => {
@@ -38,13 +39,15 @@ test.beforeAll(() => {
   mine = sql(`insert into public.work_items (title, role, crew_job_id, created_by) values ('E2E field lead ${n}', 'field_lead', '${JOB}', 'e2e') returning id`);
   // Field-lead work on a job they are not on.
   other = sql(`insert into public.work_items (title, role, crew_job_id, created_by) values ('E2E field lead other ${n}', 'field_lead', '9146-w-hutton-dr', 'e2e') returning id`);
+  // The PM's own work with no job, with dollars in it (chr(36) is "$", kept out of the shell): not the field's.
+  pmFree = sql(`insert into public.work_items (title, detail, role, created_by) values ('E2E PM no job ${n}', 'Chase the ' || chr(36) || '4,800 deposit', 'pm', 'e2e') returning id`);
 });
 
 test.afterAll(() => {
   // The seat first: whatever else failed, the Field lead seat goes back.
   sql(`update public.role_seats set holder = '${before.replace(/'/g, "''")}' where role = 'field_lead'`);
   sql(`delete from public.crew_job_people where job_id = '${JOB}' and email = '${LEAD}'`);
-  const ids = [mine, other].filter(Boolean);
+  const ids = [mine, other, pmFree].filter(Boolean);
   if (ids.length) sql(`update public.work_items set status = 'dropped', done_by = 'e2e' where id in (${ids.join(", ")}) and status = 'open'`);
 });
 
@@ -110,6 +113,26 @@ test.describe("Field lead: their jobs and tasks, no money", () => {
     expect((await page.request.patch("/api/tasks", { data: { id: Number(other), status: "done" } })).status()).toBe(404);
     expect((await page.request.patch("/api/tasks", { data: { id: Number(mine), status: "done" } })).status()).toBe(200);
     expect(sql(`select status || ':' || done_by from public.work_items where id = ${mine}`)).toBe(`done:${LEAD}`);
+  });
+
+  test("the PM's work with no job is not on the lead's Tasks, and the lead cannot change it", async ({ lead: page }) => {
+    await page.goto("/app/tasks?view=all");
+    await expect(page.getByRole("heading", { level: 1, name: "Tasks" })).toBeVisible();
+    await expect(page.getByText(`E2E PM no job ${n}`)).toHaveCount(0);
+    expect(await page.locator("main").innerText()).not.toMatch(DOLLARS);
+    for (const change of [{ status: "done" }, { status: "dropped" }, { status: "open" }, { role: "field_lead" }]) {
+      expect((await page.request.patch("/api/tasks", { data: { id: Number(pmFree), ...change } })).status(), JSON.stringify(change)).toBe(404);
+    }
+    expect(sql(`select status || ':' || role from public.work_items where id = ${pmFree}`)).toBe("open:pm");
+  });
+
+  test("the PM still sees their work with no job", async ({ browser }) => {
+    const ctx = await browser.newContext();
+    await signIn(ctx, PM, { crew: true });
+    const pm = await ctx.newPage();
+    await pm.goto("/app/tasks?view=all");
+    await expect(pm.getByText(`E2E PM no job ${n}`).first()).toBeVisible();
+    await ctx.close();
   });
 
   test("crew who hold no seat still have no Tasks or job pages", async ({ browser }) => {
