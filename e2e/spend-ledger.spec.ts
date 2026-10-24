@@ -60,6 +60,22 @@ test.describe("Old Expenses: one spend ledger", () => {
       await other.getByRole("button", { name: "Save" }).click();
       await expect(other).toHaveCount(0);
       expect(row(base + 1)).toBe("-|true|true|81250");
+      // The bot sends it again (a re-sync): it stays set aside, off Tag spend.
+      expect((await bot({ action: "add", expense: zelle(base + 1, "E2E Overhead") })).status()).toBe(200);
+      expect(row(base + 1)).toBe("-|true|true|81250");
+      await page.reload();
+      await expect(page.getByTestId("tag-spend-zelle-note")).toContainText("A Zelle payment is not counted in job cost");
+      await expect(other).toHaveCount(0);
+
+      // "Paid a bill": set aside too (its bill is counted in Payables), and said why.
+      await bot({ action: "add", expense: zelle(base + 5, "E2E Sub Paid") });
+      await page.reload();
+      const paidBill = page.getByTestId(`tag-expense-z-${base + 5}-1`);
+      await paidBill.getByRole("combobox").selectOption("__bill__");
+      await paidBill.getByRole("button", { name: "Save" }).click();
+      await expect(paidBill).toHaveCount(0);
+      expect(row(base + 5)).toBe("-|true|true|81250");
+      expect(sql(`select meta->>'setAside' from public.purchases where source_key = 'expense:z-${base + 5}:1'`)).toBe("paid_bill");
 
       // The bot's text answers: "Z<n> Jury Materials" links through the alias; "Z<n> dismiss" sets aside.
       await bot({ action: "add", expense: zelle(base + 2, "E2E Texted") });
@@ -69,6 +85,9 @@ test.describe("Old Expenses: one spend ledger", () => {
       expect(row(base + 2)).toBe(`${JOB}|false|-|81250`);
       await bot({ action: "add", expense: zelle(base + 3, "E2E Dismissed") });
       expect((await bot({ action: "dismiss", n: base + 3, via: "text" })).status()).toBe(200);
+      expect(row(base + 3)).toBe("-|false|true|81250");
+      // Sent again after the dismissal: still dismissed.
+      expect((await bot({ action: "add", expense: zelle(base + 3, "E2E Dismissed") })).status()).toBe(200);
       expect(row(base + 3)).toBe("-|false|true|81250");
       expect((await bot({ action: "dismiss", n: base + 7 })).status()).toBe(404);
 
