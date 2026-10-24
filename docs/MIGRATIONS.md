@@ -94,7 +94,8 @@ writes them; the owner approved its trigger on `client_contacts` on
 instead of the copied details). The site before it keeps working, since the
 mirrors are the same columns. Check it with `select count(*) from
 information_schema.columns where table_name = 'jobs' and column_name =
-'contact_id'` (1).
+'contact_id'` (1). `supabase/checks/0056_jobs_client_mirror.sql` checks the job
+mirror and the link pass against scratch tables and rolls back.
 0057 only widens `documents_kind_check` to allow kind 'agreement'. Apply it
 before the site change that drafts agreements on the job; until then that
 draft fails on the check and nothing else changes. Check it with

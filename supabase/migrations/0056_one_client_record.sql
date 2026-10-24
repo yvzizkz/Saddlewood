@@ -47,10 +47,15 @@ begin
     if c.client_id is distinct from new.client_id then
       -- A contact belongs to one client; a job moved to another client drops it.
       new.contact_id := null;
-    else
-      -- Only what the record has: an empty one keeps what the job had.
+    elsif tg_op = 'UPDATE' and new.contact_id = old.contact_id then
+      -- Same person: only what the record has; an empty one keeps the job's.
       new.client_email := coalesce(nullif(c.email, ''), new.client_email);
       new.client_phone := coalesce(nullif(c.phone, ''), new.client_phone);
+    else
+      -- A new job or another person: the record's details, never the last
+      -- person's left behind.
+      new.client_email := nullif(c.email, '');
+      new.client_phone := nullif(c.phone, '');
     end if;
   end if;
   return new;
@@ -62,7 +67,7 @@ create trigger jobs_client_mirror before insert or update on public.jobs
 
 -- The opportunity's mirror of its contact (company stays as typed). Only the
 -- record's non-empty values are copied: an empty one keeps what was typed.
--- The site unlinks a lead whose typed name or phone differs from the record
+-- The site unlinks a lead whose typed name, email or phone differs from the record
 -- (src/lib/clients/contacts.ts linkableContact), so nothing typed is put back.
 create or replace function public.opportunities_contact_mirror() returns trigger
 language plpgsql as $$
@@ -160,14 +165,22 @@ begin
   get diagnostics n_opps_contact = row_count;
 
   -- 4. A job takes its opportunity's contact, else the client's contact its email names.
+  --    Linking a job copies the record's email and phone, empty ones too
+  --    (jobs_client_mirror), so it links only where that loses nothing the
+  --    job has: the record has the value, or the job has none.
   update public.jobs j set contact_id = o.contact_id
-    from public.sales_opportunities o
-   where o.job_id = j.id and j.contact_id is null and o.contact_id is not null and o.client_id = j.client_id;
+    from public.sales_opportunities o, public.client_contacts cc
+   where o.job_id = j.id and j.contact_id is null and o.contact_id is not null and o.client_id = j.client_id
+     and cc.id = o.contact_id
+     and (cc.email <> '' or nullif(btrim(j.client_email), '') is null)
+     and (cc.phone <> '' or nullif(btrim(j.client_phone), '') is null);
   get diagnostics n_jobs_from_opp = row_count;
-  update public.jobs
-     set contact_id = public.client_contact_match(client_id, '', client_email)
-   where client_id is not null and contact_id is null and nullif(btrim(client_email), '') is not null
-     and public.client_contact_match(client_id, '', client_email) is not null;
+  update public.jobs j
+     set contact_id = cc.id
+    from public.client_contacts cc
+   where j.client_id is not null and j.contact_id is null and nullif(btrim(j.client_email), '') is not null
+     and cc.id = public.client_contact_match(j.client_id, '', j.client_email)
+     and (cc.phone <> '' or nullif(btrim(j.client_phone), '') is null);
   get diagnostics n_jobs_contact = row_count;
 
   return jsonb_build_object('jobs_linked_to_client', n_jobs_client, 'opportunities_linked_to_client', n_opps_client,
