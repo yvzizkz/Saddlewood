@@ -136,7 +136,11 @@ export function TagSpend({ rows, count, jobs }: { rows: UntaggedSpend[]; count: 
       const res = await fetch("/api/accounting/purchases", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(val === "__ignore__" ? { action: "set_aside", sourceKeys: [key] } : { action: "assign_job", sourceKeys: [key], jobId: val }),
+        body: JSON.stringify(
+          val === "__ignore__" || val === "__bill__"
+            ? { action: "set_aside", sourceKeys: [key], reason: val === "__bill__" ? "paid_bill" : "not_a_job" }
+            : { action: "assign_job", sourceKeys: [key], jobId: val },
+        ),
       });
       if (res.ok) start(() => router.refresh());
       else setError("Could not save that; try again.");
@@ -158,6 +162,9 @@ export function TagSpend({ rows, count, jobs }: { rows: UntaggedSpend[]; count: 
         </div>
         <p className="text-xs text-[var(--color-charcoal-light)]">Zelle payments and receipts land here until they are on a job.</p>
       </div>
+      <p className="mt-1 text-xs text-[var(--color-charcoal-light)]" data-testid="tag-spend-zelle-note">
+        A Zelle payment is not counted in job cost: what it paid is counted from its bill in Payables. Pick &ldquo;Paid a bill&rdquo; for one that paid a sub or vendor bill.
+      </p>
       {error ? <p className="mt-2 text-sm text-[#9a2a1f]">{error}</p> : null}
       <ul className="mt-3 divide-y divide-[var(--color-stone)]">
         {rows.map((r) => {
@@ -193,6 +200,7 @@ export function TagSpend({ rows, count, jobs }: { rows: UntaggedSpend[]; count: 
                     </option>
                   ))}
                   <option value="__ignore__">Not a job (overhead, personal)</option>
+                  <option value="__bill__">Paid a bill (counted in Payables)</option>
                 </select>
                 <button
                   type="button"

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeOps } from '@/lib/ops/auth';
 import { withSignToken } from '@/lib/contracts/link';
-import { getContractsState, updateContract } from '@/lib/contracts/store';
+import { ContractTermsError, getContractsState, updateContract } from '@/lib/contracts/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,7 +58,7 @@ export async function PATCH(
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: (err as Error).message },
-      { status: 500 }
+      { status: err instanceof ContractTermsError ? 409 : 500 }
     );
   }
 }

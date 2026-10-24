@@ -17,6 +17,7 @@ function from(table: string) {
     select: () => b,
     update: (p: Row) => ((patch = p), b),
     eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), b),
+    neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), b),
     is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), b),
     limit: () => b,
     maybeSingle: async () => {
@@ -31,16 +32,17 @@ function from(table: string) {
 
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({ from }) }));
 
-import { updateDraft } from "../documents";
+import { claimForSend, issueDocument, updateDraft } from "../documents";
 
 const DRAW = "d0000000-0000-4000-8000-000000000001";
 const PLAIN = "d0000000-0000-4000-8000-000000000002";
 const doc = (id: string) => ({ id, kind: "invoice", status: "draft", token: null, number: id === DRAW ? "3526-09" : "3526-10", title: "Draft", snapshot: { lines: [{ description: "Framing", amountCents: 825_000 }] }, total_cents: 825_000, job_id: "j1", client_id: "c1" });
+const AGREEMENT = "d0000000-0000-4000-8000-000000000003";
 const SNAP = { lines: [{ description: "Framing", amountCents: 500_000 }] } as never;
 
 beforeEach(() => {
   db.tables = {
-    documents: [doc(DRAW), doc(PLAIN)],
+    documents: [doc(DRAW), doc(PLAIN), { ...doc(AGREEMENT), kind: "agreement", number: "3526-AGR" }],
     sov_progress: [{ id: 1, document_id: DRAW, line_key: "sov:0", amount_cents: 825_000 }],
   };
 });
@@ -61,5 +63,14 @@ describe("updateDraft on a progress draw", () => {
   it("leaves an ordinary draft editable", async () => {
     await updateDraft(PLAIN, { snapshot: SNAP });
     expect(db.tables.documents[1].total_cents).toBe(500_000);
+  });
+});
+
+describe("an agreement in Billing", () => {
+  it("can't be edited, held for a send or issued there: it is made on its job", async () => {
+    await expect(updateDraft(AGREEMENT, { snapshot: SNAP })).rejects.toMatchObject({ status: 409, message: "an agreement is drafted and issued on its job" });
+    await expect(claimForSend(AGREEMENT)).rejects.toMatchObject({ status: 409, message: "an agreement is drafted and issued on its job" });
+    await expect(issueDocument(AGREEMENT, "marco@x")).rejects.toMatchObject({ status: 409, message: "an agreement is drafted and issued on its job" });
+    expect(db.tables.documents[2]).toMatchObject({ status: "draft", token: null, total_cents: 825_000 });
   });
 });

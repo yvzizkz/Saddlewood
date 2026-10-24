@@ -19,6 +19,7 @@ export const KIND_LABEL: Record<DocumentKind, string> = {
   invoice: "Invoice",
   statement: "Statement",
   notice: "Notice",
+  agreement: "Agreement",
 };
 
 

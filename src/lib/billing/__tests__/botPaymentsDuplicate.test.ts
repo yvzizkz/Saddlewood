@@ -8,11 +8,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type Row = Record<string, unknown>;
 const { db } = vi.hoisted(() => ({ db: { tables: {} as Record<string, Row[]>, seq: 0 } }));
 
+/** One PostgREST .or() term: col.eq.v, col.not.is.null, col.in.(a,b). */
+function orTerm(t: string): (r: Row) => boolean {
+  const m = /^(\w+)\.(eq\.(.*)|not\.is\.null|in\.\((.*)\))$/.exec(t);
+  if (!m) throw new Error(`stand-in: unknown or() term ${t}`);
+  const [, c, op, eq, list] = m;
+  if (op === "not.is.null") return (r) => r[c] != null;
+  if (eq !== undefined) return (r) => String(r[c]) === eq;
+  const vs = list.split(",");
+  return (r) => vs.includes(String(r[c]));
+}
+
 function from(table: string) {
   const filters: ((r: Row) => boolean)[] = [];
   let patch: Row | null = null;
   let inserted: Row[] | null = null;
   let order: { col: string; asc: boolean } | null = null;
+  let offset = 0;
   let limit = Infinity;
   const rows = () => (db.tables[table] ??= []);
   const run = (): Row[] => {
@@ -26,7 +38,7 @@ function from(table: string) {
       const { col, asc } = order;
       out = [...out].sort((a, b) => String(a[col]).localeCompare(String(b[col])) * (asc ? 1 : -1));
     }
-    return out.slice(0, limit).map((r) => ({ ...r }));
+    return out.slice(offset, offset + limit).map((r) => ({ ...r }));
   };
   const b = {
     select: () => b,
@@ -36,7 +48,14 @@ function from(table: string) {
     gte: (c: string, v: string) => (filters.push((r) => String(r[c]) >= v), b),
     lte: (c: string, v: string) => (filters.push((r) => String(r[c]) <= v), b),
     like: (c: string, pat: string) => (filters.push((r) => String(r[c]).startsWith(pat.replace(/%$/, ""))), b),
+    // The deposit watch reads its candidate invoices with .or() a page at a time (#46).
+    or: (expr: string) => {
+      const terms = expr.split(/,(?![^(]*\))/).map(orTerm);
+      filters.push((r) => terms.some((f) => f(r)));
+      return b;
+    },
     order: (col: string, o?: { ascending?: boolean }) => ((order = { col, asc: o?.ascending !== false }), b),
+    range: (f: number, t: number) => ((offset = f), (limit = t - f + 1), b),
     limit: (n: number) => ((limit = n), b),
     update: (p: Row) => ((patch = p), b),
     insert: (input: Row | Row[]) => {

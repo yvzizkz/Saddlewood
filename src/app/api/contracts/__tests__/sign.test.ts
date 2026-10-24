@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { getContractsStateMock, updateContractMock, session } = vi.hoisted(() => ({
+const { getContractsStateMock, signContractMock, session } = vi.hoisted(() => ({
   getContractsStateMock: vi.fn(),
-  updateContractMock: vi.fn(),
+  signContractMock: vi.fn(),
   session: { user: null as null | { email: string; app_metadata?: Record<string, unknown> } },
 }));
 
 vi.mock('@/lib/contracts/store', () => ({
   getContractsState: getContractsStateMock,
-  updateContract: updateContractMock,
+  signContract: signContractMock,
+  SIGNATURE_MARK: 'DIGITALLY SIGNED & EXECUTED',
 }));
 
 // Who is signed in, as far as the server client can tell. null is a visitor.
@@ -60,15 +61,15 @@ describe('the signing link', () => {
     vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', SERVER_KEY);
     session.user = null;
     getContractsStateMock.mockReset();
-    updateContractMock.mockReset();
+    signContractMock.mockReset();
     getContractsStateMock.mockResolvedValue({
       contracts: [contract(1, 'draft'), contract(2, 'under_review'), contract(3, 'signed')],
       next_number: 4,
       lastUpdated: '2026-09-24T18:00:00Z',
     });
-    updateContractMock.mockImplementation(async (id: string, updates: Partial<ContractItem>) => ({
-      ...contract(Number(id.slice(-1)), 'draft'),
-      ...updates,
+    signContractMock.mockImplementation(async (id: string, s: { signerName: string }) => ({
+      contract: { ...contract(Number(id.slice(-1)), 'signed'), signed_by: s.signerName },
+      already: false,
     }));
   });
 
@@ -154,7 +155,7 @@ describe('the signing link', () => {
       async (guess) => {
         const res = await POST(signing(guess), params(guess));
         expect(res.status).toBe(404);
-        expect(updateContractMock).not.toHaveBeenCalled();
+        expect(signContractMock).not.toHaveBeenCalled();
       }
     );
 
@@ -164,8 +165,8 @@ describe('the signing link', () => {
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.ok).toBe(true);
-      expect(updateContractMock.mock.calls[0][0]).toBe('cnt-001');
-      expect(updateContractMock.mock.calls[0][1]).toMatchObject({ status: 'signed', signed_by: 'Pat Client' });
+      expect(signContractMock.mock.calls[0][0]).toBe('cnt-001');
+      expect(signContractMock.mock.calls[0][1]).toMatchObject({ signerName: 'Pat Client' });
     });
 
     it('does not sign twice', async () => {
@@ -174,7 +175,7 @@ describe('the signing link', () => {
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.message).toBe('Contract is already signed.');
-      expect(updateContractMock).not.toHaveBeenCalled();
+      expect(signContractMock).not.toHaveBeenCalled();
     });
   });
 });

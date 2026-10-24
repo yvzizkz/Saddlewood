@@ -37,6 +37,7 @@ site change that reads them with the server key must be live first.
 | 0054 | `bot_payments` (before the site change) | cleanup PR |
 | 0055 | `typed_contract_sov` (right before the deploy; re-run the move after) | cleanup PR |
 | 0056 | `one_client_record` (before the site change; owner-approved 2026-10-23) | T119 PR |
+| 0057 | `agreement_documents` (before the site change; 0056 is held for T119) | T112 PR |
 
 ## Production state
 
@@ -94,6 +95,11 @@ instead of the copied details). The site before it keeps working, since the
 mirrors are the same columns. Check it with `select count(*) from
 information_schema.columns where table_name = 'jobs' and column_name =
 'contact_id'` (1).
+0057 only widens `documents_kind_check` to allow kind 'agreement'. Apply it
+before the site change that drafts agreements on the job; until then that
+draft fails on the check and nothing else changes. Check it with
+`select pg_get_constraintdef(oid) from pg_constraint where conname =
+'documents_kind_check'` (lists 'agreement').
 
 ## Rules
 

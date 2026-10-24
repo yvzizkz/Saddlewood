@@ -38,6 +38,16 @@ export type JobTotals = {
   subsCents: number;
 };
 
+/**
+ * A purchases line that counts as the job's materials. Not one set aside, and
+ * not a Zelle payment: the subs and crew paid by Zelle are in Payables
+ * already (0031: their bills, the Zelle bill payments, reimbursements), so
+ * counting the payment too would count the bill twice.
+ */
+export function isMaterialCost(r: { ignored: boolean; source: string }): boolean {
+  return !r.ignored && r.source !== "zelle";
+}
+
 export const CATEGORY_LABEL: Record<CostLine["category"], string> = { labor: "Labor", materials: "Materials", subs: "Subs and vendors" };
 
 export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lines: CostLine[]; jobs: JobTotals[]; laborWithoutRate: number; payablesMissing: boolean; capped: boolean }> {
@@ -76,7 +86,7 @@ export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lin
     lines.push({ id: `l${r.id}`, day: r.day, jobKey: k.key, job: k.name, category: "labor", trade: r.trade, tradeLabel: r.tradeLabel, cents: r.costCents, href: `/app/accounting/payroll/entry/${r.id}`, label: `${r.person}, ${r.day}` });
   }
   for (const r of purchases.rows) {
-    if (r.ignored) continue;
+    if (!isMaterialCost(r)) continue;
     const k = keyOf(r.billingJobId, r.rawJobId);
     lines.push({ id: `p${r.id}`, day: r.purchasedOn, jobKey: k.key, job: k.name, category: "materials", trade: r.trade, tradeLabel: r.tradeLabel, cents: r.lineTotalCents, href: `/app/accounting/purchases/trip/${encodeURIComponent(r.tripKey)}`, label: `${r.vendor}: ${r.description}` });
   }

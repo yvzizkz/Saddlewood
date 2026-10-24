@@ -1,55 +1,32 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   FileText,
   Shield,
   ShieldCheck,
   CheckCircle2,
-  Clock,
-  Plus,
   Copy,
   Printer,
-  ChevronRight,
   AlertTriangle,
   Building,
-  DollarSign,
   Layers,
   Scale,
   RefreshCw,
   X,
   FileCheck,
-  Send,
   ExternalLink,
 } from 'lucide-react';
-import type { ContractItem, ContractStatus, ContractType, DraftContractInput } from '@/lib/contracts/types';
-import { generateContractText } from '@/lib/contracts/generator';
+import type { ContractItem, ContractStatus } from '@/lib/contracts/types';
 
 export default function ContractsPortalPage() {
   const [contracts, setContracts] = useState<ContractItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'draft'>('pipeline');
   const [statusFilter, setStatusFilter] = useState<'all' | ContractStatus>('all');
   const [viewingContract, setViewingContract] = useState<ContractItem | null>(null);
   const [copied, setCopied] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-
-  // Form State for New Contract
-  const [formData, setFormData] = useState<DraftContractInput>({
-    client_name: '',
-    client_entity: '',
-    project_name: '',
-    project_address: '',
-    amount: 45000,
-    deposit: 4500,
-    scope: 'Structural framing, drywall hung/taped Level 4, and HVAC equipment coordination',
-    scope_details: '',
-    type: 'prime_residential',
-    warranty_years: 2,
-    late_interest: '1.5% per month (18% per annum)',
-    remobilization_fee: 1500,
-  });
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToast({ text, type });
@@ -109,60 +86,6 @@ export default function ContractsPortalPage() {
     }
   };
 
-  const handleApplyPreset = (preset: {
-    client_name: string;
-    project_address: string;
-    amount: number;
-    scope: string;
-    scope_details: string;
-    type: ContractType;
-  }) => {
-    setFormData({
-      ...formData,
-      client_name: preset.client_name,
-      project_address: preset.project_address,
-      amount: preset.amount,
-      deposit: preset.amount * 0.1,
-      scope: preset.scope,
-      scope_details: preset.scope_details,
-      type: preset.type,
-      warranty_years: preset.type === 'prime_residential' ? 2 : 1,
-    });
-    showToast(`Loaded ${preset.client_name} preset`);
-  };
-
-  const handleSubmitDraft = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.client_name || !formData.amount || !formData.scope) {
-      showToast('Please provide client name, amount, and scope', 'error');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      const res = await fetch('/api/contracts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        setContracts((prev) => [json.contract, ...prev]);
-        showToast(`Agreement ${json.contract.contract_number} drafted successfully! 🎉`);
-        setActiveTab('pipeline');
-        setViewingContract(json.contract);
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Failed to draft agreement', 'error');
-      }
-    } catch {
-      showToast('Network error while drafting agreement', 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const filteredContracts = contracts.filter((c) => {
     if (statusFilter === 'all') return true;
     return c.status === statusFilter;
@@ -218,22 +141,13 @@ export default function ContractsPortalPage() {
             <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
             Sync
           </button>
-          <button
-            onClick={() => setActiveTab(activeTab === 'draft' ? 'pipeline' : 'draft')}
+          <Link
+            href="/app/jobs"
             className="flex items-center gap-1.5 px-4 py-2 rounded bg-[var(--color-teal)] text-white text-xs font-medium hover:opacity-90 shadow-sm transition-all"
           >
-            {activeTab === 'draft' ? (
-              <>
-                <FileText className="size-3.5" />
-                View Pipeline
-              </>
-            ) : (
-              <>
-                <Plus className="size-3.5" />
-                Draft New Agreement
-              </>
-            )}
-          </button>
+            <FileText className="size-3.5" />
+            Agreements are drafted on the job
+          </Link>
         </div>
       </div>
 
@@ -306,32 +220,13 @@ export default function ContractsPortalPage() {
 
       {/* Main Tabs */}
       <div className="flex border-b border-[var(--color-stone)] mb-6">
-        <button
-          onClick={() => setActiveTab('pipeline')}
-          className={`pb-3 px-4 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${
-            activeTab === 'pipeline'
-              ? 'border-[var(--color-teal)] text-[var(--color-teal)]'
-              : 'border-transparent text-[var(--color-charcoal-light)] hover:text-[var(--color-charcoal)]'
-          }`}
-        >
+        <div className="pb-3 px-4 text-sm font-medium border-b-2 flex items-center gap-2 border-[var(--color-teal)] text-[var(--color-teal)]">
           <Layers className="size-4" />
           Active Pipeline ({contracts.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('draft')}
-          className={`pb-3 px-4 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${
-            activeTab === 'draft'
-              ? 'border-[var(--color-teal)] text-[var(--color-teal)]'
-              : 'border-transparent text-[var(--color-charcoal-light)] hover:text-[var(--color-charcoal)]'
-          }`}
-        >
-          <Plus className="size-4" />
-          Draft New Agreement
-        </button>
+        </div>
       </div>
 
       {/* TAB 1: PIPELINE */}
-      {activeTab === 'pipeline' && (
         <div>
           {/* Status Filter Bar */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -460,229 +355,6 @@ export default function ContractsPortalPage() {
             </div>
           )}
         </div>
-      )}
-
-      {/* TAB 2: DRAFT NEW CONTRACT */}
-      {activeTab === 'draft' && (
-        <div className="bg-white rounded-xl border border-[var(--color-stone)] p-4 md:p-6 shadow-sm">
-          {/* Quick Presets */}
-          <div className="mb-6 p-4 rounded-lg bg-[var(--color-cream)]/60 border border-[var(--color-stone)]">
-            <div className="text-xs font-bold text-[var(--color-charcoal)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Sparkles className="size-3.5 text-[var(--color-gold-accessible)]" />
-              Quick Scope & Project Presets
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  handleApplyPreset({
-                    client_name: 'Mark & Heather Powell',
-                    project_address: '3526 Emerson St, San Diego CA 92106',
-                    amount: 45000,
-                    scope: 'Structural framing, drywall hung/taped Level 4, and HVAC equipment coordination',
-                    scope_details: 'Includes addition framing, structural headers, drywall hung & finished to Level 4 smooth, multi-zone heat pump coordination.',
-                    type: 'prime_residential',
-                  })
-                }
-                className="p-2.5 text-left rounded border border-[var(--color-stone)] bg-white hover:border-[var(--color-teal)] text-xs transition-all"
-              >
-                <div className="font-semibold text-[var(--color-charcoal)]">Powell Residence</div>
-                <div className="text-[11px] text-[var(--color-charcoal-light)]">Framing & Drywall · $45,000</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleApplyPreset({
-                    client_name: 'North Lane Medical Group',
-                    project_address: '7401 E North Lane, Scottsdale AZ 85258',
-                    amount: 32000,
-                    scope: 'Commercial TI: metal stud framing, sound-rated drywall assemblies, and rooftop HVAC RTU installation coordination',
-                    scope_details: 'Metal stud partitions, double-layer Type X drywall with resilient channels and sound batts, rooftop unit placement coordination.',
-                    type: 'prime_commercial',
-                  })
-                }
-                className="p-2.5 text-left rounded border border-[var(--color-stone)] bg-white hover:border-[var(--color-teal)] text-xs transition-all"
-              >
-                <div className="font-semibold text-[var(--color-charcoal)]">North Lane TI</div>
-                <div className="text-[11px] text-[var(--color-charcoal-light)]">Commercial HVAC & Framing · $32,000</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleApplyPreset({
-                    client_name: 'Billy Boy Drywall Finishes',
-                    project_address: '6602 N 40th St, Phoenix AZ 85018',
-                    amount: 18500,
-                    scope: 'Subcontract trade work: tape, bed, and Level 4 drywall texture finish',
-                    scope_details: 'Furnish finishing labor and taping mud to finish 14,200 SF of drywall to Level 4 smooth finish.',
-                    type: 'subcontractor',
-                  })
-                }
-                className="p-2.5 text-left rounded border border-[var(--color-stone)] bg-white hover:border-[var(--color-teal)] text-xs transition-all"
-              >
-                <div className="font-semibold text-[var(--color-charcoal)]">Subcontractor Agreement</div>
-                <div className="text-[11px] text-[var(--color-charcoal-light)]">Finishing Labor · $18,500</div>
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmitDraft} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-[var(--color-charcoal)] mb-1">
-                  Agreement Type
-                </label>
-                <select
-                  value={formData.type}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      type: e.target.value as ContractType,
-                      warranty_years: e.target.value === 'prime_residential' ? 2 : 1,
-                    })
-                  }
-                  className="w-full text-sm p-2.5 rounded border border-[var(--color-stone)] bg-white focus:outline-none focus:border-[var(--color-teal)]"
-                >
-                  <option value="prime_residential">Prime Residential Agreement</option>
-                  <option value="prime_commercial">Prime Commercial Agreement</option>
-                  <option value="subcontractor">Subcontractor Trade Agreement</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[var(--color-charcoal)] mb-1">
-                  Client / Trade Partner Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mark & Heather Powell"
-                  value={formData.client_name}
-                  onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
-                  className="w-full text-sm p-2.5 rounded border border-[var(--color-stone)] bg-white focus:outline-none focus:border-[var(--color-teal)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[var(--color-charcoal)] mb-1">
-                  Legal Entity (if different)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Powell Family Trust LLC"
-                  value={formData.client_entity}
-                  onChange={(e) => setFormData({ ...formData, client_entity: e.target.value })}
-                  className="w-full text-sm p-2.5 rounded border border-[var(--color-stone)] bg-white focus:outline-none focus:border-[var(--color-teal)]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-[var(--color-charcoal)] mb-1">
-                  Jobsite / Project Location *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 3526 Emerson St, San Diego CA 92106"
-                  value={formData.project_address}
-                  onChange={(e) => setFormData({ ...formData, project_address: e.target.value })}
-                  className="w-full text-sm p-2.5 rounded border border-[var(--color-stone)] bg-white focus:outline-none focus:border-[var(--color-teal)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[var(--color-charcoal)] mb-1">
-                  Contract Amount ($) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="100"
-                  value={formData.amount}
-                  onChange={(e) => {
-                    const amt = Number(e.target.value);
-                    setFormData({ ...formData, amount: amt, deposit: amt * 0.1 });
-                  }}
-                  className="w-full text-sm p-2.5 rounded border border-[var(--color-stone)] bg-white font-mono focus:outline-none focus:border-[var(--color-teal)]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[var(--color-charcoal)] mb-1">
-                Specified Work Scope *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Framing, drywall hung/finished Level 4, and HVAC equipment coordination"
-                value={formData.scope}
-                onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
-                className="w-full text-sm p-2.5 rounded border border-[var(--color-stone)] bg-white focus:outline-none focus:border-[var(--color-teal)]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[var(--color-charcoal)] mb-1">
-                Scope Breakdown / Inclusions / Details
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Itemized breakdown of framing members, drywall layers, specific HVAC units, etc."
-                value={formData.scope_details}
-                onChange={(e) => setFormData({ ...formData, scope_details: e.target.value })}
-                className="w-full text-sm p-2.5 rounded border border-[var(--color-stone)] bg-white focus:outline-none focus:border-[var(--color-teal)]"
-              />
-            </div>
-
-            {/* Active Protection Toggles Note */}
-            <div className="p-3.5 rounded-lg border border-teal-200 bg-teal-50/50">
-              <div className="text-xs font-bold text-teal-900 mb-1 flex items-center gap-1.5">
-                <ShieldCheck className="size-4 text-teal-700" />
-                Active Legal Safeguards Automatically Embedded
-              </div>
-              <ul className="text-xs text-teal-800 space-y-1 list-disc list-inside">
-                <li><strong>Section 4:</strong> Absolute HVAC / Manufacturer equipment defect disclaimer (zero delay or secondary liability).</li>
-                <li><strong>Section 3:</strong> 1.5%/month late interest, 5-day Notice of Intent to Suspend, $1,500 remobilization fee, 100% legal fees.</li>
-                <li><strong>Section 6:</strong> 100% written change order mandate; 50% deposit on COs ≥ $5,000; 20% OH&P markup.</li>
-                <li><strong>Section 7:</strong> AZ A.R.S. § 33-992.01 20-Day Preliminary Lien Notice statutory disclosure & waiver exchange.</li>
-              </ul>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--color-stone)]">
-              <button
-                type="button"
-                onClick={() => setActiveTab('pipeline')}
-                className="px-4 py-2 rounded text-sm text-[var(--color-charcoal)] hover:bg-[var(--color-cream)] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-5 py-2.5 rounded bg-[var(--color-teal)] text-white text-sm font-semibold hover:opacity-90 shadow-sm flex items-center gap-2 transition-all"
-              >
-                {submitting ? (
-                  <>
-                    <RefreshCw className="size-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <FileCheck className="size-4" />
-                    Generate & Save Contract
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* MODAL: VIEW / PRINT / COPY CONTRACT */}
       {viewingContract && (
@@ -797,17 +469,5 @@ export default function ContractsPortalPage() {
         </div>
       )}
     </div>
-  );
-}
-
-function Sparkles({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-      <path d="M5 3v4" />
-      <path d="M19 17v4" />
-      <path d="M3 5h4" />
-      <path d="M17 19h4" />
-    </svg>
   );
 }

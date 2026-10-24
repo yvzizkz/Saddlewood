@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { ContractDashboardState, ContractItem, DraftContractInput } from './types';
-import { generateContractText } from './generator';
+import { SEED_TEXTS } from './seedTexts';
 
 const CONTRACTS_STATE_ID = 'contracts-state';
 const LOCAL_BOT_CONTRACTS_PATH = '/Users/landos/dev/Saddlewood-KB/bot/contracts_state.json';
@@ -99,9 +99,9 @@ const SEED_CONTRACTS: ContractItem[] = [
   },
 ];
 
-// Initialize seed contract texts
+// The seed agreements' words, as the retired generator wrote them (seedTexts.ts).
 for (const sc of SEED_CONTRACTS) {
-  sc.contract_text = generateContractText(sc, sc.contract_number);
+  sc.contract_text = SEED_TEXTS[sc.contract_number] ?? '';
 }
 
 function readLocalBotState(): Partial<ContractDashboardState> | null {
@@ -157,7 +157,8 @@ export async function getContractsState(): Promise<ContractDashboardState> {
 
   let contracts: ContractItem[] = state.contracts || [];
   if (contracts.length === 0) {
-    contracts = localContracts.length > 0 ? localContracts : SEED_CONTRACTS;
+    // A copy: a save must never change the seed rows held in memory.
+    contracts = localContracts.length > 0 ? localContracts : structuredClone(SEED_CONTRACTS);
   } else if (localContracts.length > 0) {
     const existingIds = new Set(contracts.map((c) => c.id || c.contract_number));
     for (const lc of localContracts) {
@@ -168,11 +169,9 @@ export async function getContractsState(): Promise<ContractDashboardState> {
     }
   }
 
-  // Ensure all contracts have valid text and protections
+  // Ensure all contracts have protections. Their words are never written
+  // here: the bot (contract.py) or the job (src/lib/agreements) writes them.
   for (const c of contracts) {
-    if (!c.contract_text) {
-      c.contract_text = generateContractText(c, c.contract_number);
-    }
     if (!c.protections) {
       c.protections = {
         manufacturerDefectCarveOut: true,
@@ -223,70 +222,10 @@ export async function saveContractsState(
   return state;
 }
 
-export async function draftContract(
-  input: DraftContractInput,
-  actor = 'bot'
-): Promise<ContractItem> {
-  const state = await getContractsState();
-  const n = state.next_number || state.contracts.length + 1;
-  const contractId = `cnt-${String(n).padStart(3, '0')}`;
-  const contractNo = `SWC-${new Date().getFullYear()}-${String(n).padStart(3, '0')}`;
-  const contractType = input.type || 'prime_residential';
-  const amount = Number(input.amount || 0);
-  const deposit = input.deposit !== undefined ? Number(input.deposit) : amount * 0.1;
+/** The fields an agreement's words are made from: once drafted, they change only by drafting it again. */
+const TERM_FIELDS = ['type', 'client_name', 'client_entity', 'project_name', 'project_address', 'amount', 'deposit', 'scope', 'scope_details', 'warranty_years', 'late_interest', 'remobilization_fee', 'date', 'contract_text'] as const;
 
-  const newContract: ContractItem = {
-    id: contractId,
-    n,
-    contract_number: contractNo,
-    type: contractType,
-    client_name: input.client_name,
-    client_entity: input.client_entity || input.client_name,
-    project_name:
-      input.project_name ||
-      (contractType === 'prime_residential'
-        ? `${input.client_name} Residence`
-        : `${input.client_name} Project`),
-    project_address: input.project_address,
-    amount,
-    deposit,
-    scope: input.scope,
-    scope_details: input.scope_details || '',
-    warranty_years:
-      input.warranty_years !== undefined
-        ? input.warranty_years
-        : contractType === 'prime_residential'
-          ? 2
-          : 1,
-    late_interest: input.late_interest || '1.5% per month (18% per annum)',
-    remobilization_fee:
-      input.remobilization_fee !== undefined ? Number(input.remobilization_fee) : 1500.0,
-    date: new Date().toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    }),
-    status: 'draft',
-    created_by: actor || input.created_by || 'Lando',
-    created_at: new Date().toISOString(),
-    contract_text: '',
-    protections: {
-      manufacturerDefectCarveOut: true,
-      latePaymentPenalties: true,
-      zeroVerbalChangeOrders: true,
-      preliminaryLienNotice: true,
-      limitedWorkmanshipWarranty: true,
-    },
-  };
-
-  newContract.contract_text = generateContractText(newContract, contractNo);
-
-  state.contracts.push(newContract);
-  state.next_number = n + 1;
-  await saveContractsState(state, actor);
-
-  return newContract;
-}
+export class ContractTermsError extends Error {}
 
 export async function updateContract(
   id: string,
@@ -311,17 +250,50 @@ export async function updateContract(
     updated.signed_by = actor;
   }
 
-  // Re-generate text if terms changed
-  if (
-    updates.amount !== undefined ||
-    updates.scope !== undefined ||
-    updates.client_name !== undefined ||
-    updates.project_address !== undefined
-  ) {
-    updated.contract_text = generateContractText(updated, updated.contract_number);
+  // Its words would no longer match: the terms change by drafting it again,
+  // on the job or through the bot (T112; the site's generator is retired).
+  const changed = TERM_FIELDS.filter((k) => updates[k] !== undefined && updates[k] !== current[k]);
+  if (changed.length) {
+    throw new ContractTermsError(`${changed.join(', ')} can't change on a drafted agreement; draft it again on the job`);
   }
 
   state.contracts[index] = updated;
   await saveContractsState(state, actor);
   return updated;
+}
+
+/** What a client's signature adds to the agreement's words (POST /api/contracts/<id>/sign). */
+export const SIGNATURE_MARK = 'DIGITALLY SIGNED & EXECUTED';
+
+/**
+ * A client signs: the status, who signed and when, and the signature block
+ * appended to its words, in one save. The only change to contract_text the
+ * terms check lets through, and only the sign route calls it: the words
+ * before the block stay exactly as drafted. Signing twice changes nothing.
+ * -> null when there is no such contract.
+ */
+export async function signContract(
+  id: string,
+  signing: { signerName: string; at: Date; block: string },
+  actor: string
+): Promise<{ contract: ContractItem; already: boolean } | null> {
+  const state = await getContractsState();
+  const index = state.contracts.findIndex((c) => c.id === id);
+  if (index === -1) return null;
+  const current = state.contracts[index];
+  if (current.status === 'signed') return { contract: current, already: true };
+  if (!signing.block.includes(SIGNATURE_MARK)) throw new Error('a signature block must carry the signature mark');
+
+  const text = current.contract_text ?? '';
+  const updated: ContractItem = {
+    ...current,
+    status: 'signed',
+    signed_by: signing.signerName,
+    signed_at: signing.at.toISOString(),
+    contract_text: text.includes(SIGNATURE_MARK) ? text : text + signing.block,
+    updated_at: new Date().toISOString(),
+  };
+  state.contracts[index] = updated;
+  await saveContractsState(state, actor);
+  return { contract: updated, already: false };
 }
