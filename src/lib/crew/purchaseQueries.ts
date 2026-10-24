@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { readAll } from "@/lib/supabase/paged";
 import type { SearchMode, SearchRow } from "./purchaseSearch";
 import {
   FLAG_LOOKBACK_DAYS,
@@ -169,21 +170,37 @@ export async function upsertPurchases(rows: PurchaseRow[]): Promise<number> {
  * longer holds. A covered trip on no job (and not set by hand) takes the job
  * the receipt was filed under. -> how many marks were set and cleared, and
  * how many trip lines got a job.
+ *
+ * Every line of those days is read, a page at a time (PostgREST returns at
+ * most max_rows per request): a trip cut short would total wrong, miss its
+ * receipt, and clear a mark that holds. If a read hits readAll's cap
+ * (`capped`), no mark is set or cleared and no job is linked.
  */
-export async function dedupeReceipts(days: string[]): Promise<{ covered: number; cleared: number; linked: number }> {
-  const out = { covered: 0, cleared: 0, linked: 0 };
+export async function dedupeReceipts(days: string[]): Promise<{ covered: number; cleared: number; linked: number; capped: boolean }> {
+  const out = { covered: 0, cleared: 0, linked: 0, capped: false };
   const ds = days.filter(Boolean);
   if (!ds.length) return out;
   const db = getSupabaseAdmin();
   const lines: DedupeLine[] = [];
+  type R = Pick<PurchaseDbRow, "source" | "source_key" | "purchased_on" | "vendor" | "line_total_cents" | "job_id" | "meta">;
   for (let i = 0; i < ds.length; i += MANUAL_KEY_BATCH) {
-    const { data, error } = await db
-      .from("purchases")
-      .select("source, source_key, purchased_on, vendor, line_total_cents, job_id, meta")
-      .in("purchased_on", ds.slice(i, i + MANUAL_KEY_BATCH))
-      .limit(10000);
-    if (error) fail("purchases dedupe read", error.message);
-    for (const r of (data ?? []) as Pick<PurchaseDbRow, "source" | "source_key" | "purchased_on" | "vendor" | "line_total_cents" | "job_id" | "meta">[]) {
+    const batch = ds.slice(i, i + MANUAL_KEY_BATCH);
+    const { rows, capped } = await readAll<R>(
+      (from, to) =>
+        db
+          .from("purchases")
+          .select("source, source_key, purchased_on, vendor, line_total_cents, job_id, meta")
+          .in("purchased_on", batch)
+          .order("purchased_on", { ascending: true })
+          .order("source_key", { ascending: true })
+          .range(from, to),
+      "purchases dedupe read",
+    );
+    if (capped) {
+      console.error(`purchases dedupe: more lines than one read takes on ${batch[0]}..${batch[batch.length - 1]}; marks left as they are`);
+      return { ...out, capped: true };
+    }
+    for (const r of rows) {
       lines.push({ source: r.source, sourceKey: r.source_key, purchasedOn: r.purchased_on, vendor: r.vendor, lineTotalCents: r.line_total_cents, jobId: r.job_id, meta: r.meta ?? {} });
     }
   }
