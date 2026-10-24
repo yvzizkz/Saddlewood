@@ -182,6 +182,16 @@ export default function CrewMoreScreen() {
           </Card>
         </Link>
       ) : null}
+      {home?.me.perms.includes('projects.view') && !home.me.perms.includes('crew.view') ? (
+        // Every job's status (/app/projects). The Crew tab has it under Crew > Jobs; without that tab this is the way in.
+        <Link href="/app/projects" className="mt-4 block" data-testid="more-projects">
+          <Card className="flex items-center gap-3 p-4">
+            <Briefcase className="size-5 text-[var(--color-teal)]" aria-hidden="true" />
+            <span className="flex-1 text-[15px] font-medium text-[var(--color-charcoal)]">{lang === 'es' ? 'Estado de las obras' : 'Where every job stands'}</span>
+            <ChevronRight className="size-4 text-[var(--color-charcoal-light)]" aria-hidden="true" />
+          </Card>
+        </Link>
+      ) : null}
       {home?.me.perms.includes('money.view') ? (
         // Their jobs and the tasks on them (src/lib/jobs/access.ts).
         <>

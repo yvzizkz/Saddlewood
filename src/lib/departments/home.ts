@@ -8,6 +8,7 @@ import { addDays, localDay, weekStart } from "@/lib/crew/time";
 import { loadLabor } from "@/lib/accounting/labor";
 import { loadPayables } from "@/lib/accounting/payables";
 import { loadOpenReceivables } from "@/lib/accounting/receivables";
+import { OWNER_CALLS_DAY } from "@/lib/billing/ladder";
 import { loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
 import type { JobRef } from "@/lib/jobs/hub";
 import type { ValueKind } from "@/lib/analytics/format";
@@ -26,13 +27,13 @@ export async function departmentTiles(role: Role, refs: JobRef[], feed: FeedItem
 
   if (role === "decisions") {
     const [open, cos] = await Promise.all([loadOpenReceivables(today), loadChangeOrders(refs, today)]);
-    const late14 = open.rows.filter((r) => (r.daysLate ?? 0) >= 14 && !r.payWhenPaid);
+    const ownerCalls = open.rows.filter((r) => (r.daysLate ?? 0) >= OWNER_CALLS_DAY && !r.payWhenPaid);
     const awaiting = cos.filter((c) => c.status === "requested");
     return {
       tiles: [
         { label: "Decisions waiting", value: kindCount("decision"), kind: "count", href: "/app/tasks?kind=decision", alert: kindCount("decision") > 0 },
         { label: "Change orders to price", value: awaiting.length, kind: "count", hint: awaiting.length ? `oldest ${Math.max(...awaiting.map((c) => c.ageDays ?? 0))} days` : undefined, href: "/app/accounting/billing#changes", alert: awaiting.length > 0 },
-        { label: "Owed 14+ days late", value: late14.reduce((a, r) => a + r.balanceCents, 0), kind: "money", hint: `${late14.length} invoice${late14.length === 1 ? "" : "s"} · the owner calls (SOP-007)`, href: "/app/accounting/receivables?by=age" },
+        { label: `Owed ${OWNER_CALLS_DAY}+ days late`, value: ownerCalls.reduce((a, r) => a + r.balanceCents, 0), kind: "money", hint: `${ownerCalls.length} invoice${ownerCalls.length === 1 ? "" : "s"} · the owner calls (SOP-007)`, href: "/app/accounting/receivables?by=age" },
         { label: "Moved up to you", value: mine.filter((i) => i.escalated).length, kind: "count", hint: "overdue elsewhere" },
       ],
     };
