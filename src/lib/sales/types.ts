@@ -81,6 +81,8 @@ export type Opportunity = {
   contact: Contact;
   address: string;
   clientId: string | null;
+  /** The person on the client this lead deals with (0056); the contact above then mirrors them. */
+  contactId: string | null;
   jobId: string | null;
   /** Our best guess of the job's size, in cents, until an estimate prices it. */
   valueCents: number;

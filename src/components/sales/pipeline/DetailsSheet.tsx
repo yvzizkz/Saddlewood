@@ -12,6 +12,10 @@ import { ChipPick } from './QuickAddSheet'
 
 // Everything about a prospect that is not the stage or the next step: who,
 // where, what kind of work, how it came in, the guess at its size.
+//
+// A lead linked to a person on its client (0056) shows that person's name,
+// phone and email as the record has them. Typing other ones unlinks it, so
+// what is typed stands (src/lib/clients/contacts.ts linkableContact).
 
 export function DetailsSheet({ open, onClose, o, onSaved }: { open: boolean; onClose: () => void; o: Opportunity; onSaved: (o: Opportunity) => void }) {
   const { toast } = useSalesToast()
@@ -29,6 +33,8 @@ export function DetailsSheet({ open, onClose, o, onSaved }: { open: boolean; onC
     notes: o.notes,
   }))
   const [busy, setBusy] = useState(false)
+  const [unlocked, setUnlocked] = useState(false)
+  const linked = Boolean(o.contactId) && !unlocked
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }))
   const cents = parseDollars(f.value)
   const badValue = f.value.trim() !== '' && cents === null
@@ -66,18 +72,27 @@ export function DetailsSheet({ open, onClose, o, onSaved }: { open: boolean; onC
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Contact">
-            <input className={INPUT} value={f.name} onChange={(e) => set('name')(e.target.value)} autoComplete="off" />
+            <input className={INPUT} value={f.name} onChange={(e) => set('name')(e.target.value)} readOnly={linked} aria-readonly={linked} data-testid="details-contact-name" autoComplete="off" />
           </Field>
           <Field label="Company">
             <input className={INPUT} value={f.company} onChange={(e) => set('company')(e.target.value)} autoComplete="off" />
           </Field>
           <Field label="Phone">
-            <input className={INPUT} value={f.phone} onChange={(e) => set('phone')(e.target.value)} inputMode="tel" autoComplete="off" />
+            <input className={INPUT} value={f.phone} onChange={(e) => set('phone')(e.target.value)} readOnly={linked} aria-readonly={linked} data-testid="details-contact-phone" inputMode="tel" autoComplete="off" />
           </Field>
           <Field label="Email">
-            <input className={INPUT} value={f.email} onChange={(e) => set('email')(e.target.value)} inputMode="email" autoComplete="off" />
+            <input className={INPUT} value={f.email} onChange={(e) => set('email')(e.target.value)} readOnly={linked} aria-readonly={linked} data-testid="details-contact-email" inputMode="email" autoComplete="off" />
           </Field>
         </div>
+        {linked && (
+          <p className="-mt-2 text-xs text-[var(--color-charcoal-light)]" data-testid="details-contact-linked">
+            Name, phone and email come from the client&rsquo;s contact record.{' '}
+            <button type="button" className="font-medium text-[var(--color-teal)] underline" onClick={() => setUnlocked(true)}>
+              Type other details
+            </button>{' '}
+            (this lead then keeps its own).
+          </p>
+        )}
         <Field label="Address">
           <input className={INPUT} value={f.address} onChange={(e) => set('address')(e.target.value)} autoComplete="off" />
         </Field>

@@ -28,6 +28,7 @@ const OPP: Opportunity = {
   contact: { name: "Dana Patrick", email: "Dana@Example.com", phone: "480-555-0100" },
   address: "7120 E Patrick Ln, Scottsdale, AZ 85251",
   clientId: null,
+  contactId: null,
   jobId: null,
   valueCents: 0,
   probability: null,

@@ -1,3 +1,4 @@
+import { findContact } from "@/lib/clients/contacts";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createDraft, getDocument, listEvents, usedNumbers } from "@/lib/billing/documents";
 import { contractOf } from "@/lib/billing/jobMoney";
@@ -246,15 +247,15 @@ export async function awardJob(opportunityId: string, asked: Partial<AwardChoice
     if (!clientId) fail("create client", "not found after insert");
   }
   const c = plan.client.contact;
+  // The job and the lead point at that person; the database mirrors their
+  // name, email and phone onto both (one client record, 0056).
+  let contactId: string | null = null;
   if (c && (c.email || c.name)) {
-    const { data: have, error } = await db.from("client_contacts").select("id, name, email").eq("client_id", clientId);
-    if (error) fail("read contacts", error.message);
-    const known = ((have ?? []) as { name: string; email: string }[]).some(
-      (x) => (c.email && x.email.toLowerCase() === c.email) || (!c.email && x.name.toLowerCase() === c.name.toLowerCase()),
-    );
-    if (!known) {
-      const { error: insErr } = await db.from("client_contacts").insert({ client_id: clientId, name: c.name, email: c.email, phone: c.phone, role: c.role });
+    contactId = await findContact(clientId, c.name, c.email);
+    if (!contactId) {
+      const { data: made, error: insErr } = await db.from("client_contacts").insert({ client_id: clientId, name: c.name, email: c.email, phone: c.phone, role: c.role }).select("id").single();
       if (insErr) fail("add contact", insErr.message);
+      contactId = (made as { id: string }).id;
     }
   }
 
@@ -264,9 +265,7 @@ export async function awardJob(opportunityId: string, asked: Partial<AwardChoice
     name: plan.job.name,
     address: plan.job.address || null,
     client_id: clientId,
-    client_name: plan.client.name,
-    client_email: c?.email || null,
-    client_phone: c?.phone || null,
+    contact_id: contactId,
     project_type: o.kind,
     number_prefix: plan.job.prefix || null,
     status: "active",
@@ -285,8 +284,8 @@ export async function awardJob(opportunityId: string, asked: Partial<AwardChoice
       fail("update job", error.message);
     }
   }
-  if (o.jobId !== jobId) {
-    const { error } = await db.from("sales_opportunities").update({ job_id: jobId }).eq("id", o.id);
+  if (o.jobId !== jobId || o.clientId !== clientId || o.contactId !== contactId) {
+    const { error } = await db.from("sales_opportunities").update({ job_id: jobId, client_id: clientId, contact_id: contactId }).eq("id", o.id);
     if (error) fail("link job", error.message);
   }
 
