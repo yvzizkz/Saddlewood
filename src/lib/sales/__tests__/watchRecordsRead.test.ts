@@ -117,3 +117,44 @@ describe("closeWatchesFromRecords reads the deposit whatever else the job has", 
     expect(tables.job_watches[0]).toMatchObject({ done_at: CLOSED_AT, done_by: "record: 4821-01 paid in full" });
   });
 });
+
+describe("closeWatchesFromRecords, the agreement watch (T130)", () => {
+  const AGR = "00000000-0000-4000-8000-00000000a001";
+  const AGR2 = "00000000-0000-4000-8000-00000000a002";
+  const agreement = (over: Row = {}): Row => ({ id: AGR, job_id: JOB, kind: "agreement", number: "A4821-AGR", status: "issued", revision: 1, created_at: day(6_000), ...over });
+  const signed = (documentId: string, role = "client"): Row => ({ id: 1, document_id: documentId, kind: "signed", detail: { role } });
+
+  beforeEach(() => {
+    tables.job_watches = [{ id: 7, job_id: JOB, kind: "agreement", done_at: null, done_by: "" }];
+    tables.document_events = [];
+  });
+
+  it("closes the watch once the client signed the issued agreement", async () => {
+    tables.documents.push(agreement());
+    tables.document_events.push(signed(AGR));
+    expect(await closeWatchesFromRecords([JOB], new Date(CLOSED_AT))).toEqual({ closed: 1, reopened: 0 });
+    expect(tables.job_watches[0]).toMatchObject({ done_at: CLOSED_AT, done_by: "record: A4821-AGR signed by the client" });
+  });
+
+  it("our own signature alone, or an unsigned agreement, closes nothing", async () => {
+    tables.documents.push(agreement());
+    tables.document_events.push(signed(AGR, "company"));
+    expect(await closeWatchesFromRecords([JOB])).toEqual({ closed: 0, reopened: 0 });
+    expect(tables.job_watches[0].done_at).toBeNull();
+  });
+
+  it("reads the latest revision: a signed one voided and redrafted opens the watch again", async () => {
+    tables.job_watches[0] = { id: 7, job_id: JOB, kind: "agreement", done_at: CLOSED_AT, done_by: "record: A4821-AGR signed by the client" };
+    tables.documents.push(agreement({ status: "void" }), agreement({ id: AGR2, status: "draft", revision: 2, created_at: day(6_001) }));
+    tables.document_events.push(signed(AGR));
+    expect(await closeWatchesFromRecords([JOB])).toEqual({ closed: 0, reopened: 1 });
+    expect(tables.job_watches[0]).toMatchObject({ done_at: null, done_by: "" });
+  });
+
+  it("an owner's reopen stands even with the agreement signed", async () => {
+    tables.job_watches[0] = { id: 7, job_id: JOB, kind: "agreement", done_at: null, done_by: "reopened by Marco" };
+    tables.documents.push(agreement());
+    tables.document_events.push(signed(AGR));
+    expect(await closeWatchesFromRecords([JOB])).toEqual({ closed: 0, reopened: 0 });
+  });
+});
