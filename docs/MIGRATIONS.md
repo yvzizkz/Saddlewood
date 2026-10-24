@@ -32,12 +32,13 @@ site change that reads them with the server key must be live first.
 | 0045 | `trade_checklists` | 2026-10-20 |
 | 0050 | `job_history` | 2026-10-20 |
 | 0051 | `estimate_tables_service_role_only` (deploy the site first) | cleanup PR |
+| 0052 | `old_tables_no_public_grants` | cleanup PR |
 
 ## Production state
 
 As of 2026-10-20: 0050 is applied (it went in before #37 merged); 0029–0035
-and 0040–0045 were not yet applied (0050 does not depend on them). 0051 is
-not applied. Check before applying anything, since this note can go stale: a migration is in if
+and 0040–0045 were not yet applied (0050 does not depend on them). 0051 and
+0052 are not applied. Check before applying anything, since this note can go stale: a migration is in if
 the table it creates exists.
 
 ```sql
@@ -52,8 +53,18 @@ where to_regclass('public.' || t) is null;  -- lists the missing ones
 than adding a table; apply them right after the migration before them. 0051
 changes policies and grants: check it with `select count(*) from pg_policies
 where policyname = 'auth_full_access'` (0 once it is in).
+0052 only revokes grants (any time, no site change needed): check it with
+`select count(*) from information_schema.role_table_grants where
+table_schema = 'public' and grantee in ('anon', 'authenticated')` (0 once it
+is in, with 0051).
 
 ## Rules
+
+- Grants: every table enables RLS and revokes all from `anon` and
+  `authenticated`; the site reads and writes with the service role. Grant
+  the service role `delete` only where the app deletes rows. Money and proof
+  tables (documents, payments, allocations, events) are voided, never
+  deleted, so they get select, insert and update.
 
 - A migration that is applied in production is never edited. Fix forward
   with a new number.
