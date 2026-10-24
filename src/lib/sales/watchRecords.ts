@@ -1,5 +1,6 @@
 import { paidByDocument } from "@/lib/billing/payments";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { readAll } from "@/lib/supabase/paged";
 
 // Watches that close themselves from the records (cleanup Batch 3, "Waiting
 // on an owner"). The deposit watch is done when its deposit invoice is paid in
@@ -18,12 +19,17 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const RECORD_MARK = "record: ";
 export const REOPENED_MARK = "reopened by ";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type RecordWatch = { id: number; job_id: string; kind: string; done_at: string | null; done_by: string };
 /** A job's deposit invoice: its number, and whether payments that stand cover it. */
 export type DepositState = { number: string; paid: boolean };
 
-/** What the records say should change: close these (with the note), open these again. */
+/**
+ * What the records say should change: close these (with the note), open these
+ * again. Only a deposit known to be unpaid opens a watch again; a job whose
+ * deposit could not be found leaves its watch as it is.
+ */
 export function recordChanges(watches: RecordWatch[], deposits: Map<string, DepositState>): { close: { id: number; by: string }[]; reopen: number[] } {
   const close: { id: number; by: string }[] = [];
   const reopen: number[] = [];
@@ -32,7 +38,7 @@ export function recordChanges(watches: RecordWatch[], deposits: Map<string, Depo
     const d = deposits.get(w.job_id);
     const byRecord = !!w.done_at && w.done_by.startsWith(RECORD_MARK);
     if (!w.done_at && !w.done_by.startsWith(REOPENED_MARK) && d?.paid) close.push({ id: w.id, by: `${RECORD_MARK}${d.number} paid in full` });
-    else if (byRecord && !d?.paid) reopen.push(w.id);
+    else if (byRecord && d && !d.paid) reopen.push(w.id);
   }
   return { close, reopen };
 }
@@ -46,18 +52,33 @@ async function depositsFor(jobIds: string[]): Promise<Map<string, DepositState>>
   const out = new Map<string, DepositState>();
   if (!jobIds.length) return out;
   const db = getSupabaseAdmin();
-  const [{ data: jobs, error }, { data: docs, error: dErr }] = await Promise.all([
-    db.from("jobs").select("id, billing").in("id", jobIds),
-    db.from("documents").select("id, job_id, number, title, status, total_cents, supersedes, created_at").eq("kind", "invoice").in("job_id", jobIds),
-  ]);
-  if (error || dErr) throw new Error(`watch records: read deposits failed: ${(error ?? dErr)!.message}`);
+  const { data: jobs, error } = await db.from("jobs").select("id, billing").in("id", jobIds);
+  if (error) throw new Error(`watch records: read deposits failed: ${error.message}`);
   type Doc = { id: string; job_id: string; number: string; title: string; status: string; total_cents: number | string; supersedes: string | null; created_at: string };
   const named = new Map<string, string>();
   for (const j of (jobs ?? []) as { id: string; billing: { award?: { depositId?: string | null } } | null }[]) {
     const id = j.billing?.award?.depositId;
-    if (id) named.set(j.id, id);
+    if (id && UUID.test(id)) named.set(j.id, id);
   }
-  const rows = ((docs ?? []) as Doc[]).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  // Only the invoices that can be a deposit: the named one, those titled
+  // Deposit, and revisions (a revision keeps no title rule). Every job's other
+  // invoices stay out, and the read is paged, so the 1,000-row cap can't drop
+  // a deposit and make it look unpaid.
+  const which = ["title.eq.Deposit", "supersedes.not.is.null", ...(named.size ? [`id.in.(${[...new Set(named.values())].join(",")})`] : [])].join(",");
+  const { rows, capped } = await readAll<Doc>(
+    (from, to) =>
+      db
+        .from("documents")
+        .select("id, job_id, number, title, status, total_cents, supersedes, created_at")
+        .eq("kind", "invoice")
+        .in("job_id", jobIds)
+        .or(which)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    "watch records: read deposits",
+  );
+  if (capped) throw new Error("watch records: too many deposit invoices to read; watches left as they are");
   const chosen = new Map<string, Doc>();
   for (const jobId of jobIds) {
     const mine = rows.filter((d) => d.job_id === jobId);
