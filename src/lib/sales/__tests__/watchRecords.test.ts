@@ -26,6 +26,11 @@ describe("recordChanges", () => {
     expect(recordChanges([closed], deposits(true))).toEqual({ close: [], reopen: [] });
   });
 
+  it("leaves a record-closed watch closed when the deposit can't be found", () => {
+    const closed = w({ done_at: "2026-10-21T15:00:00Z", done_by: "record: 4821-01 paid in full" });
+    expect(recordChanges([closed], new Map())).toEqual({ close: [], reopen: [] });
+  });
+
   it("never touches an owner's tick, even with the deposit unpaid", () => {
     const ticked = w({ done_at: "2026-10-21T15:00:00Z", done_by: "Marco" });
     expect(recordChanges([ticked], deposits(false))).toEqual({ close: [], reopen: [] });
