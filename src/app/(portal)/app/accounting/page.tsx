@@ -11,6 +11,7 @@ import { hrefOf } from "@/lib/analytics/drill";
 import { loadLabor } from "@/lib/accounting/labor";
 import { loadPayables } from "@/lib/accounting/payables";
 import PayablesMissing from "@/components/accounting/PayablesMissing";
+import { isMaterialCost } from "@/lib/accounting/jobCost";
 import { loadPurchases } from "@/lib/accounting/purchases";
 import { loadBillingCalendar, loadIssued, loadOpenReceivables } from "@/lib/accounting/receivables";
 import { moneySeatForPage, seesBillingJob, seesCrewJob } from "@/lib/accounting/access";
@@ -108,7 +109,8 @@ export default async function AccountingHome({ searchParams }: { searchParams: P
   const drafts = issued.filter((r) => r.status === "draft").length;
   const next = calendar[0];
   const bills = payables.rows.filter((r) => inRange(r.issuedOn, period.from, period.to) && !r.purchaseTripKey).reduce((a, r) => a + r.amountCents, 0);
-  const cost = laborCost + spend + bills;
+  // Zelle payments are counted from their bills (isMaterialCost), not twice.
+  const cost = laborCost + lines.filter(isMaterialCost).reduce((a, r) => a + r.lineTotalCents, 0) + bills;
 
   const tiles: Tile[] = [
     {

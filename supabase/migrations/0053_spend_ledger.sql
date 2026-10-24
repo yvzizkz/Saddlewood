@@ -48,7 +48,9 @@ select case when e->>'source' = 'zelle' then 'zelle' else 'receipt' end,
        round((e->>'amount')::numeric * 100)::int,
        jsonb_strip_nulls(jsonb_build_object(
          'expenseId', e->>'id',
-         'n', (e->>'n')::int,
+         -- The bot's own number, which its id carries (r-7 is R7). The old page
+         -- renumbered items it stored, so e->>'n' is not the number the bot texts.
+         'n', substring(e->>'id' from '-(\d+)$')::int,
          'recipient', e->>'recipient',
          'category', e->>'expenseType',
          'receiptUrl', e->>'receiptUrl',
@@ -66,5 +68,13 @@ select case when e->>'source' = 'zelle' then 'zelle' else 'receipt' end,
    and coalesce(e->>'amount', '') ~ '^-?[0-9]+(\.[0-9]+)?$'
    and (e->>'amount')::numeric > 0
 on conflict (source_key) do nothing;
+
+-- An earlier draft of this import took the old page's n; a database that ran
+-- it gets the bot's number from the id now. Running this file again is safe.
+update public.purchases
+   set meta = jsonb_set(meta, '{n}', to_jsonb(substring(meta->>'expenseId' from '-(\d+)$')::int))
+ where meta->>'importedFrom' = 'accounting-state'
+   and meta->>'expenseId' ~ '-\d+$'
+   and meta->>'n' is distinct from substring(meta->>'expenseId' from '-(\d+)$');
 
 commit;
