@@ -53,7 +53,7 @@ export const CATEGORY_LABEL: Record<CostLine["category"], string> = { labor: "La
 export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lines: CostLine[]; jobs: JobTotals[]; laborWithoutRate: number; payablesMissing: boolean; capped: boolean }> {
   const db = getSupabaseAdmin();
   const [jobsRes, crewRes, labor, purchases, payables, docs] = await Promise.all([
-    db.from("jobs").select("id,name,crew_job_id,billing"),
+    db.from("jobs").select("id,name,crew_job_id,contract_cents"),
     db.from("crew_jobs").select("id,name"),
     loadLabor(fromDay, toDay, { withPay: true }),
     loadPurchases(fromDay, toDay),
@@ -61,7 +61,7 @@ export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lin
     db.from("documents").select("id,job_id,kind,status,total_cents,issued_at").eq("status", "issued").in("kind", ["invoice", "change_order"]),
   ]);
   if (jobsRes.error) throw new Error(`jobs: ${jobsRes.error.message}`);
-  type J = { id: string; name: string; crew_job_id: string | null; billing: unknown };
+  type J = { id: string; name: string; crew_job_id: string | null; contract_cents: number | null };
   const billingJobs = (jobsRes.data ?? []) as J[];
   const byCrew = new Map(billingJobs.filter((j) => j.crew_job_id).map((j) => [j.crew_job_id as string, j]));
   const crewName = new Map(((crewRes.data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]));
@@ -116,7 +116,7 @@ export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lin
     let t = totals.get(key);
     if (!t) {
       const bj = billingJobs.find((b) => b.id === key);
-      t = { jobKey: key, job: name, contractCents: bj ? contractOf(bj.billing) : null, billedCents: 0, collectedCents: 0, laborCents: 0, materialsCents: 0, subsCents: 0 };
+      t = { jobKey: key, job: name, contractCents: bj ? contractOf(bj) : null, billedCents: 0, collectedCents: 0, laborCents: 0, materialsCents: 0, subsCents: 0 };
       totals.set(key, t);
     }
     return t;

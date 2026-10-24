@@ -1,6 +1,6 @@
 import { expect, test as base, type Page } from "@playwright/test";
 
-import { cents, cutoffInDays, OWNER, PM, signIn } from "./support/env";
+import { cents, cutoffInDays, OWNER, PM, signIn, sovKeys } from "./support/env";
 
 // Scenario 8b / PM progress report (docs/SCENARIOS.md): Eli sends % complete
 // from the job's Money tab before cutoff; the "% complete and photos" task
@@ -60,12 +60,12 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
 
       // 2. API guards: off-job report -> 404; PM attempting a draw -> 403.
       const offJobRes = await pmPage.request.post(`/api/jobs/${OFF_JOB}/progress`, {
-        data: { action: "report", pcts: { "sov:0": 50 }, note: "Not my job" },
+        data: { action: "report", pcts: { "line:1": 50 }, note: "Not my job" },
       });
       expect(offJobRes.status()).toBe(404);
 
       const drawAsPmRes = await pmPage.request.post(`/api/jobs/${BELLEVUE}/progress`, {
-        data: { action: "draw", pcts: { "sov:0": 100 } },
+        data: { action: "draw", pcts: { "line:1": 100 } },
       });
       expect(drawAsPmRes.status()).toBe(403);
 
@@ -108,8 +108,9 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
     pmPage,
     ownerPage,
   }) => {
-    const powellOpening = { "sov:0": 90, "sov:1": 75, "sov:2": 45, "sov:3": 40 };
     let createdDocId: string | null = null;
+    const sov = await sovKeys(ownerPage, POWELL);
+    const powellOpening = { [sov[0]]: 90, [sov[1]]: 75, [sov[2]]: 45, [sov[3]]: 40 };
 
     try {
       const priorRes = await ownerPage.request.get(`/api/jobs/${POWELL}/progress`);
@@ -145,7 +146,7 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
       await expect(sendBtn).toBeDisabled();
 
       const backApiRes = await pmPage.request.post(`/api/jobs/${POWELL}/progress`, {
-        data: { action: "report", pcts: { "sov:0": 85 }, note: "Backwards" },
+        data: { action: "report", pcts: { [sov[0]]: 85 }, note: "Backwards" },
       });
       expect(backApiRes.status()).toBe(400);
 
@@ -187,7 +188,7 @@ test.describe("PM % complete report -> task clears & owner's draw opens prefille
         lines: { key: string; billedToDateCents: number; pctToDate: number }[];
         report: unknown;
       };
-      const framingAfter = progressJson.lines.find((l) => l.key === "sov:0")!;
+      const framingAfter = progressJson.lines.find((l) => l.key === sov[0])!;
       expect(framingAfter.pctToDate).toBe(95);
       expect(framingAfter.billedToDateCents).toBe(15_675_000); // $148,500 + $8,250 = $156,750
       expect(progressJson.report).toBeNull();

@@ -20,7 +20,7 @@ export async function loadJobMoney(
   const db = getSupabaseAdmin();
   const [docs, jobs, clients] = await Promise.all([
     db.from("documents").select("*").eq("status", "issued").in("kind", ["invoice", "change_order", "statement"]),
-    db.from("jobs").select("id, number_prefix, billing"),
+    db.from("jobs").select("id, number_prefix, billing, contract_cents"),
     db.from("clients").select("id, billing"),
   ]);
   if (docs.error) throw new Error(`job money failed: ${docs.error.message}`);
@@ -41,7 +41,7 @@ export async function loadJobMoney(
     if (!firstSent.has(e.document_id)) firstSent.set(e.document_id, e.at);
   }
 
-  const jobRows = (jobs.data ?? []) as { id: string; number_prefix: string | null; billing: BillingProfile | null }[];
+  const jobRows = (jobs.data ?? []) as { id: string; number_prefix: string | null; billing: BillingProfile | null; contract_cents: number | null }[];
   const placed = placeMoney({
     documents,
     paid,
@@ -49,7 +49,7 @@ export async function loadJobMoney(
     jobs: jobRows.map((j) => ({ id: j.id, prefix: j.number_prefix, billing: j.billing })),
     clients: new Map(((clients.data ?? []) as { id: string; billing: BillingProfile | null }[]).map((c) => [c.id, c.billing ?? {}])),
   });
-  const contract = new Map(jobRows.map((j) => [j.id, contractOf(j.billing)]));
+  const contract = new Map(jobRows.map((j) => [j.id, contractOf(j)]));
   return {
     jobs: jobIds
       .filter((id) => contract.has(id))

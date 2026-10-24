@@ -4,25 +4,11 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { localDay } from "@/lib/crew/time";
-import type { SovLine } from "@/lib/sales/award";
 import { createDraft, usedNumbers } from "./documents";
 import { nextNumber } from "./numbering";
+import { lineKey, loadSovLines } from "./sovLines";
 import { checkReport, computeDraw, drawInvoiceLines, shareOf, type DepositState, type Draw, type PmReport, type ProgressLine } from "./progress";
 import type { BillingProfile } from "./types";
-
-/**
- * One SOV line as stored. Award writes { description, amountCents, kind };
- * lines carried in by hand may read { label, cents, billedPct }. Both bill the same.
- */
-export function sovLineOf(raw: unknown): { description: string; amountCents: number; billedPct: number } | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  const description = String(r.description ?? r.label ?? "").trim();
-  const amountCents = Number(r.amountCents ?? r.cents ?? 0);
-  if (!description || !Number.isFinite(amountCents)) return null;
-  const billedPct = Number(r.billedPct ?? 0);
-  return { description, amountCents: Math.round(amountCents), billedPct: billedPct > 0 && billedPct <= 100 ? billedPct : 0 };
-}
 
 export class ProgressError extends Error {
   constructor(
@@ -60,9 +46,10 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
   if (error) throw new Error(`jobs: ${error.message}`);
   if (!job) throw new ProgressError("No such job.", 404);
   const j = job as JobRow;
-  const billing = (j.billing ?? {}) as { sov?: (SovLine | Record<string, unknown>)[]; retainagePct?: number; sovOpening?: Record<string, number>; pmReport?: PmReport; award?: { depositId?: string | null } };
+  const billing = (j.billing ?? {}) as { retainagePct?: number; sovOpening?: Record<string, number>; pmReport?: PmReport; award?: { depositId?: string | null } };
   const depositId = billing.award?.depositId ?? null;
-  const [client, cos, rows, dep] = await Promise.all([
+  const [sov, client, cos, rows, dep] = await Promise.all([
+    loadSovLines([j.id]),
     j.client_id ? db.from("clients").select("billing").eq("id", j.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     db.from("change_orders").select("id,number,title,amount_cents,status").eq("job_id", j.id).in("status", ["signed", "billed"]),
     db.from("sov_progress").select("line_key,pct_to_date,amount_cents,document_id,documents!inner(id,number,status,created_at)").eq("job_id", j.id),
@@ -101,9 +88,6 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
 
   // Billed before the app (an opening percent per line, set once at cutover):
   // counted as billed so the first draw in the app starts from there.
-  // Once an opening is saved it is the whole truth, zeros included; a legacy
-  // line's billedPct only counts on a job that never had one saved.
-  const saved = billing.sovOpening !== undefined && billing.sovOpening !== null;
   const opening: Record<string, number> = { ...(billing.sovOpening ?? {}) };
   for (const [key, pct] of Object.entries(opening)) {
     const b = billed.get(key) ?? { cents: 0, pct: 0 };
@@ -112,19 +96,11 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
   }
   const lines: ProgressLine[] = [];
   const openingCents = (key: string, scheduled: number) => (opening[key] ? shareOf(scheduled, Number(opening[key])) : 0);
-  (billing.sov ?? []).forEach((raw, i) => {
-    const l = sovLineOf(raw);
-    if (!l || !l.amountCents) return;
-    const key = `sov:${i}`;
-    // A line carried in with what was already billed on it (billedPct) opens there unless an opening was set.
-    if (!saved && l.billedPct && opening[key] === undefined) {
-      const b = billed.get(key) ?? { cents: 0, pct: 0 };
-      b.pct = Math.max(b.pct, l.billedPct);
-      billed.set(key, b);
-      opening[key] = l.billedPct;
-    }
+  for (const l of sov.get(j.id) ?? []) {
+    if (!l.amountCents) continue;
+    const key = lineKey(l.id);
     lines.push({ key, description: l.description, scheduledCents: l.amountCents, billedToDateCents: (billed.get(key)?.cents ?? 0) + openingCents(key, l.amountCents), pctToDate: billed.get(key)?.pct ?? 0, kind: "sov" });
-  });
+  }
   for (const c of (cos.data ?? []) as { id: number; number: string; title: string; amount_cents: number | null; status: string }[]) {
     if (!c.amount_cents) continue;
     const key = `co:${c.id}`;

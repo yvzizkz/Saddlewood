@@ -186,10 +186,12 @@ describe("one job's money", () => {
     });
   });
 
-  it("reads the contract only when the owners entered it as whole cents", () => {
-    expect(contractOf({ contractCents: 1584000 })).toBe(1584000);
-    expect(contractOf({ contractCents: "1584000" })).toBeNull();
-    expect(contractOf({ contractCents: 10.5 })).toBeNull();
+  it("reads the contract column, whole cents only", () => {
+    expect(contractOf({ contract_cents: 1584000 })).toBe(1584000);
+    // bigint may come back as a string
+    expect(contractOf({ contract_cents: "1584000" })).toBe(1584000);
+    expect(contractOf({ contract_cents: 10.5 })).toBeNull();
+    expect(contractOf({ contract_cents: null })).toBeNull();
     expect(contractOf({})).toBeNull();
     expect(contractOf(null)).toBeNull();
   });
