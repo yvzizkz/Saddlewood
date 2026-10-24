@@ -19,6 +19,7 @@ import { loadBillingCalendar, loadOpenReceivables } from "@/lib/accounting/recei
 import { addDays, localDay } from "@/lib/crew/time";
 import { jobHref, jobKeyOf, type JobRef } from "@/lib/jobs/hub";
 import { seatHolder, type Role } from "@/lib/roles/seats";
+import { settleWatches } from "@/lib/sales/watchRecords";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
 
 export type ScheduleKind =
@@ -222,7 +223,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     db.from("crew_job_phases").select("id,job_id,ord,name,trade,planned_from,planned_to,verified_at,verified_by,note").order("ord", { ascending: true }),
     db.from("crew_people").select("email,name,trade"),
     db.from("bid_packages").select("id,job_id,trade,title,status,due_at").in("status", ["draft", "invited", "leveling"]),
-    db.from("job_watches").select("id,job_id,kind,title,due_on,note,done_at").is("done_at", null),
+    settleWatches().then(() => db.from("job_watches").select("id,job_id,kind,title,due_on,note,done_at").is("done_at", null)),
     db.from("subs").select("id,name,trades,status,coi_expires_on,w9_on_file,msa_signed_on").in("status", ["approved", "onboarding"]),
     db.from("ops_goals").select("id,title,horizon,owner,status,due_date,note").not("due_date", "is", null).neq("status", "done"),
     loadBillingCalendar(today).catch(() => []),
