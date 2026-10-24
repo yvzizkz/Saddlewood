@@ -8,8 +8,12 @@ import type { JobScope } from "@/lib/crew/scope";
 import type { Person, Seat } from "@/lib/roles/seats";
 import { feedForSeat, isMine, type FeedItem } from "./feed";
 
-/** Whose list: an owner sees the whole feed; anyone else the jobs in `jobs` (URL keys). */
-export type FeedSeat = { email: string; owner: boolean; jobs: Set<string> };
+/**
+ * Whose list: an owner sees the whole feed; a crew seat (a PM) the jobs in
+ * `jobs` (URL keys), as Tasks narrows it; null for a seat off the crew
+ * (finance), every item that is theirs.
+ */
+export type FeedSeat = { email: string; owner: boolean; jobs: Set<string> | null };
 
 /** The URL keys of the jobs a field scope covers (crew/scope.ts): every job for null. */
 export function jobsOf(refs: Pick<JobRef, "key" | "crewId">[], scope: JobScope): Set<string> {
