@@ -6,6 +6,9 @@ import { recordOpening } from "@/lib/billing/opening";
 import { proposalFromDocument } from "@/lib/sales/store";
 import { publicSignature, signaturesOf, type PublicSignature } from "@/lib/sales/signing";
 import { ProposalView } from "@/components/sales/ProposalView";
+import { AgreementSignView } from "@/components/agreements/AgreementSignView";
+import { AGREEMENT_CONSENT, clientSignature } from "@/lib/agreements/store";
+import { loadSettings } from "@/lib/sales/settingsStore";
 import { DocumentView } from "../DocumentView";
 
 // The client's copy of a document we issued: /d/<token>.
@@ -53,6 +56,36 @@ export default async function DocumentPage({
   }
 
   if (!ownCopy) await recordOpening(doc, "viewed");
+
+  // The job's agreement (T130): the client reads it and signs it here, once.
+  if (doc.kind === "agreement") {
+    const s = doc.snapshot;
+    const [sig, fonts] = await Promise.all([
+      clientSignature(doc.id).catch((err) => {
+        console.error("agreement signature not loaded:", err);
+        return null;
+      }),
+      loadSettings()
+        .then((x) => x.signing.fonts)
+        .catch(() => []),
+    ]);
+    return (
+      <AgreementSignView
+        token={doc.token ?? ""}
+        number={doc.number}
+        title={doc.title}
+        project={{ name: s.job?.name ?? doc.title, address: s.job?.address }}
+        preparedFor={s.billTo?.name ?? ""}
+        date={s.date ?? doc.issuedAt}
+        totalCents={doc.totalCents}
+        text={s.agreement?.text ?? ""}
+        consent={AGREEMENT_CONSENT}
+        fonts={fonts}
+        isVoid={doc.status === "void"}
+        signed={sig ? { name: sig.name, method: sig.method, image: sig.image, at: sig.at, snapshotSha256: sig.snapshotSha256 } : null}
+      />
+    );
+  }
 
   // A proposal from Sales (kind estimate, with its proposal frozen in the
   // snapshot): the client chooses a package and add-ons and accepts here.
