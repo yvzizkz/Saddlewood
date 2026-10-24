@@ -1,4 +1,5 @@
 import { OPEN_STAGES, stageInfo, type IssuedProposal, type Opportunity } from "./types";
+import { localDay } from "@/lib/crew/time";
 
 // The numbers on top of the Sales screen and the "do this today" list, worked
 // out from the opportunities as they stand. Pure, so it is tested without a
@@ -27,7 +28,7 @@ export function probabilityOf(o: Opportunity): number {
 /** The Phoenix calendar day of an instant; a plain day (YYYY-MM-DD) is already one, so it is kept as is. */
 function dayOf(iso: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Phoenix" });
+  return localDay(iso);
 }
 
 export function daysSince(iso: string, today: string): number {

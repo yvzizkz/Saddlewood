@@ -3,12 +3,12 @@ import { z } from "zod";
 
 import { isId } from "@/lib/billing/http";
 import { loadPolicies } from "@/lib/policies/store";
-import { phoenixToday } from "@/lib/sales/access";
 import { subsError, subsGate } from "@/lib/subs/access";
 import { canAward, readiness } from "@/lib/subs/rules";
 import { buildAwardEmailDrafts, buildWorkOrder } from "@/lib/subs/scorecard";
 import { listSubs, packageDetail, setPackageStatus, updatePackage } from "@/lib/subs/store";
 import { readPackageInput } from "@/lib/subs/validate";
+import { localDay } from "@/lib/crew/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const [d, allSubs, { values }] = await Promise.all([packageDetail(pid), listSubs(), loadPolicies()]);
     if (!d) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-    const today = phoenixToday();
+    const today = localDay();
     const bids = d.invites.filter((i) => i.latest).length;
     const role = gate.seat.role === "agent" ? "member" : gate.seat.role;
     const invites = d.invites.map((i) => {

@@ -38,10 +38,6 @@ export function ago(iso: string, now: Date = new Date()): string {
   return `${Math.floor(days / 30)}mo`;
 }
 
-/** Today in Phoenix, YYYY-MM-DD (the browser's clock). */
-export function todayPhoenix(now: Date = new Date()): string {
-  return now.toLocaleDateString("en-CA", { timeZone: "America/Phoenix" });
-}
 
 /** A short name for an email address: "marco@saddlewood…" → "Marco". */
 export function personName(email: string): string {

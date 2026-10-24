@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isId } from "@/lib/billing/http";
-import { authorizeSales, phoenixToday, salesError } from "@/lib/sales/access";
+import { authorizeSales, salesError } from "@/lib/sales/access";
 import { archiveEstimate, getEstimate, getOpportunityDetail, saveEstimate } from "@/lib/sales/store";
 import { readBody } from "@/lib/sales/validate";
+import { localDay } from "@/lib/crew/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const body = readBody(estimate.body);
     return NextResponse.json({
       ok: true,
-      today: phoenixToday(),
+      today: localDay(),
       estimate: { ...estimate, body: body.ok ? body.value : estimate.body },
       opportunity: detail?.opportunity ?? null,
       proposals: detail?.proposals ?? [],

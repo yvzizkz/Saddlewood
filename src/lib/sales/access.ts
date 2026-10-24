@@ -62,7 +62,3 @@ export function salesError(err: unknown, what: string): NextResponse {
   return NextResponse.json({ ok: false, error: `could not ${what}` }, { status: 500 });
 }
 
-/** Today in Phoenix, YYYY-MM-DD. */
-export function phoenixToday(now: Date = new Date()): string {
-  return now.toLocaleDateString("en-CA", { timeZone: "America/Phoenix" });
-}

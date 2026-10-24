@@ -1,10 +1,11 @@
 import { after, NextRequest, NextResponse } from "next/server";
 
 import { isId } from "@/lib/billing/http";
-import { phoenixToday, salesError, salesGate } from "@/lib/sales/access";
+import { salesError, salesGate } from "@/lib/sales/access";
 import { notifyAfterSignature } from "@/lib/sales/mail";
 import { proposalRecord, signAsCompany } from "@/lib/sales/store";
 import { readSignatureInput } from "@/lib/sales/signing";
+import { localDay } from "@/lib/crew/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const r = await signAsCompany(docId, { ...sig.value, email: sig.value.email || (gate.seat.email.includes("@") ? gate.seat.email : "") }, { actor: gate.who.actor, title: gate.settings.signing.companyTitle }, {
       ip: (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim(),
       ua: request.headers.get("user-agent") ?? "",
-      today: phoenixToday(),
+      today: localDay(),
     });
     const settings = gate.settings;
     after(async () => {

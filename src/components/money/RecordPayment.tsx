@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { Button, Field, INPUT } from '@/components/bot/ui'
 import { money } from './format'
+import { localDay } from '@/lib/crew/time'
 
 // Ilene's form: what came in, against which line. The site shows what it
 // would record and the balance it leaves, then records on a second tap.
@@ -29,7 +30,7 @@ export default function RecordPayment({ documentId, lines, hasLines }: { documen
   const [amount, setAmount] = useState('')
   const [fee, setFee] = useState('')
   const [method, setMethod] = useState<string>('check')
-  const [receivedOn, setReceivedOn] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Phoenix' }))
+  const [receivedOn, setReceivedOn] = useState(localDay())
   const [reference, setReference] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
   const [error, setError] = useState<string | null>(null)

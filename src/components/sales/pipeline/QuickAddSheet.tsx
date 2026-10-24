@@ -8,8 +8,8 @@ import { useSalesToast } from '../useSalesToast'
 import { Button, Field, INPUT } from '@/components/bot/ui'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { KINDS, SOURCES, type Opportunity, type OpportunityKind, type Source } from '@/lib/sales/types'
-import { todayPhoenix } from '../format'
 import { parseDollars, plusDays } from './labels'
+import { localDay } from '@/lib/crew/time'
 
 // A new prospect in under a minute, standing in a driveway: only the name is
 // required. Everything else can wait for the opportunity's own screen.
@@ -53,7 +53,7 @@ export function ChipPick<T extends string>({
 export function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter()
   const { toast } = useSalesToast()
-  const today = todayPhoenix()
+  const today = localDay()
   const [title, setTitle] = useState('')
   const [want, setWant] = useState('')
   const [name, setName] = useState('')

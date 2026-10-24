@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isId, siteUrl } from "@/lib/billing/http";
-import { phoenixToday, salesError, salesGate } from "@/lib/sales/access";
+import { salesError, salesGate } from "@/lib/sales/access";
 import { blocking, runChecks } from "@/lib/sales/checks";
 import { getEstimate, getOpportunityDetail, issueProposal, SalesError } from "@/lib/sales/store";
 import { readBody } from "@/lib/sales/validate";
+import { localDay } from "@/lib/crew/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!isId(eid)) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const parsed = input.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ ok: false, error: "bad request" }, { status: 400 });
-  const today = phoenixToday();
+  const today = localDay();
   try {
     const est = await getEstimate(eid);
     if (!est) throw new SalesError("not found", 404);
