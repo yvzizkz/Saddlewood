@@ -79,6 +79,12 @@ describe("Details on a lead linked to its client's contact", () => {
     expect(o.contactId).toBeNull();
   });
 
+  it("emptying an email the record has is an edit too", async () => {
+    const o = await updateOpportunity("o1", { contact: { ...typed, email: "" } }, "Marco");
+    expect(o.contact.email).toBe("");
+    expect(o.contactId).toBeNull();
+  });
+
   it("where the record has no phone, the one typed stands and the lead stays linked", async () => {
     seed({ ...typed, phone: "" }, { phone: "" });
     const o = await updateOpportunity("o1", { contact: { ...typed, phone: "602-555-0199" } }, "Marco");
@@ -98,6 +104,12 @@ describe("linkableContact", () => {
   it("a new lead with nothing typed but the email may take the record's name and phone", () => {
     expect(linkableContact(rows, { email: "dana@example.com" }, { fillEmpty: true })).toBe("dana");
     expect(linkableContact(rows, { email: "dana@example.com" }, { fillEmpty: false })).toBeNull();
+  });
+
+  it("an emptied email matched by name conflicts in Details, fills on a new lead", () => {
+    const t = { name: "Dana Patrick", email: "", phone: "480-555-0101" };
+    expect(linkableContact(rows, t, { fillEmpty: false })).toBeNull();
+    expect(linkableContact(rows, t, { fillEmpty: true })).toBe("dana");
   });
 
   it("a record with no name or phone never conflicts", () => {

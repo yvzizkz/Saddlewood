@@ -24,7 +24,7 @@ const digits = (s: string | undefined) => (s ?? "").replace(/\D/g, "");
 /**
  * The contact a lead with these typed details may stay linked to: the match,
  * as long as the database's mirror (0056 opportunities_contact_mirror) would
- * not write over a name or phone typed here. The mirror copies only the
+ * not write over a name, email or phone typed here. The mirror copies only the
  * record's non-empty values, so an empty record value never conflicts.
  * fillEmpty: an empty typed value may be filled from the record (a new lead);
  * otherwise emptying one is an edit too (Details). Pure.
@@ -38,9 +38,11 @@ export function linkableContact(
   const r = id ? rows.find((x) => x.id === id) : undefined;
   if (!r) return null;
   const name = (typed.name ?? "").trim();
+  const email = (typed.email ?? "").trim().toLowerCase();
   const keepsName = !r.name.trim() || r.name.trim() === name || (fillEmpty && !name);
+  const keepsEmail = !r.email.trim() || r.email.trim().toLowerCase() === email || (fillEmpty && !email);
   const keepsPhone = !digits(r.phone) || digits(r.phone) === digits(typed.phone) || (fillEmpty && !digits(typed.phone));
-  return keepsName && keepsPhone ? r.id : null;
+  return keepsName && keepsEmail && keepsPhone ? r.id : null;
 }
 
 /** linkableContact against the client's contacts. Only reads them. */
