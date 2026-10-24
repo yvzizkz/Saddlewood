@@ -19,7 +19,8 @@ export const dynamic = "force-dynamic";
 // one row per job with its contract, billing, cost and margin, and opens the
 // job page. A project manager sees their own jobs, and of the cost only what
 // their seat may (jobs/access.ts): materials, labor dollars and sub bills by
-// policy, margin only when cost and margin are on.
+// policy, margin only when cost and margin are on. A field lead sees the jobs
+// they are on and no money at all: FieldLeadJobs below.
 
 const PATH = "/app/jobs";
 type SP = Record<string, string | string[] | undefined>;
@@ -27,6 +28,7 @@ type SP = Record<string, string | string[] | undefined>;
 export default async function JobsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const seat = await workSeat();
   if (!seat) redirect("/app");
+  if (!seat.money) return <FieldLeadJobs refs={(await listJobRefs()).filter((r) => seesJob(seat, r))} />;
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
@@ -139,6 +141,30 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         />
         <DataTable rows={rows} columns={columns} searchKeys={["job", "client", "pm"]} name={`jobs-${period.key}`} rowHrefKey="href" initialSort={{ key: "open", dir: "desc" }} empty="No jobs yet. Award a sale to open one." />
       </div>
+    </div>
+  );
+}
+
+/** A field lead's jobs: where they are and who runs them, nothing about money. */
+function FieldLeadJobs({ refs }: { refs: JobRef[] }) {
+  const rows: TableRow[] = refs.map((r) => ({ id: r.key, job: r.name, href: jobHref(r.key), status: r.active ? "Active" : "Closed", address: r.address || "—", client: r.client || "—", pm: r.pm.join(", ") || "—" }));
+  const columns: Column[] = [
+    { key: "job", header: "Job", kind: "text", hrefKey: "href", phone: "title" },
+    { key: "status", header: "Status", kind: "text", filter: true, phone: "value" },
+    { key: "address", header: "Address", kind: "text", phone: "hide" },
+    { key: "client", header: "Client", kind: "text", filter: true, phone: "hide" },
+    { key: "pm", header: "PM", kind: "text", filter: true },
+  ];
+  return (
+    <div className="px-4 pb-10 pt-4 md:px-8 md:pt-6">
+      <header className="mb-4">
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-gold-accessible)]">Work</p>
+        <h1 className="text-[var(--color-charcoal)]" style={{ fontFamily: "var(--font-fraunces)" }}>
+          My jobs
+        </h1>
+        <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">The jobs you are on: schedule, log and QA, punch, changes, tasks and crew.</p>
+      </header>
+      <DataTable rows={rows} columns={columns} searchKeys={["job", "address", "client", "pm"]} name="jobs-field" rowHrefKey="href" initialSort={{ key: "status", dir: "asc" }} empty="You are not on any job yet. The PM adds you on the job's crew." />
     </div>
   );
 }

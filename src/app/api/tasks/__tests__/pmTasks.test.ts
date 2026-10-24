@@ -7,7 +7,7 @@ import { NextRequest } from "next/server";
 
 type Row = Record<string, unknown>;
 const { state } = vi.hoisted(() => ({
-  state: { seat: null as null | { owner: boolean; email: string }, rows: [] as Row[], inserted: [] as Row[], updated: [] as Row[] },
+  state: { seat: null as null | { owner: boolean; email: string; money?: boolean }, rows: [] as Row[], inserted: [] as Row[], updated: [] as Row[] },
 }));
 
 const PM_JOBS = new Set(["8009-n-ironwood-dr"]);
@@ -38,7 +38,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { PATCH, POST } from "../route";
 
 const req = (method: string, body: unknown) => new NextRequest("http://localhost/api/tasks", { method, body: JSON.stringify(body) });
-const PM = { owner: false, email: "eli.pm@example.com" };
+const PM = { owner: false, email: "eli.pm@example.com", money: true };
 
 beforeEach(() => {
   state.seat = PM;
@@ -48,6 +48,10 @@ beforeEach(() => {
     { id: 7, role: "field_lead", created_by: "eli.pm@example.com", job_id: null, crew_job_id: "8009-n-ironwood-dr" },
     { id: 8, role: "finance", created_by: "lando@saddlewoodcontracting.com", job_id: null, crew_job_id: null },
     { id: 9, role: "pm", created_by: "lando@saddlewoodcontracting.com", job_id: null, crew_job_id: "4125-camelback" },
+    // Work with no job: the PM's, the field lead's, and one the lead handed out.
+    { id: 10, role: "pm", created_by: "lando@saddlewoodcontracting.com", job_id: null, crew_job_id: null },
+    { id: 11, role: "field_lead", created_by: "eli.pm@example.com", job_id: null, crew_job_id: null },
+    { id: 12, role: "pm", created_by: "arnold@example.com", job_id: null, crew_job_id: null },
   ];
 });
 
@@ -81,5 +85,43 @@ describe("PATCH /api/tasks as a PM", () => {
     expect((await PATCH(req("PATCH", { id: 9, status: "done" }))).status).toBe(404);
     expect((await PATCH(req("PATCH", { id: 7, role: "decisions" }))).status).toBe(403);
     expect(state.updated).toHaveLength(0);
+  });
+});
+
+describe("/api/tasks as a field lead (no money, jobs/access.ts)", () => {
+  const LEAD = { owner: false, email: "arnold@example.com", money: false };
+
+  it("hands work to the field lead or the PM on their job and closes field-lead work there", async () => {
+    state.seat = LEAD;
+    expect((await POST(req("POST", { title: "Pre-cover photos", role: "field_lead", job: "8009-n-ironwood-dr" }))).status).toBe(200);
+    expect(state.inserted[0]).toMatchObject({ role: "field_lead", created_by: "arnold@example.com" });
+    expect((await PATCH(req("PATCH", { id: 7, status: "done" }))).status).toBe(200);
+    expect(state.updated[0]).toMatchObject({ id: 7, status: "done", done_by: "arnold@example.com" });
+  });
+
+  it("does not hand work up, close finance work, or touch another job", async () => {
+    state.seat = LEAD;
+    expect((await POST(req("POST", { title: "x", role: "finance" }))).status).toBe(403);
+    expect((await PATCH(req("PATCH", { id: 8, status: "done" }))).status).toBe(404);
+    expect((await PATCH(req("PATCH", { id: 9, status: "done" }))).status).toBe(404);
+  });
+
+  it("leaves the PM's work with no job alone: done, drop, reopen and reassign are all refused", async () => {
+    state.seat = LEAD;
+    for (const change of [{ status: "done" }, { status: "dropped" }, { status: "open" }, { role: "field_lead" }, { assignee: "arnold@example.com" }]) {
+      expect((await PATCH(req("PATCH", { id: 10, ...change }))).status, JSON.stringify(change)).toBe(404);
+    }
+    expect(state.updated).toHaveLength(0);
+  });
+
+  it("still closes the field lead's work with no job, and work with no job they handed out", async () => {
+    state.seat = LEAD;
+    expect((await PATCH(req("PATCH", { id: 11, status: "done" }))).status).toBe(200);
+    expect((await PATCH(req("PATCH", { id: 12, status: "dropped" }))).status).toBe(200);
+    expect(state.updated.map((u) => u.id)).toEqual([11, 12]);
+  });
+
+  it("does not change what a PM may do with the PM's work with no job", async () => {
+    expect((await PATCH(req("PATCH", { id: 10, status: "done" }))).status).toBe(200);
   });
 });

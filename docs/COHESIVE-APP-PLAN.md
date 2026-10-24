@@ -405,7 +405,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - `/internal/activity` and `/internal/bid-log` placeholders go;
    - Money's purchase search becomes Accounting › Purchases.
    - Never the four batch-2 prototypes (they wait for their bot scripts).
-10. ✅ **PM access:** `src/lib/accounting/access.ts`. A `money.view` seat sees Receivables, Billing, Purchases and Payroll hours on its own jobs. Pay and cost show only if `policy.pm.laborCost` / `policy.pm.margin` are on, never Payables, and invoices are read-only. Still to do: a field-lead seat. Accounting sections for `money.view` seats scoped to their jobs, no cost or pay. Field lead seat.
+10. ✅ **PM access:** `src/lib/accounting/access.ts`. A `money.view` seat sees Receivables, Billing, Purchases and Payroll hours on its own jobs. Pay and cost show only if `policy.pm.laborCost` / `policy.pm.margin` are on, never Payables, and invoices are read-only. **Field lead seat** (`src/lib/jobs/access.ts`): a crew lead without `money.view` who holds the Field lead seat (or covers it while it is empty) opens My jobs, the job pages and Tasks for the jobs they are on (`crew_job_people`), hands and closes field-lead and PM work there, and sees no money: no Money, Purchases or Documents tab, no dollar figure, no billing or payables items, the schedule of values refused (`e2e/field-lead.spec.ts`). Still to do: once #63 (Home's Your tasks) and #65 (PM writes on the Schedule) are on main, give the field lead the same no-money filter there.
 11. Each step: tests, lint, build, screenshots at 390 px and on desktop.
 
 ### Phase 3 (in progress; `docs/SCENARIOS.md`, `npm run e2e`): scenario testing, every department's real week (one PR)

@@ -416,7 +416,15 @@ export type CrewHome = {
   now: string;
   /** The Phoenix calendar day right now. */
   day: string;
-  me: { email: string; name: string; lang: CrewLang; group: string; perms: Capability[] };
+  me: {
+    email: string;
+    name: string;
+    lang: CrewLang;
+    group: string;
+    perms: Capability[];
+    /** Holds (or covers) the Field lead seat: My jobs and Tasks open to them, with no money (jobs/access.ts). */
+    fieldLead?: boolean;
+  };
   jobs: CrewJob[];
   /** The shift this person is on right now, if any. */
   shift: OwnShift | null;

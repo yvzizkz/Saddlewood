@@ -1,4 +1,6 @@
 import { signDownload } from "@/lib/bot/queries";
+import { holdsFieldLead } from "@/lib/roles/seats";
+import { loadPeople, loadSeats } from "@/lib/roles/store";
 import { spendJobNames } from "@/lib/expenses/store";
 import {
   getEntry,
@@ -82,6 +84,8 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
     // Before migration 0023 the table is not there: their day still loads.
     listRequests({ email, since: new Date(now.getTime() - 7 * DAY_MS).toISOString() }).catch(() => []),
   ]);
+  // A lead without money.view who holds the Field lead seat opens My jobs and Tasks from More.
+  const fieldLead = person.perms.includes("money.view") ? false : await Promise.all([loadSeats(), loadPeople()]).then(([seats, people]) => holdsFieldLead(email, seats, people)).catch(() => false);
 
   // A job's note can hold a gate code. Only the people headed there see it.
   const mine = new Set([...schedule.map((s) => s.jobId), ...(open ? [open.jobId] : [])]);
@@ -90,7 +94,7 @@ export async function crewHome(person: CrewPersonRow, push: CrewHome["push"], no
     ok: true,
     now: now.toISOString(),
     day,
-    me: { email, name: person.name, lang: person.lang, group: person.group, perms: person.perms },
+    me: { email, name: person.name, lang: person.lang, group: person.group, perms: person.perms, fieldLead },
     jobs: jobs.filter((j) => j.active).map((j) => (mine.has(j.id) ? j : { ...j, note: "" })),
     shift: open ? ownShift(open) : null,
     // A shift left open since before last week still has to show.
