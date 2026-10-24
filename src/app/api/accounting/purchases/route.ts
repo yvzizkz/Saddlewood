@@ -77,6 +77,26 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true, jobId, moved });
   }
 
+  // "Not a job" or "Paid a bill" for some lines with no name to answer by
+  // (Tag spend): set aside, off any job, and a person decided it. A bill a
+  // Zelle payment paid is in Payables, where its job cost is counted.
+  if (action === "set_aside") {
+    const setAside = body.reason === "paid_bill" ? "paid_bill" : "not_a_job";
+    const sourceKeys = Array.isArray(body.sourceKeys) ? body.sourceKeys.map(String).filter(Boolean).slice(0, 100) : [];
+    if (!sourceKeys.length) return NextResponse.json({ ok: false, error: "sourceKeys required" }, { status: 400 });
+    const { data, error } = await db.from("purchases").select("source_key, meta").in("source_key", sourceKeys);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    const at = new Date().toISOString();
+    for (const r of (data ?? []) as { source_key: string; meta: Record<string, unknown> | null }[]) {
+      const { error: upErr } = await db
+        .from("purchases")
+        .update({ job_id: null, job_manual: true, meta: { ...(r.meta ?? {}), ignored: true, decidedBy: actor, setAside }, updated_at: at })
+        .eq("source_key", r.source_key);
+      if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, moved: (data ?? []).length });
+  }
+
   // Count a Home Depot trip once: mark the app receipts Pro Xtra already has,
   // over a span of days (new purchases do this as they come in; this is for
   // the ones from before). { from?, to? } YYYY-MM-DD, at most 400 days.

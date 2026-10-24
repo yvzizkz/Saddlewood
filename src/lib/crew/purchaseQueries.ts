@@ -11,6 +11,7 @@ import {
   type AliasRule,
   type MaterialBlock,
   type PurchaseRow,
+  type PurchaseSource,
   type PurchasesToday,
   type TradeRule,
   type UnmatchedPurchase,
@@ -28,7 +29,7 @@ function fail(what: string, message: string): never {
 }
 
 type PurchaseDbRow = {
-  source: "hd" | "app";
+  source: PurchaseSource;
   source_key: string;
   purchased_on: string;
   vendor: string;
@@ -99,11 +100,13 @@ const CHUNK = 500;
 export const MANUAL_KEY_BATCH = 100;
 
 /** A line as a person left it: the trade they set (0030) and the job they put it on (0042). */
-export type ManualEdit = { source_key: string; trade: string; job_id: string | null; trade_manual: boolean; job_manual?: boolean };
+export type ManualEdit = { source_key: string; trade: string; job_id: string | null; trade_manual: boolean; job_manual?: boolean; meta?: Record<string, unknown> | null };
 
 /**
  * The Mac's lines with what a person set by hand put back: a manual trade
- * stays, and a manual job stays (and is not "set aside"). Pure, for tests.
+ * stays, and a manual job stays (and is not "set aside"), and so does a line
+ * a person set aside by hand ("Not a job" on Tag spend: no job, ignored).
+ * Pure, for tests.
  */
 export function keepManual(rows: PurchaseRow[], edits: ManualEdit[]): PurchaseRow[] {
   const by = new Map(edits.map((e) => [e.source_key, e]));
@@ -116,6 +119,10 @@ export function keepManual(rows: PurchaseRow[], edits: ManualEdit[]): PurchaseRo
       out.jobId = e.job_id;
       const meta = { ...(r.meta ?? {}) };
       delete meta.ignored;
+      if (e.job_id === null && e.meta?.ignored === true) {
+        meta.ignored = true;
+        for (const k of ["decidedBy", "setAside"]) if (e.meta[k] !== undefined) meta[k] = e.meta[k];
+      }
       out.meta = meta;
     }
     return out;
@@ -123,7 +130,7 @@ export function keepManual(rows: PurchaseRow[], edits: ManualEdit[]): PurchaseRo
 }
 
 async function manualEditsBatch(db: ReturnType<typeof getSupabaseAdmin>, batch: string[]): Promise<ManualEdit[]> {
-  const full = await db.from("purchases").select("source_key, trade, job_id, trade_manual, job_manual").in("source_key", batch).or("trade_manual.eq.true,job_manual.eq.true");
+  const full = await db.from("purchases").select("source_key, trade, job_id, trade_manual, job_manual, meta").in("source_key", batch).or("trade_manual.eq.true,job_manual.eq.true");
   if (!full.error) return (full.data ?? []) as ManualEdit[];
   // Before 0042 there is no job_manual: keep the manual trades.
   const trades = await db.from("purchases").select("source_key, trade, job_id, trade_manual").in("source_key", batch).eq("trade_manual", true);

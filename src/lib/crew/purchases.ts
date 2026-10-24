@@ -95,8 +95,18 @@ const clipped = (max: number) =>
     .default("")
     .transform((v) => v.replace(/\u0000/g, "").trim().replace(/\s+/g, " ").slice(0, max));
 
+/**
+ * Where a line comes from: Home Depot Pro Xtra, a receipt filed in the app, a
+ * supply house, typed in, a Zelle payment the bot read, a receipt texted to
+ * the bot (0030, 0053).
+ */
+export const PURCHASE_SOURCES = ["hd", "app", "vendor", "manual", "zelle", "receipt"] as const;
+export type PurchaseSource = (typeof PURCHASE_SOURCES)[number];
+/** A receipt someone filed (in the app or by text): what a Pro Xtra trip can duplicate. */
+export const RECEIPT_SOURCES: readonly PurchaseSource[] = ["app", "receipt"];
+
 export const purchaseLineSchema = z.object({
-  source: z.enum(["hd", "app"]),
+  source: z.enum(PURCHASE_SOURCES),
   sourceKey: z.string().trim().min(1).max(120),
   purchasedOn: z.string().refine(isDay, "purchasedOn must be YYYY-MM-DD"),
   vendor: clipped(80).transform((v) => v || "Home Depot"),

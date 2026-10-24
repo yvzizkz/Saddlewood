@@ -1,0 +1,20 @@
+--- a/bot/receipt_ocr.py
++++ b/bot/receipt_ocr.py
+@@ -9,7 +9,7 @@
+   2. OCR extracts Vendor, Date, Line Items, Tax, Total Amount, Payment Method.
+   3. Image classifier distinguishes Receipt vs. Jobsite Work Photo.
+   4. Auto-matches to worker's active scheduled project (e.g. Powell Residence).
+-  5. Injects expense into accounting state & portal (/internal/expenses).
++  5. Injects expense into accounting state & the site's spend ledger (Purchases > Tag spend).
+   6. Sends instant confirmation text back to worker in 3 seconds.
+ 
+ Usage:
+@@ -364,7 +364,7 @@
+         reply = (
+             f"🧾 Got physical receipt: **${amount:,.2f}** at **{vendor}** on {date_str}!\n"
+             f"Which project was this for? Reply 'R{new_n} Powell' or review at:\n"
+-            f"https://saddlewoodcontracting.com/internal/expenses"
++            f"https://saddlewoodcontracting.com/app/accounting/purchases#tag-spend"
+         )
+ 
+     return {

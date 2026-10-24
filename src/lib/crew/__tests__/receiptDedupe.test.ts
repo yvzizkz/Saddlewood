@@ -19,6 +19,17 @@ describe("matchReceiptsToTrips", () => {
     expect(matchReceiptsToTrips(lines)).toEqual([{ appKey: "app:41", tripKey: "hd:20261012:674:0:6220", jobId: "powell" }]);
   });
 
+  it("a receipt texted to the bot counts once too; a Zelle payment is never a receipt", () => {
+    const lines: DedupeLine[] = [
+      hd("hd:20261012:674:0:6220:1", "2026-10-12", 10_000),
+      { source: "receipt", sourceKey: "expense:r-13:1", purchasedOn: "2026-10-12", vendor: "The Home Depot", lineTotalCents: 10_830, jobId: null, meta: {} },
+      { source: "zelle", sourceKey: "expense:z-14:1", purchasedOn: "2026-10-12", vendor: "Home Depot", lineTotalCents: 10_830, jobId: null, meta: {} },
+    ];
+    const matches = matchReceiptsToTrips(lines);
+    expect(matches).toEqual([{ appKey: "expense:r-13:1", tripKey: "hd:20261012:674:0:6220", jobId: null }]);
+    expect(coverChanges(lines, matches).set.map((m) => m.appKey)).toEqual(["expense:r-13:1"]);
+  });
+
   it("leaves a receipt alone on another day, from another store, or outside the tax band", () => {
     const lines = [
       hd("hd:20261012:674:0:6220:1", "2026-10-12", 10_000),

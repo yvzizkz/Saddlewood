@@ -35,7 +35,7 @@ const PORTAL_EXTRA: { href: string; label: string; note: string }[] = [
   { href: '/app/policies/rights', label: 'Who decides', note: 'Roles, who holds them, and what each may approve' },
   { href: '/internal/trackers', label: 'Progress trackers', note: 'Schedules of values and invoices' },
   { href: '/internal?tab=pending', label: 'Estimates', note: 'Bids waiting for sign-off' },
-  { href: '/internal/expenses', label: 'Expenses', note: 'Tag Zelle payments and receipts' },
+  { href: '/app/accounting/purchases#tag-spend', label: 'Tag spend', note: 'Zelle payments and receipts on no job' },
   { href: '/internal/contracts', label: 'Contracts', note: 'Agreements in review' },
 ]
 

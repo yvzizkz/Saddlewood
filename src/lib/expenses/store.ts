@@ -1,437 +1,197 @@
-import fs from 'fs';
-import path from 'path';
-import { getSupabaseAdmin } from '@/lib/supabase/admin';
-import type {
-  AccountingDashboardState,
-  ExpenseCategory,
-  ExpenseItem,
-  WeeklyLaborSummary,
-  WeeklyPurchasesSummary,
-} from './types';
+// The bot's expenses (Zelle payments, texted receipts) in the one spend
+// ledger, purchases (migration 0053). Server-only, service role.
+//
+// The old Expenses page kept them as JSON in progress_trackers
+// ('accounting-state') with seed numbers; that row is left as it was, and
+// 0053 copied its real items here. Owners put each line on a job from "Tag
+// spend" on Purchases; the bot's "Z12 Powell Materials" lands the same way,
+// through the register-name rules every purchase uses.
 
-const ACCOUNTING_STATE_ID = 'accounting-state';
-const LOCAL_BOT_STATE_PATH = '/Users/landos/dev/Saddlewood-KB/bot/accounting_state.json';
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { listAliases, listTradeMap, upsertPurchases } from "@/lib/crew/purchaseQueries";
+import { linkLines, type PurchaseLine } from "@/lib/crew/purchases";
+import { listJobs } from "@/lib/crew/queries";
+import { asExpense, expenseRef, spendLine, type SpendRow } from "./spend";
+import type { ExpenseItem } from "./types";
 
-const DEFAULT_ACTIVE_PROJECTS = [
-  'Powell Residence',
-  'A Finer Touch (AFT)',
-  'North Lane',
-  '6602 N 40th St',
-  '24417 N 120th Pl',
-  'General / Overhead',
-];
+const SPEND_SOURCES = ["zelle", "receipt"];
+const COLS = "source, source_key, purchased_on, vendor, order_ref, job_name_raw, job_id, job_manual, department, class, sku, description, qty, line_total_cents, meta, created_at";
 
-const INITIAL_EXPENSES: ExpenseItem[] = [
-  {
-    id: 'z-1',
-    n: 1,
-    source: 'zelle',
-    direction: 'out',
-    date: '2026-09-21',
-    amount: 4700.0,
-    recipient: 'Steve Knisely',
-    memo: 'truck / transport',
-    transactionId: '25497567655',
-    status: 'pending',
-    project: null,
-    expenseType: null,
-    decidedBy: null,
-    decidedAt: null,
-    clearedVia: null,
-    notes: 'Chase Zelle disbursement',
-    createdAt: '2026-09-21T21:10:00Z',
-  },
-  {
-    id: 'z-2',
-    n: 2,
-    source: 'zelle',
-    direction: 'out',
-    date: '2026-09-21',
-    amount: 2450.0,
-    recipient: 'Billy Boy',
-    memo: 'framing assist',
-    transactionId: '25497567891',
-    status: 'pending',
-    project: null,
-    expenseType: null,
-    decidedBy: null,
-    decidedAt: null,
-    clearedVia: null,
-    notes: 'Chase Zelle disbursement',
-    createdAt: '2026-09-21T22:20:00Z',
-  },
-  {
-    id: 'z-3',
-    n: 3,
-    source: 'zelle',
-    direction: 'out',
-    date: '2026-09-20',
-    amount: 3800.0,
-    recipient: 'Manuel Aj Stucco',
-    memo: 'exterior patch labor',
-    transactionId: '25497567112',
-    status: 'pending',
-    project: null,
-    expenseType: null,
-    decidedBy: null,
-    decidedAt: null,
-    clearedVia: null,
-    notes: 'Subcontractor payment',
-    createdAt: '2026-09-20T16:15:00Z',
-  },
-  {
-    id: 'z-4',
-    n: 4,
-    source: 'zelle',
-    direction: 'out',
-    date: '2026-09-18',
-    amount: 1650.0,
-    recipient: 'Aidan Glass',
-    memo: 'shower enclosure hardware',
-    transactionId: '25497566840',
-    status: 'pending',
-    project: null,
-    expenseType: null,
-    decidedBy: null,
-    decidedAt: null,
-    clearedVia: null,
-    notes: 'Materials & install',
-    createdAt: '2026-09-18T14:30:00Z',
-  },
-  {
-    id: 'z-5',
-    n: 5,
-    source: 'zelle',
-    direction: 'out',
-    date: '2026-09-15',
-    amount: 980.0,
-    recipient: 'Valentin Container',
-    memo: 'jobsite dumpster swap',
-    transactionId: '25497565902',
-    status: 'pending',
-    project: null,
-    expenseType: null,
-    decidedBy: null,
-    decidedAt: null,
-    clearedVia: null,
-    notes: 'Waste & debris haul',
-    createdAt: '2026-09-15T11:00:00Z',
-  },
-];
+type Row = SpendRow & { job_manual: boolean; department: string; class: string; sku: string; qty: number | string };
 
-const INITIAL_PURCHASES: WeeklyPurchasesSummary = {
-  totalSpend: 11485.42,
-  count: 14,
-  byProject: {
-    'Powell Residence': {
-      total: 5820.65,
-      count: 6,
-      items: [
-        {
-          id: 'hd-1',
-          date: '2026-09-24',
-          vendor: 'The Home Depot (Store #0472)',
-          description: 'Drywall 5/8 Type X 4x8, joint compound, paper tape',
-          amount: 1420.5,
-          project: 'Powell Residence',
-          category: 'Drywall & Materials',
-        },
-        {
-          id: 'hd-2',
-          date: '2026-09-22',
-          vendor: 'The Home Depot (Store #0472)',
-          description: 'Lutron Maestro LED+ dimmers & companion switches',
-          amount: 1166.67,
-          project: 'Powell Residence',
-          category: 'Electrical & Lighting',
-        },
-        {
-          id: 'hd-3',
-          date: '2026-09-21',
-          vendor: 'The Home Depot (Store #0472)',
-          description: '20 ft x 100 ft 6 mil plastic sheeting & tape',
-          amount: 278.0,
-          project: 'Powell Residence',
-          category: 'Protection & Consumables',
-        },
-        {
-          id: 'vr-1',
-          date: '2026-09-20',
-          vendor: 'Central Arizona Supply',
-          description: 'Rough plumbing fittings, valves, PEX-A',
-          amount: 2955.48,
-          project: 'Powell Residence',
-          category: 'Plumbing Fixtures',
-        },
-      ],
-    },
-    'North Lane': {
-      total: 3410.22,
-      count: 4,
-      items: [
-        {
-          id: 'fd-1',
-          date: '2026-09-23',
-          vendor: 'Floor & Decor',
-          description: 'Porcelain tile 24x48, thinset, leveling clips',
-          amount: 2840.5,
-          project: 'North Lane',
-          category: 'Tile & Flooring',
-        },
-        {
-          id: 'lw-1',
-          date: '2026-09-21',
-          vendor: "Lowe's",
-          description: 'Schluter Ditra underlayment & waterproof membrane',
-          amount: 569.72,
-          project: 'North Lane',
-          category: 'Waterproofing',
-        },
-      ],
-    },
-    'A Finer Touch (AFT)': {
-      total: 2254.55,
-      count: 4,
-      items: [
-        {
-          id: 'hd-4',
-          date: '2026-09-24',
-          vendor: 'The Home Depot (Store #0411)',
-          description: 'Steel studs 3-5/8 20ga, track, self-drilling screws',
-          amount: 1840.25,
-          project: 'A Finer Touch (AFT)',
-          category: 'Steel Framing',
-        },
-        {
-          id: 'hd-5',
-          date: '2026-09-22',
-          vendor: 'The Home Depot (Store #0411)',
-          description: 'Fasteners, acoustic sealant, safety equipment',
-          amount: 414.3,
-          project: 'A Finer Touch (AFT)',
-          category: 'Hardware & Fasteners',
-        },
-      ],
-    },
-  },
-};
-
-const INITIAL_LABOR: WeeklyLaborSummary = {
-  totalHours: 346.5,
-  byProject: {
-    'Powell Residence': {
-      project: 'Powell Residence',
-      totalHours: 154.0,
-      employees: [
-        { name: 'Marco Ochoa', regularHours: 40.0, overtimeHours: 6.5, totalHours: 46.5 },
-        { name: 'Refugio G.', regularHours: 40.0, overtimeHours: 4.0, totalHours: 44.0 },
-        { name: 'Jose Martinez', regularHours: 38.0, overtimeHours: 0.0, totalHours: 38.0 },
-        { name: 'Billy Boy', regularHours: 25.5, overtimeHours: 0.0, totalHours: 25.5 },
-      ],
-    },
-    'A Finer Touch (AFT)': {
-      project: 'A Finer Touch (AFT)',
-      totalHours: 118.0,
-      employees: [
-        { name: 'Carlos H.', regularHours: 40.0, overtimeHours: 2.0, totalHours: 42.0 },
-        { name: 'Tony Lopez', regularHours: 40.0, overtimeHours: 0.0, totalHours: 40.0 },
-        { name: 'Gerardo M.', regularHours: 36.0, overtimeHours: 0.0, totalHours: 36.0 },
-      ],
-    },
-    'North Lane': {
-      project: 'North Lane',
-      totalHours: 74.5,
-      employees: [
-        { name: 'David Lopez', regularHours: 40.0, overtimeHours: 0.0, totalHours: 40.0 },
-        { name: 'Victor Flores', regularHours: 34.5, overtimeHours: 0.0, totalHours: 34.5 },
-      ],
-    },
-  },
-};
-
-function readLocalBotState(): Record<string, unknown> | null {
-  try {
-    if (fs.existsSync(LOCAL_BOT_STATE_PATH)) {
-      const raw = fs.readFileSync(LOCAL_BOT_STATE_PATH, 'utf8');
-      return JSON.parse(raw);
-    }
-  } catch {
-    // Ignore read errors from sandbox/prod
-  }
-  return null;
+/**
+ * Link the lines (alias, job name, trade) and store them, keeping what a
+ * person set by hand. linkLines derives "ignored" from the alias rules only,
+ * so a line already dismissed ("Z12 dismiss") gets it back here when it is
+ * still on no job: a resend never returns it to Tag spend.
+ */
+async function store(lines: PurchaseLine[]): Promise<void> {
+  const [aliases, rules, jobs] = await Promise.all([listAliases(), listTradeMap(), listJobs()]);
+  const { rows } = linkLines(lines, aliases, rules, jobs.filter((j) => j.active));
+  await upsertPurchases(keepDismissed(lines, rows));
 }
 
-function writeLocalBotState(data: Record<string, unknown>) {
-  try {
-    if (fs.existsSync(path.dirname(LOCAL_BOT_STATE_PATH))) {
-      fs.writeFileSync(LOCAL_BOT_STATE_PATH, JSON.stringify(data, null, 1), 'utf8');
-    }
-  } catch {
-    // Ignore write errors in cloud environments
-  }
+/** Rows whose line came in dismissed, and is on no job, stay dismissed. Pure, for tests. */
+export function keepDismissed<T extends { sourceKey: string; jobId: string | null; meta: Record<string, unknown> }>(lines: PurchaseLine[], rows: T[]): T[] {
+  const dismissed = new Set(lines.filter((l) => l.meta?.ignored === true).map((l) => l.sourceKey));
+  return rows.map((r) => (dismissed.has(r.sourceKey) && r.jobId === null ? { ...r, meta: { ...r.meta, ignored: true } } : r));
 }
 
-export async function getAccountingState(): Promise<AccountingDashboardState> {
+/** The ids the bot gives item number n. */
+export function byNumber(n: number): string[] {
+  return [`z-${n}`, `r-${n}`];
+}
+
+async function find(ref: ReturnType<typeof expenseRef>): Promise<Row | null> {
+  if (!ref) return null;
   const db = getSupabaseAdmin();
-  let state: Partial<AccountingDashboardState> = {};
+  let q = db.from("purchases").select(COLS).in("source", SPEND_SOURCES);
+  // By number: the bot's ids carry it (Z12 is z-12, R7 is r-7), so match the
+  // id, never a stored n an older page may have renumbered.
+  q = "id" in ref ? q.eq("meta->>expenseId", ref.id) : q.in("meta->>expenseId", byNumber(ref.n));
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(1);
+  if (error) throw new Error(`purchases read failed: ${error.message}`);
+  return ((data ?? [])[0] as Row | undefined) ?? null;
+}
 
-  try {
-    const { data } = await db
-      .from('progress_trackers')
-      .select('state')
-      .eq('id', ACCOUNTING_STATE_ID)
-      .maybeSingle();
+async function reread(key: string): Promise<ExpenseItem> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("purchases").select(COLS).eq("source_key", key).maybeSingle();
+  if (error || !data) throw new Error(`purchases read failed: ${error?.message ?? "row missing"}`);
+  return asExpense(data as Row);
+}
 
-    if (data && data.state && typeof data.state === 'object') {
-      state = data.state as Partial<AccountingDashboardState>;
-    }
-  } catch (err) {
-    console.error('Supabase getAccountingState read error:', err);
-  }
-
-  // Check local bot state for any Zelle updates
-  const localBot = readLocalBotState();
-  let localZelle: ExpenseItem[] = [];
-  if (localBot && Array.isArray(localBot.zelle_transactions)) {
-    localZelle = localBot.zelle_transactions as ExpenseItem[];
-  }
-
-  let expenses: ExpenseItem[] = state.expenses || [];
-  if (expenses.length === 0) {
-    expenses = localZelle.length > 0 ? localZelle : INITIAL_EXPENSES;
-  } else if (localZelle.length > 0) {
-    // Merge local bot Zelle items
-    const existingIds = new Set(expenses.map((e) => e.id || `z-${e.n}`));
-    for (const z of localZelle) {
-      const zKey = z.id || `z-${z.n}`;
-      if (!existingIds.has(zKey)) {
-        expenses.push(z);
-      }
-    }
-  }
-
-  const weeklyPurchases = state.weeklyPurchases || INITIAL_PURCHASES;
-  const weeklyLabor = state.weeklyLabor || INITIAL_LABOR;
-  const activeProjects = state.activeProjects || DEFAULT_ACTIVE_PROJECTS;
-
+/** The stored line as a line to send again, with changes. */
+function lineOf(r: Row, change: { jobNameRaw?: string; meta: Record<string, unknown> }): PurchaseLine {
   return {
-    expenses,
-    weeklyPurchases,
-    weeklyLabor,
-    activeProjects,
-    lastUpdated: state.lastUpdated || new Date().toISOString(),
+    source: r.source === "zelle" ? "zelle" : "receipt",
+    sourceKey: r.source_key,
+    purchasedOn: r.purchased_on,
+    vendor: r.vendor,
+    store: "",
+    orderRef: r.order_ref,
+    jobNameRaw: change.jobNameRaw ?? r.job_name_raw,
+    department: r.department,
+    class: r.class,
+    sku: r.sku,
+    description: r.description,
+    qty: Number(r.qty) || 1,
+    lineTotalCents: r.line_total_cents,
+    // The name decides again; a job a person set stays (keepManual).
+    jobId: null,
+    meta: change.meta,
   };
 }
 
-export async function saveAccountingState(
-  state: AccountingDashboardState,
-  actor: string
-): Promise<AccountingDashboardState> {
+export type AddResult = { ok: true; item: ExpenseItem; created: boolean } | { ok: false; error: string };
+
+/**
+ * A new item from the bot. Sending it again is safe (same key). A receipt
+ * filed in the app is already a line (app:<entry id>): nothing is added.
+ */
+export async function addExpense(expense: unknown): Promise<AddResult> {
+  const input = spendLine(expense);
+  if (input.kind === "bad") return { ok: false, error: input.error };
+  if (input.kind === "app") return { ok: true, item: expense as ExpenseItem, created: false };
+  const before = await find({ id: String(input.line.meta.expenseId) });
+  // A resend keeps the job an owner or a "Z12 ..." text has given it since,
+  // and what was decided about it (category, decidedBy, a dismissal).
+  const line = before ? { ...input.line, jobNameRaw: before.job_name_raw || input.line.jobNameRaw, meta: { ...input.line.meta, ...before.meta } } : input.line;
+  await store([line]);
+  return { ok: true, item: await reread(line.sourceKey), created: !before };
+}
+
+/** "Z12 Powell Materials": the line takes the job name, and the job it names. */
+export async function categorizeExpense(idOrN: unknown, project: string, expenseType: string, decidedBy: string): Promise<ExpenseItem | null> {
+  const r = await find(expenseRef(idOrN));
+  if (!r) return null;
+  const { ignored: _was, ...meta } = r.meta ?? {};
+  void _was;
+  await store([lineOf(r, { jobNameRaw: project.trim().slice(0, 160), meta: { ...meta, category: expenseType.trim().slice(0, 60), decidedBy } })]);
+  return reread(r.source_key);
+}
+
+/** "Z12 dismiss": set aside, off every job unless a person put it on one. */
+export async function dismissExpense(idOrN: unknown, decidedBy: string): Promise<ExpenseItem | null> {
+  const r = await find(expenseRef(idOrN));
+  if (!r) return null;
   const db = getSupabaseAdmin();
-  state.lastUpdated = new Date().toISOString();
-
-  // Save to Supabase
-  try {
-    await db.from('progress_trackers').upsert({
-      id: ACCOUNTING_STATE_ID,
-      project_name: 'Accounting & Expenses',
-      invoice_number: 'live',
-      state: state as unknown as Record<string, unknown>,
-      updated_by: actor,
-    });
-  } catch (err) {
-    console.error('Supabase saveAccountingState upsert error:', err);
-  }
-
-  // Sync to local bot state if on local machine
-  const localBot = readLocalBotState() || {};
-  localBot.zelle_transactions = state.expenses;
-  localBot.last_expense_update = state.lastUpdated;
-  localBot.updated_by = actor;
-  writeLocalBotState(localBot);
-
-  return state;
+  const { error } = await db
+    .from("purchases")
+    .update({ meta: { ...(r.meta ?? {}), ignored: true, decidedBy }, ...(r.job_manual ? {} : { job_id: null }), updated_at: new Date().toISOString() })
+    .eq("source_key", r.source_key);
+  if (error) throw new Error(`purchases update failed: ${error.message}`);
+  return reread(r.source_key);
 }
 
-export async function categorizeExpense(
-  idOrN: string | number,
-  project: string,
-  expenseType: string,
-  decidedBy: string,
-  clearedVia: 'portal' | 'text' | 'email' = 'portal'
-): Promise<ExpenseItem | null> {
-  const state = await getAccountingState();
-  const searchN = typeof idOrN === 'number' ? idOrN : parseInt(String(idOrN).replace(/\D/g, ''), 10);
-  const searchId = String(idOrN).trim().toLowerCase();
-
-  const item = state.expenses.find(
-    (e) => e.id.toLowerCase() === searchId || (searchN && e.n === searchN)
-  );
-
-  if (!item) return null;
-
-  item.status = 'categorized';
-  item.project = project;
-  item.expenseType = expenseType;
-  item.decidedBy = decidedBy;
-  item.decidedAt = new Date().toISOString();
-  item.clearedVia = clearedVia;
-
-  if (project && !state.activeProjects.includes(project)) {
-    state.activeProjects.push(project);
-  }
-
-  await saveAccountingState(state, decidedBy);
-  return item;
+/** The bot's items, newest first, in the old shape. */
+export async function listExpenses(limit = 300): Promise<ExpenseItem[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("purchases").select(COLS).in("source", SPEND_SOURCES).order("purchased_on", { ascending: false }).limit(limit);
+  if (error) throw new Error(`purchases read failed: ${error.message}`);
+  return ((data ?? []) as Row[]).map((r) => asExpense(r));
 }
 
-export async function dismissExpense(
-  idOrN: string | number,
-  decidedBy: string,
-  clearedVia: 'portal' | 'text' | 'email' = 'portal'
-): Promise<ExpenseItem | null> {
-  const state = await getAccountingState();
-  const searchN = typeof idOrN === 'number' ? idOrN : parseInt(String(idOrN).replace(/\D/g, ''), 10);
-  const searchId = String(idOrN).trim().toLowerCase();
+export type UntaggedSpend = {
+  sourceKey: string;
+  source: string;
+  purchasedOn: string;
+  vendor: string;
+  description: string;
+  cents: number;
+  /** What the bot or the import had typed, when no rule matched it. */
+  typed: string;
+};
 
-  const item = state.expenses.find(
-    (e) => e.id.toLowerCase() === searchId || (searchN && e.n === searchN)
-  );
-
-  if (!item) return null;
-
-  item.status = 'dismissed';
-  item.decidedBy = decidedBy;
-  item.decidedAt = new Date().toISOString();
-  item.clearedVia = clearedVia;
-
-  await saveAccountingState(state, decidedBy);
-  return item;
-}
-
-export async function addExpense(
-  expense: Partial<ExpenseItem> & Omit<ExpenseItem, 'id' | 'n' | 'createdAt'>,
-  actor: string
-): Promise<ExpenseItem> {
-  const state = await getAccountingState();
-  // A receipt sent from the app names the app entry it came from. The bot
-  // sends it again when it does not hear back; that must not add a second row.
-  const appEntry = (expense as { appEntry?: unknown }).appEntry;
-  if (typeof appEntry === 'number') {
-    const prior = state.expenses.find((e) => (e as { appEntry?: unknown }).appEntry === appEntry);
-    if (prior) return prior;
-  }
-  const maxN = state.expenses.reduce((m, e) => Math.max(m, e.n || 0), 0);
-  const n = maxN + 1;
-  const prefix = expense.source === 'receipt' ? 'r' : 'z';
-  const newItem: ExpenseItem = {
-    ...expense,
-    id: expense.id || `${prefix}-${n}`,
-    n,
-    createdAt: new Date().toISOString(),
+/**
+ * Spend on no job, with no name to answer by, that nobody set aside: a Zelle
+ * payment nobody tagged, a receipt or a register line with no job typed. A
+ * line with a name waits in "Which job is this?" instead, answered once for
+ * every line under it; a receipt a Pro Xtra trip covers is not counted.
+ */
+export async function untaggedSpend(limit = 50): Promise<{ rows: UntaggedSpend[]; count: number }> {
+  const db = getSupabaseAdmin();
+  const { data, error, count } = await db
+    .from("purchases")
+    .select("source, source_key, purchased_on, vendor, job_name_raw, description, line_total_cents", { count: "exact" })
+    .is("job_id", null)
+    .eq("job_key", "")
+    .or("meta->>ignored.is.null,meta->>ignored.neq.true")
+    .is("meta->>coveredBy", null)
+    .order("purchased_on", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`purchases read failed: ${error.message}`);
+  const rows = (data ?? []) as { source: string; source_key: string; purchased_on: string; vendor: string; job_name_raw: string; description: string; line_total_cents: number }[];
+  return {
+    count: count ?? rows.length,
+    rows: rows.map((r) => ({
+      sourceKey: r.source_key,
+      source: r.source,
+      purchasedOn: r.purchased_on,
+      vendor: r.vendor,
+      description: r.description,
+      cents: r.line_total_cents,
+      typed: r.job_name_raw,
+    })),
   };
+}
 
-  state.expenses.unshift(newItem);
-  await saveAccountingState(state, actor);
-  return newItem;
+/** Names the spend was filed under that are no crew job yet (Crew admin's "Add a job" hints). */
+export async function spendJobNames(limit = 12): Promise<string[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("purchases")
+    .select("job_name_raw")
+    .in("source", SPEND_SOURCES)
+    .is("job_id", null)
+    .neq("job_name_raw", "")
+    .order("purchased_on", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(`purchases read failed: ${error.message}`);
+  const seen = new Map<string, string>();
+  for (const r of (data ?? []) as { job_name_raw: string }[]) {
+    const k = r.job_name_raw.trim().toLowerCase();
+    if (k.length >= 2 && !seen.has(k)) seen.set(k, r.job_name_raw.trim());
+  }
+  return [...seen.values()].slice(0, limit);
 }
