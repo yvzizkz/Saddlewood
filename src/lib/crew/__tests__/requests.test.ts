@@ -66,10 +66,22 @@ vi.mock("../queries", () => ({
   },
 }));
 
-vi.mock("../requestQueries", () => ({
+vi.mock("../requestQueries", async (orig) => ({
+  requestFromPickup: (await orig<typeof import("../requestQueries")>()).requestFromPickup,
   listRequests: async () => db.requests,
   getRequest: async (id: number) => db.requests.find((r) => r.id === id) ?? null,
-  getRequestByPickup: async (pickupId: number) => db.requests.find((r) => r.pickupId === pickupId) ?? null,
+  syncRequestToPickup: async (pickupId: number, pickup: string) => {
+    const { requestFromPickup } = await orig<typeof import("../requestQueries")>();
+    const next = requestFromPickup("ordered", pickup as never);
+    let n = 0;
+    for (const r of db.requests) {
+      if (r.pickupId === pickupId && ["ordered", "picked", "delivered", "cancelled"].includes(r.status as string) && r.status !== next) {
+        r.status = next;
+        n++;
+      }
+    }
+    return n;
+  },
   insertRequest: async (r: Record<string, unknown>) => {
     const prior = r.entryId !== null ? db.requests.find((x) => x.entryId === r.entryId) : undefined;
     if (prior) return { request: prior, existed: true };
@@ -123,7 +135,7 @@ vi.mock("@/lib/bot/queries", () => ({
 
 import { runCrewAct } from "../act";
 import type { CrewPersonRow } from "../queries";
-import { applyMacRequests, runRequestAct } from "../requests";
+import { applyMacRequests, mirrorPickupToRequest, runRequestAct } from "../requests";
 import { decideRule, ownersDecide, ownersFirst, pmDecides, requestDetail, requestTitle } from "../requestRules";
 import { adminActSchema, crewActSchema, crewSyncSchema, type AdminActInput, type CrewActInput, type CrewRequest } from "../types";
 import { buildMorning } from "@/lib/owner/morning";
@@ -418,6 +430,34 @@ describe("ordering, and the pickup that comes of it", () => {
     expect(db.requests[0].status).toBe("picked");
     expect(await crew(rico, { kind: "pickup.update", id: pickupId, status: "delivered", files: [photo()] }, at("09:00", "2026-10-06"))).toEqual({ ok: true });
     expect(db.requests[0].status).toBe("delivered");
+  });
+
+  it("is cancelled with its pickup, and ordered again if the pickup is staged again", async () => {
+    await admin(asEli, { kind: "request.order", id: 2, supplier: "Home Depot" });
+    const pickupId = db.pickups[0].id as number;
+    // The office cancels the pickup (Crew admin's pickup.update, which carries it back).
+    await mirrorPickupToRequest(pickupId, "cancelled");
+    expect(db.requests[0].status).toBe("cancelled");
+    await mirrorPickupToRequest(pickupId, "staged");
+    expect(db.requests[0].status).toBe("ordered");
+  });
+});
+
+describe("a request reads where it stands from its pickup", () => {
+  it("once ordered, is the pickup's status; before that, its own", async () => {
+    const { requestFromPickup } = await vi.importActual<typeof import("../requestQueries")>("../requestQueries");
+    expect(requestFromPickup("ordered", "picked")).toBe("picked");
+    expect(requestFromPickup("ordered", "delivered")).toBe("delivered");
+    expect(requestFromPickup("picked", "cancelled")).toBe("cancelled");
+    expect(requestFromPickup("delivered", "staged")).toBe("ordered");
+    // A pickup in trouble is still on order; the line says so (pickupStatus).
+    expect(requestFromPickup("picked", "problem")).toBe("ordered");
+    // The column says ordered but the copy-back was missed: the pickup wins.
+    expect(requestFromPickup("ordered", "delivered")).toBe("delivered");
+    // Never ordered, or no pickup: the request's own status.
+    expect(requestFromPickup("approved", "delivered")).toBe("approved");
+    expect(requestFromPickup("denied", "staged")).toBe("denied");
+    expect(requestFromPickup("ordered", null)).toBe("ordered");
   });
 });
 

@@ -1,9 +1,23 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { REQUEST_STATUSES, type CrewRequest, type CrewRequestStatus } from "./types";
+import { REQUEST_STATUSES, type CrewPickupStatus, type CrewRequest, type CrewRequestStatus } from "./types";
 
 // Every read and write of crew_requests (migration 0023). Service-role client
 // only, after the route has decided who is asking, like queries.ts. Kept out
 // of queries.ts so the table can be mocked on its own in tests.
+//
+// Once a request is ordered, where it stands is its pickup's: every read
+// takes the pickup's status with it and works the request's out from that
+// (requestFromPickup), so the two cannot disagree. The status column is kept
+// up to date as well (mirrorPickupToRequest), for the open-list index.
+
+/** The request's status, read through its pickup once it was ordered. */
+export function requestFromPickup(status: CrewRequestStatus, pickup: CrewPickupStatus | null): CrewRequestStatus {
+  if (!pickup || !["ordered", "picked", "delivered", "cancelled"].includes(status)) return status;
+  return pickup === "picked" ? "picked" : pickup === "delivered" ? "delivered" : pickup === "cancelled" ? "cancelled" : "ordered";
+}
+
+// The pickup it became, read in the same query (crew_requests.pickup_id).
+const COLS = "*, pickup:crew_pickups(status)";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -34,9 +48,13 @@ type RequestRow = {
   pickup_id: number | null;
   created_at: string;
   updated_at: string;
+  pickup?: { status: string } | null;
 };
 
+const PICKUP_STATUSES: readonly CrewPickupStatus[] = ["staged", "picked", "delivered", "problem", "cancelled"];
+
 function toRequest(r: RequestRow): CrewRequest {
+  const pickupStatus = r.pickup_id !== null ? (PICKUP_STATUSES.find((s) => s === r.pickup?.status) ?? null) : null;
   const source = r.source && typeof r.source === "object" && !Array.isArray(r.source) ? (r.source as Record<string, unknown>) : {};
   return {
     id: r.id,
@@ -47,7 +65,7 @@ function toRequest(r: RequestRow): CrewRequest {
     items: r.items,
     qty: r.qty,
     estCents: typeof r.est_cents === "number" ? r.est_cents : null,
-    status: REQUEST_STATUSES.find((s) => s === r.status) ?? "asked",
+    status: requestFromPickup(REQUEST_STATUSES.find((s) => s === r.status) ?? "asked", pickupStatus),
     askedBy: r.asked_by,
     askedAt: r.asked_at,
     entryId: typeof source.entryId === "number" ? source.entryId : null,
@@ -59,6 +77,7 @@ function toRequest(r: RequestRow): CrewRequest {
     orderRef: r.order_ref,
     store: r.store,
     pickupId: r.pickup_id,
+    pickupStatus,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -67,8 +86,8 @@ function toRequest(r: RequestRow): CrewRequest {
 /** The ones still moving, plus everything settled (denied, delivered, cancelled) since `since`. */
 export async function listRequests(filter: { email?: string; since: string }): Promise<CrewRequest[]> {
   const db = getSupabaseAdmin();
-  let open = db.from("crew_requests").select("*").in("status", ["asked", "approved", "ordered", "picked"]);
-  let settled = db.from("crew_requests").select("*").in("status", ["denied", "delivered", "cancelled"]).gte("updated_at", filter.since);
+  let open = db.from("crew_requests").select(COLS).in("status", ["asked", "approved", "ordered", "picked"]);
+  let settled = db.from("crew_requests").select(COLS).in("status", ["denied", "delivered", "cancelled"]).gte("updated_at", filter.since);
   if (filter.email) {
     open = open.eq("asked_by", filter.email);
     settled = settled.eq("asked_by", filter.email);
@@ -84,18 +103,9 @@ export async function listRequests(filter: { email?: string; since: string }): P
 
 export async function getRequest(id: number): Promise<CrewRequest | null> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("crew_requests").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await db.from("crew_requests").select(COLS).eq("id", id).maybeSingle();
   if (error) fail("crew_requests read", error.message);
   return data ? toRequest(data as RequestRow) : null;
-}
-
-/** The request an ordered pickup came from, if any. */
-export async function getRequestByPickup(pickupId: number): Promise<CrewRequest | null> {
-  const db = getSupabaseAdmin();
-  const { data, error } = await db.from("crew_requests").select("*").eq("pickup_id", pickupId).order("id", { ascending: false }).limit(1);
-  if (error) fail("crew_requests read", error.message);
-  const row = (data as RequestRow[] | null)?.[0];
-  return row ? toRequest(row) : null;
 }
 
 export type NewRequest = {
@@ -125,11 +135,11 @@ export async function insertRequest(r: NewRequest): Promise<{ request: CrewReque
       asked_by: r.askedBy,
       source: r.entryId !== null ? { entryId: r.entryId } : {},
     })
-    .select("*")
+    .select(COLS)
     .single();
   if (!error) return { request: toRequest(data as RequestRow), existed: false };
   if (error.code !== UNIQUE_VIOLATION || r.entryId === null) fail("crew_requests insert", error.message);
-  const { data: prior, error: e2 } = await db.from("crew_requests").select("*").eq("source->>entryId", String(r.entryId)).limit(1);
+  const { data: prior, error: e2 } = await db.from("crew_requests").select(COLS).eq("source->>entryId", String(r.entryId)).limit(1);
   const row = (prior as RequestRow[] | null)?.[0];
   if (e2 || !row) fail("crew_requests insert", e2?.message ?? "the earlier copy could not be read");
   return { request: toRequest(row), existed: true };
@@ -157,8 +167,27 @@ export async function patchRequest(
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (only?.statusIn) q = q.in("status", only.statusIn);
-  const { data, error } = await q.select("*");
+  const { data, error } = await q.select(COLS);
   if (error) fail("crew_requests update", error.message);
   const row = (data as RequestRow[] | null)?.[0];
   return row ? toRequest(row) : null;
+}
+
+/**
+ * Bring the stored status of the request a pickup came from in line with the
+ * pickup (the reads already show it so; this keeps the open-list index right).
+ * Only an ordered request moves: one never ordered is not the pickup's.
+ */
+export async function syncRequestToPickup(pickupId: number, pickup: CrewPickupStatus): Promise<number> {
+  const next = requestFromPickup("ordered", pickup);
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("crew_requests")
+    .update({ status: next, updated_at: new Date().toISOString() })
+    .eq("pickup_id", pickupId)
+    .in("status", ["ordered", "picked", "delivered", "cancelled"])
+    .neq("status", next)
+    .select("id");
+  if (error) fail("crew_requests update", error.message);
+  return (data ?? []).length;
 }

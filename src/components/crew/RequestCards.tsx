@@ -150,6 +150,7 @@ export function RequestLine({ r, who, action }: { r: CrewRequest; who: string; a
             r.status === 'asked' && r.talk ? `${r.decidedBy.split(/\s+/)[0] || 'someone'} asked to talk` : '',
             r.status === 'denied' || r.status === 'cancelled' ? [r.decidedBy.split(/\s+/)[0], r.decisionNote].filter(Boolean).join(': ') : '',
             r.status === 'ordered' || r.status === 'picked' || r.status === 'delivered' ? [r.supplier, r.orderRef ? `#${r.orderRef}` : ''].filter(Boolean).join(' ') : '',
+            r.status === 'ordered' && r.pickupStatus === 'problem' ? 'the pickup has a problem' : '',
           ]
             .filter(Boolean)
             .join(' · ')}

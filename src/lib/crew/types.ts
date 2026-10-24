@@ -368,6 +368,8 @@ export type CrewRequest = {
   store: string;
   /** The will-call pickup made when it was ordered. */
   pickupId: number | null;
+  /** That pickup's status; once ordered, the request's status is worked out from it. */
+  pickupStatus?: CrewPickupStatus | null;
   createdAt: string;
   updatedAt: string;
 };
