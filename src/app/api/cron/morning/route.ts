@@ -9,16 +9,20 @@ import { listJobPeople, listJobs, listPeople, listReports, listSchedule, listTas
 import { listRequests } from "@/lib/crew/requestQueries";
 import { readSettings } from "@/lib/crew/settings";
 import { localDay } from "@/lib/crew/time";
+import { listJobRefs } from "@/lib/jobs/hub";
 import { loadWaiting } from "@/lib/owner/load";
 import { buildMorning } from "@/lib/owner/morning";
-import { loadLaneSeats } from "@/lib/roles/store";
+import { peopleOf } from "@/lib/roles/seats";
+import { laneSeatsOf, loadSeats } from "@/lib/roles/store";
+import { loadFeed } from "@/lib/tasks/feed";
 
 // The 7 AM "Your day" push. Vercel's cron calls this at 14:00 UTC, which is
 // 7 AM in Phoenix all year (no daylight saving), Monday to Saturday
 // (vercel.json), with CRON_SECRET as a bearer token. The Mac's token may call
 // it too, and `?dry=1` returns who would get what without sending: that is how
 // it is checked on the live site. Every push carries the day as its tag, so a
-// second run replaces the first on the phone instead of buzzing twice.
+// second run replaces the first on the phone instead of buzzing twice. What is
+// each person's to do comes from the one task feed, read once for everyone.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +42,7 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const day = localDay(now);
   try {
-    const [{ sections }, people, schedule, tasks, reports, jobPeople, jobs, requests, settings] = await Promise.all([
+    const [{ sections }, people, schedule, tasks, reports, jobPeople, jobs, requests, settings, seats, refs] = await Promise.all([
       readState(),
       listPeople(),
       listSchedule({ fromDay: day, toDay: day }),
@@ -49,12 +53,15 @@ export async function GET(request: NextRequest) {
       // Material requests (0023) still open; empty before the migration.
       listRequests({ since: now.toISOString() }).catch(() => []),
       readSettings(),
+      loadSeats(),
+      listJobRefs(),
     ]);
     const waiting = await loadWaiting(ownerNames(sections.people), now);
+    const feed = await loadFeed(refs, seats, day, { waiting });
     const notes = buildMorning({
       day,
       owners: sections.people,
-      laneSeats: await loadLaneSeats(),
+      laneSeats: laneSeatsOf(seats),
       people,
       schedule,
       tasks,
@@ -67,6 +74,11 @@ export async function GET(request: NextRequest) {
       jobs,
       requests,
       pmLimitCents: settings["requests.pmLimitCents"],
+      feed,
+      seats,
+      // The people the seats name, as Tasks reads them (roles/store.ts loadPeople).
+      seatPeople: peopleOf(sections.people, people.filter((p) => p.active)),
+      refs,
     });
     if (dry) return NextResponse.json({ ok: true, day, dry: true, notes }, { headers: { "Cache-Control": "no-store" } });
     let sent = 0;
