@@ -9,6 +9,7 @@ import { readSignatureInput } from "@/lib/sales/signing";
 import { loadSettings } from "@/lib/sales/settingsStore";
 import { acceptProposal, proposalRecord, SalesError } from "@/lib/sales/store";
 import { localDay } from "@/lib/crew/time";
+import { usd } from "@/lib/money";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,9 +30,6 @@ const input = z.object({
   signature: z.unknown().optional(),
 });
 
-function money(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -62,7 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       try {
         await sendPush(await laneAddresses("sales"), {
           title: `${r.signed ? "Signed" : "Accepted"}: ${doc.title || doc.number}`.slice(0, 80),
-          body: `${who} ${r.signed ? "signed" : "accepted"} ${r.packageName} at ${money(r.totalCents)}.${r.executed ? " Fully signed." : r.signed ? " Countersign in Sales." : " Open the job next."}`,
+          body: `${who} ${r.signed ? "signed" : "accepted"} ${r.packageName} at ${usd(r.totalCents)}.${r.executed ? " Fully signed." : r.signed ? " Countersign in Sales." : " Open the job next."}`,
           url: r.opportunityId ? `/app/sales/${r.opportunityId}` : "/app/sales",
           tag: `accepted-${doc.id}`.slice(0, 60),
         });

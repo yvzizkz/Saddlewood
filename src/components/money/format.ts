@@ -1,7 +1,9 @@
 // Small formatters shared by the Money screens.
 
+import { usd } from "@/lib/money";
+
 export function money(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  return usd(cents);
 }
 
 export function day(iso: string | null | undefined): string {

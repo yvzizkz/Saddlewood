@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { describeDevice } from "./proof";
 import { BILLING_FROM, BILLING_REPLY_TO, RECORDS_COPY } from "./send";
 import type { BillingDocument, DocumentEvent, DocumentKind } from "./types";
+import { usd } from "@/lib/money";
 
 // Tells Marco when a client opens a document, the way Joist's "viewed"
 // notification did: an email from accounting@ for each real opening.
@@ -33,9 +34,6 @@ export function shouldAlert(earlier: DocumentEvent[], now: Date): boolean {
   return !earlier.some((e) => isPersonOpening(e) && new Date(e.at).getTime() >= since);
 }
 
-function money(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
 
 function phoenixTime(at: Date): string {
   return at.toLocaleString("en-US", {
@@ -64,8 +62,8 @@ export function alertMessage(input: {
       : `${clientName} opened ${label}`;
   const text = [
     input.kind === "downloaded"
-      ? `${clientName} downloaded ${input.what ?? "a file"} from ${label} (${money(doc.totalCents)}).`
-      : `${clientName} opened ${label} (${money(doc.totalCents)}).`,
+      ? `${clientName} downloaded ${input.what ?? "a file"} from ${label} (${usd(doc.totalCents)}).`
+      : `${clientName} opened ${label} (${usd(doc.totalCents)}).`,
     "",
     `When: ${phoenixTime(input.at)} (Phoenix time)`,
     `Device: ${describeDevice(input.userAgent)}`,

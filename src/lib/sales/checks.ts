@@ -1,6 +1,7 @@
 import { allItems, inPackage, priceEstimate, type Priced } from "./calc";
 import { RATE_CARD } from "./catalog";
 import type { EstimateBody, EstimateItem, OpportunityKind } from "./types";
+import { usd } from "@/lib/money";
 
 // What has to be true before a number goes to a client. These are the rules
 // written after real misses (CLAUDE.md "Estimating & takeoffs"): Franklin Hall
@@ -38,9 +39,6 @@ function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000);
 }
 
-function usd(c: number): string {
-  return (c / 100).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
 
 /** True when the line's price is a dollar figure someone typed or copied, not only hours at the rate. */
 function hasDollarPrice(i: EstimateItem): boolean {
@@ -281,7 +279,7 @@ export function runChecks(body: EstimateBody, ctx: CheckContext, priced: Priced 
         id: "pricing-prior",
         level: Math.abs(pct) >= 10 ? "warn" : "info",
         area: "pricing",
-        title: `${delta > 0 ? "Up" : "Down"} ${usd(Math.abs(delta))} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%) from ${last.number} rev ${last.revision}`,
+        title: `${delta > 0 ? "Up" : "Down"} ${usd(Math.abs(delta), { whole: true })} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%) from ${last.number} rev ${last.revision}`,
         detail: "Say why in the intro or a clarification before it goes out.",
       });
     }

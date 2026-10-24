@@ -4,6 +4,7 @@ import { degrees, PDFDocument, rgb, StandardFonts, type Color, type PDFFont, typ
 
 import { scheduleAmounts, type ProposalSnapshot } from "./presentation";
 import type { PublicSignature } from "./signing";
+import { usd } from "@/lib/money";
 
 // The proposal as a PDF: what rides on a proposal email as an attachment, and
 // the signed copy both sides keep. It is the printed form of the client's page
@@ -111,9 +112,6 @@ function oneLine(text: string | null | undefined): string {
 
 // ---- formatting -----------------------------------------------------------------------
 
-function money(c: number): string {
-  return (c / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
 
 function longDay(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -411,7 +409,7 @@ function packageBoxes(w: Writer, p: ProposalSnapshot) {
       w.text(l, x + 10, y + 2, f.body, 8, C.light);
     }
     y -= 8 + 22;
-    w.text(money(b.pk.totalCents), x + 10, y + 5, f.headBold, 16, C.ink);
+    w.text(usd(b.pk.totalCents), x + 10, y + 5, f.headBold, 16, C.ink);
     y -= 6;
     for (const l of b.hl) {
       y -= 10.5;
@@ -489,7 +487,7 @@ export async function renderProposalPdf(input: PdfInput): Promise<Uint8Array> {
   const pid = pkg?.id ?? "";
 
   if (acc) {
-    const text = `Accepted by ${acc.name} on ${longDay(acc.at)}: ${acc.packageName}, ${money(acc.totalCents)}.`;
+    const text = `Accepted by ${acc.name} on ${longDay(acc.at)}: ${acc.packageName}, ${usd(acc.totalCents)}.`;
     const lines = wrap(text, f.bold, 9.5, CW - 24);
     const h = lines.length * 14 + 14;
     w.ensure(h + 14);
@@ -521,15 +519,15 @@ export async function renderProposalPdf(input: PdfInput): Promise<Uint8Array> {
       w.page.drawLine({ start: { x: M, y: w.y }, end: { x: W - M, y: w.y }, thickness: 0.5, color: C.stone });
     }
     w.y -= 4;
-    const amt = p.layout !== "total" && s.amounts?.[pid] !== undefined ? money(s.amounts[pid]) : null;
+    const amt = p.layout !== "total" && s.amounts?.[pid] !== undefined ? usd(s.amounts[pid]) : null;
     w.row(s.name, amt, { font: f.bold, size: 10.5 });
     if (s.note) w.para(s.note, { size: 8.5, color: C.light });
     for (const l of lines) {
       let left = `– ${l.description}`;
       if (l.allowance) left += "  [Allowance]";
-      if (l.qty !== undefined) left += `   ${qtyText(l.qty)} ${l.unit ?? ""}${l.unitCents !== undefined ? ` × ${money(l.unitCents)}` : ""}`;
+      if (l.qty !== undefined) left += `   ${qtyText(l.qty)} ${l.unit ?? ""}${l.unitCents !== undefined ? ` × ${usd(l.unitCents)}` : ""}`;
       const a = l.amounts?.[pid];
-      w.row(left, a !== undefined ? money(a) : null, { size: 9, indent: 8, sub: l.note });
+      w.row(left, a !== undefined ? usd(a) : null, { size: 9, indent: 8, sub: l.note });
     }
   });
   if (p.adjustments.length) {
@@ -539,7 +537,7 @@ export async function renderProposalPdf(input: PdfInput): Promise<Uint8Array> {
     w.y -= 2;
     for (const a of p.adjustments) {
       if (a.amounts[pid] === undefined) continue;
-      w.row(a.label, money(a.amounts[pid]), { font: f.bold, size: 10 });
+      w.row(a.label, usd(a.amounts[pid]), { font: f.bold, size: 10 });
     }
   }
   if (p.layout === "total" && sections.some((s) => s.lines.some((l) => l.allowance && l.amounts?.[pid] !== undefined))) {
@@ -553,7 +551,7 @@ export async function renderProposalPdf(input: PdfInput): Promise<Uint8Array> {
     for (const o of options) {
       const taken = acc?.options.some((x) => x.description === o.description && x.priceCents === o.priceCents) ?? false;
       const mark = acc ? (taken ? "[Included]  " : "[Not included]  ") : "";
-      w.row(`${mark}${o.description}`, `+${money(o.priceCents)}`, { size: 9.5, sub: o.note, font: taken ? f.bold : f.body });
+      w.row(`${mark}${o.description}`, `+${usd(o.priceCents)}`, { size: 9.5, sub: o.note, font: taken ? f.bold : f.body });
     }
   }
 
@@ -568,7 +566,7 @@ export async function renderProposalPdf(input: PdfInput): Promise<Uint8Array> {
     w.page.drawRectangle({ x: M, y: top - h, width: CW, height: h, color: C.cream });
     const label = acc ? "Accepted total" : p.packages.length > 1 ? `${pkg?.name ?? ""} total` : "Total";
     w.text(label.toUpperCase(), M + 14, top - 20, f.bold, 7.5, C.goldText);
-    w.right(money(total), W - M - 14, top - 32, f.headBold, 22, C.teal);
+    w.right(usd(total), W - M - 14, top - 32, f.headBold, 22, C.teal);
     incl.forEach((l, i) => w.text(l, M + 14, top - 34 - i * 11, f.body, 8, C.light));
     if (p.validUntil) w.text(`Valid until ${longDay(p.validUntil)}.`, M + 14, top - h + 10, f.body, 8, C.light);
     w.y = top - h;
@@ -590,7 +588,7 @@ export async function renderProposalPdf(input: PdfInput): Promise<Uint8Array> {
         w.text(l, M, w.y + 4, f.body, 9.5);
         if (i === 0) {
           w.right(`${s.pct}%`, W - M - 90, w.y + 4, f.body, 9.5, C.light);
-          w.right(money(s.cents), W - M, w.y + 4, f.bold, 9.5);
+          w.right(usd(s.cents), W - M, w.y + 4, f.bold, 9.5);
         }
       });
     }

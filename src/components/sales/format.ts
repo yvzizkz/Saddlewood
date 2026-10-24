@@ -1,17 +1,7 @@
 // Small formatters shared by the Sales screens.
 
-export function usd(cents: number, opts: { whole?: boolean; compact?: boolean } = {}): string {
-  if (opts.compact && Math.abs(cents) >= 100000_00) {
-    return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 });
-  }
-  const whole = opts.whole ?? false;
-  return (cents / 100).toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: whole ? 0 : 2,
-  });
-}
+// The one money formatter (src/lib/money.ts), under the name these screens use.
+export { usd } from "@/lib/money";
 
 /** Dollars (a unit price) with as many decimals as it needs, up to 4. */
 export function dollars(n: number): string {

@@ -1,6 +1,7 @@
 import type { BotPeople } from "@/lib/bot/types";
 import type { AnswersFirst } from "./settings";
 import type { CrewJobPerson, CrewRequest } from "./types";
+import { usd } from "@/lib/money";
 
 // The rules of a material request (migration 0023), pure and client-safe:
 // who may decide it, whose list it lands on, and how it reads. The server
@@ -20,8 +21,7 @@ export const NO_SWITCH = "Deciding material requests needs the requests switch. 
 
 /** "$412", "$1,250", "$19.50" */
 export function dollars(cents: number): string {
-  const whole = cents % 100 === 0;
-  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
+  return usd(cents, { cents: "auto" });
 }
 
 /**

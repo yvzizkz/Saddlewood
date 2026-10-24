@@ -7,6 +7,7 @@ import { scheduleAmounts, type ProposalSnapshot } from "@/lib/sales/presentation
 import type { SignatureFont } from "@/lib/sales/settings";
 import type { PublicSignature } from "@/lib/sales/signing";
 import { SignaturePad, type PadValue } from "./SignaturePad";
+import { usd } from "@/lib/money";
 
 // The proposal as the client sees it: on their link (/d/<token>), and inside
 // the builder as its live preview, so what the office previews is what goes
@@ -15,14 +16,6 @@ import { SignaturePad, type PadValue } from "./SignaturePad";
 // worked out from the frozen proposal, and the server works it out again on
 // accept (src/lib/sales/presentation.ts, acceptedTotal).
 
-function money(cents: number, whole = false): string {
-  return (cents / 100).toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: whole ? 0 : 2,
-  });
-}
 
 function longDay(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -209,7 +202,7 @@ export function ProposalView({
             <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#2f6b4a]/30 bg-[#2f6b4a]/10 px-4 py-3 text-sm text-[#2f6b4a]">
               <CircleCheck className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
               <p>
-                <span className="font-semibold">{executed || done?.executed ? "Signed by everyone" : signs && (clientSig || done) ? "Signed" : "Accepted"}</span> by {accepted.name} on {longDay(accepted.at)}: {accepted.packageName}, {money(accepted.totalCents)}.
+                <span className="font-semibold">{executed || done?.executed ? "Signed by everyone" : signs && (clientSig || done) ? "Signed" : "Accepted"}</span> by {accepted.name} on {longDay(accepted.at)}: {accepted.packageName}, {usd(accepted.totalCents)}.
                 {signMode === "both" && !companySig && !done?.executed ? " Saddlewood countersigns next; you will get the signed copy." : ""}
                 {done ? " Thank you. We will be in touch to schedule." : ""}
               </p>
@@ -244,7 +237,7 @@ export function ProposalView({
                       ) : null}
                       <span className="font-heading text-lg">{x.name}</span>
                       {x.tagline ? <span className={`text-xs ${on ? "opacity-80" : "text-charcoal-light"}`}>{x.tagline}</span> : null}
-                      <span className="mt-3 font-heading text-2xl tabular-nums">{money(x.totalCents, true)}</span>
+                      <span className="mt-3 font-heading text-2xl tabular-nums">{usd(x.totalCents, { whole: true })}</span>
                       {x.highlights.length ? (
                         <ul className="mt-3 space-y-1 text-xs">
                           {x.highlights.map((h) => (
@@ -270,7 +263,7 @@ export function ProposalView({
                   <div className="flex items-baseline justify-between gap-4">
                     <p className="font-medium text-charcoal">{s.name}</p>
                     {p.layout !== "total" && s.amounts?.[pkg?.id ?? ""] !== undefined ? (
-                      <p className="shrink-0 font-medium tabular-nums text-charcoal">{money(s.amounts[pkg!.id])}</p>
+                      <p className="shrink-0 font-medium tabular-nums text-charcoal">{usd(s.amounts[pkg!.id])}</p>
                     ) : null}
                   </div>
                   {s.note ? <p className="mt-1 text-sm text-charcoal-light">{s.note}</p> : null}
@@ -285,13 +278,13 @@ export function ProposalView({
                             {l.qty !== undefined ? (
                               <span className="ml-1.5 text-charcoal-light">
                                 {qty(l.qty)} {l.unit}
-                                {l.unitCents !== undefined ? ` × ${money(l.unitCents)}` : ""}
+                                {l.unitCents !== undefined ? ` × ${usd(l.unitCents)}` : ""}
                               </span>
                             ) : null}
                             {l.note ? <span className="block pl-4 text-xs text-charcoal-light">{l.note}</span> : null}
                           </span>
                           {l.amounts?.[pkg?.id ?? ""] !== undefined ? (
-                            <span className="shrink-0 tabular-nums text-charcoal-light">{money(l.amounts[pkg!.id])}</span>
+                            <span className="shrink-0 tabular-nums text-charcoal-light">{usd(l.amounts[pkg!.id])}</span>
                           ) : null}
                         </li>
                       ))}
@@ -304,7 +297,7 @@ export function ProposalView({
               .map((a) => (
                 <div key={a.key} className="flex items-baseline justify-between gap-4 border-t border-stone py-3">
                   <p className="font-medium text-charcoal">{a.label}</p>
-                  <p className="shrink-0 font-medium tabular-nums text-charcoal">{money(a.amounts[pkg!.id])}</p>
+                  <p className="shrink-0 font-medium tabular-nums text-charcoal">{usd(a.amounts[pkg!.id])}</p>
                 </div>
               ))}
             {p.layout === "total" && allowances.length && p.show.showAllowanceAmounts !== false ? (
@@ -329,7 +322,7 @@ export function ProposalView({
                         <span className="block text-sm font-medium text-charcoal">{o.description}</span>
                         {o.note ? <span className="block text-xs text-charcoal-light">{o.note}</span> : null}
                       </span>
-                      <span className="shrink-0 text-sm font-medium tabular-nums text-charcoal">+{money(o.priceCents, o.priceCents % 100 === 0)}</span>
+                      <span className="shrink-0 text-sm font-medium tabular-nums text-charcoal">+{usd(o.priceCents, { cents: "auto" })}</span>
                     </label>
                   );
                 })}
@@ -344,7 +337,7 @@ export function ProposalView({
                 <Eyebrow>{many ? `${pkg?.name} total` : "Total"}</Eyebrow>
                 {chosen.length ? <p className="mt-1 text-xs text-charcoal-light">incl. {chosen.map((o) => o.description).join(", ")}</p> : null}
               </div>
-              <p className="font-heading text-3xl tabular-nums text-teal sm:text-4xl">{money(total)}</p>
+              <p className="font-heading text-3xl tabular-nums text-teal sm:text-4xl">{usd(total)}</p>
             </div>
             {p.validUntil ? <p className="mt-2 text-xs text-charcoal-light">Valid until {longDay(p.validUntil)}.</p> : null}
           </div>
@@ -363,7 +356,7 @@ export function ProposalView({
                     <tr key={s.label}>
                       <td className="py-2 pr-3 text-charcoal">{s.label}</td>
                       <td className="py-2 pr-3 text-right tabular-nums text-charcoal-light">{s.pct}%</td>
-                      <td className="py-2 text-right font-medium tabular-nums text-charcoal">{money(s.cents)}</td>
+                      <td className="py-2 text-right font-medium tabular-nums text-charcoal">{usd(s.cents)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -414,7 +407,7 @@ export function ProposalView({
               <h3 className="text-xl text-teal">{signs ? "Accept and sign" : "Accept this proposal"}</h3>
               <p className="mt-1 text-sm text-charcoal-light">
                 {many ? `${pkg?.name}` : "The work above"}
-                {chosen.length ? ` with ${chosen.length} add-on${chosen.length === 1 ? "" : "s"}` : ""}, {money(total)}.{" "}
+                {chosen.length ? ` with ${chosen.length} add-on${chosen.length === 1 ? "" : "s"}` : ""}, {usd(total)}.{" "}
                 {signMode === "both" ? "Saddlewood countersigns and you receive the signed copy." : "We follow up with the schedule."}
               </p>
               {mode === "preview" ? (
@@ -472,7 +465,7 @@ export function ProposalView({
                     className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-teal px-5 text-base font-medium text-off-white transition-colors hover:bg-teal-dark disabled:opacity-40"
                   >
                     {signs ? <PenLine className="size-4" aria-hidden="true" /> : null}
-                    {busy ? "Recording…" : `${signs ? "Accept and sign" : "Accept"} · ${money(total)}`}
+                    {busy ? "Recording…" : `${signs ? "Accept and sign" : "Accept"} · ${usd(total)}`}
                   </button>
                 </div>
               )}
@@ -524,7 +517,7 @@ export function ProposalView({
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-charcoal-light">{many ? pkg?.name : "Total"}</p>
-              <p className="font-heading text-xl tabular-nums text-teal">{money(total)}</p>
+              <p className="font-heading text-xl tabular-nums text-teal">{usd(total)}</p>
             </div>
             <a href="#accept" className="inline-flex min-h-11 items-center rounded-xl bg-teal px-5 text-sm font-medium text-off-white">
               {signs ? "Review & sign" : "Review & accept"}

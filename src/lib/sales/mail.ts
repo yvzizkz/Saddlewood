@@ -21,6 +21,7 @@ import type { ProposalSnapshot } from "./presentation";
 import { fillTemplate, SIGNATURE_FONTS, type RecipientRule, type SalesSettings } from "./settings";
 import { publicSignature, type Signature } from "./signing";
 import { addEvent, type EstimateSnapshot } from "./store";
+import { usd } from "@/lib/money";
 
 // Proposal mail: the one an owner sends (link, PDF, or both, after a
 // preview), and the notices the signing workflow sends on its own when the
@@ -275,9 +276,6 @@ export async function sendPrepared(doc: BillingDocument, prepared: Extract<Prepa
 
 // ---- the signing workflow's notices -------------------------------------------------
 
-function money(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
 
 /** The client's addresses for a notice: the email they gave when signing, and every outside address a person sent the proposal to. */
 export function clientAddresses(sigs: Signature[], events: { kind: string; detail: Record<string, unknown> }[]): string[] {
@@ -311,7 +309,7 @@ export async function notifyAfterSignature(args: {
   const client = sigs.find((s) => s.role === "client");
   const accepted = acceptedFromEvents(events);
   const link = doc.token ? documentLink(siteUrl(), doc.token) : "";
-  const say = accepted ? `${accepted.packageName ? `${accepted.packageName}, ` : ""}${money(accepted.totalCents)}` : "";
+  const say = accepted ? `${accepted.packageName ? `${accepted.packageName}, ` : ""}${usd(accepted.totalCents)}` : "";
 
   let pdf: { filename: string; content: Buffer } | null = null;
   const attach = async () => {

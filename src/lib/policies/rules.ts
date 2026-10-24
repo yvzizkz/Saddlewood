@@ -8,6 +8,9 @@
 // the app spec, the PM plan, the operating model). Legal points are for
 // counsel to confirm, as SOP-007 already says.
 
+
+import { usd } from "@/lib/money";
+
 export type PolicyControl =
   | { type: "toggle" }
   | { type: "money" }
@@ -285,9 +288,6 @@ export function readPolicies(stored: Record<string, unknown>): Policies {
   return out;
 }
 
-function money(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
 
 function pct(n: number): string {
   return String(Math.round(n * 100) / 100);
@@ -318,4 +318,4 @@ export function fillTerms(text: string, p: Policies): string {
 }
 
 /** Money as the screen shows it. */
-export const policyMoney = money;
+export const policyMoney = (cents: number): string => usd(cents, { whole: true });

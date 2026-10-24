@@ -8,6 +8,7 @@ import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type Cre
 import { planAsk } from "@/lib/crew/plan";
 import { WATCH_AHEAD_DAYS, watchDue, watchLane, type JobWatch } from "@/lib/sales/award";
 import type { Lane } from "./lanes";
+import { usd } from "@/lib/money";
 
 export { planAsk };
 
@@ -90,9 +91,6 @@ function nextWorkday(day: string): string {
   return weekdayOf(next) === 0 ? addDays(next, 1) : next;
 }
 
-function dollars(cents: number): string {
-  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
-}
 
 function clip(text: string, max = 160): string {
   const one = text.replace(/\s+/g, " ").trim();
@@ -275,7 +273,7 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
         lane: marco ? "decisions" : "money",
         kind: "decision",
         title: `Call ${client.name}: ${d.doc.number} is ${late} days late`,
-        detail: `${dollars(d.balanceCents)} open${d.next ? ` · next step ${dayShort(d.next.on)}: ${d.next.label}` : ""}`,
+        detail: `${usd(d.balanceCents, { whole: true })} open${d.next ? ` · next step ${dayShort(d.next.on)}: ${d.next.label}` : ""}`,
         href: `/app/money/${d.doc.id}`,
         at: d.doc.dueDate,
       });
@@ -292,7 +290,7 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       lane: "money",
       kind: "decision",
       title: `Which job is this? '${p.name || p.key}'`,
-      detail: `${plural(p.trips, "trip", "trips")}, ${dollars(p.cents)}, last ${dayShort(p.lastOn).replace(/^\w+, /, "")}`,
+      detail: `${plural(p.trips, "trip", "trips")}, ${usd(p.cents, { whole: true })}, last ${dayShort(p.lastOn).replace(/^\w+, /, "")}`,
       href: "/app/crew?view=today",
       at: null,
     });
@@ -304,7 +302,7 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       lane: "money",
       kind: "decision",
       title: `${plural(rest.length, "more Home Depot name needs", "more Home Depot names need")} a job`,
-      detail: clip(rest.map((p) => `'${p.name || p.key}' ${dollars(p.cents)}`).join(", ")),
+      detail: clip(rest.map((p) => `'${p.name || p.key}' ${usd(p.cents, { whole: true })}`).join(", ")),
       href: "/app/crew?view=today",
       at: null,
     });
@@ -318,7 +316,7 @@ export function buildWaiting(input: WaitingInput): WaitingItem[] {
       lane: "money",
       kind: "decision",
       title: `${older.count.toLocaleString("en-US")} older Home Depot name${older.count === 1 ? "" : "s"} from before the app`,
-      detail: `${dollars(older.cents)} across them; find them with search.`,
+      detail: `${usd(older.cents, { whole: true })} across them; find them with search.`,
       href: "/app/accounting/purchases#find",
       at: null,
     });

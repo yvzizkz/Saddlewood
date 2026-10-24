@@ -7,6 +7,7 @@ import { SignaturePad, type PadValue } from '@/components/sales/SignaturePad'
 import { SIGNATURE_FONT_KEYS } from '@/lib/sales/settings'
 import { createClient } from '@/lib/supabase/client'
 import type { BidLine, InviteStatus, PublicPackage } from '@/lib/subs/types'
+import { usd } from '@/lib/money'
 
 // The sub's side of a bid: the package as we sent it, and their bid. Prices
 // per line (or "not included"), what they include and leave out, when they
@@ -37,9 +38,6 @@ type Upload = { path: string; name: string; size: number; type: string }
 const INPUT =
   'w-full rounded-xl border border-stone-mid bg-white px-3 py-2.5 text-base text-charcoal placeholder:text-[#9a938a] focus:border-teal focus:outline-none'
 
-function usd(cents: number): string {
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
 
 function when(iso: string): string {
   return new Date(iso).toLocaleString('en-US', { timeZone: 'America/Phoenix', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
