@@ -14,10 +14,12 @@
 // theirs; past its due date plus its grace it moves up one role (escalationOf).
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { ownerNames } from "@/lib/bot/home";
 import { readState } from "@/lib/bot/queries";
 import { addDays, localDay } from "@/lib/crew/time";
 import { loadWaiting } from "@/lib/owner/load";
 import type { Lane } from "@/lib/owner/lanes";
+import type { WaitingItem } from "@/lib/owner/waiting";
 import { loadPayables } from "@/lib/accounting/payables";
 import { loadBillingCalendar } from "@/lib/accounting/receivables";
 import { loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
@@ -88,15 +90,13 @@ function roleOfOwnerName(name: string, seats: Seat[]): Role {
   return hit?.role ?? "ops";
 }
 
-export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()): Promise<FeedItem[]> {
+/** `waiting`: the owners' list when the caller already read it (the 7 AM push reads it once). */
+export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay(), pre: { waiting?: WaitingItem[] } = {}): Promise<FeedItem[]> {
   const db = getSupabaseAdmin();
-  const { sections } = await readState();
-  const owners = Object.entries(sections.people)
-    .filter(([, p]) => p.role === "owner")
-    .map(([e]) => e);
   const [work, waiting, crewTasks, cards, payables, cos, calendar, waivers] = await Promise.all([
     db.from("work_items").select("*").eq("status", "open").order("due_on", { ascending: true, nullsFirst: false }).limit(1000),
-    loadWaiting(owners).catch(() => []),
+    // By the owners' names, so a hand-off goes back to whoever gave it.
+    pre.waiting ?? readState().then(({ sections }) => loadWaiting(ownerNames(sections.people))).catch(() => []),
     db.from("crew_tasks").select("id,email,title,detail,job_id,job_name,due,status").in("status", ["open", "doing", "blocked"]).limit(500),
     db.from("ops_cards").select("id,title,owner,col,note,updated_at").is("archived_at", null).in("col", ["backlog", "drafting", "review"]).limit(300),
     loadPayables(today).catch(() => ({ rows: [] as Awaited<ReturnType<typeof loadPayables>>["rows"] })),
