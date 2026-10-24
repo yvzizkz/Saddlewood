@@ -10,6 +10,7 @@ import { formatValue } from "@/lib/analytics/format";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import type { LaborRow } from "@/lib/accounting/labor";
 import type { PurchaseItemRow } from "@/lib/accounting/purchases";
+import { isMaterialCost } from "@/lib/accounting/jobCost";
 import { clockText, localClock, localDay } from "@/lib/crew/time";
 import { getJobRef, jobHref } from "@/lib/jobs/hub";
 import { PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
@@ -704,7 +705,8 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   // Overview.
   const [labor, purchases, bills] = await Promise.all([jobLabor(ref, "2020-01-01", today), jobPurchases(ref, "2020-01-01", today), seat.margin ? jobBills(ref) : Promise.resolve([])]);
   const laborCost = labor.reduce((a, r) => a + (r.costCents ?? 0), 0);
-  const materials = purchases.reduce((a, r) => a + r.lineTotalCents, 0);
+  // Zelle payments are counted from their bills in Payables (isMaterialCost).
+  const materials = purchases.filter(isMaterialCost).reduce((a, r) => a + r.lineTotalCents, 0);
   const subs = bills.filter((b) => !b.purchaseTripKey).reduce((a, b) => a + b.amountCents, 0);
   const cost = laborCost + materials + subs;
   const hoursWeek = labor.filter((r) => inRange(r.day, resolvePeriod({ p: "wtd" }, today).from, today)).reduce((a, r) => a + r.minutes, 0);
