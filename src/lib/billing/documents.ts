@@ -188,10 +188,18 @@ export type DraftChanges = {
   sendGroupId?: string | null;
 };
 
-/** Why a document is not open to a change: gone, issued, or held by a send. */
+/**
+ * An agreement is drafted, issued and signed on its job (src/lib/agreements),
+ * never edited, issued or sent from Billing: its words are contract.py's, and
+ * its price and scope the accepted proposal's.
+ */
+const ON_ITS_JOB = "an agreement is drafted and issued on its job";
+
+/** Why a document is not open to a change: gone, issued, an agreement, or held by a send. */
 async function whyLocked(id: string): Promise<DocumentError> {
   const doc = await getDocument(id);
   if (!doc) return new DocumentError("not found", 404);
+  if (doc.kind === "agreement") return new DocumentError(ON_ITS_JOB, 409);
   if (doc.status !== "draft") {
     return new DocumentError(`this ${doc.kind.replace("_", " ")} was ${doc.status === "void" ? "voided" : "issued"} and cannot be changed; issue a new revision instead`, 409);
   }
@@ -243,6 +251,7 @@ export async function updateDraft(id: string, changes: DraftChanges): Promise<Bi
       .update(row)
       .eq("id", id)
       .eq("status", "draft")
+      .neq("kind", "agreement")
       .is("token", null)
       .select("*")
       .maybeSingle();
@@ -300,6 +309,7 @@ export async function claimForSend(id: string, now: Date = new Date()): Promise<
     .update({ token })
     .eq("id", id)
     .eq("status", "draft")
+    .neq("kind", "agreement")
     .is("token", null)
     .select("token")
     .maybeSingle();
@@ -308,6 +318,7 @@ export async function claimForSend(id: string, now: Date = new Date()): Promise<
 
   const doc = await getDocument(id);
   if (!doc) throw new DocumentError("not found", 404);
+  if (doc.kind === "agreement") throw new DocumentError(ON_ITS_JOB, 409);
   if (doc.status !== "draft") throw new DocumentError("this document is no longer a draft", 409);
   const held = doc.updatedAt ? new Date(doc.updatedAt).getTime() : now.getTime();
   if (!doc.token || now.getTime() - held < CLAIM_STALE_MS) {
@@ -353,6 +364,7 @@ export async function issueDocument(
   if (!held) {
     const current = await getDocument(id);
     if (!current) throw new DocumentError("not found", 404);
+    if (current.kind === "agreement") throw new DocumentError(ON_ITS_JOB, 409);
     held = current.status === "draft" ? current.token : null;
     // A send that is under way issues it itself; one that died long ago left its token to keep.
     const since = current.updatedAt ? now.getTime() - new Date(current.updatedAt).getTime() : Infinity;
@@ -367,7 +379,8 @@ export async function issueDocument(
       issued_by: issuedBy,
     })
     .eq("id", id)
-    .eq("status", "draft");
+    .eq("status", "draft")
+    .neq("kind", "agreement");
   q = held ? q.eq("token", held) : q.is("token", null);
   const { data, error } = await q.select("*").maybeSingle();
   if (error) fail("issue document", error.message);

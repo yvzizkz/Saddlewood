@@ -23,6 +23,7 @@ const KIND_LABEL: Record<DocumentKind, string> = {
   invoice: "Invoice",
   statement: "Statement",
   notice: "Notice",
+  agreement: "Agreement",
 };
 
 const isPersonOpening = (e: DocumentEvent) =>
