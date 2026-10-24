@@ -5,7 +5,7 @@ import { inScope, scopeFrom, type JobScope } from "@/lib/crew/scope";
 import { SETTING_DEFAULTS } from "@/lib/crew/settings";
 import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewRequest, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
 import type { JobRef } from "@/lib/jobs/hub";
-import type { Person, Seat } from "@/lib/roles/seats";
+import { ROLES, seatHolder, type Person, type Seat } from "@/lib/roles/seats";
 import { feedForSeat, isMine, type FeedItem } from "@/lib/tasks/feed";
 import { lanesOf, type LaneSeats } from "./lanes";
 import type { WaitingItem } from "./waiting";
@@ -56,10 +56,12 @@ export type MorningInput = {
 
 /**
  * This person's part of the feed, as Tasks shows it under Mine: an owner's from
- * the whole feed (their part of Waiting on you as `waiting` routes it), anyone
- * else's narrowed to the jobs they see (feedForSeat).
+ * the whole feed (their part of Waiting on you as `waiting` routes it). A crew
+ * seat's as their Tasks shows it (feedForSeat): their jobs, never Payables, the
+ * ops board or the owners' list. A seat that is not on the crew (finance) gets
+ * every item that is theirs, Payables included.
  */
-function feedFor(input: MorningInput, email: string, who: { owner: true; waiting: WaitingItem[] } | { owner: false; scope: JobScope }): FeedItem[] {
+function feedFor(input: MorningInput, email: string, who: { owner: true; waiting: WaitingItem[] } | { owner: false; crew: boolean; scope: JobScope }): FeedItem[] {
   const feed = input.feed ?? [];
   if (!feed.length) return [];
   const seats = input.seats ?? [];
@@ -70,7 +72,9 @@ function feedFor(input: MorningInput, email: string, who: { owner: true; waiting
     return feed.filter((i) => (i.source === "waiting" ? keys.has(i.id) : mine(i)));
   }
   const { scope } = who;
-  const jobs = new Set((input.refs ?? []).filter((r) => scope === null || (!!r.crewId && scope.includes(r.crewId))).map((r) => r.key));
+  if (!who.crew) return feed.filter(mine);
+  // Every job when the seat is not narrowed, whether or not the job refs were read.
+  const jobs = scope === null ? new Set(feed.flatMap((i) => (i.jobKey ? [i.jobKey] : []))) : new Set((input.refs ?? []).filter((r) => !!r.crewId && scope.includes(r.crewId)).map((r) => r.key));
   return feedForSeat(feed, jobs, mine).filter(mine);
 }
 
@@ -93,6 +97,12 @@ function leadOf(items: FeedItem[], day: string): Lead {
 /** "2 overdue, 1 due today, 1 moved up to you" */
 function leadCounts(lead: Lead): string[] {
   return [lead.overdue ? `${lead.overdue} overdue` : "", lead.dueToday ? `${lead.dueToday} due today` : "", lead.movedUp ? `${lead.movedUp} moved up to you` : ""].filter(Boolean);
+}
+
+/** The lead counts, or how many are open when none is late, due today or moved up. */
+function countsOf(lead: Lead, open: number): string[] {
+  const counts = leadCounts(lead);
+  return counts.length || !open ? counts : [plural(open, "open task", "open tasks")];
 }
 
 /** "Oldest: Approve Desert Plumbing 1042 (12729 W Keim Dr), 4 days late" */
@@ -159,20 +169,22 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     if (seat.role !== "owner") continue;
     const lanes = lanesOf(email, input.owners, input.laneSeats);
     const mine = input.waiting.filter((i) => (i.who && ownerNamesAll.has(i.who) ? i.who === seat.name : lanes.includes(i.lane)));
-    const lead = leadOf(feedFor(input, email, { owner: true, waiting: mine }), day);
+    const items = feedFor(input, email, { owner: true, waiting: mine });
+    const lead = leadOf(items, day);
     const decisions = mine.filter((i) => i.kind === "decision");
     const signals = mine.filter((i) => i.kind === "signal");
     const handoffs = mine.filter((i) => i.kind === "handoff");
     const bids = lanes.includes("sales") ? input.bids : 0;
     const counts = [
-      ...leadCounts(lead),
+      // Waiting on you is counted below by kind; the rest of their feed here.
+      ...countsOf(lead, items.filter((i) => i.source !== "waiting").length),
       decisions.length ? plural(decisions.length, "decision", "decisions") : "",
       signals.length ? `${signals.length} to watch` : "",
       handoffs.length ? plural(handoffs.length, "hand-off out", "hand-offs out") : "",
       bids ? plural(bids, "bid", "bids") : "",
     ].filter(Boolean);
     const top = [...decisions, ...signals].map((i) => i.title).filter((t) => t !== lead.oldest?.title).slice(0, lead.oldest ? 2 : 3);
-    const parts = [oldestClause(lead), top.join("; "), crewLine(day, input.schedule)];
+    const parts = [counts.length ? oldestClause(lead) : "", top.join("; "), crewLine(day, input.schedule)];
     if (planSenders.length && lanes.includes("decisions") && !input.reports.some((r) => r.day === day)) {
       parts.push(`No plan from ${planSenders.length === 1 ? firstNameOf(planSenders[0].name) : "the supervisor"} for today.`);
     }
@@ -198,14 +210,15 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     const toCheck = tasks.filter((t) => isReportedDone(t) && t.email !== p.email).length;
     const dueToday = tasks.filter((t) => isOpen(t) && t.due === day && !supervisorEmails.has(t.email)).length;
     // Their own work (hand-offs to them, the PM's seat, the field's once it moved up) comes from the feed.
-    const lead = leadOf(feedFor(input, p.email, { owner: false, scope }), day);
-    const yours = leadCounts(lead);
+    const own = feedFor(input, p.email, { owner: false, crew: true, scope });
+    const lead = leadOf(own, day);
+    const yours = countsOf(lead, own.length);
     // Material requests (0023) waiting on this PM: on their jobs, not their own, within their limit.
     const pmLimit = input.pmLimitCents ?? SETTING_DEFAULTS["requests.pmLimitCents"];
     const requests = p.perms.includes("requests.approve") ? (input.requests ?? []).filter((r) => inScope(scope, r.jobId) && pmDecides(r, p.email, pmLimit)).length : 0;
     const lines = [
       yours.length ? `Yours: ${yours.join(", ")}` : "",
-      oldestClause(lead),
+      yours.length ? oldestClause(lead) : "",
       crewLine(day, theirs),
       cant ? `${plural(cant, "person", "people")} can't make it` : "",
       unconfirmed ? `${unconfirmed} not confirmed yet` : "",
@@ -222,10 +235,10 @@ export function buildMorning(input: MorningInput): MorningNote[] {
   for (const p of input.people) {
     if (!p.active || supervisorEmails.has(p.email)) continue;
     const mine = today.filter((s) => s.email === p.email).sort((a, b) => (a.startTime || "99").localeCompare(b.startTime || "99"));
+    notified.add(p.email); // a worker is heard from here or not at all, never as a seat below
     if (!mine.length) continue; // not working today: no buzz
-    notified.add(p.email);
     const where = mine.map((s) => `${s.jobName}${s.startTime ? ` ${p.lang === "es" ? "a las" : "at"} ${clockText(s.startTime)}` : ""}`).join(", ");
-    const tasks = feedFor(input, p.email, { owner: false, scope: scopeFrom({ role: "member", email: p.email, perms: p.perms }, input.jobPeople ?? []) }).sort(byAge);
+    const tasks = feedFor(input, p.email, { owner: false, crew: true, scope: scopeFrom({ role: "member", email: p.email, perms: p.perms }, input.jobPeople ?? []) }).sort(byAge);
     const lead = leadOf(tasks, day);
     const first = tasks[0];
     const late = { en: [lead.overdue ? `${lead.overdue} overdue` : "", lead.dueToday ? `${lead.dueToday} due today` : ""].filter(Boolean), es: [lead.overdue ? `${lead.overdue} ${lead.overdue === 1 ? "atrasada" : "atrasadas"}` : "", lead.dueToday ? `${lead.dueToday} para hoy` : ""].filter(Boolean) };
@@ -238,20 +251,23 @@ export function buildMorning(input: MorningInput): MorningNote[] {
 
   // ---- anyone else holding a seat (finance): their tasks, when they have any --------
   for (const n of notes) notified.add(n.email);
-  for (const person of input.seatPeople ?? []) {
-    if (person.owner || notified.has(person.email)) continue;
+  const seatPeople = input.seatPeople ?? [];
+  const holders = new Set(ROLES.flatMap((r) => seatHolder(r, input.seats ?? [], seatPeople).emails));
+  for (const person of seatPeople) {
+    if (person.owner || notified.has(person.email) || !holders.has(person.email)) continue;
     notified.add(person.email);
     const crew = input.people.find((c) => c.email === person.email);
     if (crew && !crew.active) continue;
     const scope = crew ? scopeFrom({ role: "member", email: crew.email, perms: crew.perms }, input.jobPeople ?? []) : null;
-    const items = feedFor(input, person.email, { owner: false, scope });
+    const items = feedFor(input, person.email, { owner: false, crew: !!crew, scope });
     if (!items.length) continue; // nothing on their list: no buzz
     const lead = leadOf(items, day);
-    const counts = leadCounts(lead);
+    const counts = countsOf(lead, items.length);
+    const late = leadCounts(lead).length > 0;
     notes.push({
       email: person.email,
-      title: `Your day: ${counts.length ? counts.join(", ") : plural(items.length, "task", "tasks")}`,
-      body: clip([oldestClause(lead), counts.length ? plural(items.length, "task", "tasks") + " open in all" : ""].filter(Boolean).join(" · "), 240),
+      title: `Your day: ${counts.join(", ")}`,
+      body: clip([oldestClause(lead), late ? plural(items.length, "task", "tasks") + " open in all" : ""].filter(Boolean).join(" · "), 240),
       url: "/app/tasks",
       tag,
     });
