@@ -376,10 +376,10 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - views Mine / My team / Per job / Per department;
    - escalation by service level;
    - the 7 AM push and Home read it.
-4. **One schedule** (§6.3):
+4. ✅ **One schedule** (§6.3): `schedule_items` (0034), `src/lib/schedule/feed.ts` over every source in the table, `/app/schedule` (My day, Week board, Month, GC look-ahead) and the job page's Schedule tab with its phase timeline. An award's start reads in place as a sub mobilization (the package's work window, else the winning bid's start), held by the mobilization gate; bids out show their due date.
    - `schedule_items` migration + `src/lib/schedule/feed.ts` over every source in the table;
    - My day (phone), Week board and Month (desktop), Job timeline, GC look-ahead draft.
-5. **Field operations** (§6.4):
+5. ✅ **Field operations** (§6.4): 0035 and 0045, `src/lib/field/ops.ts`, `src/lib/field/checklists.ts`, `/api/field`: the structured daily log and its "log missing" item in the task feed, receipts into `purchases`, trade checklists per phase that block verify, punch items by room and wall, and directives into change orders.
    - structured daily log + "log missing" item;
    - receipts normalized into `purchases`;
    - pre-cover `checklists` per phase gating verify;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildGcLookAheadDrafts,
+  mobilizationOf,
   monthGrid,
   SCHEDULE_KIND_LABEL,
   weekDays,
@@ -102,5 +103,37 @@ describe("schedule feed helpers", () => {
     expect(drafts[0].body).toContain("Pre-cover drywall screw & corner-bead inspection");
     expect(drafts[0].body).toContain("Billing cutoff: Build Collective");
     expect(SCHEDULE_KIND_LABEL.inspection).toBe("Inspection");
+  });
+});
+
+describe("an awarded sub's start on the schedule", () => {
+  const ready = { ready: true, missing: [] };
+  const held = { ready: false, missing: ["no insurance certificate", "no W-9"] };
+
+  it("takes the package's work window over the winning bid's start", () => {
+    expect(mobilizationOf({ workFrom: "2026-11-02", workTo: "2026-11-06" }, "2026-10-30", ready, "2026-10-24")).toEqual({
+      startDay: "2026-11-02",
+      endDay: "2026-11-06",
+      status: "scheduled",
+      detail: "Cleared to mobilize",
+    });
+  });
+
+  it("falls back to the winning bid's start, one day long", () => {
+    expect(mobilizationOf({ workFrom: null, workTo: null }, "2026-10-30", ready, "2026-10-24")).toMatchObject({ startDay: "2026-10-30", endDay: "2026-10-30" });
+  });
+
+  it("is not on the schedule with no start at all", () => {
+    expect(mobilizationOf({ workFrom: null, workTo: "2026-11-06" }, null, ready, "2026-10-24")).toBeNull();
+  });
+
+  it("names what holds the sub, and is overdue once the start comes while they are still held", () => {
+    expect(mobilizationOf({ workFrom: "2026-11-02", workTo: null }, null, held, "2026-10-24")).toMatchObject({ status: "scheduled", detail: "Not cleared to mobilize: no insurance certificate, no W-9" });
+    expect(mobilizationOf({ workFrom: "2026-10-24", workTo: null }, null, held, "2026-10-24")?.status).toBe("overdue");
+    expect(mobilizationOf({ workFrom: "2026-10-20", workTo: null }, null, ready, "2026-10-24")?.status).toBe("scheduled");
+  });
+
+  it("never ends before it starts", () => {
+    expect(mobilizationOf({ workFrom: "2026-11-02", workTo: "2026-10-30" }, null, ready, "2026-10-24")?.endDay).toBe("2026-11-02");
   });
 });
