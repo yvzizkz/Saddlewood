@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decisionRights, escalationOf, peopleOf, seatHolder, type Seat } from "../seats";
+import { decisionRights, escalationOf, holdsFieldLead, peopleOf, seatHolder, type Seat } from "../seats";
 
 const people = peopleOf(
   {
@@ -30,6 +30,16 @@ describe("seatHolder", () => {
   });
   it("uses the decided defaults for a seat with no row", () => {
     expect(seatHolder("ops", [], people).emails.sort()).toEqual(["info@x.com", "lando@x.com"]);
+  });
+});
+
+describe("holdsFieldLead", () => {
+  const lead = (holder: string, backup: string): Seat[] => [{ role: "field_lead", holder, backup, note: "", updatedBy: "", updatedAt: null }];
+  it("is the holder, or the backup only while the seat is empty", () => {
+    expect(holdsFieldLead("Eli.PM@x.com", lead("eli.pm@x.com", "Marco"), people)).toBe(true);
+    expect(holdsFieldLead("marco@x.com", lead("eli.pm@x.com", "Marco"), people)).toBe(false);
+    expect(holdsFieldLead("eli.pm@x.com", lead("", "Eli"), people)).toBe(true);
+    expect(holdsFieldLead("", lead("", "Eli"), people)).toBe(false);
   });
 });
 

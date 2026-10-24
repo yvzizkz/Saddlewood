@@ -7,7 +7,7 @@ import { NextRequest } from "next/server";
 
 type Row = Record<string, unknown>;
 const { state } = vi.hoisted(() => ({
-  state: { seat: null as null | { owner: boolean; email: string }, rows: [] as Row[], inserted: [] as Row[], updated: [] as Row[] },
+  state: { seat: null as null | { owner: boolean; email: string; money?: boolean }, rows: [] as Row[], inserted: [] as Row[], updated: [] as Row[] },
 }));
 
 const PM_JOBS = new Set(["8009-n-ironwood-dr"]);
@@ -81,5 +81,24 @@ describe("PATCH /api/tasks as a PM", () => {
     expect((await PATCH(req("PATCH", { id: 9, status: "done" }))).status).toBe(404);
     expect((await PATCH(req("PATCH", { id: 7, role: "decisions" }))).status).toBe(403);
     expect(state.updated).toHaveLength(0);
+  });
+});
+
+describe("/api/tasks as a field lead (no money, jobs/access.ts)", () => {
+  const LEAD = { owner: false, email: "arnold@example.com", money: false };
+
+  it("hands work to the field lead or the PM on their job and closes field-lead work there", async () => {
+    state.seat = LEAD;
+    expect((await POST(req("POST", { title: "Pre-cover photos", role: "field_lead", job: "8009-n-ironwood-dr" }))).status).toBe(200);
+    expect(state.inserted[0]).toMatchObject({ role: "field_lead", created_by: "arnold@example.com" });
+    expect((await PATCH(req("PATCH", { id: 7, status: "done" }))).status).toBe(200);
+    expect(state.updated[0]).toMatchObject({ id: 7, status: "done", done_by: "arnold@example.com" });
+  });
+
+  it("does not hand work up, close finance work, or touch another job", async () => {
+    state.seat = LEAD;
+    expect((await POST(req("POST", { title: "x", role: "finance" }))).status).toBe(403);
+    expect((await PATCH(req("PATCH", { id: 8, status: "done" }))).status).toBe(403);
+    expect((await PATCH(req("PATCH", { id: 9, status: "done" }))).status).toBe(404);
   });
 });

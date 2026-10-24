@@ -14,7 +14,7 @@ import { PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
 import { jobHref, listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { canCloseHere, departmentOf, feedForSeat, isMine, KIND_LABEL, loadFeed, type FeedItem } from "@/lib/tasks/feed";
+import { canCloseHere, departmentOf, feedForSeat, isMine, KIND_LABEL, loadFeed, withoutMoney, type FeedItem } from "@/lib/tasks/feed";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const [allRefs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
   const refs = allRefs.filter((r) => seesJob(seat, r));
   const mineOf = (i: FeedItem) => isMine(i, me, seats, people);
-  const feed = feedForSeat(await loadFeed(allRefs, seats, today), seat.owner ? null : new Set(refs.map((r) => r.key)), mineOf);
+  const seated = feedForSeat(await loadFeed(allRefs, seats, today), seat.owner ? null : new Set(refs.map((r) => r.key)), mineOf);
+  const feed = seat.money ? seated : withoutMoney(seated);
   const mineAll = feed.filter(mineOf);
   const scoped = view === "mine" ? mineAll : feed;
 

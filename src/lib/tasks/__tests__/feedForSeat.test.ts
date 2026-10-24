@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canCloseHere, feedForSeat, type FeedItem } from "../feed";
+import { canCloseHere, feedForSeat, withoutMoney, type FeedItem } from "../feed";
 
 // A project manager's Tasks: their jobs, their own no-job work, and never the
 // owners' waiting list, the ops board or sub bills.
@@ -71,5 +71,17 @@ describe("canCloseHere", () => {
     expect(canCloseHere({ editable: true, role: "finance" }, false)).toBe(false);
     expect(canCloseHere({ editable: true, role: "field_lead" }, false)).toBe(true);
     expect(canCloseHere({ editable: false, role: "pm" }, false)).toBe(false);
+  });
+});
+
+describe("withoutMoney", () => {
+  it("leaves a field lead the work and crew tasks, never billing, bills, waivers or accounting links", () => {
+    const xs = [
+      ...feed,
+      item("wvib9", { source: "billing", kind: "compliance" }),
+      item("w5", { href: "/app/accounting/receivables" }),
+      item("w6", { href: "/app/money/12" }),
+    ];
+    expect(withoutMoney(xs).map((i) => i.id)).toEqual(["w1", "w2", "w3", "w4", "q1", "o1", "c1"]);
   });
 });
