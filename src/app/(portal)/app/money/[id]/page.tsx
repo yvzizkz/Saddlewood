@@ -168,7 +168,7 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
                   </p>
                   {pm.voidedAt ? <p className="text-xs text-[#9a2a1f]">Voided: {pm.voidReason}</p> : null}
                 </div>
-                {pm.voidedAt ? <Chip tone="bad">Void</Chip> : null}
+                {pm.voidedAt ? <Chip tone="bad">Void</Chip> : pm.source === "bot" ? <Chip>From Joist{pm.externalRef ? ` · ${pm.externalRef}` : ""}</Chip> : null}
               </div>
               {seat.owner && !pm.voidedAt ? <VoidButton url={`/api/billing/payments/${pm.id}/void`} what={`this ${money(pm.amountCents)} payment`} label="Void this payment" testId={`void-payment-${pm.id}`} /> : null}
             </Card>

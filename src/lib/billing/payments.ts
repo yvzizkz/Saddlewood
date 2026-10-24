@@ -22,8 +22,14 @@ export type Payment = {
   recordedAt: string;
   voidedAt: string | null;
   voidReason: string;
+  /** "bot": a Joist payment the bot confirmed (0054); "app": recorded on Money. */
+  source: PaymentSource;
+  /** The bot's number for it, "P12". */
+  externalRef: string | null;
   allocations: Allocation[];
 };
+
+export type PaymentSource = "app" | "bot";
 
 type PaymentRow = {
   id: string;
@@ -39,6 +45,9 @@ type PaymentRow = {
   recorded_at: string;
   voided_at: string | null;
   void_reason: string;
+  // Absent before 0054.
+  source?: PaymentSource;
+  external_ref?: string | null;
 };
 type AllocationRow = { payment_id: string; document_id: string; line_index: number | null; amount_cents: number | string };
 
@@ -61,6 +70,8 @@ function toPayment(r: PaymentRow, allocations: AllocationRow[]): Payment {
     recordedAt: r.recorded_at,
     voidedAt: r.voided_at,
     voidReason: r.void_reason,
+    source: r.source === "bot" ? "bot" : "app",
+    externalRef: r.external_ref ?? null,
     allocations: allocations
       .filter((a) => a.payment_id === r.id)
       .map((a) => ({ documentId: a.document_id, lineIndex: a.line_index, amountCents: Number(a.amount_cents) })),
@@ -78,6 +89,8 @@ export type PaymentInput = {
   evidence?: string;
   recordedBy: string;
   allocations: Allocation[];
+  /** A Joist payment the bot confirmed, with its number (0054). */
+  bot?: { externalRef: string };
 };
 
 /** What the input must look like before anything is written. Returns the problem, or null. */
@@ -115,6 +128,8 @@ export async function recordPayment(p: PaymentInput): Promise<Payment> {
       note: (p.note ?? "").trim().slice(0, 1000),
       evidence: (p.evidence ?? "").trim().slice(0, 300),
       recorded_by: p.recordedBy,
+      // Only a bot payment names its source: Money's own keeps working before 0054.
+      ...(p.bot ? { source: "bot", external_ref: p.bot.externalRef } : {}),
     })
     .select("*")
     .single();
@@ -130,6 +145,17 @@ export async function recordPayment(p: PaymentInput): Promise<Payment> {
     fail("apply payment", aerr.message);
   }
   return toPayment(row, (allocs ?? []) as AllocationRow[]);
+}
+
+/** One payment with its allocations, or null. */
+export async function getPayment(id: string): Promise<Payment | null> {
+  const db = getSupabaseAdmin();
+  const { data: row, error } = await db.from("payments").select("*").eq("id", id).maybeSingle();
+  if (error) fail("read payment", error.message);
+  if (!row) return null;
+  const { data: allocs, error: aerr } = await db.from("payment_allocations").select("*").eq("payment_id", id);
+  if (aerr) fail("read allocations", aerr.message);
+  return toPayment(row as PaymentRow, (allocs ?? []) as AllocationRow[]);
 }
 
 export async function voidPayment(id: string, reason: string, now: Date = new Date()): Promise<boolean> {

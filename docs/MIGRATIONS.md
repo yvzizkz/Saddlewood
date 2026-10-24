@@ -34,12 +34,13 @@ site change that reads them with the server key must be live first.
 | 0051 | `estimate_tables_service_role_only` (deploy the site first) | cleanup PR |
 | 0052 | `old_tables_no_public_grants` | cleanup PR |
 | 0053 | `spend_ledger` (after 0042 and 0044; before the site change) | cleanup PR |
+| 0054 | `bot_payments` (before the site change) | cleanup PR |
 
 ## Production state
 
 As of 2026-10-22 (checked live by the KB session): everything through 0050
 is applied, including 0029–0035, 0040–0045 and the 0044 trip_key
-expression. 0051, 0052 and 0053 (the cleanup stack) are not. They go in, in
+expression. 0051, 0052, 0053 and 0054 (the cleanup stack) are not. They go in, in
 order, as the stack merges, each before the code that needs it is live
 (0051 is the exception, after; see above). Check before applying anything,
 since this note can go stale: a migration is in if the table it creates exists.
@@ -65,6 +66,11 @@ old Expenses row (`progress_trackers` 'accounting-state', left in place) into
 them, skipping the page's five seed payments. Apply it before the site change
 that writes them (/api/expenses). Check it with `select pg_get_constraintdef(oid)
 from pg_constraint where conname = 'purchases_source_check'` (lists 'zelle').
+0054 adds `payments.source` ('app' or 'bot') and `external_ref` (the bot's
+P number, one standing row each). Apply it before the site change that
+writes them (/api/bot/payments). Money and Receivables read it with `*`, so
+they keep working without it. Check it with `select count(*) from
+information_schema.columns where table_name = 'payments' and column_name = 'source'` (1).
 
 ## Rules
 

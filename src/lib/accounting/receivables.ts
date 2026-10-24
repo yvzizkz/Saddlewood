@@ -110,6 +110,8 @@ export type CollectedRow = {
   number: string;
   method: string;
   reference: string;
+  /** Where it was recorded: "Money" (a person) or "Joist (bot)" (0054). */
+  recordedIn: string;
   amountCents: number;
   feeCents: number;
 };
@@ -119,12 +121,13 @@ export async function loadCollected(fromDay: string, toDay: string): Promise<Col
   const db = getSupabaseAdmin();
   const { data: pays, error } = await db
     .from("payments")
-    .select("id,client_id,received_on,amount_cents,fee_cents,method,reference,voided_at")
+    // "*": source is there only once 0054 is in.
+    .select("*")
     .is("voided_at", null)
     .gte("received_on", fromDay)
     .lte("received_on", toDay);
   if (error) throw new Error(`payments: ${error.message}`);
-  const list = (pays ?? []) as { id: string; client_id: string | null; received_on: string; amount_cents: number; fee_cents: number; method: string; reference: string }[];
+  const list = (pays ?? []) as { id: string; client_id: string | null; received_on: string; amount_cents: number; fee_cents: number; method: string; reference: string; source?: string }[];
   if (!list.length) return [];
   const [alloc, clients, jobs] = await Promise.all([
     db.from("payment_allocations").select("payment_id,document_id,amount_cents").in("payment_id", list.map((p) => p.id)),
@@ -150,6 +153,7 @@ export async function loadCollected(fromDay: string, toDay: string): Promise<Col
       client: (p.client_id && clientName.get(p.client_id)) || "Unknown client",
       method: p.method,
       reference: p.reference,
+      recordedIn: p.source === "bot" ? "Joist (bot)" : "Money",
     };
     mine.forEach((a, i) => {
       const d = docMap.get(a.document_id);

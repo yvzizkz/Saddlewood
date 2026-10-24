@@ -80,6 +80,7 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
       numberHref: r.documentId ? `/app/money/${r.documentId}` : null,
       method: r.method,
       reference: r.reference,
+      recordedIn: r.recordedIn,
       amount: r.amountCents,
       fee: r.feeCents || null,
     }));
@@ -90,6 +91,7 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
       { key: "number", header: "Invoice", kind: "text", hrefKey: "numberHref" },
       { key: "method", header: "Method", kind: "text", filter: true },
       { key: "reference", header: "Reference", kind: "text", phone: "hide" },
+      { key: "recordedIn", header: "Recorded", kind: "text", filter: true, phone: "hide" },
       { key: "amount", header: "Amount", kind: "money", total: true, phone: "value" },
       { key: "fee", header: "Fee", kind: "money", total: true, phone: "hide" },
     ];
