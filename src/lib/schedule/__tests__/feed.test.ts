@@ -130,7 +130,15 @@ describe("an awarded sub's start on the schedule", () => {
   it("names what holds the sub, and is overdue once the start comes while they are still held", () => {
     expect(mobilizationOf({ workFrom: "2026-11-02", workTo: null }, null, held, "2026-10-24")).toMatchObject({ status: "scheduled", detail: "Not cleared to mobilize: no insurance certificate, no W-9" });
     expect(mobilizationOf({ workFrom: "2026-10-24", workTo: null }, null, held, "2026-10-24")?.status).toBe("overdue");
-    expect(mobilizationOf({ workFrom: "2026-10-20", workTo: null }, null, ready, "2026-10-24")?.status).toBe("scheduled");
+    expect(mobilizationOf({ workFrom: "2026-10-20", workTo: null }, null, ready, "2026-10-24")?.status).toBe("done");
+  });
+
+  it("flags a held sub only while the work window is open, never on finished work", () => {
+    // A COI that lapsed after the job: the award stays, the start is not missed.
+    expect(mobilizationOf({ workFrom: "2026-09-01", workTo: "2026-09-12" }, null, held, "2026-10-24")?.status).toBe("done");
+    expect(mobilizationOf({ workFrom: "2026-10-20", workTo: "2026-10-24" }, null, held, "2026-10-24")?.status).toBe("overdue");
+    expect(mobilizationOf({ workFrom: "2026-10-20", workTo: "2026-10-23" }, null, held, "2026-10-24")?.status).toBe("done");
+    expect(mobilizationOf({ workFrom: "2026-10-25", workTo: "2026-10-30" }, null, held, "2026-10-24")?.status).toBe("scheduled");
   });
 
   it("never ends before it starts", () => {

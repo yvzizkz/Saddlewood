@@ -206,22 +206,24 @@ export function buildGcLookAheadDrafts(
 /**
  * When an awarded sub starts on site: the package's work window, else the
  * winning bid's start (bid_packages.work_from/work_to, bid_responses.start_on).
- * Overdue once the start has come while the mobilization gate still holds them
- * (subs/rules.ts readiness: COI, W-9, MSA, license, ACH). Null with no start.
+ * Overdue while the window is open and the mobilization gate still holds them
+ * (subs/rules.ts readiness: COI, W-9, MSA, license, ACH); done once the window
+ * has passed, since an award never closes and readiness is read against today,
+ * so a lapsed COI on finished work is not a missed start. Null with no start.
  */
 export function mobilizationOf(
   pkg: { workFrom: string | null; workTo: string | null },
   bidStartOn: string | null,
   gate: Readiness,
   today: string,
-): { startDay: string; endDay: string; status: "scheduled" | "overdue"; detail: string } | null {
+): { startDay: string; endDay: string; status: "scheduled" | "overdue" | "done"; detail: string } | null {
   const startDay = pkg.workFrom ?? bidStartOn;
   if (!startDay) return null;
   const endDay = pkg.workTo && pkg.workTo >= startDay ? pkg.workTo : startDay;
   return {
     startDay,
     endDay,
-    status: !gate.ready && startDay <= today ? "overdue" : "scheduled",
+    status: endDay < today ? "done" : !gate.ready && startDay <= today ? "overdue" : "scheduled",
     detail: gate.ready ? "Cleared to mobilize" : `Not cleared to mobilize: ${gate.missing.join(", ")}`,
   };
 }
