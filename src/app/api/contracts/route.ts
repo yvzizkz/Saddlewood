@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeOps } from '@/lib/ops/auth';
 import { withSignToken } from '@/lib/contracts/link';
-import { draftContract, getContractsState, saveContractsState } from '@/lib/contracts/store';
-import type { DraftContractInput } from '@/lib/contracts/types';
+import { getContractsState, saveContractsState } from '@/lib/contracts/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -74,16 +73,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, contract: incoming });
     }
 
-    const payload: DraftContractInput = body.contract || body;
-    if (!payload.client_name || !payload.amount || !payload.scope) {
-      return NextResponse.json(
-        { ok: false, error: 'Missing required contract fields: client_name, amount, or scope' },
-        { status: 400 }
-      );
-    }
-
-    const contract = await draftContract(payload, who.actor);
-    return NextResponse.json({ ok: true, contract: withSignToken(contract) }, { status: 201 });
+    // The site no longer writes an agreement's words here (T112): an
+    // agreement is drafted on its job, from the accepted proposal. The bot's
+    // own drafts (contract.py, action "draft" above) still sync until its
+    // patch moves it to the job's agreement route.
+    return NextResponse.json(
+      { ok: false, error: 'agreements are drafted on the job now: /app/jobs/<id>' },
+      { status: 410 }
+    );
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: (err as Error).message },
