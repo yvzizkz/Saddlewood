@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Bell, BellOff, Briefcase, ChevronRight, Download, HardHat, Landmark, ListTodo, LogOut } from 'lucide-react'
+import { Bell, BellOff, Briefcase, CalendarDays, ChevronRight, Download, HardHat, Landmark, ListTodo, LogOut } from 'lucide-react'
 
 import { triggerOnboardingReplay } from '@/components/auth/OnboardingFlow'
 import { PasskeyCard } from '@/components/auth/PasskeyCard'
@@ -206,6 +206,13 @@ export default function CrewMoreScreen() {
             <Card className="flex items-center gap-3 p-4">
               <ListTodo className="size-5 text-[var(--color-teal)]" aria-hidden="true" />
               <span className="flex-1 text-[15px] font-medium text-[var(--color-charcoal)]">{lang === 'es' ? 'Tareas de mis obras' : 'Tasks on my jobs'}</span>
+              <ChevronRight className="size-4 text-[var(--color-charcoal-light)]" aria-hidden="true" />
+            </Card>
+          </Link>
+          <Link href="/app/schedule" className="mt-4 block">
+            <Card className="flex items-center gap-3 p-4">
+              <CalendarDays className="size-5 text-[var(--color-teal)]" aria-hidden="true" />
+              <span className="flex-1 text-[15px] font-medium text-[var(--color-charcoal)]">{lang === 'es' ? 'Calendario de mis obras' : 'Schedule on my jobs'}</span>
               <ChevronRight className="size-4 text-[var(--color-charcoal-light)]" aria-hidden="true" />
             </Card>
           </Link>

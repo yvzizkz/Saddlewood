@@ -423,9 +423,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       .filter((i) => i.jobKey === ref.key || (!i.jobKey && i.client && i.client === ref.client))
       .filter((i) => owner || i.source !== "pay");
     const table: TableRow[] = jobSched.map((i) => {
-      const deadHref =
-        (!subsSeat && i.source === "bid") ||
-        (!owner && Boolean(i.href?.startsWith("/app/schedule")));
+      const deadHref = !subsSeat && i.source === "bid";
       return {
         id: i.id,
         day: i.startDay,
@@ -440,21 +438,20 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     });
     const editableItems = jobSched.filter((i) => i.editable && i.itemId);
     return (
-      <JobFrame {...frame} actions={owner ? <Link className="text-sm underline" href={hrefOf("/app/schedule", { job: ref.key })}>Open in Schedule</Link> : undefined}>
-        {owner ? (
+      <JobFrame {...frame} actions={<Link className="text-sm underline" href={hrefOf("/app/schedule", { job: ref.key })}>Open in Schedule</Link>}>
+        {/* Owners, and the PM on their own job for their seat or the field lead (api/schedule). */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <NewScheduleItem
             job={ref.key}
             defaultDay={today}
             jobs={[{ value: ref.key, label: ref.name }]}
-            roles={ROLES.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
+            roles={(owner ? ROLES : PM_ROLES).map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
             kinds={EDITABLE_SCHEDULE_KINDS}
           />
           <Link className="text-xs underline text-[var(--color-charcoal-light)]" href={hrefOf("/app/schedule", { view: "lookahead", job: ref.key })}>
             Wednesday two-week look-ahead draft →
           </Link>
         </div>
-        ) : null}
 
         <Card className="p-4">
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Job timeline · phases & promised completion</p>
@@ -495,7 +492,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                       {[it.kindLabel, it.startTime ? clockText(it.startTime) : null, it.detail].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  {owner ? <ScheduleStatusButton id={it.itemId!} status={it.status} /> : null}
+                  <ScheduleStatusButton id={it.itemId!} status={it.status} />
                 </li>
               ))}
             </ul>

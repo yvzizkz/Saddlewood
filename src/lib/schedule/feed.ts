@@ -125,6 +125,24 @@ export function monthGrid(anchorDay: string): { monthLabel: string; monthPrefix:
   return { monthLabel, monthPrefix: firstDay.slice(0, 7), weeks };
 }
 
+/** Where a project manager's links can go: their job pages and Billing (accounting/access.ts). */
+const PM_OPENS = ["/app/jobs/", "/app/accounting/billing"];
+
+/**
+ * A project manager's cut of the schedule (jobs/access.ts): their jobs, and the
+ * billing dates of those jobs' clients, as the job's Schedule tab shows them.
+ * Never pay runs or bills due (Payables), company dates or compliance. A link
+ * to a screen they cannot open goes to the job's Schedule tab (or this one). An
+ * owner (jobs null) gets every event as it is.
+ */
+export function scheduleForSeat(events: ScheduleEvent[], jobs: Set<string> | null, refs: Pick<JobRef, "key" | "client">[]): ScheduleEvent[] {
+  if (jobs === null) return events;
+  const clients = new Set(refs.filter((r) => jobs.has(r.key) && r.client).map((r) => r.client));
+  return events
+    .filter((e) => e.source !== "pay" && (e.jobKey ? jobs.has(e.jobKey) : !!e.client && clients.has(e.client)))
+    .map((e) => (PM_OPENS.some((p) => e.href.startsWith(p)) ? e : { ...e, href: e.jobKey ? jobHref(e.jobKey, "schedule") : "/app/schedule" }));
+}
+
 export type GcLookAheadDraft = {
   client: string;
   fromDay: string;

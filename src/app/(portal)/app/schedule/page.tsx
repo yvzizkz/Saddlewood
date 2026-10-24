@@ -9,8 +9,8 @@ import { LookAheadDraftCard, NewScheduleItem, ScheduleStatusButton } from "@/com
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { resolvePeriod } from "@/lib/analytics/period";
-import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { addDays, dayShort, localDay } from "@/lib/crew/time";
+import { PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
 import { jobHref, listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
@@ -21,6 +21,7 @@ import {
   eventOverlaps,
   loadScheduleFeed,
   monthGrid,
+  scheduleForSeat,
   weekDays,
   type ScheduleEvent,
 } from "@/lib/schedule/feed";
@@ -43,8 +44,10 @@ const KIND_TONE: Record<string, string> = {
 };
 
 export default async function SchedulePage({ searchParams }: { searchParams: Promise<SP> }) {
-  const viewer = await getViewer();
-  if (!(await viewerIsOwner(viewer)) || viewer.kind !== "staff") redirect("/app");
+  // Owners see every job; a project manager their own (jobs/access.ts), and writes on them.
+  const seat = await workSeat();
+  if (!seat) redirect("/app");
+  const owner = seat.owner;
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
 
@@ -54,8 +57,9 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
     rawView === "day" || rawView === "week" || rawView === "month" || rawView === "lookahead" ? rawView : "week";
   const anchor = one("day") && /^\d{4}-\d{2}-\d{2}$/.test(one("day")!) ? one("day")! : today;
 
-  const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
-  const allEvents = await loadScheduleFeed(refs, today);
+  const [allRefs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
+  const refs = owner ? allRefs : allRefs.filter((r) => seesJob(seat, r));
+  const allEvents = scheduleForSeat(await loadScheduleFeed(allRefs, today), owner ? null : new Set(refs.map((r) => r.key)), refs);
 
   const wDays = weekDays(anchor);
   const mGrid = monthGrid(anchor);
@@ -160,7 +164,9 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             Schedule
           </h1>
           <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">
-            One schedule over crew dispatch, job phases, inspections, deliveries, sub mobilizations, client billing cutoffs and compliance dates.
+            {owner
+              ? "One schedule over crew dispatch, job phases, inspections, deliveries, sub mobilizations, client billing cutoffs and compliance dates."
+              : "Your jobs: crew dispatch, phases, inspections, deliveries, sub mobilizations and your clients' billing cutoffs."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -198,17 +204,27 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
       </header>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <NewScheduleItem
-          jobs={activeJobs.map((r) => ({ value: r.key, label: r.name }))}
-          kinds={EDITABLE_SCHEDULE_KINDS}
-          roles={ROLES.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
-          defaultDay={anchor}
-        />
+        {owner || activeJobs.length ? (
+          <NewScheduleItem
+            jobs={activeJobs.map((r) => ({ value: r.key, label: r.name }))}
+            kinds={EDITABLE_SCHEDULE_KINDS}
+            roles={(owner ? ROLES : PM_ROLES).map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
+            defaultDay={anchor}
+            jobRequired={!owner}
+          />
+        ) : (
+          <span />
+        )}
         <span className="text-xs text-[var(--color-charcoal-light)]">
-          Showing {formatValue("date", rangeFrom)} – {formatValue("date", rangeTo)} ·{" "}
-          <Link href="/internal/ops/calendar" className="underline">
-            Company 30/90-day goals
-          </Link>
+          Showing {formatValue("date", rangeFrom)} – {formatValue("date", rangeTo)}
+          {owner ? (
+            <>
+              {" · "}
+              <Link href="/internal/ops/calendar" className="underline">
+                Company 30/90-day goals
+              </Link>
+            </>
+          ) : null}
         </span>
       </div>
 
@@ -304,9 +320,11 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
               <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">
                 Week board · Jobs × Days ({dayShort(wDays[0])} – {dayShort(wDays[6])})
               </p>
-              <Link href="/app/crew" className="text-xs underline text-[var(--color-charcoal-light)]">
-                Edit crew dispatch in Crew
-              </Link>
+              {owner ? (
+                <Link href="/app/crew" className="text-xs underline text-[var(--color-charcoal-light)]">
+                  Edit crew dispatch in Crew
+                </Link>
+              ) : null}
             </div>
             <table className="w-full min-w-[920px] border-collapse text-left text-xs">
               <thead>
@@ -365,8 +383,8 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                 {/* Company-wide row: billing cutoffs, Friday payroll/Melio runs, COI watches, goals */}
                 <tr className="align-top bg-[var(--color-background)]/60">
                   <td className="py-2.5 pr-3">
-                    <span className="font-medium text-[var(--color-charcoal)]">Billing, Pay Runs & Compliance</span>
-                    <p className="text-[11px] text-[var(--color-charcoal-light)]">Cutoffs, Friday runs, COI watches</p>
+                    <span className="font-medium text-[var(--color-charcoal)]">{owner ? "Billing, Pay Runs & Compliance" : "Billing cutoffs"}</span>
+                    <p className="text-[11px] text-[var(--color-charcoal-light)]">{owner ? "Cutoffs, Friday runs, COI watches" : "Your clients' cutoffs and % complete due"}</p>
                   </td>
                   {wDays.map((day) => {
                     const cell = d.rows.filter((e) => !e.jobKey && eventFallsOn(e, day));
