@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { peopleOf, type Seat } from "@/lib/roles/seats";
 import type { FeedItem } from "../feed";
-import { jobsOf, leadOf, mineOf, summaryOf } from "../mine";
+import { jobsOf, leadOf, mineOf, seatFeedOf, summaryOf } from "../mine";
 
 // One person's Mine, shared by Tasks, the 7 AM push and Home's "Your tasks".
 
@@ -57,6 +57,16 @@ describe("mineOf", () => {
 
   it("gives a worker only what is assigned to them, moved up or not", () => {
     expect(ids(mineOf(FEED, { email: ARNOLD, owner: false, jobs: jobsOf(REFS, null) }, seats, people))).toEqual(["c1"]);
+  });
+});
+
+describe("seatFeedOf", () => {
+  it("gives an owner the whole feed, and a project manager their jobs with Mine inside it", () => {
+    expect(ids(seatFeedOf(FEED, { email: MARCO, owner: true, jobs: null }, seats, people))).toEqual(ids(FEED));
+    const seat = { email: ELI, owner: false, jobs: jobsOf(REFS, ["keim"]) };
+    const everyone = seatFeedOf(FEED, seat, seats, people);
+    expect(ids(everyone)).not.toContain("bambi");
+    expect(ids(mineOf(FEED, seat, seats, people)).every((id) => ids(everyone).includes(id))).toBe(true);
   });
 });
 

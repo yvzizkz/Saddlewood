@@ -20,10 +20,14 @@ export function jobsOf(refs: Pick<JobRef, "key" | "crewId">[], scope: JobScope):
   return new Set(refs.filter((r) => scope === null || (!!r.crewId && scope.includes(r.crewId))).map((r) => r.key));
 }
 
+/** Tasks' Everyone for this seat: the feed narrowed to the seat's jobs, plus whatever is theirs elsewhere. */
+export function seatFeedOf(feed: FeedItem[], seat: FeedSeat, seats: Seat[], people: Person[]): FeedItem[] {
+  return feedForSeat(feed, seat.owner ? null : seat.jobs, (i) => isMine(i, seat.email, seats, people));
+}
+
 /** Tasks' Mine for this seat. */
 export function mineOf(feed: FeedItem[], seat: FeedSeat, seats: Seat[], people: Person[]): FeedItem[] {
-  const mine = (i: FeedItem) => isMine(i, seat.email, seats, people);
-  return feedForSeat(feed, seat.owner ? null : seat.jobs, mine).filter(mine);
+  return seatFeedOf(feed, seat, seats, people).filter((i) => isMine(i, seat.email, seats, people));
 }
 
 /** Overdue first by days late, then what falls due soonest, then what has waited longest. */
