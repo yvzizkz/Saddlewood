@@ -145,10 +145,10 @@ Run on 2026-10-25 against the local stack: one grid of every seat against every 
 | Accounting Overview, Payroll, Purchases, Receivables, Billing | open | **home** (gap 1) | home | open (his jobs; hours, not pay) | home | home |
 | Payables, Job costing | open | **home** (gap 1) | home | home | home | home |
 | `/app/money` | → Receivables | home | home | → Receivables | home | home |
-| Subs, Sales, Sales settings, Policies, Duties, Ask | open | open (read; owners change) | open (read; owners change) | home | home | home |
+| Subs, Sales, Sales settings, Policies, Duties, Ask | open | open (read; owners change; pipeline, rates and policy limits in dollars) | open (read; owners change; same dollars) | home | home | home |
 | Who decides, Departments, Bill | open | home | home | home | home | home |
 | Projects | open | open | open | open | home | home |
-| Crew | open | home | home | open | open | home |
+| Crew | open | home | home | open | open (receipt amounts, gap 3) | home |
 | Your week, Your hours | → Crew | home | home | open | open | open |
 | More | open | open | open | open | open | open |
 
@@ -160,9 +160,9 @@ Run on 2026-10-25 against the local stack: one grid of every seat against every 
 | `PATCH /api/accounting/payables` | in | refused | refused | refused | refused | refused |
 | `PUT /api/policies`, `PUT /api/sales/settings`, `PATCH /api/roles/seats` | in | refused | refused | refused | refused | refused |
 
-**No access leaks:** no seat opened a page or API outside its row. **One money finding** (3 below): a field lead sees receipt amounts on their Crew page. Office seats see dollars only on the Sales and Policies pages above. (The first run read pages before their data loaded and missed those three; agy caught it, and the spec now waits for the data.)
+**What the run found:** no seat opened a page or API outside its row. Seats without money do see dollars in two places. Office seats who are not owners see the pipeline totals and estimate cards on Sales, the rounding options ($1 to $500) on Sales settings, and the policy limits ($500, $1,000, $10,000) on Policies; that is their own work, read only, and never AR, pay, cost or margin. The field lead sees receipt amounts on their Crew page, including an owner's out-of-pocket receipt (gap 3). The first version of the spec read pages before their data loaded and missed all of these; agy and Ship's review caught it, and the spec now waits for the data.
 
 **Gaps and findings (for the owner, not fixed here):**
 1. **An office Finance seat who is not an owner has no Accounting, Tasks or Schedule.** Accounting opens only for owners and crew with `money.view` (`src/lib/accounting/access.ts`), and Tasks/Schedule only for `workSeat()`. Today the Finance seat is Ilene, who is an owner, so nothing is blocked. But handing Finance to a bookkeeper who is not an owner would leave them only Subs, Sales, Policies and Duties, and their 7 AM push (`owner/morning.ts`, which links a seat off the crew to `/app/tasks`) would open a page that sends them home. The fix is a finance seat in `moneySeatForPage` (every job, Payables, no Policies writes) and a Finance cut of Tasks; it needs the owner's call on what a non-owner bookkeeper may change.
 2. **An office Sales admin who is not an owner has no Tasks.** Work handed to the Sales seat (`work_items` with role `sales`, and the bot's sales lane) lives on Tasks, which they cannot open; they see the pipeline on Sales only. Both gaps close with the same change: a Tasks cut for an office seat (its role's items, no job pages).
-3. **A field lead's Crew page shows receipt amounts.** The lead group's `crew.view` and `receipts` switches (from before the seat) list the job's receipts on `/app/crew` with their dollars, including one an owner paid out of pocket ("Home Depot · $64.25 · Paid out of pocket: owed to lando"). Every other page keeps a field lead off money. Whether a lead checking the crew's receipts should see amounts is the owner's call: hide the amount for a seat without `money.view`, or keep it because they approve the receipt.
+3. **A field lead's Crew page shows receipt amounts.** The lead group's `crew.view` and `receipts` switches (from before the seat) list the job's receipts on `/app/crew` with their dollars, including one an owner paid out of pocket ("Home Depot · $64.25 · Paid out of pocket: owed to lando"). Every other page keeps a field lead off money. Open, waiting on the owner's call (T246): hide the amount for crew without `money.view`, or keep it because the lead approves the receipt. Not changed here.

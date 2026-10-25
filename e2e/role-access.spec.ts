@@ -2,7 +2,7 @@
 // what"): every seat against every app section and the main write APIs, in one
 // grid. A page is "open" (it renders where it was asked), "home" (sent back to
 // /app), or moved to another page ("→/app/…"). Each page is read once its
-// client fetches settle (networkidle). A seat without money sees no dollar
+// client fetches settle (networkidle, and no aria-busy or "Loading…" left). A seat without money sees no dollar
 // figure on anything it opens, except an office seat on its own work: the
 // pipeline and rates on Sales, and the dollar limits written in Policies. The writes are probed with an empty body,
 // so a seat that may write gets a 400 and nothing changes; a seat that may not
@@ -127,6 +127,9 @@ test.describe("Who can open what", () => {
       const got: string[] = [];
       for (const [path, want] of PAGES) {
         await page.goto(path, { waitUntil: "networkidle", timeout: 60_000 });
+        // Client screens load in useEffect: read them only once nothing is still loading.
+        await expect.soft(page.locator("[aria-busy='true']"), `${seat} ${path}: still loading`).toHaveCount(0, { timeout: 15_000 });
+        await expect.soft(page.getByText("Loading…"), `${seat} ${path}: still loading`).toHaveCount(0, { timeout: 15_000 });
         const at = new URL(page.url());
         const asked = new URL(path, page.url());
         const cell = at.pathname === asked.pathname ? O : at.pathname === "/app" ? H : `→${at.pathname}`;
