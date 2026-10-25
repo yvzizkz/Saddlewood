@@ -14,7 +14,8 @@ import { PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
 import { jobHref, listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { canCloseHere, departmentOf, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed, type FeedItem } from "@/lib/tasks/feed";
+import { canCloseHere, departmentOf, forFieldLead, isMine, KIND_LABEL, loadFeed, type FeedItem } from "@/lib/tasks/feed";
+import { seatFeedOf } from "@/lib/tasks/mine";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +40,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
   const [allRefs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
   const refs = allRefs.filter((r) => seesJob(seat, r));
-  const mineOf = (i: FeedItem) => isMine(i, me, seats, people);
-  const seated = feedForSeat(await loadFeed(allRefs, seats, today), seat.owner ? null : new Set(refs.map((r) => r.key)), mineOf);
-  const feed = seat.money ? seated : forFieldLead(seated, mineOf);
-  const mineAll = feed.filter(mineOf);
+  // The same Mine the 7 AM push and Home's "Your tasks" read (tasks/mine.ts).
+  const raw = await loadFeed(allRefs, seats, today);
+  const feedSeat = { email: me, owner: seat.owner, jobs: seat.owner ? null : new Set(refs.map((r) => r.key)) };
+  const mineHere = (i: FeedItem) => isMine(i, me, seats, people);
+  const seated = seatFeedOf(raw, feedSeat, seats, people);
+  const feed = seat.money ? seated : forFieldLead(seated, mineHere);
+  const mineAll = feed.filter(mineHere);
   const scoped = view === "mine" ? mineAll : feed;
 
   // The trend shows what falls due, four weeks back to four weeks ahead.

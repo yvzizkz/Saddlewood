@@ -57,9 +57,10 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
       await expect(page.getByText("Sub and vendor bills")).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Make the draft invoice" })).toHaveCount(0);
       await expect(page.locator('a[href^="/app/accounting/payables"]')).toHaveCount(0);
-      await expect(page.locator('a[href^="/app/schedule"]')).toHaveCount(0);
       if (tab === "schedule") {
         await expect(page.locator('a[href^="/app/subs/bids"]')).toHaveCount(0);
+        // He opens the Schedule on his jobs and writes on it (e2e/pm-schedule.spec.ts).
+        await expect(page.getByRole("link", { name: "Open in Schedule" })).toBeVisible();
       }
     }
 
