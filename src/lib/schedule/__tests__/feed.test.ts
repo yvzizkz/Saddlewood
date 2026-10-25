@@ -5,6 +5,7 @@ import {
   mobilizationOf,
   monthGrid,
   SCHEDULE_KIND_LABEL,
+  scheduleForSeat,
   weekDays,
   type ScheduleEvent,
 } from "../feed";
@@ -143,5 +144,62 @@ describe("an awarded sub's start on the schedule", () => {
 
   it("never ends before it starts", () => {
     expect(mobilizationOf({ workFrom: "2026-11-02", workTo: "2026-10-30" }, null, ready, "2026-10-24")?.endDay).toBe("2026-11-02");
+  });
+});
+
+describe("a project manager's cut of the schedule", () => {
+  const ev = (id: string, over: Partial<ScheduleEvent>): ScheduleEvent => ({
+    id,
+    source: "item",
+    kind: "inspection",
+    kindLabel: "Inspection",
+    jobKey: "ironwood",
+    job: "8009 N Ironwood Dr",
+    client: "Patrick Homes",
+    title: id,
+    detail: "",
+    startDay: "2026-10-28",
+    endDay: "2026-10-28",
+    startTime: "",
+    who: "",
+    whoEmail: "",
+    role: "pm",
+    status: "scheduled",
+    href: "/app/jobs/ironwood?tab=schedule",
+    editable: true,
+    ...over,
+  });
+  const refs = [
+    { key: "ironwood", client: "Patrick Homes" },
+    { key: "camelback", client: "Build Collective" },
+  ];
+  const events = [
+    ev("mine", {}),
+    ev("crew", { source: "crew", kind: "crew", href: "/app/jobs/ironwood?tab=crew" }),
+    ev("bid", { source: "bid", kind: "bid_due", href: "/app/subs/bids/4" }),
+    ev("bill", { source: "pay", kind: "pay_day", href: "/app/accounting/payables/bill/9" }),
+    ev("other", { jobKey: "camelback", client: "Build Collective" }),
+    ev("cutoff", { source: "billing", kind: "billing_cutoff", jobKey: null, client: "Patrick Homes", href: "/app/accounting/billing" }),
+    ev("their cutoff", { source: "billing", kind: "billing_cutoff", jobKey: null, client: "Build Collective", href: "/app/accounting/billing" }),
+    ev("payroll", { source: "pay", kind: "pay_day", jobKey: null, client: "", href: "/app/accounting/payroll" }),
+    ev("coi", { source: "sub", kind: "compliance", jobKey: null, client: "", href: "/app/subs" }),
+  ];
+
+  it("keeps their jobs and their clients' billing dates, never pay runs, other jobs or company dates", () => {
+    expect(scheduleForSeat(events, new Set(["ironwood"]), refs).map((e) => e.id)).toEqual(["mine", "crew", "bid", "cutoff"]);
+  });
+
+  it("sends a link they cannot open to the job's Schedule tab", () => {
+    const hrefs = Object.fromEntries(scheduleForSeat(events, new Set(["ironwood"]), refs).map((e) => [e.id, e.href]));
+    expect(hrefs).toEqual({
+      mine: "/app/jobs/ironwood?tab=schedule",
+      crew: "/app/jobs/ironwood?tab=crew",
+      bid: "/app/jobs/ironwood?tab=schedule",
+      cutoff: "/app/accounting/billing",
+    });
+  });
+
+  it("leaves an owner's schedule as it is", () => {
+    expect(scheduleForSeat(events, null, refs)).toBe(events);
   });
 });

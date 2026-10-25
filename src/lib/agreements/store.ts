@@ -1,8 +1,9 @@
-import { createDraft, DocumentError, toDocument, type DocumentRow } from "@/lib/billing/documents";
+import { createDraft, DocumentError, listEvents, newToken, recordEvent, toDocument, type DocumentRow } from "@/lib/billing/documents";
 import type { BillingDocument } from "@/lib/billing/types";
 import { localDay } from "@/lib/crew/time";
 import { loadPolicies } from "@/lib/policies/store";
 import type { AwardRecord } from "@/lib/sales/award";
+import { signaturesOf, snapshotHash, type Signature, type SignatureInput, type SignatureRecord } from "@/lib/sales/signing";
 import { proposalFromDocument } from "@/lib/sales/store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -13,6 +14,8 @@ import { planAgreement, type AgreementChoices, type AgreementSource } from "./dr
 // proposal and Company policies; an issued one is never rewritten (void it
 // first, and the redraft is its next revision). Drafting makes no link a
 // client can open: a draft has only its own preview, and nothing here sends.
+// Issuing freezes it and gives it the client's link (/d/<token>), which staff
+// pass on themselves; the client signs it there (T130), once.
 
 export type JobAgreement = {
   /** The latest agreement on the job that is not void, else the latest void one. */
@@ -104,4 +107,63 @@ export async function draftAgreement(jobId: string, choices: AgreementChoices, a
     supersedes: voided ? { id: voided.id, revision: voided.revision } : null,
     createdBy: actor,
   });
+}
+
+/** Issue the job's draft agreement: frozen from here on, with its client link. Nothing is sent. */
+export async function issueAgreement(jobId: string, actor: string, now: Date = new Date()): Promise<BillingDocument> {
+  const live = (await agreementsOf(jobId)).find((d) => d.status !== "void");
+  if (!live) throw new DocumentError("draft the agreement first", 409);
+  if (live.status === "issued") throw new DocumentError("the agreement is already issued", 409);
+  const { data, error } = await getSupabaseAdmin()
+    .from("documents")
+    .update({ status: "issued", token: newToken(), issued_at: now.toISOString(), issued_by: actor })
+    .eq("id", live.id)
+    .eq("kind", "agreement")
+    .eq("status", "draft")
+    .select("*")
+    .maybeSingle();
+  if (error) throw new Error(`agreement: issue failed: ${error.message}`);
+  if (!data) throw new DocumentError("the agreement changed while it was being issued; try again", 409);
+  return toDocument(data as DocumentRow);
+}
+
+/** What the client agrees to by signing (kept word for word in the signature record). */
+export const AGREEMENT_CONSENT =
+  "By signing, I agree to this agreement and its terms, and I agree that this electronic signature is as binding as a handwritten one.";
+
+/** The client's signature on an agreement, if there is one. */
+export async function clientSignature(documentId: string): Promise<Signature | null> {
+  return signaturesOf(await listEvents(documentId)).find((s) => s.role === "client") ?? null;
+}
+
+/**
+ * The client signs the issued agreement on its link. One client signature per
+ * agreement: the proof record's dedupe key refuses a second. The record
+ * carries a SHA-256 of the frozen agreement, so the signature is tied to
+ * these words and this price.
+ */
+export async function signAgreement(doc: BillingDocument, sig: SignatureInput, meta: { ip: string; ua: string }): Promise<Signature> {
+  if (doc.kind !== "agreement") throw new DocumentError("This link does not open an agreement.", 404);
+  if (doc.status !== "issued") throw new DocumentError("This agreement is no longer open for signing.", 409);
+  if (await clientSignature(doc.id)) throw new DocumentError("This agreement is already signed.", 409);
+  const record: SignatureRecord = {
+    role: "client",
+    name: sig.name.trim().replace(/\s+/g, " "),
+    email: sig.email ?? "",
+    title: "",
+    method: sig.method,
+    typed: sig.method === "type" ? (sig.typed ?? "") : "",
+    font: sig.method === "type" ? (sig.font ?? "") : "",
+    image: sig.image,
+    consent: AGREEMENT_CONSENT,
+    snapshotSha256: snapshotHash(doc.snapshot),
+    ip: meta.ip.slice(0, 64),
+    ua: meta.ua.slice(0, 300),
+    totalCents: doc.totalCents,
+  };
+  const recorded = await recordEvent({ documentId: doc.id, kind: "signed", actor: "client link", dedupe: `signed:client:${doc.id}`, detail: record });
+  if (!recorded) throw new DocumentError("This agreement is already signed.", 409);
+  const mine = await clientSignature(doc.id);
+  if (!mine) throw new Error("agreement: the signature was recorded but could not be read back");
+  return mine;
 }

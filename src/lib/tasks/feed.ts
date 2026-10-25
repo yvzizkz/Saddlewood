@@ -14,10 +14,12 @@
 // theirs; past its due date plus its grace it moves up one role (escalationOf).
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { ownerNames } from "@/lib/bot/home";
 import { readState } from "@/lib/bot/queries";
 import { addDays, localDay } from "@/lib/crew/time";
 import { loadWaiting } from "@/lib/owner/load";
 import type { Lane } from "@/lib/owner/lanes";
+import type { WaitingItem } from "@/lib/owner/waiting";
 import { loadPayables } from "@/lib/accounting/payables";
 import { loadBillingCalendar } from "@/lib/accounting/receivables";
 import { loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
@@ -59,6 +61,8 @@ export type FeedItem = {
   href: string;
   /** A work item: done, dropped and reassigned in place. Others are acted on where they live. */
   editable: boolean;
+  /** A hand-off on Waiting on you: the owner (by name) it goes back to, whatever the lane. */
+  backTo?: string;
 };
 
 const LANE_ROLE: Record<Lane, Role> = { sales: "sales", decisions: "decisions", money: "finance", systems: "ops" };
@@ -75,8 +79,9 @@ export function placeItem(role: Role, dueOn: string | null, graceDays: number, t
   return { nowRole: escalated ? escalationOf(role) : role, overdueDays: late, escalated };
 }
 
-/** Is this item mine? Assigned to me, or to my role with nobody named, or escalated to a role I hold. */
-export function isMine(item: Pick<FeedItem, "assignee" | "role" | "nowRole" | "escalated">, me: string, seats: Seat[], people: Person[]): boolean {
+/** Is this item mine? A hand-off back to me, assigned to me, or to my role with nobody named, or escalated to a role I hold. */
+export function isMine(item: Pick<FeedItem, "assignee" | "role" | "nowRole" | "escalated" | "backTo">, me: string, seats: Seat[], people: Person[]): boolean {
+  if (item.backTo) return people.some((p) => p.owner && p.email === me && p.name === item.backTo);
   const mine = (r: Role) => seatHolder(r, seats, people).emails.includes(me);
   if (item.escalated) return mine(item.nowRole) || item.assignee === me;
   if (item.assignee) return item.assignee === me;
@@ -88,15 +93,13 @@ function roleOfOwnerName(name: string, seats: Seat[]): Role {
   return hit?.role ?? "ops";
 }
 
-export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()): Promise<FeedItem[]> {
+/** `waiting`: the owners' list when the caller already read it (the 7 AM push reads it once). */
+export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay(), pre: { waiting?: WaitingItem[] } = {}): Promise<FeedItem[]> {
   const db = getSupabaseAdmin();
-  const { sections } = await readState();
-  const owners = Object.entries(sections.people)
-    .filter(([, p]) => p.role === "owner")
-    .map(([e]) => e);
   const [work, waiting, crewTasks, cards, payables, cos, calendar, waivers] = await Promise.all([
     db.from("work_items").select("*").eq("status", "open").order("due_on", { ascending: true, nullsFirst: false }).limit(1000),
-    loadWaiting(owners).catch(() => []),
+    // By the owners' names, so a hand-off goes back to whoever gave it.
+    pre.waiting ?? readState().then(({ sections }) => loadWaiting(ownerNames(sections.people))).catch(() => []),
     db.from("crew_tasks").select("id,email,title,detail,job_id,job_name,due,status").in("status", ["open", "doing", "blocked"]).limit(500),
     db.from("ops_cards").select("id,title,owner,col,note,updated_at").is("archived_at", null).in("col", ["backlog", "drafting", "review"]).limit(300),
     loadPayables(today).catch(() => ({ rows: [] as Awaited<ReturnType<typeof loadPayables>>["rows"] })),
@@ -147,6 +150,7 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
       escalated: false,
       href: it.href,
       editable: false,
+      ...(it.who ? { backTo: it.who } : {}),
     });
   }
 

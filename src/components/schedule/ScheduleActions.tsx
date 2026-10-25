@@ -14,19 +14,22 @@ export function NewScheduleItem({
   kinds,
   roles,
   defaultDay,
+  jobRequired = false,
 }: {
   job?: string;
   jobs: Opt[];
   kinds: Opt[];
   roles: Opt[];
   defaultDay: string;
+  /** A project manager's: on one of their jobs, never company-wide. */
+  jobRequired?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState(kinds[0]?.value ?? "inspection");
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
-  const [jobKey, setJobKey] = useState(job ?? "");
+  const [jobKey, setJobKey] = useState(job ?? (jobRequired ? (jobs[0]?.value ?? "") : ""));
   const [startDay, setStartDay] = useState(defaultDay);
   const [endDay, setEndDay] = useState(defaultDay);
   const [startTime, setStartTime] = useState("09:00");
@@ -114,7 +117,7 @@ export function NewScheduleItem({
             aria-label="Job"
             className="h-9 rounded-lg border border-[var(--color-stone)] bg-white px-2.5 text-sm text-[var(--color-charcoal)]"
           >
-            <option value="">Company-wide / any job</option>
+            {!jobRequired ? <option value="">Company-wide / any job</option> : null}
             {jobs.map((j) => (
               <option key={j.value} value={j.value}>
                 {j.label}
