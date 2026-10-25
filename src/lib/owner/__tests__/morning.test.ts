@@ -264,6 +264,44 @@ describe("the 7 AM push reads the one task feed", () => {
   });
 });
 
+describe("a field lead's 7 AM push (no money, jobs/access.ts)", () => {
+  // Marcus holds the Field lead seat: a crew lead who checks work, without money.view, on Keim.
+  const seats = SEATS.map((x) => (x.role === "field_lead" ? { ...x, holder: "Marcus" } : x));
+  const people = PEOPLE.map((p) => (p.email === MARCUS ? { ...p, perms: ["clock", "tasks.verify"] } : p)) as MorningInput["people"];
+  const FEED = [
+    feedItem("f1", { title: "Frame the Keim soffit", role: "field_lead", nowRole: "field_lead", jobKey: "keim", job: "12729 W Keim Dr", ...due("2026-10-12") }),
+    feedItem("f2", { title: "Pick up the Keim permit", role: "field_lead", nowRole: "field_lead", ...due(DAY) }),
+    // Theirs by seat, but it carries dollars: not on a field lead's push.
+    feedItem("f3", { source: "billing", kind: "billing", title: "Keim draw backup $12,400", role: "field_lead", nowRole: "field_lead", jobKey: "keim", job: "12729 W Keim Dr", ...due("2026-10-10"), editable: false, href: "/app/accounting/billing" }),
+    // The PM's own work with no job: the PM's, not the field's.
+    feedItem("w5", { title: "Send the PM checklist", ...due(DAY) }),
+  ];
+  const run = (perms: string[]) =>
+    buildMorning(
+      input({
+        reports: [{ id: 1, day: DAY } as MorningInput["reports"][number]],
+        feed: FEED,
+        seats,
+        seatPeople: peopleOf({ ...OWNERS }, people),
+        refs: REFS,
+        people: people.map((p) => (p.email === MARCUS ? { ...p, perms } : p)) as MorningInput["people"],
+        jobPeople: [{ jobId: "keim", email: MARCUS, role: "supervisor" }],
+      }),
+    );
+
+  it("counts what their Home and Tasks show, and names nothing that carries dollars", () => {
+    const body = noteFor(run(["clock", "tasks.verify"]), MARCUS)?.body ?? "";
+    expect(body.startsWith("Yours: 1 overdue, 1 due today · Oldest: Frame the Keim soffit (12729 W Keim Dr), 1 day late")).toBe(true);
+    expect(body).not.toContain("draw backup");
+    expect(body).not.toMatch(/\$\s?\d/);
+    expect(body).not.toContain("PM checklist");
+  });
+
+  it("keeps the money item for a lead who has money.view", () => {
+    expect(noteFor(run(["clock", "tasks.verify", "money.view"]), MARCUS)?.body).toContain("Keim draw backup");
+  });
+});
+
 describe("the 7 AM push and the seats (Ship's review of #62)", () => {
   const quiet = { reports: [{ id: 1, day: DAY } as MorningInput["reports"][number]] };
 
