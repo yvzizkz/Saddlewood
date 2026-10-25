@@ -26,7 +26,12 @@ export async function visibleCrewJobs(who: ScopeCaller): Promise<JobScope> {
 /** The same from assignments already read (the 7 AM push reads them once for everyone). */
 export function scopeFrom(who: ScopeCaller, assignments: CrewJobPerson[]): JobScope {
   if (!isNarrowed(who)) return null;
-  return [...new Set(assignments.filter((a) => a.email === who.email).map((a) => a.jobId))];
+  return jobsOn(who.email, assignments);
+}
+
+/** The field jobs a person is on (crew_job_people), whatever their switches: a field lead's seat (jobs/access.ts). */
+export function jobsOn(email: string, assignments: CrewJobPerson[]): string[] {
+  return [...new Set(assignments.filter((a) => a.email === email).map((a) => a.jobId))];
 }
 
 /**
