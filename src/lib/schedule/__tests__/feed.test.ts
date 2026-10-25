@@ -199,6 +199,13 @@ describe("a project manager's cut of the schedule", () => {
     });
   });
 
+  it("keeps a sub's start on their job, linked to the job's Schedule tab instead of the bid", () => {
+    const mob = (id: string, jobKey: string) => ev(id, { source: "bid", kind: "sub_mobilization", jobKey, href: "/app/subs/bids/7", editable: false });
+    expect(scheduleForSeat([mob("theirs", "ironwood"), mob("not theirs", "camelback")], new Set(["ironwood"]), refs)).toMatchObject([
+      { id: "theirs", href: "/app/jobs/ironwood?tab=schedule" },
+    ]);
+  });
+
   it("leaves an owner's schedule as it is", () => {
     expect(scheduleForSeat(events, null, refs)).toBe(events);
   });
