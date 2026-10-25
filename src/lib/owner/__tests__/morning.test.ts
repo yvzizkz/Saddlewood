@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { CrewScheduleItem, CrewTask } from "@/lib/crew/types";
+import { peopleOf, type Seat } from "@/lib/roles/seats";
+import type { FeedItem } from "@/lib/tasks/feed";
 import { buildMorning, type MorningInput } from "../morning";
 import type { WaitingItem } from "../waiting";
 
@@ -41,6 +43,32 @@ function input(over: Partial<MorningInput> = {}): MorningInput {
 }
 const noteFor = (notes: ReturnType<typeof buildMorning>, email: string) => notes.find((n) => n.email === email);
 
+// The one task feed (tasks/feed.ts), as loadFeed hands it over.
+const ILENE = "ilene@saddlewoodcontracting.com";
+const SEATS: Seat[] = [
+  { role: "decisions", holder: "Marco", backup: "Lando", note: "", updatedBy: "", updatedAt: null },
+  { role: "sales", holder: "Marco", backup: "Lando", note: "", updatedBy: "", updatedAt: null },
+  { role: "finance", holder: "Ilene", backup: "Lando", note: "", updatedBy: "", updatedAt: null },
+  { role: "ops", holder: "Lando", backup: "Marco", note: "", updatedBy: "", updatedAt: null },
+  { role: "pm", holder: "Eli", backup: "Marco", note: "", updatedBy: "", updatedAt: null },
+  { role: "field_lead", holder: "", backup: "Eli", note: "", updatedBy: "", updatedAt: null },
+];
+const SEAT_PEOPLE = peopleOf({ ...OWNERS, [ILENE]: { name: "Ilene", role: "requester" } }, PEOPLE);
+const REFS = [
+  { key: "keim", crewId: "keim" },
+  { key: "bambi", crewId: "bambi" },
+];
+function feedItem(id: string, over: Partial<FeedItem>): FeedItem {
+  return { id, source: "work", kind: "task", title: id, detail: "", role: "pm", nowRole: "pm", assignee: "", jobKey: null, job: "", dueOn: null, since: null, overdueDays: 0, escalated: false, href: "/app/tasks", editable: true, ...over };
+}
+/** Due on a day, and how late that is on DAY (loadFeed's placeItem). */
+function due(dueOn: string): Pick<FeedItem, "dueOn" | "overdueDays"> {
+  return { dueOn, overdueDays: Math.max(0, Math.round((Date.parse(`${DAY}T12:00:00Z`) - Date.parse(`${dueOn}T12:00:00Z`)) / 86_400_000)) };
+}
+function withFeed(feed: FeedItem[]): Pick<MorningInput, "feed" | "seats" | "seatPeople" | "refs"> {
+  return { feed, seats: SEATS, seatPeople: SEAT_PEOPLE, refs: REFS };
+}
+
 describe("the 7 AM push", () => {
   it("gives each owner their own lanes, and a hand-off back to whoever gave it", () => {
     const notes = buildMorning(
@@ -79,12 +107,14 @@ describe("the 7 AM push", () => {
           task({ id: 2, email: MARCUS, due: DAY }),
           task({ id: 3, email: ELI, title: "Order the Bambi lumber", due: DAY, createdBy: "Marco" }),
         ],
+        // Their own hand-off reaches them through the feed, as Tasks shows it.
+        ...withFeed([feedItem("c3", { source: "crew", role: "field_lead", nowRole: "field_lead", assignee: ELI, title: "Order the Bambi lumber", jobKey: "keim", job: "12729 W Keim Dr", dueOn: DAY })]),
       }),
     );
     expect(noteFor(notes, ELI)).toEqual({
       email: ELI,
       title: "Your day",
-      body: "3 people on 1 job today. · 1 not confirmed yet · 1 task to check · 1 task due today · 1 hand-off due from you",
+      body: "Yours: 1 due today · Oldest: Order the Bambi lumber (12729 W Keim Dr) · 3 people on 1 job today. · 1 not confirmed yet · 1 task to check · 1 crew task due today",
       url: "/app/crew",
       tag: `morning-${DAY}`,
     });
@@ -100,14 +130,15 @@ describe("the 7 AM push", () => {
         tasks: [task({ status: "done", reportedAt: "2026-10-12T22:00:00Z", jobId: "bambi" }), task({ id: 2, due: DAY })],
       }),
     );
-    expect(noteFor(notes, ELI)?.body).toBe("1 person on 1 job today. · 1 not confirmed yet · 1 task due today");
+    expect(noteFor(notes, ELI)?.body).toBe("1 person on 1 job today. · 1 not confirmed yet · 1 crew task due today");
   });
 
   it("tells a worker where they are going, in their language, and skips anyone off today", () => {
-    const notes = buildMorning(input({ schedule: [slot({})], tasks: [task({}), task({ id: 2, title: "Tape the hallway", due: DAY })] }));
+    const crew = (id: string, over: Partial<FeedItem>) => feedItem(id, { source: "crew", role: "field_lead", nowRole: "field_lead", assignee: ARNOLD, jobKey: "keim", job: "12729 W Keim Dr", ...over });
+    const notes = buildMorning(input({ schedule: [slot({})], ...withFeed([crew("c1", { title: "Hang the garage ceiling" }), crew("c2", { title: "Tape the hallway", dueOn: DAY })]) }));
     expect(noteFor(notes, ARNOLD)).toMatchObject({
       title: "Tu día, mar 13 oct",
-      body: "12729 W Keim Dr a las 7:00 AM. 2 tareas, primero: Tape the hallway.",
+      body: "12729 W Keim Dr a las 7:00 AM. 2 tareas (1 para hoy), primero: Tape the hallway.",
     });
     expect(noteFor(notes, MARCUS)).toBeUndefined();
   });
@@ -170,5 +201,109 @@ describe("late from the field, folded into the 7 AM push", () => {
     expect(narrowed([], [late({ job: "keim" })])).toContain("Late from the field: Arnold · keim");
     // An owner is never narrowed.
     expect(noteFor(buildMorning(input({ people: pmPeople, jobPeople: [{ jobId: "keim", email: ELI, role: "pm" }], late: [late({ job: "6402 E Bambi Drive" })] })), MARCO)?.body).toContain("Bambi");
+  });
+});
+
+describe("the 7 AM push reads the one task feed", () => {
+  const quiet = { reports: [{ id: 1, day: DAY } as MorningInput["reports"][number]] };
+  const pmPeople = PEOPLE.map((p) => (p.email === ELI ? { ...p, perms: [...p.perms, "projects.mine", "money.view"] } : p)) as MorningInput["people"];
+  const FEED = [
+    // A sub bill unapproved past SOP-004's 10 days: moved up from the PM to the owners' decisions.
+    feedItem("b7", { source: "bill", kind: "approval", title: "Approve Desert Plumbing 1042", job: "6402 E Bambi Drive", jobKey: "bambi", role: "pm", nowRole: "decisions", escalated: true, ...due("2026-10-09"), editable: false, href: "/app/accounting/payables/bill/7" }),
+    feedItem("w1", { title: "Call the inspector", role: "decisions", nowRole: "decisions", ...due(DAY) }),
+    feedItem("w2", { title: "Renew the COI", role: "ops", nowRole: "ops", ...due("2026-10-12") }),
+    // The PM's: one on their job, one on a job they are not on, one with no job.
+    feedItem("w3", { title: "Walk Keim with the client", jobKey: "keim", job: "12729 W Keim Dr", ...due("2026-10-11") }),
+    feedItem("w4", { title: "Walk Bambi with the client", jobKey: "bambi", job: "6402 E Bambi Drive", ...due("2026-10-11") }),
+    feedItem("w5", { title: "Send the PM checklist", ...due(DAY) }),
+    // Finance: the invoice package, and a waiver we owe.
+    feedItem("pkc1:2026-10-15", { source: "billing", kind: "billing", title: "Invoice package for Optima", role: "finance", nowRole: "finance", ...due("2026-10-15"), editable: false, href: "/app/accounting/billing" }),
+    feedItem("wvo9", { source: "billing", kind: "compliance", title: "Waiver for Draw 3 (Optima)", role: "finance", nowRole: "finance", jobKey: "keim", job: "12729 W Keim Dr", editable: false, href: "/app/accounting/billing" }),
+    // A worker's crew task, two days late: moved up to the PM, still the worker's.
+    feedItem("c11", { source: "crew", title: "Hang the garage ceiling", role: "field_lead", nowRole: "pm", escalated: true, assignee: ARNOLD, jobKey: "keim", job: "12729 W Keim Dr", ...due("2026-10-11"), editable: false }),
+  ];
+  const notes = buildMorning(
+    input({ ...quiet, ...withFeed(FEED), people: pmPeople, jobPeople: [{ jobId: "keim", email: ELI, role: "pm" }], schedule: [slot({ ack: "ok" })] }),
+  );
+
+  it("leads an owner's push with what is overdue, due today and moved up to them, and the oldest", () => {
+    expect(noteFor(notes, MARCO)).toMatchObject({
+      title: "Your day: 1 overdue, 1 due today, 1 moved up to you",
+      body: "Oldest: Approve Desert Plumbing 1042 (6402 E Bambi Drive), 4 days late · 1 person on 1 job today.",
+    });
+    // Lando holds ops: the COI is his, the decisions are not.
+    expect(noteFor(notes, LANDO)).toMatchObject({ title: "Your day: 1 overdue", body: "Oldest: Renew the COI, 1 day late · 1 person on 1 job today." });
+  });
+
+  it("gives a project manager only their jobs' work and their own, never bills or another job's", () => {
+    const body = noteFor(notes, ELI)?.body ?? "";
+    // Keim (their job, 2 days late), the crew task moved up to them, the no-job checklist due today.
+    expect(body.startsWith("Yours: 2 overdue, 1 due today, 1 moved up to you · Oldest: Walk Keim with the client (12729 W Keim Dr), 2 days late")).toBe(true);
+    expect(body).not.toContain("Bambi");
+    expect(body).not.toContain("Desert Plumbing");
+    expect(body).not.toContain("Invoice package");
+  });
+
+  it("gives finance their tasks, though they are not on the crew", () => {
+    expect(noteFor(notes, ILENE)).toEqual({
+      email: ILENE,
+      title: "Your day: 2 open tasks",
+      body: "Oldest: Invoice package for Optima",
+      url: "/app/tasks",
+      tag: `morning-${DAY}`,
+    });
+  });
+
+  it("gives a worker their own list from the feed, late first", () => {
+    expect(noteFor(notes, ARNOLD)?.body).toBe("12729 W Keim Dr a las 7:00 AM. 1 tarea (1 atrasada), primero: Hang the garage ceiling.");
+  });
+
+  it("buzzes nobody extra for a seat with nothing on it", () => {
+    const none = buildMorning(input({ ...quiet, ...withFeed([]) }));
+    expect(noteFor(none, ILENE)).toBeUndefined();
+  });
+});
+
+describe("the 7 AM push and the seats (Ship's review of #62)", () => {
+  const quiet = { reports: [{ id: 1, day: DAY } as MorningInput["reports"][number]] };
+
+  it("never buzzes a worker off today, whatever is on their list", () => {
+    const notes = buildMorning(
+      input({
+        ...quiet,
+        ...withFeed([
+          feedItem("c1", { source: "crew", role: "field_lead", nowRole: "field_lead", assignee: ARNOLD, jobKey: "keim", ...due("2026-10-12"), editable: false }),
+          feedItem("w9", { role: "field_lead", nowRole: "field_lead", assignee: ARNOLD, title: "Sweep the garage" }),
+        ]),
+      }),
+    );
+    expect(noteFor(notes, ARNOLD)).toBeUndefined();
+  });
+
+  it("gives a finance seat off the crew their bills on hold, sub waivers and ops cards", () => {
+    const notes = buildMorning(
+      input({
+        ...quiet,
+        ...withFeed([
+          feedItem("b4", { source: "bill", kind: "compliance", title: "Clear the hold on Desert Plumbing 1042", role: "finance", nowRole: "finance", jobKey: "bambi", job: "6402 E Bambi Drive", ...due("2026-10-10"), href: "/app/accounting/payables/bill/4", editable: false }),
+          feedItem("wvi4", { source: "billing", kind: "compliance", title: "Collect Desert Plumbing's waiver", role: "finance", nowRole: "finance", jobKey: "bambi", href: "/app/accounting/payables/bill/4", editable: false }),
+          feedItem("oops1", { source: "ops", kind: "friction", title: "Fix the QuickBooks sync", role: "finance", nowRole: "finance", href: "/internal/ops", editable: false }),
+        ]),
+      }),
+    );
+    expect(noteFor(notes, ILENE)).toMatchObject({ title: "Your day: 1 overdue", body: "Oldest: Clear the hold on Desert Plumbing 1042 (6402 E Bambi Drive), 3 days late · 3 tasks open in all" });
+  });
+
+  it("never tells an owner nothing is waiting while naming their oldest task", () => {
+    const notes = buildMorning(input({ ...quiet, ...withFeed([feedItem("w1", { title: "Call the inspector", role: "decisions", nowRole: "decisions" }), feedItem("w2", { title: "Book the dumpster", role: "decisions", nowRole: "decisions", dueOn: "2026-10-20" })]) }));
+    expect(noteFor(notes, MARCO)).toMatchObject({ title: "Your day: 2 open tasks", body: "Oldest: Book the dumpster · Nobody is on the schedule today." });
+    // Nothing at all: still the quiet day.
+    expect(noteFor(buildMorning(input({ ...quiet, ...withFeed([]) })), MARCO)?.title).toBe("Your day: nothing waiting on you");
+  });
+
+  it("always leads a project manager's own work with Yours", () => {
+    const pmPeople = PEOPLE.map((p) => (p.email === ELI ? { ...p, perms: [...p.perms, "projects.mine"] } : p)) as MorningInput["people"];
+    const notes = buildMorning(input({ ...quiet, people: pmPeople, jobPeople: [{ jobId: "keim", email: ELI, role: "pm" }], ...withFeed([feedItem("w5", { title: "Send the PM checklist" })]) }));
+    expect(noteFor(notes, ELI)?.body).toBe("Yours: 1 open task · Oldest: Send the PM checklist · Nobody is on the schedule today.");
   });
 });
