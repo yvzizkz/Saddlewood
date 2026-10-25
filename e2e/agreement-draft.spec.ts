@@ -79,7 +79,7 @@ test.describe("The agreement on the job", () => {
       const body = await again.json();
       expect(body.agreement).toMatchObject({ id, status: "draft", revision: 1, totalCents: 4712500 });
       expect(body.agreement.text).toContain("Name: Heather E2E");
-      expect(body.agreement).not.toHaveProperty("link");
+      expect(body.agreement.link).toBeNull();
       expect(sql(`select count(*) from public.documents where kind = 'agreement' and job_id = '${job}'`)).toBe("1");
     } finally {
       sql(
