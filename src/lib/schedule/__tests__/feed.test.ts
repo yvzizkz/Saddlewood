@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildGcLookAheadDrafts,
+  mobilizationOf,
   monthGrid,
   SCHEDULE_KIND_LABEL,
   scheduleForSeat,
@@ -106,6 +107,46 @@ describe("schedule feed helpers", () => {
   });
 });
 
+describe("an awarded sub's start on the schedule", () => {
+  const ready = { ready: true, missing: [] };
+  const held = { ready: false, missing: ["no insurance certificate", "no W-9"] };
+
+  it("takes the package's work window over the winning bid's start", () => {
+    expect(mobilizationOf({ workFrom: "2026-11-02", workTo: "2026-11-06" }, "2026-10-30", ready, "2026-10-24")).toEqual({
+      startDay: "2026-11-02",
+      endDay: "2026-11-06",
+      status: "scheduled",
+      detail: "Cleared to mobilize",
+    });
+  });
+
+  it("falls back to the winning bid's start, one day long", () => {
+    expect(mobilizationOf({ workFrom: null, workTo: null }, "2026-10-30", ready, "2026-10-24")).toMatchObject({ startDay: "2026-10-30", endDay: "2026-10-30" });
+  });
+
+  it("is not on the schedule with no start at all", () => {
+    expect(mobilizationOf({ workFrom: null, workTo: "2026-11-06" }, null, ready, "2026-10-24")).toBeNull();
+  });
+
+  it("names what holds the sub, and is overdue once the start comes while they are still held", () => {
+    expect(mobilizationOf({ workFrom: "2026-11-02", workTo: null }, null, held, "2026-10-24")).toMatchObject({ status: "scheduled", detail: "Not cleared to mobilize: no insurance certificate, no W-9" });
+    expect(mobilizationOf({ workFrom: "2026-10-24", workTo: null }, null, held, "2026-10-24")?.status).toBe("overdue");
+    expect(mobilizationOf({ workFrom: "2026-10-20", workTo: null }, null, ready, "2026-10-24")?.status).toBe("done");
+  });
+
+  it("flags a held sub only while the work window is open, never on finished work", () => {
+    // A COI that lapsed after the job: the award stays, the start is not missed.
+    expect(mobilizationOf({ workFrom: "2026-09-01", workTo: "2026-09-12" }, null, held, "2026-10-24")?.status).toBe("done");
+    expect(mobilizationOf({ workFrom: "2026-10-20", workTo: "2026-10-24" }, null, held, "2026-10-24")?.status).toBe("overdue");
+    expect(mobilizationOf({ workFrom: "2026-10-20", workTo: "2026-10-23" }, null, held, "2026-10-24")?.status).toBe("done");
+    expect(mobilizationOf({ workFrom: "2026-10-25", workTo: "2026-10-30" }, null, held, "2026-10-24")?.status).toBe("scheduled");
+  });
+
+  it("never ends before it starts", () => {
+    expect(mobilizationOf({ workFrom: "2026-11-02", workTo: "2026-10-30" }, null, ready, "2026-10-24")?.endDay).toBe("2026-11-02");
+  });
+});
+
 describe("a project manager's cut of the schedule", () => {
   const ev = (id: string, over: Partial<ScheduleEvent>): ScheduleEvent => ({
     id,
@@ -162,6 +203,13 @@ describe("a project manager's cut of the schedule", () => {
     const withAr = [...events, ev("ar", { source: "ar", kind: "ar_ladder", href: "/app/accounting/receivables" })];
     expect(scheduleForSeat(withAr, new Set(["ironwood"]), refs, false).map((e) => e.id)).toEqual(["mine", "crew", "bid"]);
     expect(scheduleForSeat(withAr, new Set(["ironwood"]), refs).map((e) => e.id)).toEqual(["mine", "crew", "bid", "cutoff", "ar"]);
+  });
+
+  it("keeps a sub's start on their job, linked to the job's Schedule tab instead of the bid", () => {
+    const mob = (id: string, jobKey: string) => ev(id, { source: "bid", kind: "sub_mobilization", jobKey, href: "/app/subs/bids/7", editable: false });
+    expect(scheduleForSeat([mob("theirs", "ironwood"), mob("not theirs", "camelback")], new Set(["ironwood"]), refs)).toMatchObject([
+      { id: "theirs", href: "/app/jobs/ironwood?tab=schedule" },
+    ]);
   });
 
   it("leaves an owner's schedule as it is", () => {

@@ -2,6 +2,7 @@
 // leveling -> award -> frozen Work Order & email drafts -> bill -> waiver hold
 // -> payment (docs/SCENARIOS.md §6).
 
+import { addDays, localDay } from "../src/lib/crew/time";
 import { expect, test } from "./support/env";
 
 const VALID_PNG =
@@ -39,6 +40,7 @@ test.describe("Subs: the subcontractor & compliance week", () => {
 
   test("Package -> invites -> sub bid links -> leveling -> award under $10k -> frozen Work Order & mobilization hold when COI is expired", async ({ owner: page }) => {
     const title = `E2E Acoustic Baffles ${Date.now()}`;
+    const dueDay = addDays(localDay(), 21);
     const pkgRes = await page.request.post("/api/bids", {
       data: {
         jobId: "b0000001-0000-4000-8000-000000008009",
@@ -54,7 +56,7 @@ test.describe("Subs: the subcontractor & compliance week", () => {
         workFrom: "2026-11-02",
         workTo: "2026-11-06",
         siteWalk: "",
-        dueAt: null,
+        dueAt: `${dueDay}T17:00:00-07:00`,
         terms: "Per Saddlewood MSA.",
       },
     });
@@ -77,6 +79,10 @@ test.describe("Subs: the subcontractor & compliance week", () => {
     // Put package out to bid
     const outRes = await page.request.patch(`/api/bids/${pkg.id}`, { data: { status: "out" } });
     expect(outRes.ok()).toBeTruthy();
+
+    // Out to bid, its due date is on the Schedule.
+    await page.goto(`/app/schedule?view=day&day=${dueDay}`);
+    await expect(page.getByRole("link", { name: `Bids due: ${title}` }).first()).toBeVisible();
 
     const medinaInvite = invites.find((i: { subId: string }) => i.subId === "d0000001-0000-4000-8000-000000000001");
     const sonoranInvite = invites.find((i: { subId: string }) => i.subId === "d0000001-0000-4000-8000-000000000003");
@@ -147,6 +153,15 @@ test.describe("Subs: the subcontractor & compliance week", () => {
     await expect(page.getByText(/WO-8009-INSU · Frozen Work Order/i)).toBeVisible();
     await expect(page.getByText("Hold before mobilization")).toBeVisible();
     await expect(page.getByText(/insurance expired/i).first()).toBeVisible();
+
+    // Awarded, the sub's start is on the Schedule with what holds them; the bid due date is gone.
+    await page.goto("/app/schedule?view=day&day=2026-11-02");
+    const start = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: `Sonoran Thermal Insulation LLC (Synthetic) starts: ${title}` }) });
+    await expect(start).toHaveCount(1);
+    await expect(start).toContainText("Sub mobilization");
+    await expect(start).toContainText(/Not cleared to mobilize: .*insurance expired/);
+    await page.goto(`/app/schedule?view=day&day=${dueDay}`);
+    await expect(page.getByRole("link", { name: `Bids due: ${title}` })).toHaveCount(0);
   });
 
   test("A sub bill missing its lien waiver or with an expired COI is held in Payables until the waiver is received", async ({ owner: page }) => {
