@@ -7,6 +7,7 @@ import { Button, Card, Chip, Empty, INPUT, ScreenTitle, SectionTitle } from '@/c
 import { eodDone } from '@/lib/crew/eod'
 import { addDays, clock12, clockText, dayLabel, dayShort, hoursText, localClock, workedMinutes } from '@/lib/crew/time'
 import { firstNameOf, isReportedDone, parseAmount, type CrewEntry, type CrewPickup, type CrewQuestion, type CrewRequest, type CrewScheduleItem, type CrewTask } from '@/lib/crew/types'
+import MyTasksCard from '@/components/tasks/MyTasksCard'
 import { useCrew } from './CrewProvider'
 import { CantSheet, EodSheet, NoteSheet, PickupSheet, ProgressSheet, PunchSheet, ReceiptSheet, TaskSheet, type PunchMode } from './CrewSheets'
 import type { CrewStrings } from './strings'
@@ -428,6 +429,9 @@ export default function TodayScreen() {
           </Card>
         </>
       ) : null}
+
+      {/* A project manager's Mine on Tasks: punch, logs, billing steps, work moved up to them. */}
+      {home.me.perms.includes('money.view') ? <MyTasksCard /> : null}
 
       {openTasks.length ? (
         <>

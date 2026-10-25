@@ -61,6 +61,8 @@ export type FeedItem = {
   href: string;
   /** A work item: done, dropped and reassigned in place. Others are acted on where they live. */
   editable: boolean;
+  /** A hand-off on Waiting on you: the owner (by name) it goes back to, whatever the lane. */
+  backTo?: string;
 };
 
 const LANE_ROLE: Record<Lane, Role> = { sales: "sales", decisions: "decisions", money: "finance", systems: "ops" };
@@ -77,8 +79,9 @@ export function placeItem(role: Role, dueOn: string | null, graceDays: number, t
   return { nowRole: escalated ? escalationOf(role) : role, overdueDays: late, escalated };
 }
 
-/** Is this item mine? Assigned to me, or to my role with nobody named, or escalated to a role I hold. */
-export function isMine(item: Pick<FeedItem, "assignee" | "role" | "nowRole" | "escalated">, me: string, seats: Seat[], people: Person[]): boolean {
+/** Is this item mine? A hand-off back to me, assigned to me, or to my role with nobody named, or escalated to a role I hold. */
+export function isMine(item: Pick<FeedItem, "assignee" | "role" | "nowRole" | "escalated" | "backTo">, me: string, seats: Seat[], people: Person[]): boolean {
+  if (item.backTo) return people.some((p) => p.owner && p.email === me && p.name === item.backTo);
   const mine = (r: Role) => seatHolder(r, seats, people).emails.includes(me);
   if (item.escalated) return mine(item.nowRole) || item.assignee === me;
   if (item.assignee) return item.assignee === me;
@@ -147,6 +150,7 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
       escalated: false,
       href: it.href,
       editable: false,
+      ...(it.who ? { backTo: it.who } : {}),
     });
   }
 

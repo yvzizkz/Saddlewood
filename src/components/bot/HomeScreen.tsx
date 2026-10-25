@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, Lock, Paperclip }
 
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { RequestDecideCard } from '@/components/crew/RequestCards'
+import MyTasksCard from '@/components/tasks/MyTasksCard'
 import { useBot } from './BotProvider'
 import DraftSheet from './DraftSheet'
 import { Button, Card, Chip, Dot, Empty, INPUT, ScreenTitle, SectionTitle } from './ui'
@@ -526,7 +527,7 @@ export default function HomeScreen() {
 
       <SectionTitle count={needs}>Waiting on you</SectionTitle>
       {needs === 0 && !mySignals.length ? (
-        <Empty>Nothing is waiting on you. When something needs your yes, or something goes wrong, it lands here.</Empty>
+        <Empty>Nothing needs your yes right now. When something does, or something goes wrong, it lands here.</Empty>
       ) : null}
 
       {myDecisions.length ? (
@@ -571,6 +572,9 @@ export default function HomeScreen() {
           ))}
         </Card>
       ) : null}
+
+      {/* The rest of what is theirs on Tasks: billing, compliance, change orders, work handed to their seat. */}
+      {owner ? <MyTasksCard /> : null}
 
       <OthersWaiting home={home} />
 
