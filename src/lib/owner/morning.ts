@@ -1,11 +1,11 @@
 import type { BotCrewLateItem, BotPeople } from "@/lib/bot/types";
 import { addDays, dayShort, clockText, weekdayOf } from "@/lib/crew/time";
 import { pmDecides } from "@/lib/crew/requestRules";
-import { inScope, scopeFrom, type JobScope } from "@/lib/crew/scope";
+import { inScope, jobsOn, scopeFrom, type JobScope } from "@/lib/crew/scope";
 import { SETTING_DEFAULTS } from "@/lib/crew/settings";
 import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewRequest, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
 import type { JobRef } from "@/lib/jobs/hub";
-import { ROLES, seatHolder, type Person, type Seat } from "@/lib/roles/seats";
+import { holdsFieldLead, ROLES, seatHolder, type Person, type Seat } from "@/lib/roles/seats";
 import type { FeedItem } from "@/lib/tasks/feed";
 import { byAge, jobsOf, leadCounts, leadOf, mineOf, type Lead } from "@/lib/tasks/mine";
 import { lanesOf, type LaneSeats } from "./lanes";
@@ -60,13 +60,17 @@ export type MorningInput = {
  * A crew seat's as their Tasks shows it: their jobs, never Payables, the ops
  * board or the owners' list. A seat that is not on the crew (finance) gets every
  * item that is theirs, Payables included. `scope` null for every job. A crew
- * seat without money.view (a field lead) gets Tasks' no-money cut, as Home does.
+ * seat without money.view (a field lead) gets Tasks' no-money cut, as Home does,
+ * and only the jobs they are on, with or without projects.mine (workSeat in
+ * jobs/access.ts narrows a field lead to their crew_job_people the same way).
  */
 function feedFor(input: MorningInput, email: string, who: { owner: boolean; crew?: boolean; scope: JobScope; money?: boolean }): FeedItem[] {
   const feed = input.feed ?? [];
   if (!feed.length) return [];
+  const fieldLead = !!who.crew && who.money === false && holdsFieldLead(email, input.seats ?? [], input.seatPeople ?? []);
+  const scope = fieldLead ? jobsOn(email, input.jobPeople ?? []) : who.scope;
   // Every job when the seat is not narrowed, whether or not the job refs were read.
-  const jobs = who.owner || !who.crew ? null : who.scope === null ? new Set(feed.flatMap((i) => (i.jobKey ? [i.jobKey] : []))) : jobsOf(input.refs ?? [], who.scope);
+  const jobs = who.owner || !who.crew ? null : scope === null ? new Set(feed.flatMap((i) => (i.jobKey ? [i.jobKey] : []))) : jobsOf(input.refs ?? [], scope);
   return mineOf(feed, { email, owner: who.owner, jobs, money: who.money }, input.seats ?? [], input.seatPeople ?? []);
 }
 
