@@ -424,7 +424,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - **Owner:** Monday decisions with `rule?`, CO pricing, AR day-14 call, Friday ops review.
 2. Seed each scenario on the local stack (`supabase/seed-scenarios/*.sql`, synthetic names).
 3. Drive them with Playwright (`e2e/*.spec.ts`) against `npm run dev` on the local stack. Assert the numbers on every screen they touch: department headlines, job page, schedule, tasks, exports.
-4. Fix what breaks. Report a can/can't table per role: owner, PM, finance, sales admin, field lead, crew.
+4. Fix what breaks. Report a can/can't table per role: owner, PM, finance, sales admin, field lead, crew. The table is in `docs/SCENARIOS.md` ("Who can open what", `e2e/role-access.spec.ts`): no leaks; two gaps for an office seat who is not an owner (Finance has no Accounting or Tasks, Sales admin no Tasks) wait on the owner's call.
 
 **Done means:** every department in §6.2 has its home in the app, connected through the job; the schedule and the tasks are one feed each; every row of §6.6 is built, live or consciously dropped; and every Phase 3 scenario passes.
 

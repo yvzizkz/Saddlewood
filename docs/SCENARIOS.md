@@ -130,3 +130,38 @@ From the runs on 2026-10-20: `npx playwright test` passes **39/39**, twice in a 
 | **Owner** | Read every department's figures and what waits on it; price, sign and bill a CO from the job page; move a seat and see the work follow; hand a task to a role and watch it move up when overdue; close it; see the job page agree with Receivables to the cent | Record a payment from a P-number match in the app; it still goes through Joist (bot path). Approve and send an invoice package in one step: the package is a checklist and a task today, and sending is the Bill screen |
 | **Finance** | See each client's cutoff and what must go with the invoice; get told to bill a signed CO; record a lien waiver on the invoice (gap fixed in this phase); bill SOV progress draws by percent complete with retainage and signed COs (`0041`); read AR with aging, proof and the ladder; split Melio's fee from the gross; see Friday's pay run and the holds; export payroll that matches the table | Record a sub's incoming waiver from a standalone waiver form on the bill page (the bill page toggles `waiver_received`, and `/api/waivers` records directional rows) |
 | **PM** | Open Overview, Payroll hours, Purchases, Receivables and Billing on his own jobs; open his own invoices read-only; open `Jobs` and his assigned job pages across all 11 tabs; send his `% complete` report + note on `Job › Money` (clearing the client's `% complete and photos` task and pre-filling the owner's draw); record field logs, punch, checklists, receipts, and change requests (`Awaiting price`); hand tasks to `PM` or `Field and crew` and close them in `Tasks` (`Mine` / `My jobs`); reach `My jobs` and `Tasks` from crew `More` | See pay, labor dollars or margin (by policy, unless an owner switches them on); Payables; Departments; unassigned jobs (`404`); pricing or signing a change order (`403`); creating an SOV draw invoice (`403`) |
+
+## Who can open what (every seat, `e2e/role-access.spec.ts`)
+
+Run on 2026-10-25 against the local stack: one grid of every seat against every app section and the main write APIs. **open** renders where it was asked; **home** sends the seat back to `/app`; **→** moves it to another page. Every seat without money (finance and sales admin who are not owners, field lead, crew) shows no dollar figure on anything it opens. The finance and sales admin columns are an office person who is not an owner (`bot_state.people` role `requester`) holding that seat; locally and today Ilene is an owner, so the spec makes her a requester for the run and puts her back.
+
+| Page | Owner | Finance | Sales admin | PM | Field lead | Crew |
+|---|---|---|---|---|---|---|
+| Home `/app` | open | open | open | open (Today) | open (Today) | open (Today) |
+| Jobs, a job page, its Schedule tab | open | home | home | open (his jobs) | open (their jobs, no money) | home |
+| A job's Money tab | open | home | home | open | the job page, no money | home |
+| Tasks | open | home | home | open | open | home |
+| Schedule | open | home | home | open (his jobs) | open (their jobs, no billing or AR) | home |
+| Accounting Overview, Payroll, Purchases, Receivables, Billing | open | **home** (gap 1) | home | open (his jobs; hours, not pay) | home | home |
+| Payables, Job costing | open | **home** (gap 1) | home | home | home | home |
+| `/app/money` | → Receivables | home | home | → Receivables | home | home |
+| Subs, Sales, Sales settings, Policies, Duties, Ask | open | open (read; owners change) | open (read; owners change) | home | home | home |
+| Who decides, Departments, Bill | open | home | home | home | home | home |
+| Projects | open | open | open | open | home | home |
+| Crew | open | home | home | open | open | home |
+| Your week, Your hours | → Crew | home | home | open | open | open |
+| More | open | open | open | open | open | open |
+
+| API (an empty body, so nothing is written) | Owner | Finance | Sales admin | PM | Field lead | Crew |
+|---|---|---|---|---|---|---|
+| `GET /api/tasks/mine` (Home's Your tasks) | in | refused | refused | in | in | refused |
+| `GET /api/jobs/[id]/progress` (schedule of values) | in | refused | refused | in | refused | refused |
+| `POST /api/tasks`, `POST /api/schedule` | in | refused | refused | in | in | refused |
+| `PATCH /api/accounting/payables` | in | refused | refused | refused | refused | refused |
+| `PUT /api/policies`, `PUT /api/sales/settings`, `PATCH /api/roles/seats` | in | refused | refused | refused | refused | refused |
+
+**No leaks found:** no seat opened a page or API outside its row, and no seat without money saw a dollar figure.
+
+**Gaps (for the owner, not fixed here):**
+1. **An office Finance seat who is not an owner has no Accounting, Tasks or Schedule.** Accounting opens only for owners and crew with `money.view` (`src/lib/accounting/access.ts`), and Tasks/Schedule only for `workSeat()`. Today the Finance seat is Ilene, who is an owner, so nothing is blocked. But handing Finance to a bookkeeper who is not an owner would leave them only Subs, Sales, Policies and Duties, and their 7 AM push (`owner/morning.ts`, which links a seat off the crew to `/app/tasks`) would open a page that sends them home. The fix is a finance seat in `moneySeatForPage` (every job, Payables, no Policies writes) and a Finance cut of Tasks; it needs the owner's call on what a non-owner bookkeeper may change.
+2. **An office Sales admin who is not an owner has no Tasks.** Work handed to the Sales seat (`work_items` with role `sales`, and the bot's sales lane) lives on Tasks, which they cannot open; they see the pipeline on Sales only. Both gaps close with the same change: a Tasks cut for an office seat (its role's items, no job pages).
