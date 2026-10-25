@@ -1,8 +1,10 @@
 // Who can open what (plan Phase 3 step 4, docs/SCENARIOS.md "Who can open
 // what"): every seat against every app section and the main write APIs, in one
 // grid. A page is "open" (it renders where it was asked), "home" (sent back to
-// /app), or moved to another page ("→/app/…"). A seat without money sees no
-// dollar figure on anything it opens. The writes are probed with an empty body,
+// /app), or moved to another page ("→/app/…"). Each page is read once its
+// client fetches settle (networkidle). A seat without money sees no dollar
+// figure on anything it opens, except an office seat on its own work: the
+// pipeline and rates on Sales, and the dollar limits written in Policies. The writes are probed with an empty body,
 // so a seat that may write gets a 400 and nothing changes; a seat that may not
 // is refused before the body is read.
 //
@@ -24,13 +26,16 @@ const OFFICE = "ilene8a@gmail.com";
 const LEAD = "tacho.framing@example.com";
 
 type Seat = "owner" | "finance" | "sales" | "pm" | "field_lead" | "crew";
-const SEATS: { seat: Seat; email: string; crew: boolean; money: boolean }[] = [
-  { seat: "owner", email: "lando@saddlewoodcontracting.com", crew: false, money: true },
-  { seat: "finance", email: OFFICE, crew: false, money: false },
-  { seat: "sales", email: OFFICE, crew: false, money: false },
-  { seat: "pm", email: "eli.pm@example.com", crew: true, money: true },
-  { seat: "field_lead", email: LEAD, crew: true, money: false },
-  { seat: "crew", email: "jesus.paint@example.com", crew: true, money: false },
+// `dollars`: true for a seat with money; otherwise the only pages where a dollar figure may show.
+const OFFICE_DOLLARS = ["/app/sales", "/app/sales/settings", "/app/policies"];
+const SEATS: { seat: Seat; email: string; crew: boolean; dollars: true | string[] }[] = [
+  { seat: "owner", email: "lando@saddlewoodcontracting.com", crew: false, dollars: true },
+  { seat: "finance", email: OFFICE, crew: false, dollars: OFFICE_DOLLARS },
+  { seat: "sales", email: OFFICE, crew: false, dollars: OFFICE_DOLLARS },
+  { seat: "pm", email: "eli.pm@example.com", crew: true, dollars: true },
+  // Finding 3 (docs/SCENARIOS.md): the lead group's Crew page lists receipts with their amounts. Open, the owner's call.
+  { seat: "field_lead", email: LEAD, crew: true, dollars: ["/app/crew"] },
+  { seat: "crew", email: "jesus.paint@example.com", crew: true, dollars: [] },
 ];
 
 const O = "open";
@@ -107,7 +112,7 @@ test.afterAll(() => {
 });
 
 test.describe("Who can open what", () => {
-  SEATS.forEach(({ seat, email, crew, money }, col) => {
+  SEATS.forEach(({ seat, email, crew, dollars }, col) => {
     test(`${seat}: pages, money and writes`, async ({ browser }) => {
       test.setTimeout(300_000);
       if (seat === "finance") sql(`update public.role_seats set holder = 'Ilene' where role = 'finance'`);
@@ -121,13 +126,13 @@ test.describe("Who can open what", () => {
 
       const got: string[] = [];
       for (const [path, want] of PAGES) {
-        await page.goto(path, { waitUntil: "domcontentloaded", timeout: 60_000 });
+        await page.goto(path, { waitUntil: "networkidle", timeout: 60_000 });
         const at = new URL(page.url());
         const asked = new URL(path, page.url());
         const cell = at.pathname === asked.pathname ? O : at.pathname === "/app" ? H : `→${at.pathname}`;
         got.push(`${path} ${cell}`);
         expect.soft(cell, `${seat} ${path}`).toBe(want[col]);
-        if (!money && cell !== H) {
+        if (dollars !== true && cell !== H && !dollars.includes(path)) {
           const text = await page.locator("main").first().innerText({ timeout: 5000 }).catch(() => page.locator("body").innerText({ timeout: 5000 }));
           expect.soft(text, `${seat} ${path}: no dollars`).not.toMatch(DOLLARS);
         }

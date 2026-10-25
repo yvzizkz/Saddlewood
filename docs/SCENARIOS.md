@@ -133,7 +133,7 @@ From the runs on 2026-10-20: `npx playwright test` passes **39/39**, twice in a 
 
 ## Who can open what (every seat, `e2e/role-access.spec.ts`)
 
-Run on 2026-10-25 against the local stack: one grid of every seat against every app section and the main write APIs. **open** renders where it was asked; **home** sends the seat back to `/app`; **→** moves it to another page. Every seat without money (finance and sales admin who are not owners, field lead, crew) shows no dollar figure on anything it opens. The finance and sales admin columns are an office person who is not an owner (`bot_state.people` role `requester`) holding that seat; locally and today Ilene is an owner, so the spec makes her a requester for the run and puts her back.
+Run on 2026-10-25 against the local stack: one grid of every seat against every app section and the main write APIs. **open** renders where it was asked; **home** sends the seat back to `/app`; **→** moves it to another page. Each page is read once its data has loaded (`networkidle`). Crew show no dollar figure on anything they open; the field lead none outside their Crew page (finding 3). Finance and sales admin who are not owners show dollars only on their own work: the pipeline and rates on Sales and Sales settings, and the dollar limits written in Policies (read only); never AR, pay, cost or margin. The finance and sales admin columns are an office person who is not an owner (`bot_state.people` role `requester`) holding that seat; locally and today Ilene is an owner, so the spec makes her a requester for the run and puts her back.
 
 | Page | Owner | Finance | Sales admin | PM | Field lead | Crew |
 |---|---|---|---|---|---|---|
@@ -160,8 +160,9 @@ Run on 2026-10-25 against the local stack: one grid of every seat against every 
 | `PATCH /api/accounting/payables` | in | refused | refused | refused | refused | refused |
 | `PUT /api/policies`, `PUT /api/sales/settings`, `PATCH /api/roles/seats` | in | refused | refused | refused | refused | refused |
 
-**No leaks found:** no seat opened a page or API outside its row, and no seat without money saw a dollar figure.
+**No access leaks:** no seat opened a page or API outside its row. **One money finding** (3 below): a field lead sees receipt amounts on their Crew page. Office seats see dollars only on the Sales and Policies pages above. (The first run read pages before their data loaded and missed those three; agy caught it, and the spec now waits for the data.)
 
-**Gaps (for the owner, not fixed here):**
+**Gaps and findings (for the owner, not fixed here):**
 1. **An office Finance seat who is not an owner has no Accounting, Tasks or Schedule.** Accounting opens only for owners and crew with `money.view` (`src/lib/accounting/access.ts`), and Tasks/Schedule only for `workSeat()`. Today the Finance seat is Ilene, who is an owner, so nothing is blocked. But handing Finance to a bookkeeper who is not an owner would leave them only Subs, Sales, Policies and Duties, and their 7 AM push (`owner/morning.ts`, which links a seat off the crew to `/app/tasks`) would open a page that sends them home. The fix is a finance seat in `moneySeatForPage` (every job, Payables, no Policies writes) and a Finance cut of Tasks; it needs the owner's call on what a non-owner bookkeeper may change.
 2. **An office Sales admin who is not an owner has no Tasks.** Work handed to the Sales seat (`work_items` with role `sales`, and the bot's sales lane) lives on Tasks, which they cannot open; they see the pipeline on Sales only. Both gaps close with the same change: a Tasks cut for an office seat (its role's items, no job pages).
+3. **A field lead's Crew page shows receipt amounts.** The lead group's `crew.view` and `receipts` switches (from before the seat) list the job's receipts on `/app/crew` with their dollars, including one an owner paid out of pocket ("Home Depot · $64.25 · Paid out of pocket: owed to lando"). Every other page keeps a field lead off money. Whether a lead checking the crew's receipts should see amounts is the owner's call: hide the amount for a seat without `money.view`, or keep it because they approve the receipt.
