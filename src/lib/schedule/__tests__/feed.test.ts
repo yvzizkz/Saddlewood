@@ -158,6 +158,12 @@ describe("a project manager's cut of the schedule", () => {
     });
   });
 
+  it("gives a field lead the same cut with no money: no billing dates, AR calls or link into Billing", () => {
+    const withAr = [...events, ev("ar", { source: "ar", kind: "ar_ladder", href: "/app/accounting/receivables" })];
+    expect(scheduleForSeat(withAr, new Set(["ironwood"]), refs, false).map((e) => e.id)).toEqual(["mine", "crew", "bid"]);
+    expect(scheduleForSeat(withAr, new Set(["ironwood"]), refs).map((e) => e.id)).toEqual(["mine", "crew", "bid", "cutoff", "ar"]);
+  });
+
   it("leaves an owner's schedule as it is", () => {
     expect(scheduleForSeat(events, null, refs)).toBe(events);
   });

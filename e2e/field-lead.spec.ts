@@ -22,6 +22,8 @@ let before = "";
 let mine = "";
 let other = "";
 let pmFree = "";
+const extra: string[] = [];
+const extraSched: string[] = [];
 
 const test = base.extend<{ lead: Page }>({
   lead: async ({ context, page }, provide) => {
@@ -47,7 +49,8 @@ test.afterAll(() => {
   // The seat first: whatever else failed, the Field lead seat goes back.
   sql(`update public.role_seats set holder = '${before.replace(/'/g, "''")}' where role = 'field_lead'`);
   sql(`delete from public.crew_job_people where job_id = '${JOB}' and email = '${LEAD}'`);
-  const ids = [mine, other, pmFree].filter(Boolean);
+  if (extraSched.length) sql(`update public.schedule_items set status = 'cancelled' where id in (${extraSched.join(", ")})`);
+  const ids = [mine, other, pmFree, ...extra].filter(Boolean);
   if (ids.length) sql(`update public.work_items set status = 'dropped', done_by = 'e2e' where id in (${ids.join(", ")}) and status = 'open'`);
 });
 
@@ -133,6 +136,41 @@ test.describe("Field lead: their jobs and tasks, no money", () => {
     await pm.goto("/app/tasks?view=all");
     await expect(pm.getByText(`E2E PM no job ${n}`).first()).toBeVisible();
     await ctx.close();
+  });
+
+  test("Home's Your tasks counts the same Mine as Tasks", async ({ lead: page }) => {
+    const fresh = sql(`insert into public.work_items (title, role, crew_job_id, created_by) values ('E2E field lead home ${n}', 'field_lead', '${JOB}', 'e2e') returning id`);
+    extra.push(fresh);
+    const api = await (await page.request.get("/api/tasks/mine")).json();
+    expect(api.ok).toBe(true);
+    await page.goto("/app");
+    const card = page.getByRole("region", { name: "Your tasks" });
+    await expect(card).toBeVisible();
+    const count = Number(await card.getByRole("heading").locator("span").textContent());
+    expect(count).toBe(api.count);
+    await page.goto("/app/tasks");
+    const label = await page.getByRole("group", { name: "Whose" }).getByRole("link").first().textContent();
+    expect(Number(label?.match(/\((\d+)\)/)?.[1])).toBe(count);
+    expect(count).toBeGreaterThan(0);
+    expect(JSON.stringify(api)).not.toMatch(DOLLARS);
+  });
+
+  test("the Schedule shows their job with no dollars, and they add and cancel an item on it", async ({ lead: page }) => {
+    expect((await page.goto("/app/schedule?view=month"))?.status()).toBe(200);
+    expect(new URL(page.url()).pathname).toBe("/app/schedule");
+    expect(await page.locator("main").innerText()).not.toMatch(DOLLARS);
+    const title = `E2E field lead inspection ${n}`;
+    const day = "2026-11-03";
+    const add = await page.request.post("/api/schedule", { data: { kind: "inspection", title, startDay: day, role: "field_lead", job: JOB } });
+    expect(add.status()).toBe(200);
+    const id = sql(`select id from public.schedule_items where title = '${title}'`);
+    extraSched.push(id);
+    await page.goto(`/app/schedule?view=day&day=${day}`);
+    await expect(page.getByText(title).first()).toBeVisible();
+    expect((await page.request.patch("/api/schedule", { data: { id: Number(id), status: "cancelled" } })).status()).toBe(200);
+    // Not on a job they are not on, and not company-wide.
+    expect((await page.request.post("/api/schedule", { data: { kind: "inspection", title, startDay: "2026-11-02", role: "field_lead", job: "9146-w-hutton-dr" } })).status()).toBe(404);
+    expect((await page.request.post("/api/schedule", { data: { kind: "inspection", title, startDay: "2026-11-02", role: "field_lead" } })).status()).toBe(404);
   });
 
   test("crew who hold no seat still have no Tasks or job pages", async ({ browser }) => {

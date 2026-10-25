@@ -133,14 +133,17 @@ const PM_OPENS = ["/app/jobs/", "/app/accounting/billing"];
  * billing dates of those jobs' clients, as the job's Schedule tab shows them.
  * Never pay runs or bills due (Payables), company dates or compliance. A link
  * to a screen they cannot open goes to the job's Schedule tab (or this one). An
- * owner (jobs null) gets every event as it is.
+ * owner (jobs null) gets every event as it is. A seat with no money (a field
+ * lead) also loses billing dates and AR calls, which carry dollars, and Billing.
  */
-export function scheduleForSeat(events: ScheduleEvent[], jobs: Set<string> | null, refs: Pick<JobRef, "key" | "client">[]): ScheduleEvent[] {
+export function scheduleForSeat(events: ScheduleEvent[], jobs: Set<string> | null, refs: Pick<JobRef, "key" | "client">[], money = true): ScheduleEvent[] {
   if (jobs === null) return events;
   const clients = new Set(refs.filter((r) => jobs.has(r.key) && r.client).map((r) => r.client));
+  const opens = money ? PM_OPENS : PM_OPENS.filter((p) => p.startsWith("/app/jobs/"));
   return events
-    .filter((e) => e.source !== "pay" && (e.jobKey ? jobs.has(e.jobKey) : !!e.client && clients.has(e.client)))
-    .map((e) => (PM_OPENS.some((p) => e.href.startsWith(p)) ? e : { ...e, href: e.jobKey ? jobHref(e.jobKey, "schedule") : "/app/schedule" }));
+    .filter((e) => e.source !== "pay" && (money || (e.source !== "billing" && e.source !== "ar")))
+    .filter((e) => (e.jobKey ? jobs.has(e.jobKey) : !!e.client && clients.has(e.client)))
+    .map((e) => (opens.some((p) => e.href.startsWith(p)) ? e : { ...e, href: e.jobKey ? jobHref(e.jobKey, "schedule") : "/app/schedule" }));
 }
 
 export type GcLookAheadDraft = {

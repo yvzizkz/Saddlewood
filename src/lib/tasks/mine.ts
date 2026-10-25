@@ -6,14 +6,15 @@
 import type { JobRef } from "@/lib/jobs/hub";
 import type { JobScope } from "@/lib/crew/scope";
 import type { Person, Seat } from "@/lib/roles/seats";
-import { feedForSeat, isMine, type FeedItem } from "./feed";
+import { feedForSeat, forFieldLead, isMine, type FeedItem } from "./feed";
 
 /**
  * Whose list: an owner sees the whole feed; a crew seat (a PM) the jobs in
  * `jobs` (URL keys), as Tasks narrows it; null for a seat off the crew
- * (finance), every item that is theirs.
+ * (finance), every item that is theirs. `money: false` is a seat with no money
+ * (a field lead, jobs/access.ts), cut as Tasks cuts it (feed.ts forFieldLead).
  */
-export type FeedSeat = { email: string; owner: boolean; jobs: Set<string> | null };
+export type FeedSeat = { email: string; owner: boolean; jobs: Set<string> | null; money?: boolean };
 
 /** The URL keys of the jobs a field scope covers (crew/scope.ts): every job for null. */
 export function jobsOf(refs: Pick<JobRef, "key" | "crewId">[], scope: JobScope): Set<string> {
@@ -22,7 +23,9 @@ export function jobsOf(refs: Pick<JobRef, "key" | "crewId">[], scope: JobScope):
 
 /** Tasks' Everyone for this seat: the feed narrowed to the seat's jobs, plus whatever is theirs elsewhere. */
 export function seatFeedOf(feed: FeedItem[], seat: FeedSeat, seats: Seat[], people: Person[]): FeedItem[] {
-  return feedForSeat(feed, seat.owner ? null : seat.jobs, (i) => isMine(i, seat.email, seats, people));
+  const mine = (i: FeedItem) => isMine(i, seat.email, seats, people);
+  const seated = feedForSeat(feed, seat.owner ? null : seat.jobs, mine);
+  return seat.money === false ? forFieldLead(seated, mine) : seated;
 }
 
 /** Tasks' Mine for this seat. */
