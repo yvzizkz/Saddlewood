@@ -210,6 +210,8 @@ describe("a project manager's cut of the schedule", () => {
     expect(scheduleForSeat([mob("theirs", "ironwood"), mob("not theirs", "camelback")], new Set(["ironwood"]), refs)).toMatchObject([
       { id: "theirs", href: "/app/jobs/ironwood?tab=schedule" },
     ]);
+    // A field lead (no money) sees the start too: it carries no dollars.
+    expect(scheduleForSeat([mob("theirs", "ironwood")], new Set(["ironwood"]), refs, false).map((e) => e.href)).toEqual(["/app/jobs/ironwood?tab=schedule"]);
   });
 
   it("leaves an owner's schedule as it is", () => {
