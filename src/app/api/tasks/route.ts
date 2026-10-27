@@ -64,7 +64,8 @@ export async function PATCH(request: NextRequest) {
     const { data: cur } = await db.from("work_items").select("role,created_by,job_id,crew_job_id").eq("id", b.id!).maybeSingle();
     const w = cur as { role: Role; created_by: string; job_id: string | null; crew_job_id: string | null } | null;
     if (!w) return NextResponse.json({ ok: false, error: "No such task." }, { status: 404 });
-    const onJob = w.job_id || w.crew_job_id ? seesJob(seat, { billingId: w.job_id, crewId: w.crew_job_id }) : true;
+    // Work with no job: a PM's own, or a field lead's (no money seat) only with the field lead's seat or handed out by them.
+    const onJob = w.job_id || w.crew_job_id ? seesJob(seat, { billingId: w.job_id, crewId: w.crew_job_id }) : seat.money || w.role === "field_lead" || w.created_by === seat.email;
     if (!onJob) return NextResponse.json({ ok: false, error: "No such task." }, { status: 404 });
     if (!PM_ROLES.includes(w.role) && w.created_by !== seat.email) return notYours();
     if (b.role !== undefined && !PM_ROLES.includes(b.role as Role)) return notYours();

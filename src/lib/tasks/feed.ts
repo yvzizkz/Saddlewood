@@ -274,6 +274,20 @@ export function feedForSeat(items: FeedItem[], jobs: Set<string> | null, mine: (
   return items.filter((i) => i.source !== "waiting" && i.source !== "ops" && i.source !== "bill" && !isPayables(i) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)));
 }
 
+/** A seat with no money (a field lead, jobs/access.ts): nothing from billing or payables, where every item carries dollars. */
+export function withoutMoney(items: FeedItem[]): FeedItem[] {
+  return items.filter((i) => i.source !== "billing" && i.source !== "bill" && !isPayables(i) && !i.href.startsWith("/app/accounting") && !i.href.startsWith("/app/money"));
+}
+
+/**
+ * A field lead's Tasks (jobs/access.ts): what feedForSeat leaves a PM, with no
+ * money, and of the work with no job only theirs or the field lead's seat's.
+ * The PM's own job-free work is the PM's, not the field's.
+ */
+export function forFieldLead(items: FeedItem[], mine: (i: FeedItem) => boolean): FeedItem[] {
+  return withoutMoney(items).filter((i) => !!i.jobKey || mine(i) || i.role === "field_lead");
+}
+
 /**
  * Payables work, owners only: a sub's waiver owed before we pay it (wvi<bill>,
  * with the sub bill's amount), or anything that opens a bill in Payables.

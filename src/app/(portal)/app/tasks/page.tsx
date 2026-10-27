@@ -42,7 +42,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const refs = allRefs.filter((r) => seesJob(seat, r));
   // The same Mine the 7 AM push and Home's "Your tasks" read (tasks/mine.ts).
   const raw = await loadFeed(allRefs, seats, today);
-  const feedSeat = { email: me, owner: seat.owner, jobs: seat.owner ? null : new Set(refs.map((r) => r.key)) };
+  const feedSeat = { email: me, owner: seat.owner, jobs: seat.owner ? null : new Set(refs.map((r) => r.key)), money: seat.money };
   const feed = seatFeedOf(raw, feedSeat, seats, people);
   const mineAll = mineOf(raw, feedSeat, seats, people);
   const scoped = view === "mine" ? mineAll : feed;

@@ -192,8 +192,8 @@ export default function CrewMoreScreen() {
           </Card>
         </Link>
       ) : null}
-      {home?.me.perms.includes('money.view') ? (
-        // Their jobs and the tasks on them (src/lib/jobs/access.ts).
+      {home?.me.perms.includes('money.view') || home?.me.fieldLead ? (
+        // Their jobs and the tasks on them (src/lib/jobs/access.ts); a field lead's with no money.
         <>
           <Link href="/app/jobs" className="mt-4 block">
             <Card className="flex items-center gap-3 p-4">

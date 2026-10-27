@@ -22,7 +22,8 @@ export const dynamic = "force-dynamic";
 
 async function billingJob(id: string): Promise<{ seat: NonNullable<Awaited<ReturnType<typeof workSeat>>>; job: string } | NextResponse> {
   const seat = await workSeat();
-  if (!seat) return NextResponse.json({ ok: false, error: "owners and project managers only" }, { status: 403 });
+  // The schedule of values is contract dollars: a field lead's seat has none (jobs/access.ts).
+  if (!seat?.money) return NextResponse.json({ ok: false, error: "owners and project managers only" }, { status: 403 });
   const ref = await jobForWrite(seat, id);
   if (!ref?.billingId) return NextResponse.json({ ok: false, error: "This job has no billing side yet." }, { status: 404 });
   return { seat, job: ref.billingId };

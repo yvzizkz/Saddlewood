@@ -5,7 +5,7 @@
 //   schedule_items (0034)   inspections, site visits, deliveries, meetings, sub mobilizations
 //   crew_schedule           crew assignments (who, where, start time, ack)
 //   crew_job_phases         phase windows (planned_from..planned_to, verified_at)
-//   bid_packages            sub bid due dates
+//   bid_packages            sub bid due dates; an award's start (work window, or the winning bid's start) as a sub mobilization
 //   clients/jobs billing    client billing cutoffs + PM % complete due (-3 business days, SOP-006 Gate 3)
 //   receivables             AR collection ladder steps
 //   job_watches             contract watches (agreement, deposit, 20-day prelim notice, COI to GC, permit)
@@ -20,6 +20,8 @@ import { addDays, localDay } from "@/lib/crew/time";
 import { jobHref, jobKeyOf, type JobRef } from "@/lib/jobs/hub";
 import { seatHolder, type Role } from "@/lib/roles/seats";
 import { settleWatches } from "@/lib/sales/watchRecords";
+import { readiness, type Readiness } from "@/lib/subs/rules";
+import type { SubStatus } from "@/lib/subs/types";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
 
 export type ScheduleKind =
@@ -133,14 +135,17 @@ const PM_OPENS = ["/app/jobs/", "/app/accounting/billing"];
  * billing dates of those jobs' clients, as the job's Schedule tab shows them.
  * Never pay runs or bills due (Payables), company dates or compliance. A link
  * to a screen they cannot open goes to the job's Schedule tab (or this one). An
- * owner (jobs null) gets every event as it is.
+ * owner (jobs null) gets every event as it is. A seat with no money (a field
+ * lead) also loses billing dates and AR calls, which carry dollars, and Billing.
  */
-export function scheduleForSeat(events: ScheduleEvent[], jobs: Set<string> | null, refs: Pick<JobRef, "key" | "client">[]): ScheduleEvent[] {
+export function scheduleForSeat(events: ScheduleEvent[], jobs: Set<string> | null, refs: Pick<JobRef, "key" | "client">[], money = true): ScheduleEvent[] {
   if (jobs === null) return events;
   const clients = new Set(refs.filter((r) => jobs.has(r.key) && r.client).map((r) => r.client));
+  const opens = money ? PM_OPENS : PM_OPENS.filter((p) => p.startsWith("/app/jobs/"));
   return events
-    .filter((e) => e.source !== "pay" && (e.jobKey ? jobs.has(e.jobKey) : !!e.client && clients.has(e.client)))
-    .map((e) => (PM_OPENS.some((p) => e.href.startsWith(p)) ? e : { ...e, href: e.jobKey ? jobHref(e.jobKey, "schedule") : "/app/schedule" }));
+    .filter((e) => e.source !== "pay" && (money || (e.source !== "billing" && e.source !== "ar")))
+    .filter((e) => (e.jobKey ? jobs.has(e.jobKey) : !!e.client && clients.has(e.client)))
+    .map((e) => (opens.some((p) => e.href.startsWith(p)) ? e : { ...e, href: e.jobKey ? jobHref(e.jobKey, "schedule") : "/app/schedule" }));
 }
 
 export type GcLookAheadDraft = {
@@ -219,6 +224,61 @@ export function buildGcLookAheadDrafts(
   return drafts.sort((a, b) => b.eventCount - a.eventCount || a.client.localeCompare(b.client));
 }
 
+/**
+ * When an awarded sub starts on site: the package's work window, else the
+ * winning bid's start (bid_packages.work_from/work_to, bid_responses.start_on).
+ * Overdue while the window is open and the mobilization gate still holds them
+ * (subs/rules.ts readiness: COI, W-9, MSA, license, ACH); done once the window
+ * has passed, since an award never closes and readiness is read against today,
+ * so a lapsed COI on finished work is not a missed start. Null with no start.
+ */
+export function mobilizationOf(
+  pkg: { workFrom: string | null; workTo: string | null },
+  bidStartOn: string | null,
+  gate: Readiness,
+  today: string,
+): { startDay: string; endDay: string; status: "scheduled" | "overdue" | "done"; detail: string } | null {
+  const startDay = pkg.workFrom ?? bidStartOn;
+  if (!startDay) return null;
+  const endDay = pkg.workTo && pkg.workTo >= startDay ? pkg.workTo : startDay;
+  return {
+    startDay,
+    endDay,
+    status: endDay < today ? "done" : !gate.ready && startDay <= today ? "overdue" : "scheduled",
+    detail: gate.ready ? "Cleared to mobilize" : `Not cleared to mobilize: ${gate.missing.join(", ")}`,
+  };
+}
+
+type Awarded = { id: string; job_id: string | null; trade: string; title: string; work_from: string | null; work_to: string | null; awarded_invite_id: string | null };
+type AwardedSub = { id: string; name: string; status: string; coi_expires_on: string | null; w9_on_file: boolean; msa_signed_on: string | null; roc_verified_at: string | null; ach_confirmed_at: string | null };
+
+/** Awarded packages with the sub that won each and that bid's latest start. */
+async function loadAwards(): Promise<{ pkg: Awarded; sub: AwardedSub | null; startOn: string | null }[]> {
+  const db = getSupabaseAdmin();
+  const { data } = await db.from("bid_packages").select("id,job_id,trade,title,work_from,work_to,awarded_invite_id").eq("status", "awarded").limit(500);
+  const pkgs = (data ?? []) as Awarded[];
+  const inviteIds = pkgs.flatMap((p) => (p.awarded_invite_id ? [p.awarded_invite_id] : []));
+  if (!inviteIds.length) return pkgs.map((pkg) => ({ pkg, sub: null, startOn: null }));
+  const [invitesRes, responsesRes] = await Promise.all([
+    db.from("bid_invites").select("id,sub_id").in("id", inviteIds),
+    db.from("bid_responses").select("invite_id,revision,start_on").in("invite_id", inviteIds),
+  ]);
+  const subOf = new Map(((invitesRes.data ?? []) as { id: string; sub_id: string }[]).map((i) => [i.id, i.sub_id]));
+  const latest = new Map<string, { revision: number; start_on: string | null }>();
+  for (const r of (responsesRes.data ?? []) as { invite_id: string; revision: number; start_on: string | null }[]) {
+    if ((latest.get(r.invite_id)?.revision ?? -1) < r.revision) latest.set(r.invite_id, r);
+  }
+  const subIds = [...new Set(subOf.values())];
+  const { data: subRows } = subIds.length
+    ? await db.from("subs").select("id,name,status,coi_expires_on,w9_on_file,msa_signed_on,roc_verified_at,ach_confirmed_at").in("id", subIds)
+    : { data: [] };
+  const subs = new Map(((subRows ?? []) as AwardedSub[]).map((s) => [s.id, s]));
+  return pkgs.map((pkg) => {
+    const inv = pkg.awarded_invite_id;
+    return { pkg, sub: (inv && subs.get(subOf.get(inv) ?? "")) || null, startOn: (inv && latest.get(inv)?.start_on) || null };
+  });
+}
+
 export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Promise<ScheduleEvent[]> {
   const db = getSupabaseAdmin();
   const [
@@ -230,6 +290,7 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     watchesRes,
     subsRes,
     goalsRes,
+    awards,
     billingCal,
     openAr,
     payables,
@@ -240,10 +301,12 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
     db.from("crew_schedule").select("id,day,email,job_id,job_name,start_time,note,ack,priority").order("day", { ascending: true }).limit(1000),
     db.from("crew_job_phases").select("id,job_id,ord,name,trade,planned_from,planned_to,verified_at,verified_by,note").order("ord", { ascending: true }),
     db.from("crew_people").select("email,name,trade"),
-    db.from("bid_packages").select("id,job_id,trade,title,status,due_at").in("status", ["draft", "invited", "leveling"]),
+    // Out to bid, or drafted with a due date (0028's statuses); closed and awarded are past bidding.
+    db.from("bid_packages").select("id,job_id,trade,title,status,due_at").in("status", ["draft", "out"]),
     settleWatches().then(() => db.from("job_watches").select("id,job_id,kind,title,due_on,note,done_at").is("done_at", null)),
     db.from("subs").select("id,name,trades,status,coi_expires_on,w9_on_file,msa_signed_on").in("status", ["approved", "onboarding"]),
     db.from("ops_goals").select("id,title,horizon,owner,status,due_date,note").not("due_date", "is", null).neq("status", "done"),
+    loadAwards().catch(() => []),
     loadBillingCalendar(today).catch(() => []),
     loadOpenReceivables(today).catch(() => ({ rows: [], today })),
     loadPayables(today).catch(() => ({ rows: [], payments: [], trades: [], fridayCutoff: nextFridayDay(today) })),
@@ -417,6 +480,36 @@ export async function loadScheduleFeed(refs: JobRef[], today = localDay()): Prom
       role: "pm",
       status: day < today ? "overdue" : "scheduled",
       href: `/app/subs/bids/${b.id}`,
+      editable: false,
+    });
+  }
+
+  // 4b. Awards: the sub's start on site (bid_packages work window or the winning bid's start)
+  for (const { pkg, sub, startOn } of awards) {
+    const gate = sub
+      ? readiness({ status: sub.status as SubStatus, coiExpiresOn: sub.coi_expires_on, w9OnFile: sub.w9_on_file, msaSignedOn: sub.msa_signed_on, rocVerifiedAt: sub.roc_verified_at, achConfirmedAt: sub.ach_confirmed_at }, today)
+      : { ready: false, missing: ["no awarded sub on file"] };
+    const mob = mobilizationOf({ workFrom: pkg.work_from, workTo: pkg.work_to }, startOn, gate, today);
+    if (!mob) continue;
+    const meta = resolveJobMeta(pkg.job_id, null);
+    out.push({
+      id: `mob:${pkg.id}`,
+      source: "bid",
+      kind: "sub_mobilization",
+      kindLabel: SCHEDULE_KIND_LABEL.sub_mobilization,
+      jobKey: meta.jobKey,
+      job: meta.job,
+      client: meta.client,
+      title: `${sub?.name ?? "Sub"} starts: ${pkg.title || pkg.trade}`,
+      detail: `${pkg.trade} · ${mob.detail}`,
+      startDay: mob.startDay,
+      endDay: mob.endDay,
+      startTime: "",
+      who: sub?.name ?? holderOf("pm"),
+      whoEmail: "",
+      role: "pm",
+      status: mob.status,
+      href: `/app/subs/bids/${pkg.id}`,
       editable: false,
     });
   }

@@ -63,6 +63,12 @@ export function seatHolder(role: Role, seats: Seat[], people: Person[]): { name:
   return { name: "the owners", emails: owners.map((p) => p.email), covering: true };
 }
 
+/** Whether this person answers for the Field lead seat right now: its holder, or its backup while it is empty (jobs/access.ts). */
+export function holdsFieldLead(email: string, seats: Seat[], people: Person[]): boolean {
+  const e = email.trim().toLowerCase();
+  return !!e && seatHolder("field_lead", seats, people).emails.some((x) => x.toLowerCase() === e);
+}
+
 /** The role an overdue item moves up to (SOP escalation: PM → owner decisions; everyone else → decisions; decisions → ops backup). */
 export function escalationOf(role: Role): Role {
   if (role === "field_lead") return "pm";

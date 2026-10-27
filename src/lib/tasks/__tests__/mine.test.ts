@@ -70,6 +70,30 @@ describe("seatFeedOf", () => {
   });
 });
 
+describe("a field lead's Mine and Everyone", () => {
+  // Arnold holds the field lead seat; a field lead has no money (jobs/access.ts).
+  const fl: Seat[] = seats.map((x) => (x.role === "field_lead" ? { ...x, holder: "Arnold" } : x));
+  const feed = [
+    ...FEED,
+    item("fl-nojob", { role: "field_lead", nowRole: "field_lead" }),
+    item("fl-cutoff", { source: "billing", kind: "billing", role: "field_lead", nowRole: "field_lead", jobKey: "keim", href: "/app/accounting/billing" }),
+  ];
+  const seat = { email: ARNOLD, owner: false, jobs: jobsOf(REFS, ["keim"]), money: false };
+
+  it("cuts the same as Tasks: their jobs, no money, and of the job-free work only theirs", () => {
+    expect(ids(seatFeedOf(feed, seat, fl, people))).toEqual(["c1", "c2", "fl-nojob", "keim"]);
+    expect(ids(seatFeedOf(feed, { ...seat, money: true }, fl, people))).toEqual(expect.arrayContaining(["fl-cutoff", "nojob"]));
+  });
+
+  it("gives Home's Your tasks the count Tasks shows under Mine, with nothing that carries dollars", () => {
+    const mine = mineOf(feed, seat, fl, people);
+    expect(ids(mine)).toContain("fl-nojob");
+    expect(ids(mine)).not.toContain("fl-cutoff");
+    expect(ids(mine).every((id) => ids(seatFeedOf(feed, seat, fl, people)).includes(id))).toBe(true);
+    expect(summaryOf(mine, DAY, () => false).count).toBe(mine.length);
+  });
+});
+
 describe("jobsOf", () => {
   it("covers every job for no scope, and only the field jobs in scope otherwise", () => {
     expect([...jobsOf(REFS, null)]).toEqual(["keim", "bambi", "billing-only"]);

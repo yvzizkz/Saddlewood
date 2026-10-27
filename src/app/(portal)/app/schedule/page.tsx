@@ -59,7 +59,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
 
   const [allRefs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
   const refs = owner ? allRefs : allRefs.filter((r) => seesJob(seat, r));
-  const allEvents = scheduleForSeat(await loadScheduleFeed(allRefs, today), owner ? null : new Set(refs.map((r) => r.key)), refs);
+  const allEvents = scheduleForSeat(await loadScheduleFeed(allRefs, today), owner ? null : new Set(refs.map((r) => r.key)), refs, seat.money);
 
   const wDays = weekDays(anchor);
   const mGrid = monthGrid(anchor);

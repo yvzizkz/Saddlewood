@@ -371,15 +371,15 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - `decision_rights` rows (role, action, limit) in Company policies;
    - roles and seats (who holds PM, Finance, Sales admin, Field lead), with cover for empty seats;
    - existing limits (`requests.pmLimitCents`, award limits) read from it.
-3. ✅ **One task system** (§6.5): `work_items` (0033), `src/lib/tasks/feed.ts`, `/app/tasks`, and a Tasks tab on each job page. PM seats now open their own jobs and Tasks (`src/lib/jobs/access.ts`): they hand work to the PM or field lead, close it, record a change, and run the log and punch; money stays read only, and labor dollars, margin and sub bills follow policy. The 7 AM push reads the feed (`src/lib/owner/morning.ts`): each person gets their Mine part of it, led by what is overdue, due today and moved up to them, and finance gets a push of their own. Home reads it too: "Your tasks" on the owner's Home and the PM's Today counts the same Mine as Tasks (`src/lib/tasks/mine.ts`, `/api/tasks/mine`). Still to do: PM writes on the Schedule.
+3. ✅ **One task system** (§6.5): `work_items` (0033), `src/lib/tasks/feed.ts`, `/app/tasks`, and a Tasks tab on each job page. PM seats now open their own jobs and Tasks (`src/lib/jobs/access.ts`): they hand work to the PM or field lead, close it, record a change, and run the log and punch; money stays read only, and labor dollars, margin and sub bills follow policy. The 7 AM push reads the feed (`src/lib/owner/morning.ts`): each person gets their Mine part of it, led by what is overdue, due today and moved up to them, and finance gets a push of their own. Home reads it too: "Your tasks" on the owner's Home and the PM's Today counts the same Mine as Tasks (`src/lib/tasks/mine.ts`, `/api/tasks/mine`), and a PM writes on the Schedule for his jobs (`scheduleForSeat`, `/api/schedule`).
    - `work_items` migration + `src/lib/tasks/feed.ts` over `crew_tasks`, ops cards, bot waiting-on, watches, purchase cards and request approvals;
    - views Mine / My team / Per job / Per department;
    - escalation by service level;
    - the 7 AM push and Home read it.
-4. **One schedule** (§6.3):
+4. ✅ **One schedule** (§6.3): `schedule_items` (0034), `src/lib/schedule/feed.ts` over every source in the table, `/app/schedule` (My day, Week board, Month, GC look-ahead) and the job page's Schedule tab with its phase timeline. An award's start reads in place as a sub mobilization (the package's work window, else the winning bid's start), held by the mobilization gate; bids out show their due date.
    - `schedule_items` migration + `src/lib/schedule/feed.ts` over every source in the table;
    - My day (phone), Week board and Month (desktop), Job timeline, GC look-ahead draft.
-5. **Field operations** (§6.4):
+5. ✅ **Field operations** (§6.4): 0035 and 0045, `src/lib/field/ops.ts`, `src/lib/field/checklists.ts`, `/api/field`: the structured daily log and its "log missing" item in the task feed, receipts into `purchases`, trade checklists per phase that block verify, punch items by room and wall, and directives into change orders.
    - structured daily log + "log missing" item;
    - receipts normalized into `purchases`;
    - pre-cover `checklists` per phase gating verify;
@@ -405,7 +405,7 @@ OM §7 rows A1 to A13 and SOP-008 §4 rows S1 to S9. Each is built (with its pha
    - `/internal/activity` and `/internal/bid-log` placeholders go;
    - Money's purchase search becomes Accounting › Purchases.
    - Never the four batch-2 prototypes (they wait for their bot scripts).
-10. ✅ **PM access:** `src/lib/accounting/access.ts`. A `money.view` seat sees Receivables, Billing, Purchases and Payroll hours on its own jobs. Pay and cost show only if `policy.pm.laborCost` / `policy.pm.margin` are on, never Payables, and invoices are read-only. Still to do: a field-lead seat. Accounting sections for `money.view` seats scoped to their jobs, no cost or pay. Field lead seat.
+10. ✅ **PM access:** `src/lib/accounting/access.ts`. A `money.view` seat sees Receivables, Billing, Purchases and Payroll hours on its own jobs. Pay and cost show only if `policy.pm.laborCost` / `policy.pm.margin` are on, never Payables, and invoices are read-only. **Field lead seat** (`src/lib/jobs/access.ts`): a crew lead without `money.view` who holds the Field lead seat (or covers it while it is empty) opens My jobs, the job pages and Tasks for the jobs they are on (`crew_job_people`), hands and closes field-lead and PM work there, and sees no money: no Money, Purchases or Documents tab, no dollar figure, no billing or payables items, the schedule of values refused. Home's "Your tasks" on their Today counts the same no-money Mine as Tasks (`FeedSeat.money`), and the Schedule shows their jobs with no billing dates or AR calls, where they add and close the field's items (`e2e/field-lead.spec.ts`).
 11. Each step: tests, lint, build, screenshots at 390 px and on desktop.
 
 ### Phase 3 (in progress; `docs/SCENARIOS.md`, `npm run e2e`): scenario testing, every department's real week (one PR)
