@@ -1,11 +1,11 @@
 import type { BotCrewLateItem, BotPeople } from "@/lib/bot/types";
 import { addDays, dayShort, clockText, weekdayOf } from "@/lib/crew/time";
 import { pmDecides } from "@/lib/crew/requestRules";
-import { inScope, scopeFrom, type JobScope } from "@/lib/crew/scope";
+import { inScope, jobsOn, scopeFrom, type JobScope } from "@/lib/crew/scope";
 import { SETTING_DEFAULTS } from "@/lib/crew/settings";
 import { firstNameOf, isReportedDone, type CrewJob, type CrewJobPerson, type CrewLang, type CrewPerson, type CrewReport, type CrewRequest, type CrewScheduleItem, type CrewTask } from "@/lib/crew/types";
 import type { JobRef } from "@/lib/jobs/hub";
-import { ROLES, seatHolder, type Person, type Seat } from "@/lib/roles/seats";
+import { holdsFieldLead, ROLES, seatHolder, type Person, type Seat } from "@/lib/roles/seats";
 import type { FeedItem } from "@/lib/tasks/feed";
 import { byAge, jobsOf, leadCounts, leadOf, mineOf, type Lead } from "@/lib/tasks/mine";
 import { lanesOf, type LaneSeats } from "./lanes";
@@ -59,14 +59,19 @@ export type MorningInput = {
  * This person's part of the feed, as Tasks shows it under Mine (tasks/mine.ts).
  * A crew seat's as their Tasks shows it: their jobs, never Payables, the ops
  * board or the owners' list. A seat that is not on the crew (finance) gets every
- * item that is theirs, Payables included. `scope` null for every job.
+ * item that is theirs, Payables included. `scope` null for every job. A crew
+ * seat without money.view (a field lead) gets Tasks' no-money cut, as Home does,
+ * and only the jobs they are on, with or without projects.mine (workSeat in
+ * jobs/access.ts narrows a field lead to their crew_job_people the same way).
  */
-function feedFor(input: MorningInput, email: string, who: { owner: boolean; crew?: boolean; scope: JobScope }): FeedItem[] {
+function feedFor(input: MorningInput, email: string, who: { owner: boolean; crew?: boolean; scope: JobScope; money?: boolean }): FeedItem[] {
   const feed = input.feed ?? [];
   if (!feed.length) return [];
+  const fieldLead = !!who.crew && who.money === false && holdsFieldLead(email, input.seats ?? [], input.seatPeople ?? []);
+  const scope = fieldLead ? jobsOn(email, input.jobPeople ?? []) : who.scope;
   // Every job when the seat is not narrowed, whether or not the job refs were read.
-  const jobs = who.owner || !who.crew ? null : who.scope === null ? new Set(feed.flatMap((i) => (i.jobKey ? [i.jobKey] : []))) : jobsOf(input.refs ?? [], who.scope);
-  return mineOf(feed, { email, owner: who.owner, jobs }, input.seats ?? [], input.seatPeople ?? []);
+  const jobs = who.owner || !who.crew ? null : scope === null ? new Set(feed.flatMap((i) => (i.jobKey ? [i.jobKey] : []))) : jobsOf(input.refs ?? [], scope);
+  return mineOf(feed, { email, owner: who.owner, jobs, money: who.money }, input.seats ?? [], input.seatPeople ?? []);
 }
 
 /** The lead counts, or how many are open when none is late, due today or moved up. */
@@ -180,7 +185,7 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     const toCheck = tasks.filter((t) => isReportedDone(t) && t.email !== p.email).length;
     const dueToday = tasks.filter((t) => isOpen(t) && t.due === day && !supervisorEmails.has(t.email)).length;
     // Their own work (hand-offs to them, the PM's seat, the field's once it moved up) comes from the feed.
-    const own = feedFor(input, p.email, { owner: false, crew: true, scope });
+    const own = feedFor(input, p.email, { owner: false, crew: true, scope, money: p.perms.includes("money.view") });
     const lead = leadOf(own, day);
     const yours = countsOf(lead, own.length);
     // Material requests (0023) waiting on this PM: on their jobs, not their own, within their limit.
@@ -208,7 +213,7 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     notified.add(p.email); // a worker is heard from here or not at all, never as a seat below
     if (!mine.length) continue; // not working today: no buzz
     const where = mine.map((s) => `${s.jobName}${s.startTime ? ` ${p.lang === "es" ? "a las" : "at"} ${clockText(s.startTime)}` : ""}`).join(", ");
-    const tasks = feedFor(input, p.email, { owner: false, crew: true, scope: scopeFrom({ role: "member", email: p.email, perms: p.perms }, input.jobPeople ?? []) }).sort(byAge);
+    const tasks = feedFor(input, p.email, { owner: false, crew: true, scope: scopeFrom({ role: "member", email: p.email, perms: p.perms }, input.jobPeople ?? []), money: p.perms.includes("money.view") }).sort(byAge);
     const lead = leadOf(tasks, day);
     const first = tasks[0];
     const late = { en: [lead.overdue ? `${lead.overdue} overdue` : "", lead.dueToday ? `${lead.dueToday} due today` : ""].filter(Boolean), es: [lead.overdue ? `${lead.overdue} ${lead.overdue === 1 ? "atrasada" : "atrasadas"}` : "", lead.dueToday ? `${lead.dueToday} para hoy` : ""].filter(Boolean) };
@@ -229,7 +234,7 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     const crew = input.people.find((c) => c.email === person.email);
     if (crew && !crew.active) continue;
     const scope = crew ? scopeFrom({ role: "member", email: crew.email, perms: crew.perms }, input.jobPeople ?? []) : null;
-    const items = feedFor(input, person.email, { owner: false, crew: !!crew, scope });
+    const items = feedFor(input, person.email, { owner: false, crew: !!crew, scope, money: crew ? crew.perms.includes("money.view") : true });
     if (!items.length) continue; // nothing on their list: no buzz
     const lead = leadOf(items, day);
     const counts = countsOf(lead, items.length);
