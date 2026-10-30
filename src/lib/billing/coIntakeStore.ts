@@ -5,6 +5,8 @@
 // same rows: it rewrites a draft that nobody has touched since, and leaves
 // alone one an owner has edited, priced or sent. Server only.
 
+import { sendPush } from "@/lib/bot/push";
+import { laneAddresses } from "@/lib/crew/notify";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getJobRef } from "@/lib/jobs/hub";
 import { createDraft, DocumentError, getDocument, updateDraft, usedNumbers } from "./documents";
@@ -172,5 +174,22 @@ export async function runIntake(input: Intake, actor: string): Promise<IntakeOut
     const row = await findRow(input.sourceRef, it.key);
     out.push(row ? await refresh(row, it, ctx, actor) : await create(job, input, it, ctx, actor));
   }
+  await tellOwners(out.filter((o) => o.action === "created"), input, job.ctx.jobName);
   return out;
+}
+
+/** To the phone of whoever prices (the "decisions" lane): what came in, opening the first to price. Never fails the intake. */
+async function tellOwners(created: IntakeOutcome[], input: Intake, jobName: string): Promise<void> {
+  if (!created.length) return;
+  try {
+    const who = input.requestedBy.replace(/\s*\(.*\)\s*$/, "");
+    await sendPush(await laneAddresses("decisions"), {
+      title: `${who} asked for ${created.length === 1 ? "a change order" : `${created.length} change orders`}`.slice(0, 80),
+      body: `${jobName}: ${created.map((c) => c.number).join(", ")} ready to price.`.slice(0, 240),
+      url: `/app/changes/${created[0].changeOrderId}`,
+      tag: `co-intake-${created[0].changeOrderId}`,
+    });
+  } catch (e) {
+    console.error("[co intake] push:", (e as Error).message);
+  }
 }

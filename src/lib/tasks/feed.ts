@@ -197,7 +197,7 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
   // priced one not sent, and a signed one not billed, are follow-ups.
   for (const c of cos) {
     if (c.registerId === null) continue;
-    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
+    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.status === "requested" || c.status === "priced" ? `/app/changes/${c.registerId}` : c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
     if (c.status === "requested") {
       const due = c.requestedOn ? addDays(c.requestedOn, 2) : null;
       out.push({ ...base, id: `co${c.registerId}`, kind: "co_price", title: `Price: ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 1, today) });

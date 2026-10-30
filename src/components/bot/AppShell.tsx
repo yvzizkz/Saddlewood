@@ -20,7 +20,7 @@ import { activeHref, phoneTabs, type NavViewer } from '@/components/layout/nav'
 // Ask is a tool, not a place: it sits in the header.
 
 /** Pages laid out for a desktop: tables and charts use the full width. */
-const WIDE = ['/app/accounting', '/app/jobs', '/app/tasks', '/app/schedule', '/app/departments']
+const WIDE = ['/app/accounting', '/app/jobs', '/app/tasks', '/app/schedule', '/app/departments', '/app/changes']
 
 function useNavViewer(): NavViewer {
   const { home } = useBot()
