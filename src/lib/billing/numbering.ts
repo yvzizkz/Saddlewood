@@ -6,7 +6,9 @@
 // hand cannot: the same number twice, "4847-  16" beside "4847- 16", a suffix
 // invented on the day.
 //
-// Change orders are CO-<n> within their job, per SOP-002.
+// Change orders are CO-<n> within their job, per SOP-002. Clients see them as
+// <street number>-CO<n> (8009-CO7, as Joist printed them), so a job with a
+// number prefix gets that form; CO-4 and 8009-CO7 count as one sequence.
 
 /** A number as it is stored and compared: no spaces, one dash, upper case. */
 export function normalizeNumber(raw: string): string {
@@ -45,6 +47,23 @@ export function nextNumber(prefix: string, used: string[]): string {
   return `${p}-${String(highest + 1).padStart(2, "0")}`;
 }
 
-export function nextChangeOrderNumber(used: string[]): string {
-  return nextNumber("CO", used).replace(/^CO-0*(\d)/, "CO-$1");
+/** The n in CO-n, COn or <prefix>-COn, or null when it is not a change-order number. */
+export function changeOrderSequence(number: string): number | null {
+  const m = /(?:^|-)CO-?(\d+)$/.exec(normalizeNumber(number));
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The next change-order number on a job: one past the highest CO sequence in
+ * `used` (the job's register rows and change-order documents, voids included),
+ * as <prefix>-CO<n> when the job has a number prefix, else CO-<n>.
+ */
+export function nextChangeOrderNumber(used: string[], prefix = ""): string {
+  let highest = 0;
+  for (const u of used) {
+    const s = changeOrderSequence(u);
+    if (s !== null && s > highest) highest = s;
+  }
+  const p = normalizeNumber(prefix);
+  return p ? `${p}-CO${highest + 1}` : `CO-${highest + 1}`;
 }
