@@ -21,7 +21,9 @@ const JURY = "b0000001-0000-4000-8000-000000008009";
 // The smallest PDF a viewer opens: what the engineer's SK8 stands in for here.
 const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n").toString("base64");
 
-const items = (lvlNote = "Per Chris's markup, attached.") => [
+type Item = { key: string; title: string; detail?: string; refs?: string; note?: string; lines: { description: string; quantity?: number; unit?: string; note?: string }[]; notIncluded?: { description: string; note?: string }[] };
+
+const items = (lvlNote = "Per Chris's markup, attached."): Item[] => [
   {
     key: "shear-wall",
     title: "Shear Wall Revision at Studio / Garage Door",
@@ -106,7 +108,7 @@ test.describe("Change-order intake", () => {
 
       // Only the register's note moved: the draft stays, the row takes the note.
       const noted = items("Per Chris's markup; includes the upper beam.");
-      noted[0] = { ...noted[0], detail: "Engineer's revision after the owner added the door" } as (typeof noted)[0];
+      noted[0] = { ...noted[0], detail: "Engineer's revision after the owner added the door" };
       expect(((await (await post({ ...request, items: noted })).json()).changeOrders as { action: string }[])[0].action).toBe("updated");
       expect(sql(`select detail from change_orders where id = ${made[0].changeOrderId}`)).toBe("Engineer's revision after the owner added the door");
 
