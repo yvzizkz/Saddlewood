@@ -3,6 +3,7 @@
 // the register requested → priced → sent with a line on its timeline for
 // each step. Owners only, checked by the routes. Server only.
 
+import { localDay } from "@/lib/crew/time";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { coEvent, coEventsAfter, loadTimelines } from "./coEvents";
 import type { TimelineLine } from "./coTimeline";
@@ -10,7 +11,7 @@ import { jobKeyOf, listJobRefs } from "@/lib/jobs/hub";
 import { deliver, type DeliverResult } from "./deliver";
 import { createDraft, ensurePreviewToken, getDocument, totalOf, updateDraft } from "./documents";
 import { listExhibits, type Exhibit } from "./exhibits";
-import { applyPrices, coEmail, defaultTo, sendBlockers, type Contact, type PriceEdit } from "./coPrice";
+import { applyPrices, coEmail, coFollowUpEmail, defaultTo, sendBlockers, type Contact, type PriceEdit } from "./coPrice";
 import { nextChangeOrderNumberFor } from "./coIntakeStore";
 import type { BillingDocument } from "./types";
 
@@ -54,6 +55,8 @@ export type PriceIt = {
   contacts: Contact[];
   to: string[];
   email: { subject: string; body: string };
+  /** Sent and not signed: the follow-up, drafted for an owner to send (never sent by itself). */
+  followUp: { subject: string; body: string } | null;
   timeline: TimelineLine[];
 };
 
@@ -119,7 +122,10 @@ export async function loadPriceIt(id: number, actor: string): Promise<PriceIt> {
   const [exhibits, contacts, refs, timelines] = await Promise.all([listExhibits(doc.id), contactsOf(doc.clientId), listJobRefs(), loadTimelines([{ id: row.id, documentId: doc.id }])]);
   const jobKey = jobKeyOf({ billingId: row.job_id, crewId: row.crew_job_id }, refs);
   const job = (jobKey ? refs.find((r) => r.key === jobKey)?.name : null) ?? doc.snapshot.job?.name ?? "";
-  const to = defaultTo(contacts, row.requested_by);
+  const sentTo = (row.status === "sent" ? await lastSentTo(row.id) : []).filter((e) => contacts.some((c) => c.email === e));
+  const to = sentTo.length ? sentTo : defaultTo(contacts, row.requested_by);
+  const person = contacts.find((c) => c.email === to[0]) ?? null;
+  const sentOn = doc.issuedAt ? localDay(doc.issuedAt) : null;
   return {
     id: row.id,
     number: doc.number,
@@ -134,7 +140,8 @@ export async function loadPriceIt(id: number, actor: string): Promise<PriceIt> {
     exhibits,
     contacts,
     to,
-    email: coEmail({ number: doc.number, title: doc.title || row.title, job, totalCents: doc.totalCents, to: contacts.find((c) => c.email === to[0]) ?? null }),
+    email: coEmail({ number: doc.number, title: doc.title || row.title, job, totalCents: doc.totalCents, to: person }),
+    followUp: row.status === "sent" && doc.status === "issued" ? coFollowUpEmail({ number: doc.number, title: doc.title || row.title, job, totalCents: doc.totalCents, sentOn, to: person }) : null,
     timeline: timelines.get(row.id) ?? [],
   };
 }
@@ -192,6 +199,31 @@ export async function sendChangeOrder(id: number, input: Record<string, unknown>
   // It went out: a lost timeline line must not turn that into an error.
   if (wasRequested) await coEventsAfter([id], "priced", actor, { amountCents: doc.totalCents });
   await coEventsAfter([id], "sent", actor, { documentId: doc.id, emailId: result.body.emailId ?? null, to: input.to ?? [] });
+  return result;
+}
+
+/** Who it last went to, so the follow-up goes to the same people. */
+async function lastSentTo(id: number): Promise<string[]> {
+  const { data, error } = await getSupabaseAdmin().from("change_order_events").select("detail").eq("change_order_id", id).eq("kind", "sent").order("at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(`change_order_events read: ${error.message}`);
+  const to = (data as { detail?: { to?: unknown } } | null)?.detail?.to;
+  return Array.isArray(to) ? to.filter((x): x is string => typeof x === "string") : [];
+}
+
+/**
+ * Follow up on one sent and not signed: the same document's link again, with
+ * the owner's words. Two taps like Send (without "confirm" nothing goes); the
+ * register stays sent and the timeline gets the follow-up.
+ */
+export async function followUpChangeOrder(id: number, input: Record<string, unknown>, actor: string): Promise<DeliverResult> {
+  const row = await readRow(id);
+  if (row.status !== "sent") throw new PriceError(row.status === "requested" || row.status === "priced" ? "It has not been sent yet." : `It is ${row.status}; there is nothing to follow up.`, 409);
+  const doc = row.document_id ? await getDocument(row.document_id) : null;
+  if (!doc || doc.status !== "issued") throw new PriceError("Its document is not out with the client.", 409);
+  const result = await deliver(actor, doc, input);
+  if (input.confirm === true && result.body.sent === true) {
+    await coEventsAfter([id], "sent", actor, { documentId: doc.id, emailId: result.body.emailId ?? null, to: input.to ?? [], followUp: true });
+  }
   return result;
 }
 

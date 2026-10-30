@@ -42,6 +42,7 @@ function registerLine(e: CoEvent, showMoney: boolean): TimelineLine | null {
     case "sent": {
       const to = Array.isArray(d.to) ? (d.to as unknown[]).filter((x): x is string => typeof x === "string") : [];
       if (d.marked) return line(`Marked sent${by(e.actor)}`);
+      if (d.followUp) return line(`Followed up${to.length ? ` with ${to.join(", ")}` : ""}${by(e.actor)}`);
       return line(`Sent${to.length ? ` to ${to.join(", ")}` : ""}${by(e.actor)}`);
     }
     case "signed":

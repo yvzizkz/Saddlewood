@@ -135,9 +135,31 @@ test.describe("Price it", () => {
       await pmCtx.close();
 
       // Every step an owner moves it adds a line, and the client's openings come from the document's proof record.
-      for (const status of ["priced", "sent", "signed"]) {
+      for (const status of ["priced", "sent"]) {
         expect((await page.request.patch("/api/change-orders", { data: { id: co.changeOrderId, status } })).status()).toBe(200);
       }
+
+      // Sent and not signed: its page has the follow-up drafted, checked first, never sent by itself.
+      // (Marked sent here, so its document is put out with the client by hand, as a real send would.)
+      sql(`update documents set status = 'issued', issued_at = now() - interval '6 days', token = 'e2e${Date.now()}' where id = '${co.documentId}'`);
+      await page.goto(`/app/changes/${co.changeOrderId}`, { waitUntil: "networkidle" });
+      const fu = page.getByRole("region", { name: "Follow up" });
+      await expect(fu.getByLabel("Subject")).toHaveValue(`Following up: change order ${co.number}, Shear Wall Revision at Studio / Garage Door (8009 N Ironwood Dr (Jury AFT 123))`);
+      await expect(fu.getByLabel("Message")).toHaveValue(/\$3,100\.50, which we sent on /);
+      await fu.getByRole("button", { name: "Check it" }).click();
+      await expect(fu.getByRole("button", { name: /^Send now to/ })).toBeVisible();
+      await page.screenshot({ path: `${SHOTS}/follow-up.png`, fullPage: true });
+      await fu.getByRole("button", { name: /^Send now to/ }).click();
+      await expect(fu.locator("ul[role=alert]")).toContainText("mail service is not set up");
+      expect(sql(`select count(*) from change_order_events where change_order_id = ${co.changeOrderId} and detail ? 'followUp'`)).toBe("0");
+      // Six days out against a five-day policy: it is on the owners' Tasks as a follow-up, opening this page.
+      await page.goto("/app/tasks?view=all", { waitUntil: "networkidle" });
+      await page.getByPlaceholder("Search").first().fill(co.number);
+      await expect(page.getByRole("link", { name: new RegExp(`Follow up: ${co.number}`) }).first()).toHaveAttribute("href", `/app/changes/${co.changeOrderId}`);
+      await page.goto("/app/policies", { waitUntil: "networkidle" });
+      await expect(page.locator("#co-pace")).toContainText("A follow-up 5 days after it was sent");
+
+      expect((await page.request.patch("/api/change-orders", { data: { id: co.changeOrderId, status: "signed" } })).status()).toBe(200);
       sql(`insert into document_events (document_id, kind, actor, automatic) values ('${co.documentId}', 'viewed', 'client link', false), ('${co.documentId}', 'viewed', 'client link', true)`);
       expect(sql(`select string_agg(kind, ',' order by id) from change_order_events where change_order_id = ${co.changeOrderId}`)).toBe("requested,drafted,priced,sent,signed");
       await page.goto("/app/jobs/8009-n-ironwood-dr?tab=changes", { waitUntil: "networkidle" });

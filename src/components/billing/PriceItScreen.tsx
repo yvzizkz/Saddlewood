@@ -50,7 +50,8 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
   // tap can never send a draft that differs from what is on screen.
   const [preview, setPreview] = useState<{ key: string } | null>(null)
   const [showDoc, setShowDoc] = useState(false)
-  const [busy, setBusy] = useState<'' | 'save' | 'check' | 'send' | 'reject'>('')
+  const [busy, setBusy] = useState<'' | 'save' | 'check' | 'send' | 'reject' | 'follow'>('')
+  const [follow, setFollow] = useState<{ subject: string; body: string; checked: boolean }>({ subject: data.followUp?.subject ?? '', body: data.followUp?.body ?? '', checked: false })
   const [err, setErr] = useState<string[]>([])
   const [sent, setSent] = useState(false)
 
@@ -71,7 +72,6 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
   const liveDoc = { ...data.doc, title: edit.title, snapshot, totalCents: total }
 
   const set = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)))
-  const toggle = (list: string[], email: string) => (list.includes(email) ? list.filter((e) => e !== email) : [...list, email])
 
   async function save(): Promise<boolean> {
     if (badPrice >= 0) {
@@ -106,6 +106,22 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
       if (!(await save())) return
       const r = await post(`/api/change-orders/${data.id}/send`, { ...message(), confirm: true })
       if (!r.ok || r.data.sent !== true) return setErr([String(r.data.error ?? 'It did not go out.'), ...((r.data.blockers as string[]) ?? [])])
+      setSent(true)
+      router.refresh()
+    } finally {
+      setBusy('')
+    }
+  }
+
+  // Follow up: the first tap shows what would go (nothing sent), the second sends it.
+  async function followUp() {
+    setErr([])
+    setBusy('follow')
+    try {
+      const r = await post(`/api/change-orders/${data.id}/follow-up`, { to, cc, subject: follow.subject, body: follow.body, ...(follow.checked ? { confirm: true } : {}) })
+      if (!r.ok || (follow.checked && r.data.sent !== true)) return setErr([String(r.data.error ?? 'It did not go out.')])
+      if (!follow.checked) return setFollow((f) => ({ ...f, checked: true }))
+      setFollow((f) => ({ ...f, checked: false }))
       setSent(true)
       router.refresh()
     } finally {
@@ -148,7 +164,7 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
         {sent ? (
           <Card className="mb-4 p-4">
             <p className="font-medium text-[var(--color-charcoal)]">Sent to {to.join(', ')}.</p>
-            <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">It is on the job&apos;s Changes tab as sent. You&apos;ll see when they open it.</p>
+            <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">{data.followUp ? 'The follow-up is on its timeline.' : 'It is on the job\u2019s Changes tab as sent.'} You&apos;ll see when they open it.</p>
             <Link className="mt-3 inline-block text-sm underline" href={back}>
               Back to the job
             </Link>
@@ -157,6 +173,32 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
 
         {!editable && !sent ? (
           <Card className="mb-4 p-4 text-sm text-[var(--color-charcoal-light)]">This change order is {data.status}; it is shown as the client has it.</Card>
+        ) : null}
+
+        {data.followUp && !sent ? (
+          <section aria-label="Follow up">
+            <Card className="mb-4 space-y-3 p-4">
+              <p className="font-medium text-[var(--color-charcoal)]">Follow up</p>
+              <Recipients contacts={data.contacts} to={to} cc={cc} setTo={setTo} setCc={setCc} onChange={() => setFollow((f) => ({ ...f, checked: false }))} />
+              <Field label="Subject">
+                <input className={INPUT} value={follow.subject} onChange={(e) => setFollow({ ...follow, subject: e.target.value, checked: false })} />
+              </Field>
+              <Field label="Message" hint="The link to the change order goes under it.">
+                <textarea className={`${AREA} min-h-[9rem]`} value={follow.body} onChange={(e) => setFollow({ ...follow, body: e.target.value, checked: false })} />
+              </Field>
+              {err.length ? (
+                <ul className="text-sm text-[#9a2a1f]" role="alert">
+                  {err.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <Button variant="primary" busy={busy === 'follow'} disabled={!!busy || to.length === 0 || !follow.body.trim()} onClick={followUp}>
+                <Send className="size-4" aria-hidden="true" /> {follow.checked ? `Send now to ${person?.name.split(' ')[0] || to[0]}` : 'Check it'}
+              </Button>
+              {follow.checked ? <p className="text-xs text-[var(--color-charcoal-light)]">Checked: nothing has gone yet. Tap again to send.</p> : null}
+            </Card>
+          </section>
         ) : null}
 
         {editable && !sent ? (
@@ -227,36 +269,7 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
                   ))}
                 </ul>
               ) : null}
-              {data.contacts.length ? (
-                <div>
-                  <p className="mb-1 text-xs text-[var(--color-charcoal-light)]">To (tap again for Cc)</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {data.contacts.map((c) => {
-                      const state = to.includes(c.email) ? 'To' : cc.includes(c.email) ? 'Cc' : ''
-                      return (
-                        <button
-                          key={c.email}
-                          type="button"
-                          onClick={() => {
-                            setPreview(null)
-                            if (state === 'To') {
-                              setTo((t) => toggle(t, c.email))
-                              setCc((x) => toggle(x, c.email))
-                            } else if (state === 'Cc') setCc((x) => toggle(x, c.email))
-                            else setTo((t) => toggle(t, c.email))
-                          }}
-                          className={`rounded-full border px-2.5 py-1 text-sm ${state ? 'border-[var(--color-teal)] bg-[rgba(0,95,95,0.08)]' : 'border-[var(--color-stone-mid)]'}`}
-                        >
-                          {state ? `${state}: ` : ''}
-                          {c.name || c.email}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-[#9a2a1f]">No contact on file for this client. Add one on the client before sending.</p>
-              )}
+              <Recipients contacts={data.contacts} to={to} cc={cc} setTo={setTo} setCc={setCc} onChange={() => setPreview(null)} />
 
               {previewing ? (
                 <div className="space-y-2" data-testid="co-email">
@@ -331,6 +344,41 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
       <section aria-label="As the client sees it" className={`${showDoc || !editable || sent ? 'mt-6' : 'hidden'} lg:mt-0 lg:block`}>
         <div className="overflow-hidden rounded-2xl border border-[var(--color-stone)]">{docView}</div>
       </section>
+    </div>
+  )
+}
+
+const toggle = (list: string[], email: string) => (list.includes(email) ? list.filter((e) => e !== email) : [...list, email])
+
+/** The client's contacts as chips: tap for To, again for Cc, again to drop. */
+function Recipients({ contacts, to, cc, setTo, setCc, onChange }: { contacts: PriceIt['contacts']; to: string[]; cc: string[]; setTo: (f: (t: string[]) => string[]) => void; setCc: (f: (c: string[]) => string[]) => void; onChange: () => void }) {
+  if (!contacts.length) return <p className="text-sm text-[#9a2a1f]">No contact on file for this client. Add one on the client before sending.</p>
+  return (
+    <div>
+      <p className="mb-1 text-xs text-[var(--color-charcoal-light)]">To (tap again for Cc)</p>
+      <div className="flex flex-wrap gap-1.5">
+        {contacts.map((c) => {
+          const state = to.includes(c.email) ? 'To' : cc.includes(c.email) ? 'Cc' : ''
+          return (
+            <button
+              key={c.email}
+              type="button"
+              onClick={() => {
+                onChange()
+                if (state === 'To') {
+                  setTo((t) => toggle(t, c.email))
+                  setCc((x) => toggle(x, c.email))
+                } else if (state === 'Cc') setCc((x) => toggle(x, c.email))
+                else setTo((t) => toggle(t, c.email))
+              }}
+              className={`rounded-full border px-2.5 py-1 text-sm ${state ? 'border-[var(--color-teal)] bg-[rgba(0,95,95,0.08)]' : 'border-[var(--color-stone-mid)]'}`}
+            >
+              {state ? `${state}: ` : ''}
+              {c.name || c.email}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
