@@ -4,6 +4,8 @@
 // each step. Owners only, checked by the routes. Server only.
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { coEvent, coEventsAfter, loadTimelines } from "./coEvents";
+import type { TimelineLine } from "./coTimeline";
 import { jobKeyOf, listJobRefs } from "@/lib/jobs/hub";
 import { deliver, type DeliverResult } from "./deliver";
 import { createDraft, ensurePreviewToken, getDocument, totalOf, updateDraft } from "./documents";
@@ -52,6 +54,7 @@ export type PriceIt = {
   contacts: Contact[];
   to: string[];
   email: { subject: string; body: string };
+  timeline: TimelineLine[];
 };
 
 async function readRow(id: number): Promise<Row> {
@@ -63,11 +66,6 @@ async function readRow(id: number): Promise<Row> {
   if (error) throw new Error(`change_orders read: ${error.message}`);
   if (!data) throw new PriceError("No such change order.", 404);
   return data as Row;
-}
-
-async function event(id: number, kind: string, actor: string, detail: Record<string, unknown> = {}): Promise<void> {
-  const { error } = await getSupabaseAdmin().from("change_order_events").insert({ change_order_id: id, kind, actor, detail });
-  if (error) throw new Error(`change_order_events insert: ${error.message}`);
 }
 
 /**
@@ -103,7 +101,7 @@ async function draftFor(row: Row, actor: string): Promise<BillingDocument> {
   });
   const { error: upErr } = await db.from("change_orders").update({ document_id: doc.id, number }).eq("id", row.id).is("document_id", null);
   if (upErr) throw new Error(`change_orders link: ${upErr.message}`);
-  await event(row.id, "drafted", actor, { documentId: doc.id, number });
+  await coEvent(row.id, "drafted", actor, { documentId: doc.id, number });
   return doc;
 }
 
@@ -118,7 +116,7 @@ async function contactsOf(clientId: string | null): Promise<Contact[]> {
 export async function loadPriceIt(id: number, actor: string): Promise<PriceIt> {
   const row = await readRow(id);
   const doc = await draftFor(row, actor);
-  const [exhibits, contacts, refs] = await Promise.all([listExhibits(doc.id), contactsOf(doc.clientId), listJobRefs()]);
+  const [exhibits, contacts, refs, timelines] = await Promise.all([listExhibits(doc.id), contactsOf(doc.clientId), listJobRefs(), loadTimelines([{ id: row.id, documentId: doc.id }])]);
   const jobKey = jobKeyOf({ billingId: row.job_id, crewId: row.crew_job_id }, refs);
   const job = (jobKey ? refs.find((r) => r.key === jobKey)?.name : null) ?? doc.snapshot.job?.name ?? "";
   const to = defaultTo(contacts, row.requested_by);
@@ -137,6 +135,7 @@ export async function loadPriceIt(id: number, actor: string): Promise<PriceIt> {
     contacts,
     to,
     email: coEmail({ number: doc.number, title: doc.title || row.title, job, totalCents: doc.totalCents, to: contacts.find((c) => c.email === to[0]) ?? null }),
+    timeline: timelines.get(row.id) ?? [],
   };
 }
 
@@ -190,8 +189,9 @@ export async function sendChangeOrder(id: number, input: Record<string, unknown>
     console.error("change order sent but register not moved:", id, error.message);
     return { status: 200, body: { ...result.body, warning: "sent, but the register still shows it unsent; mark it sent on the job's Changes tab" } };
   }
-  if (wasRequested) await event(id, "priced", actor, { amountCents: doc.totalCents });
-  await event(id, "sent", actor, { documentId: doc.id, emailId: result.body.emailId ?? null, to: input.to ?? [] });
+  // It went out: a lost timeline line must not turn that into an error.
+  if (wasRequested) await coEventsAfter([id], "priced", actor, { amountCents: doc.totalCents });
+  await coEventsAfter([id], "sent", actor, { documentId: doc.id, emailId: result.body.emailId ?? null, to: input.to ?? [] });
   return result;
 }
 

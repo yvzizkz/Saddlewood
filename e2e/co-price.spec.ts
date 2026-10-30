@@ -110,6 +110,10 @@ test.describe("Price it", () => {
       await page.reload({ waitUntil: "networkidle" });
       await expect(page.getByRole("region", { name: "As the client sees it" })).toBeVisible();
       await page.screenshot({ path: `${SHOTS}/desktop.png`, fullPage: true });
+      // What happened so far: intake's two lines.
+      const happened = page.getByRole("region", { name: "What happened" });
+      await expect(happened).toContainText('Asked for by Chris Turner (AFT) (email "Sheer wall change at garage")');
+      await expect(happened).toContainText(`Draft ${co.number} made`);
 
       // A settled change order with no document (an old one) opens on its job's Changes tab and gets no draft.
       const old = sql(`select id || '|' || (select count(*) from documents where kind = 'change_order') from change_orders where status = 'billed' and document_id is null and job_id is not null order by id limit 1`);
@@ -129,6 +133,23 @@ test.describe("Price it", () => {
       expect([401, 403]).toContain((await pm.request.post(`/api/change-orders/${co.changeOrderId}/price`, { data: { title: "x", lines: [{ description: "x", amountCents: 1 }] } })).status());
       expect([401, 403]).toContain((await pm.request.post(`/api/change-orders/${co.changeOrderId}/send`, { data: { to: [] } })).status());
       await pmCtx.close();
+
+      // Every step an owner moves it adds a line, and the client's openings come from the document's proof record.
+      for (const status of ["priced", "sent", "signed"]) {
+        expect((await page.request.patch("/api/change-orders", { data: { id: co.changeOrderId, status } })).status()).toBe(200);
+      }
+      sql(`insert into document_events (document_id, kind, actor, automatic) values ('${co.documentId}', 'viewed', 'client link', false), ('${co.documentId}', 'viewed', 'client link', true)`);
+      expect(sql(`select string_agg(kind, ',' order by id) from change_order_events where change_order_id = ${co.changeOrderId}`)).toBe("requested,drafted,priced,sent,signed");
+      await page.goto("/app/jobs/8009-n-ironwood-dr?tab=changes", { waitUntil: "networkidle" });
+      const item = page.locator("li").filter({ hasText: co.number }).filter({ has: page.locator("details") }).first();
+      await expect(item.locator("summary")).toHaveText("Opened by the client"); // the latest thing, here the seeded opening
+      await item.locator("summary").click();
+      const timeline = item.getByTestId("co-timeline");
+      await expect(timeline).toContainText("Priced at $3,100.50");
+      await expect(timeline).toContainText("Marked sent");
+      await expect(timeline).toContainText("Marked approved");
+      await expect(timeline.getByText("Opened by the client", { exact: true })).toHaveCount(1);
+      await page.screenshot({ path: `${SHOTS}/changes-timeline.png`, fullPage: true });
     } finally {
       await bot.dispose();
       if (!hadMirror) sql(`delete from bot_state where key = 'outboundAllow'`);
