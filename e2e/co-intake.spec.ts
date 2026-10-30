@@ -104,6 +104,12 @@ test.describe("Change-order intake", () => {
       expect(((await reworded.json()).changeOrders as { key: string; action: string }[]).map((c) => `${c.key}:${c.action}`)).toEqual(["shear-wall:unchanged", "lvl:updated", "tv-niches:unchanged"]);
       expect(JSON.parse(sql(`select snapshot from documents where id = '${made[1].documentId}'`)).note).toContain("includes the upper beam");
 
+      // Only the register's note moved: the draft stays, the row takes the note.
+      const noted = items("Per Chris's markup; includes the upper beam.");
+      noted[0] = { ...noted[0], detail: "Engineer's revision after the owner added the door" } as (typeof noted)[0];
+      expect(((await (await post({ ...request, items: noted })).json()).changeOrders as { action: string }[])[0].action).toBe("updated");
+      expect(sql(`select detail from change_orders where id = ${made[0].changeOrderId}`)).toBe("Engineer's revision after the owner added the door");
+
       // An owner rewords the TV niches draft; the next re-send leaves it as the owner left it.
       const edit = await page.request.patch(`/api/billing/documents/${made[2].documentId}`, { data: { title: "TV Niches (framing only)" } });
       expect(edit.status()).toBe(200);
@@ -121,12 +127,14 @@ test.describe("Change-order intake", () => {
       const after = (await (await post(request)).json()).changeOrders as { action: string; reason?: string }[];
       expect(after[0]).toMatchObject({ action: "kept", reason: "it is priced now" });
     } finally {
-      // Exhibits refuse deletes (document_exhibits_guard); a test row is taken out with the guards off, locally.
+      // Exhibits refuse deletes (document_exhibits_guard); a test row is taken out with the guards off, locally,
+      // which also turns off the cascade, so the CO's events go first by hand.
       const docs = `select document_id from change_orders where source_ref = '${ref}' and document_id is not null`;
       sql(`begin; set local session_replication_role = replica;
            delete from document_exhibits where document_id in (${docs});
            delete from document_events where document_id in (${docs});
            create temp table co_docs on commit drop as ${docs};
+           delete from change_order_events where change_order_id in (select id from change_orders where source_ref = '${ref}');
            delete from change_orders where source_ref = '${ref}';
            delete from documents where id in (select document_id from co_docs);
            commit;`);

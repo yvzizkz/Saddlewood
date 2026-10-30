@@ -33,7 +33,7 @@ export type IntakeOutcome = {
   reason?: string;
 };
 
-type CoRow = { id: number; number: string; status: string; title: string; document_id: string | null; intake_hash: string };
+type CoRow = { id: number; number: string; status: string; title: string; detail: string; document_id: string | null; intake_hash: string };
 
 /** The next change-order number on a billing job: past every register row and change-order document it has. */
 export async function nextChangeOrderNumberFor(jobId: string, prefix: string): Promise<string> {
@@ -51,7 +51,7 @@ async function event(changeOrderId: number, kind: string, actor: string, detail:
 async function findRow(sourceRef: string, key: string): Promise<CoRow | null> {
   const { data, error } = await getSupabaseAdmin()
     .from("change_orders")
-    .select("id,number,status,title,document_id,intake_hash")
+    .select("id,number,status,title,detail,document_id,intake_hash")
     .eq("source_ref", sourceRef)
     .eq("source_key", key)
     .maybeSingle();
@@ -138,7 +138,15 @@ async function refresh(row: CoRow, it: IntakeItem, ctx: DraftContext, actor: str
   if (draftHash(doc.title, doc.snapshot) !== row.intake_hash) return { ...base, action: "kept", reason: "an owner has changed the draft" };
   const snapshot = snapshotFor(it, ctx);
   const hash = draftHash(it.title, snapshot);
-  if (hash === row.intake_hash) return { ...base, action: "unchanged" };
+  if (hash === row.intake_hash) {
+    // The client-facing draft is the same; the register's own note may still have moved.
+    if ((it.detail ?? "") !== row.detail) {
+      const { error } = await getSupabaseAdmin().from("change_orders").update({ detail: it.detail ?? "" }).eq("id", row.id).eq("status", "requested");
+      if (error) throw new Error(`change_orders update: ${error.message}`);
+      return { ...base, action: "updated" };
+    }
+    return { ...base, action: "unchanged" };
+  }
   try {
     await updateDraft(doc.id, { title: it.title, snapshot });
   } catch (err) {
