@@ -92,6 +92,13 @@ test.describe("Price it", () => {
       await expect(page.getByLabel("Subject")).toHaveValue(`Change order ${co.number}: Shear Wall Revision at Studio / Garage Door (8009 N Ironwood Dr (Jury AFT 123))`);
       await expect(page.getByLabel("Message")).toHaveValue(/\$3,000\.50/);
       await page.screenshot({ path: `${SHOTS}/phone-email.png`, fullPage: true });
+      // Changing a price while the email is open closes it: the second tap can't send a draft other than the one on screen.
+      await page.getByLabel("Line 1 price").fill("1900");
+      await expect(page.getByTestId("co-email")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: /^Send now/ })).toHaveCount(0);
+      await send.click();
+      await expect(page.getByLabel("Message")).toHaveValue(/\$3,100\.50/);
+      await expect.poll(() => sql(`select amount_cents from change_orders where id = ${co.changeOrderId}`)).toBe("310050");
       // The second tap: locally there is no mail key, so it cannot leave, and the register does not move.
       await page.getByRole("button", { name: /^Send now/ }).click();
       await expect(page.locator("ul[role=alert]")).toContainText("mail service is not set up");

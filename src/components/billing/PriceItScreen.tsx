@@ -44,7 +44,10 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
   const [cc, setCc] = useState<string[]>([])
   const [subject, setSubject] = useState<string | null>(null)
   const [body, setBody] = useState<string | null>(null)
-  const [preview, setPreview] = useState<{ subject: string; to: string[]; cc: string[] } | null>(null)
+  // The email preview is for the draft as it was saved on the first tap. Any
+  // edit after that (title, a line, a price, the note) closes it, so the second
+  // tap can never send a draft that differs from what is on screen.
+  const [preview, setPreview] = useState<{ key: string } | null>(null)
   const [showDoc, setShowDoc] = useState(false)
   const [busy, setBusy] = useState<'' | 'save' | 'check' | 'send' | 'reject'>('')
   const [err, setErr] = useState<string[]>([])
@@ -57,7 +60,9 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
     note,
     lines: lines.map((l, i) => ({ description: l.description.trim(), note: l.note.trim(), amountCents: prices[i] ?? 0, noCharge: l.noCharge })),
   }
-  const snapshot = useMemo(() => applyPrices(data.doc.snapshot, edit), [data.doc.snapshot, JSON.stringify(edit)]) // eslint-disable-line react-hooks/exhaustive-deps
+  const editKey = JSON.stringify(edit)
+  const previewing = preview !== null && preview.key === editKey
+  const snapshot = useMemo(() => applyPrices(data.doc.snapshot, edit), [data.doc.snapshot, editKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const total = (snapshot.lines ?? []).reduce((s, l) => s + l.amountCents, 0)
   const blockers = [...(badPrice >= 0 ? [`Line ${badPrice + 1}: the price is not a number.`] : []), ...sendBlockers(edit.title, snapshot)]
   const person = data.contacts.find((c) => c.email === to[0]) ?? null
@@ -86,16 +91,18 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
       if (!(await save())) return
       const r = await post(`/api/change-orders/${data.id}/send`, message())
       if (!r.ok) return setErr([String(r.data.error ?? 'Could not prepare it.'), ...((r.data.blockers as string[]) ?? [])])
-      setPreview({ subject: message().subject, to, cc })
+      setPreview({ key: editKey })
     } finally {
       setBusy('')
     }
   }
 
   async function send() {
+    if (!previewing || blockers.length > 0 || to.length === 0) return
     setErr([])
     setBusy('send')
     try {
+      if (!(await save())) return
       const r = await post(`/api/change-orders/${data.id}/send`, { ...message(), confirm: true })
       if (!r.ok || r.data.sent !== true) return setErr([String(r.data.error ?? 'It did not go out.'), ...((r.data.blockers as string[]) ?? [])])
       setSent(true)
@@ -211,22 +218,16 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
               </div>
             ) : null}
 
-            <div className="sticky bottom-16 z-10 mt-5 rounded-2xl border border-[var(--color-stone)] bg-white p-3 shadow-sm lg:bottom-4">
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm text-[var(--color-charcoal-light)]">Total</span>
-                <span className="text-xl font-semibold tabular-nums text-[var(--color-charcoal)]" data-testid="co-total">
-                  {usd(total)}
-                </span>
-              </div>
+            <div className="mt-5 space-y-3">
               {blockers.length ? (
-                <ul className="mt-2 space-y-0.5 text-sm text-[#8f6c18]" data-testid="co-blockers">
+                <ul className="space-y-0.5 text-sm text-[#8f6c18]" data-testid="co-blockers">
                   {blockers.map((b) => (
                     <li key={b}>{b}</li>
                   ))}
                 </ul>
               ) : null}
               {data.contacts.length ? (
-                <div className="mt-3">
+                <div>
                   <p className="mb-1 text-xs text-[var(--color-charcoal-light)]">To (tap again for Cc)</p>
                   <div className="flex flex-wrap gap-1.5">
                     {data.contacts.map((c) => {
@@ -253,11 +254,11 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
                   </div>
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-[#9a2a1f]">No contact on file for this client. Add one on the client before sending.</p>
+                <p className="text-sm text-[#9a2a1f]">No contact on file for this client. Add one on the client before sending.</p>
               )}
 
-              {preview ? (
-                <div className="mt-3 space-y-2" data-testid="co-email">
+              {previewing ? (
+                <div className="space-y-2" data-testid="co-email">
                   <Field label="Subject">
                     <input className={INPUT} value={subject ?? email.subject} onChange={(e) => setSubject(e.target.value)} />
                   </Field>
@@ -268,16 +269,30 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
               ) : null}
 
               {err.length ? (
-                <ul className="mt-2 text-sm text-[#9a2a1f]" role="alert">
+                <ul className="text-sm text-[#9a2a1f]" role="alert">
                   {err.map((e) => (
                     <li key={e}>{e}</li>
                   ))}
                 </ul>
               ) : null}
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {preview ? (
-                  <Button variant="primary" busy={busy === 'send'} disabled={!!busy} onClick={send}>
+              <Button variant="danger" busy={busy === 'reject'} disabled={!!busy} onClick={reject}>
+                Reject
+              </Button>
+            </div>
+
+            {/* Only the total and the main actions stay pinned, so on a phone the
+                bar never covers the lines being priced. */}
+            <div className="sticky bottom-16 z-10 mt-4 rounded-2xl border border-[var(--color-stone)] bg-white p-3 shadow-sm lg:bottom-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-[var(--color-charcoal-light)]">Total</span>
+                <span className="text-xl font-semibold tabular-nums text-[var(--color-charcoal)]" data-testid="co-total">
+                  {usd(total)}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {previewing ? (
+                  <Button variant="primary" busy={busy === 'send'} disabled={!!busy || blockers.length > 0 || to.length === 0} onClick={send}>
                     <Send className="size-4" aria-hidden="true" /> Send now to {person?.name.split(' ')[0] || to[0]}
                   </Button>
                 ) : (
@@ -300,9 +315,6 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
                 </Button>
                 <Button variant="quiet" className="lg:hidden" onClick={() => setShowDoc((v) => !v)}>
                   <Eye className="size-4" aria-hidden="true" /> {showDoc ? 'Hide' : 'As they see it'}
-                </Button>
-                <Button variant="danger" busy={busy === 'reject'} disabled={!!busy} onClick={reject}>
-                  Reject
                 </Button>
               </div>
             </div>
