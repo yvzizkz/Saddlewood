@@ -13,6 +13,7 @@ import { ArrowLeft, Eye, Paperclip, Send } from 'lucide-react'
 
 import { Button, Card, Chip, Field, INPUT, ScreenTitle } from '@/components/bot/ui'
 import { DocumentView } from '@/app/d/DocumentView'
+import CoTimeline from '@/components/billing/CoTimeline'
 import { applyPrices, BLANK, coEmail, parseDollars, sendBlockers, type PriceEdit } from '@/lib/billing/coPrice'
 import type { PriceIt } from '@/lib/billing/coPriceStore'
 import { usd } from '@/lib/money'
@@ -320,6 +321,11 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
             </div>
           </>
         ) : null}
+
+        <section aria-label="What happened" className="mt-6">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">What happened</p>
+          <CoTimeline lines={data.timeline} />
+        </section>
       </div>
 
       <section aria-label="As the client sees it" className={`${showDoc || !editable || sent ? 'mt-6' : 'hidden'} lg:mt-0 lg:block`}>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { coEventsAfter } from "@/lib/billing/coEvents";
 import { nextChangeOrderNumberFor } from "@/lib/billing/coIntakeStore";
 import { nextChangeOrderNumber } from "@/lib/billing/numbering";
 import { CO_STATUS, type CoStatus } from "@/lib/billing/registers";
@@ -45,7 +46,9 @@ export async function POST(request: NextRequest) {
     .select("id")
     .single();
   if (error) throw new Error(`change_orders insert: ${error.message}`);
-  return NextResponse.json({ ok: true, id: (data as { id: number }).id });
+  const id = (data as { id: number }).id;
+  await coEventsAfter([id], "requested", seat.email, { via: source === "request" ? "" : source });
+  return NextResponse.json({ ok: true, id });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -94,5 +97,24 @@ export async function PATCH(request: NextRequest) {
   if (!Object.keys(patch).length) return NextResponse.json({ ok: false, error: "Nothing to change." }, { status: 400 });
   const { error } = await db.from("change_orders").update(patch).eq("id", b.id!);
   if (error) throw new Error(`change_orders update: ${error.message}`);
+
+  // The timeline: the step it moved to, else a new price or note.
+  const to = patch.status as CoStatus | undefined;
+  const amountCents = (patch.amount_cents as number | undefined) ?? cur.amount_cents;
+  if (to && to !== cur.status) {
+    const detail: Record<string, unknown> =
+      to === "requested" ? { reopened: true }
+      : to === "priced" ? { amountCents }
+      : to === "signed" ? { signedOn: patch.signed_on, amountCents, marked: true }
+      : to === "billed" ? { invoiceId: b.billedDocumentId ?? null }
+      : to === "rejected" ? { note: patch.note ?? "" }
+      : to === "sent" ? { marked: true }
+      : {};
+    await coEventsAfter([b.id!], to === "requested" ? "requested" : to, owner.email, detail);
+  } else if (patch.amount_cents !== undefined && patch.amount_cents !== cur.amount_cents) {
+    await coEventsAfter([b.id!], "updated", owner.email, { amountCents });
+  } else if (typeof patch.note === "string" && patch.note) {
+    await coEventsAfter([b.id!], "note", owner.email, { note: patch.note });
+  }
   return NextResponse.json({ ok: true, number: patch.number ?? cur.number });
 }

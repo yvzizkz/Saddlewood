@@ -8,6 +8,7 @@
 import { sendPush } from "@/lib/bot/push";
 import { laneAddresses } from "@/lib/crew/notify";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { coEvent } from "./coEvents";
 import { getJobRef } from "@/lib/jobs/hub";
 import { createDraft, DocumentError, getDocument, updateDraft, usedNumbers } from "./documents";
 import { draftHash, snapshotFor, type DraftContext, type Intake, type IntakeItem } from "./coIntake";
@@ -43,11 +44,6 @@ export async function nextChangeOrderNumberFor(jobId: string, prefix: string): P
   if (error) throw new Error(`change_orders numbers: ${error.message}`);
   const reg = ((data ?? []) as { number: string }[]).map((r) => r.number).filter(Boolean);
   return nextChangeOrderNumber([...reg, ...(await usedNumbers("change_order", jobId))], prefix);
-}
-
-async function event(changeOrderId: number, kind: string, actor: string, detail: Record<string, unknown>): Promise<void> {
-  const { error } = await getSupabaseAdmin().from("change_order_events").insert({ change_order_id: changeOrderId, kind, actor, detail });
-  if (error) throw new Error(`change_order_events insert: ${error.message}`);
 }
 
 async function findRow(sourceRef: string, key: string): Promise<CoRow | null> {
@@ -126,8 +122,8 @@ async function create(job: Job, input: Intake, it: IntakeItem, ctx: DraftContext
     throw new Error(`change_orders insert: ${error.message}`);
   }
   const id = (data as { id: number }).id;
-  await event(id, "requested", input.requestedBy, { sourceRef: input.sourceRef, subject: input.subject ?? "" });
-  await event(id, "drafted", actor, { documentId: doc.id, number: doc.number });
+  await coEvent(id, "requested", input.requestedBy, { sourceRef: input.sourceRef, subject: input.subject ?? "" });
+  await coEvent(id, "drafted", actor, { documentId: doc.id, number: doc.number });
   return { key: it.key, changeOrderId: id, number: doc.number, documentId: doc.id, action: "created" };
 }
 
@@ -161,7 +157,7 @@ async function refresh(row: CoRow, it: IntakeItem, ctx: DraftContext, actor: str
     .eq("id", row.id)
     .eq("status", "requested");
   if (error) throw new Error(`change_orders update: ${error.message}`);
-  await event(row.id, "updated", actor, { documentId: doc.id });
+  await coEvent(row.id, "updated", actor, { documentId: doc.id });
   return { ...base, action: "updated" };
 }
 

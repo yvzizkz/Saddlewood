@@ -75,6 +75,7 @@ beforeEach(() => {
     sov_lines: SOV.map((l) => ({ ...l })),
     clients: [{ id: "c1", billing: {} }],
     change_orders: [],
+    change_order_events: [],
     sov_progress: [],
     documents: [],
   };
@@ -108,6 +109,10 @@ describe("discardDraw", () => {
     expect(db.t.documents).toEqual([]);
     expect(db.t.sov_progress).toEqual([]);
     expect(db.t.change_orders[0]).toMatchObject({ status: "signed", billed_document_id: null });
+    expect(db.t.change_order_events.map((e) => [e.change_order_id, e.kind, (e.detail as Row).why ?? (e.detail as Row).invoice])).toEqual([
+      [7, "billed", made.number],
+      [7, "updated", `draft draw ${made.number} was discarded`],
+    ]);
     expect((await loadProgress(JOB)).openDraft).toBeNull();
   });
 });

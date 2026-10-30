@@ -3,6 +3,7 @@
 // phase gating `phase.verify` (SOP-009), punch items per room/wall location,
 // and directive/ASK intake into `work_items` (docs/COHESIVE-APP-PLAN.md §6.4).
 
+import { coEventsAfter } from "@/lib/billing/coEvents";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeJobName, TRADE_SLUGS, tripKey as computeTripKey, type Trade } from "@/lib/crew/purchases";
 import { dedupeReceipts } from "@/lib/crew/purchaseQueries";
@@ -264,6 +265,7 @@ export async function syncEodDirectivesAndDecisions(
         }
         if (insertedCo && typeof (insertedCo as { id: number }).id === "number") {
           changeOrderId = (insertedCo as { id: number }).id;
+          await coEventsAfter([changeOrderId], "requested", input.createdBy, { via: `directive on the ${input.day} EOD log` });
         }
       } else if (typeof (existingCo as { id: number }).id === "number") {
         changeOrderId = (existingCo as { id: number }).id;
