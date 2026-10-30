@@ -39,6 +39,7 @@ site change that reads them with the server key must be live first.
 | 0056 | `one_client_record` (before the site change; owner-approved 2026-10-23) | T119 PR |
 | 0057 | `agreement_documents` (before the site change; 0056 is held for T119) | T112 PR |
 | 0058 | `jobs_mirror_first_contact` (after 0056; any time, no site change needs it) | 0058 PR |
+| 0059 | `change_order_intake` (before the Mac posts to `/api/change-orders/intake`; nothing else needs it) | CO intake PR |
 
 ## Production state
 
@@ -109,6 +110,11 @@ to another still takes the new record's details. It changes no rows and no
 site code waits on it. Check it with
 `supabase/checks/0058_jobs_mirror_first_contact.sql` (scratch tables, rolls
 back); 0056's check still passes after it.
+0059 adds where a change order came from (`change_orders.source_ref`,
+`source_key`, `intake_hash`, unique on the first two when set) and the CO
+timeline (`change_order_events`). Only `/api/change-orders/intake` uses them,
+so it can go in any time before the Mac's intake is switched on. Check it with
+`select to_regclass('public.change_order_events')` (not null).
 
 ## Rules
 
