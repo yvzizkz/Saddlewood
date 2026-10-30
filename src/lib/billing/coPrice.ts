@@ -81,6 +81,23 @@ export function coEmail(input: { number: string; title: string; job: string; tot
   };
 }
 
+/** A follow-up on one sent and not yet signed: drafted for an owner to read and send, never sent by itself. */
+export function coFollowUpEmail(input: { number: string; title: string; job: string; totalCents: number; sentOn: string | null; to: Contact | null }): { subject: string; body: string } {
+  const first = input.to?.name.trim().split(/\s+/)[0] ?? "";
+  const when = input.sentOn ? ` on ${new Date(`${input.sentOn}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })}` : "";
+  return {
+    subject: `Following up: change order ${input.number}, ${input.title} (${input.job})`,
+    body: [
+      `${first ? `Hi ${first},` : "Hello,"}`,
+      "",
+      `Following up on change order ${input.number} for ${input.title} at ${input.job}, ${usd(input.totalCents)}, which we sent${when}. It is at the link below. Could you approve it, or let us know if you have questions? We would like to keep the work moving.`,
+      "",
+      "Thank you,",
+      "Saddlewood Contracting",
+    ].join("\n"),
+  };
+}
+
 const MAX_CENTS = 10_000_000_000;
 const isObject = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === "object" && !Array.isArray(v);
 const words = (v: unknown, max: number): string | null => (typeof v === "string" && v.trim().length <= max ? v.replace(/\r\n/g, "\n").trim() : null);

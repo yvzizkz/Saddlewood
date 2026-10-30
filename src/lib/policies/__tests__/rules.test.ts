@@ -8,7 +8,7 @@ describe("company policies", () => {
   it("start at the recommendation, one key each, every decision with a recommendation and a reason", () => {
     const keys = POLICY_DEFS.map((p) => p.key);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(DECISIONS).toHaveLength(10);
+    expect(DECISIONS).toHaveLength(11);
     for (const d of DECISIONS) {
       expect(d.policies.length).toBeGreaterThan(0);
       expect(d.recommendation.length).toBeGreaterThan(10);

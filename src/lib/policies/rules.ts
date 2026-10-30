@@ -145,6 +145,20 @@ export const DECISIONS: DecisionDef[] = [
     ],
   },
   {
+    id: "co-pace",
+    title: "How fast a change order moves",
+    question: "How soon is a requested change order priced, and when do we follow up on one the client has not signed?",
+    recommendation: "Priced and sent within 2 days of the ask. A follow-up 5 days after it was sent, drafted for an owner to send.",
+    why: "SOP-002 wants the change priced while the work is still in front of the client; a change built before it is signed is the one that goes unpaid. The follow-up is a draft on the change order's page: an owner reads it and taps Send, it never goes by itself.",
+    sources: "SOP-002 (record and price the change the day it is asked for); the CO intake brief (10/30: aging nudges, never auto-sent).",
+    liveIn: "Tasks and Waiting on you: a change order not priced in time goes to the owners; one sent and not signed becomes a follow-up with the email ready on its page.",
+    laterIn: "",
+    policies: [
+      { key: "policy.co.priceWithinDays", label: "Price and send within", recommended: 2, control: { type: "days", max: 30 } },
+      { key: "policy.co.followUpDays", label: "Follow up when not signed after", recommended: 5, control: { type: "days", max: 60 }, hint: "Counted from the day it was sent." },
+    ],
+  },
+  {
     id: "purchases",
     title: "Purchase approvals",
     question: "Who approves a purchase, and up to what amount?",
