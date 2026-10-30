@@ -217,7 +217,11 @@ export function DocumentView({
                     <td
                       className={`py-4 text-right font-medium tabular-nums ${line.amountCents < 0 ? "text-gold-accessible" : "text-charcoal"}`}
                     >
-                      {usd(line.amountCents)}
+                      {line.noCharge && line.amountCents === 0 ? (
+                        <span className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-medium text-gold-accessible">No charge</span>
+                      ) : (
+                        usd(line.amountCents)
+                      )}
                     </td>
                   </tr>
                   {/* The pieces of a lump line, each with its price, across the full width. */}

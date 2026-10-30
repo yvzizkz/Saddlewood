@@ -50,6 +50,8 @@ export type DocumentLine = {
   quantity?: number;
   unit?: string;
   note?: string;
+  /** A $0 line priced at nothing on purpose: shown as "No charge", and a change order may be sent with it. */
+  noCharge?: boolean;
   /** The pieces that make up this line's amount, each shown with its own price; 0 shows as "No charge". */
   parts?: { description: string; amountCents: number; label?: string }[];
 };
