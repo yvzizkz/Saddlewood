@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { cents, cutoffInDays, expect, hours, test } from "./support/env";
 
 const JOB = "8009-n-ironwood-dr";
+const CO_NUMBER = /(?:\d+-)?CO-?\d+/;
 
 test.describe("Finance: the AFT billing week", () => {
   test("Billing shows AFT's cutoff, what goes with it, and the PM's date before it", async ({ owner: page }) => {
@@ -55,9 +56,10 @@ test.describe("Finance: the AFT billing week", () => {
 
       await row.getByPlaceholder("$ price").fill("1840");
       await row.getByRole("button", { name: "Price it" }).click();
-      await expect(row).toContainText(/CO-\d+/);
+      // A job with a street-number prefix numbers its COs <prefix>-CO<n> (8009-CO7), others CO-<n> (billing/numbering.ts).
+      await expect(row).toContainText(CO_NUMBER);
       await expect(row).toContainText("Priced, not sent");
-      const number = (await row.textContent())?.match(/CO-\d+/)?.[0] ?? "";
+      const number = (await row.textContent())?.match(CO_NUMBER)?.[0] ?? "";
 
       await row.getByRole("button", { name: "Signed" }).click();
       await expect(row).toContainText("Signed, not billed");
