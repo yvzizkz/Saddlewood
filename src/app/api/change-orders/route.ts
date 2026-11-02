@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { coEventsAfter } from "@/lib/billing/coEvents";
 import { nextChangeOrderNumberFor } from "@/lib/billing/coIntakeStore";
+import { queueJoist } from "@/lib/billing/joistSyncStore";
 import { nextChangeOrderNumber } from "@/lib/billing/numbering";
 import { CO_STATUS, type CoStatus } from "@/lib/billing/registers";
 import { requireOwner } from "@/lib/crew/auth";
@@ -111,8 +112,10 @@ export async function PATCH(request: NextRequest) {
       : to === "sent" ? { marked: true }
       : {};
     await coEventsAfter([b.id!], to === "requested" ? "requested" : to, owner.email, detail);
+    if (to === "priced" || to === "signed") await queueJoist(b.id!, to);
   } else if (patch.amount_cents !== undefined && patch.amount_cents !== cur.amount_cents) {
     await coEventsAfter([b.id!], "updated", owner.email, { amountCents });
+    await queueJoist(b.id!, "priced");
   } else if (typeof patch.note === "string" && patch.note) {
     await coEventsAfter([b.id!], "note", owner.email, { note: patch.note });
   }

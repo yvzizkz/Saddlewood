@@ -166,6 +166,7 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
             Asked by {data.requestedBy || 'the client'} on {new Date(`${data.requestedOn}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
           </p>
         </ScreenTitle>
+        <JoistLine id={data.id} joist={data.joist} />
 
         {sent ? (
           <Card className="mb-4 p-4">
@@ -386,5 +387,51 @@ function Recipients({ contacts, to, cc, setTo, setCc, onChange }: { contacts: Pr
         })}
       </div>
     </div>
+  )
+}
+
+/** Its copy in Joist, made by the Mac (docs/JOIST-SYNC.md): never in the way of sending from here. */
+function JoistLine({ id, joist }: { id: number; joist: PriceIt['joist'] }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  if (joist.error && !joist.waiting) {
+    return (
+      <p className="-mt-2 mb-4 flex flex-wrap items-center gap-2 text-sm text-[#8f6c18]" data-testid="co-joist">
+        Joist copy failed: {joist.error}
+        <button
+          type="button"
+          className="underline"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            await fetch(`/api/change-orders/${id}/joist`, { method: 'POST' })
+            setBusy(false)
+            router.refresh()
+          }}
+        >
+          Try again
+        </button>
+      </p>
+    )
+  }
+  if (!joist.id && !joist.waiting) return null
+  return (
+    <p className="-mt-2 mb-4 text-sm text-[var(--color-charcoal-light)]" data-testid="co-joist">
+      {joist.id ? (
+        <>
+          In Joist as estimate{' '}
+          {joist.url ? (
+            <a className="underline" href={joist.url} target="_blank" rel="noreferrer">
+              {joist.id}
+            </a>
+          ) : (
+            joist.id
+          )}
+          {joist.waiting ? '; the latest changes are on their way.' : '.'}
+        </>
+      ) : (
+        'Waiting for the Mac to copy it into Joist.'
+      )}
+    </p>
   )
 }

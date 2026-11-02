@@ -9,6 +9,7 @@ A client asks for a change by email. The system turns that request into a number
 | 3. The owner opens "Price it" from the push, types the prices and presses Send | `/app/changes/<id>` | #71 |
 | 4. A timeline per CO (every register move, plus the client's openings from the document's proof record), then nudges when it ages | `change_order_events` (0059), `lib/billing/coTimeline.ts`; job Changes tab and `/app/changes/<id>` | timeline: #72; nudges (policy `co-pace`, the follow-up drafted on `/app/changes/<id>`, never sent by itself): #73 |
 | 5. The client approves on the CO's own link (click, signature, upload), or the owner confirms an approval that came in by email | `/d/<token>` | next |
+| 6. While Joist is in use, each drafted, priced or signed CO is copied into Joist by the Mac | `joist_jobs` (0060), `docs/JOIST-SYNC.md` | site: #75; Mac worker: KB |
 
 ## Numbers
 

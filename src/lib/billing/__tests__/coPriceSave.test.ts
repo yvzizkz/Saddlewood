@@ -50,6 +50,7 @@ function from(table: string) {
     },
     select: () => b,
     order: () => b,
+    limit: () => b,
     maybeSingle: async () => {
       const r = run();
       return { data: r.data?.[0] ?? null, error: r.error };
