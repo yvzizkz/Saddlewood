@@ -75,3 +75,18 @@ describe("buildTimeline", () => {
     expect(lines.map((l) => l.text)).toEqual(["The client signed it on the link"]);
   });
 });
+
+describe("buildTimeline: approved on the link", () => {
+  it("is one line, the register's, with the client's name", () => {
+    const lines = buildTimeline(
+      [co("signed", "2026-11-02T17:00:01Z", "client link", { via: "link", name: "Chris Turner", signedOn: "2026-11-02", amountCents: 48500 })],
+      [doc("signed", "2026-11-02T17:00:00Z", { detail: { role: "client", name: "Chris Turner" } })],
+    );
+    expect(lines.map((l) => [l.text, l.tone])).toEqual([["Approved by Chris Turner on the link (signed 2026-11-02)", "good"]]);
+  });
+
+  it("keeps the document's line when the register was marked by hand", () => {
+    const lines = buildTimeline([co("signed", "2026-11-02T17:00:01Z", "marco@x.com", { marked: true, signedOn: "2026-11-02" })], [doc("signed", "2026-11-02T17:00:00Z", { detail: { role: "client" } })]);
+    expect(lines.map((l) => l.text)).toEqual(["The client signed it on the link", "Marked approved (signed 2026-11-02) by marco@x.com"]);
+  });
+});

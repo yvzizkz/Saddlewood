@@ -73,7 +73,7 @@ export function coEmail(input: { number: string; title: string; job: string; tot
     body: [
       `${first ? `Hi ${first},` : "Hello,"}`,
       "",
-      `Here is change order ${input.number} for ${input.title} at ${input.job}, ${usd(input.totalCents)}. The details and drawings are at the link below. Please reply to approve it, or with any questions.`,
+      `Here is change order ${input.number} for ${input.title} at ${input.job}, ${usd(input.totalCents)}. The details and drawings are at the link below, where you can approve and sign it. Reply with any questions.`,
       "",
       "Thank you,",
       "Saddlewood Contracting",
@@ -90,7 +90,7 @@ export function coFollowUpEmail(input: { number: string; title: string; job: str
     body: [
       `${first ? `Hi ${first},` : "Hello,"}`,
       "",
-      `Following up on change order ${input.number} for ${input.title} at ${input.job}, ${usd(input.totalCents)}, which we sent${when}. It is at the link below. Could you approve it, or let us know if you have questions? We would like to keep the work moving.`,
+      `Following up on change order ${input.number} for ${input.title} at ${input.job}, ${usd(input.totalCents)}, which we sent${when}. It is at the link below, where you can approve and sign it. Could you take a look, or let us know if you have questions? We would like to keep the work moving.`,
       "",
       "Thank you,",
       "Saddlewood Contracting",

@@ -46,6 +46,7 @@ function registerLine(e: CoEvent, showMoney: boolean): TimelineLine | null {
       return line(`Sent${to.length ? ` to ${to.join(", ")}` : ""}${by(e.actor)}`);
     }
     case "signed":
+      if (d.via === "link") return line(`Approved by ${str(d.name) ?? "the client"} on the link${str(d.signedOn) ? ` (signed ${str(d.signedOn)})` : ""}`, "good");
       return line(`${d.marked ? "Marked approved" : "Approved"}${str(d.signedOn) ? ` (signed ${str(d.signedOn)})` : ""}${by(e.actor)}`, "good");
     case "rejected":
       return line(`Rejected${by(e.actor)}${str(d.note) ? `: ${str(d.note)}` : ""}`, "warn");
@@ -95,7 +96,10 @@ const phoenixDay = (at: string) => new Date(at).toLocaleDateString("en-CA", { ti
 /** `money: false` (a seat without money.view) leaves the amounts out. */
 export function buildTimeline(register: CoEvent[], documentEvents: DocumentEvent[] = [], opts: { money?: boolean; dayOf?: (at: string) => string } = {}): TimelineLine[] {
   const showMoney = opts.money ?? true;
-  const lines = [...register.map((e) => registerLine(e, showMoney)).filter((l): l is TimelineLine => l !== null), ...documentLines(documentEvents, opts.dayOf ?? phoenixDay)];
+  // An approval on the link is one line (the register's, with the name), not two.
+  const onLink = register.some((e) => e.kind === "signed" && e.detail.via === "link");
+  const docLines = documentLines(documentEvents, opts.dayOf ?? phoenixDay).filter((l) => !(onLink && l.kind === "signed"));
+  const lines = [...register.map((e) => registerLine(e, showMoney)).filter((l): l is TimelineLine => l !== null), ...docLines];
   return lines.sort((a, b) => a.at.localeCompare(b.at));
 }
 

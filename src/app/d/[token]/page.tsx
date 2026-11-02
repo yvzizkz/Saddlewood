@@ -9,6 +9,9 @@ import { ProposalView } from "@/components/sales/ProposalView";
 import { AgreementSignView } from "@/components/agreements/AgreementSignView";
 import { AGREEMENT_CONSENT, clientSignature } from "@/lib/agreements/store";
 import { loadSettings } from "@/lib/sales/settingsStore";
+import { approvalBlock, CO_CONSENT, coClientSignature, coForDocument } from "@/lib/billing/coApprove";
+import { CoApprovePanel, type CoApproved } from "@/components/billing/CoApprovePanel";
+import type { SignatureFont } from "@/lib/sales/settings";
 import { DocumentView } from "../DocumentView";
 
 // The client's copy of a document we issued: /d/<token>.
@@ -144,12 +147,43 @@ export default async function DocumentPage({
   const saveHref = (e: Exhibit) =>
     `/d/${doc.token}/x/${e.id}?dl=1${ownCopy ? "&copy=1" : ""}`;
 
+  // A change order (T256): the client approves it under the document, once.
+  // Our own copy shows the approval when there is one, never the form.
+  let approval: { blocked: string | null; approved: CoApproved | null; fonts: SignatureFont[] } | null = null;
+  if (doc.kind === "change_order") {
+    try {
+      const [co, sig, fonts] = await Promise.all([
+        coForDocument(doc.id),
+        coClientSignature(doc.id),
+        loadSettings()
+          .then((x) => x.signing.fonts)
+          .catch(() => []),
+      ]);
+      const approved = sig ? { name: sig.name, image: sig.image, at: sig.at, snapshotSha256: sig.snapshotSha256 } : null;
+      if (approved || !ownCopy) approval = { blocked: approvalBlock(doc, co), approved, fonts };
+    } catch (err) {
+      console.error("change-order approval not loaded:", err);
+    }
+  }
+  const footer = approval ? (
+    <CoApprovePanel
+      token={doc.token ?? ""}
+      number={doc.number}
+      totalCents={doc.totalCents}
+      consent={CO_CONSENT}
+      fonts={approval.fonts}
+      blocked={approval.blocked}
+      approved={approval.approved}
+    />
+  ) : null;
+
   return (
     <DocumentView
       doc={doc}
       exhibits={exhibits}
       href={href}
       saveHref={saveHref}
+      footer={footer}
     />
   );
 }
