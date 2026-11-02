@@ -13,10 +13,14 @@ export async function coEvent(id: number, kind: CoEventKind, actor: string, deta
 /** The same, for several change orders, after the move already happened: a lost line must not undo it. */
 export async function coEventsAfter(ids: number[], kind: CoEventKind, actor: string, detail: Record<string, unknown> = {}): Promise<void> {
   if (!ids.length) return;
-  const { error } = await getSupabaseAdmin()
-    .from("change_order_events")
-    .insert(ids.map((id) => ({ change_order_id: id, kind, actor, detail })));
-  if (error) console.error(`change_order_events insert (${kind}):`, error.message);
+  try {
+    const { error } = await getSupabaseAdmin()
+      .from("change_order_events")
+      .insert(ids.map((id) => ({ change_order_id: id, kind, actor, detail })));
+    if (error) console.error(`change_order_events insert (${kind}):`, error.message);
+  } catch (err) {
+    console.error(`change_order_events insert (${kind}):`, err);
+  }
 }
 
 /** Each change order's timeline: its own lines plus its document's proof record. */

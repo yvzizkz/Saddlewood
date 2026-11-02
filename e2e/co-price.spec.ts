@@ -142,6 +142,7 @@ test.describe("Price it", () => {
       // Sent and not signed: its page has the follow-up drafted, checked first, never sent by itself.
       // (Marked sent here, so its document is put out with the client by hand, as a real send would.)
       sql(`update documents set status = 'issued', issued_at = now() - interval '6 days', token = 'e2e${Date.now()}' where id = '${co.documentId}'`);
+      await page.setViewportSize({ width: 390, height: 844 });
       await page.goto(`/app/changes/${co.changeOrderId}`, { waitUntil: "networkidle" });
       const fu = page.getByRole("region", { name: "Follow up" });
       await expect(fu.getByLabel("Subject")).toHaveValue(`Following up: change order ${co.number}, Shear Wall Revision at Studio / Garage Door (8009 N Ironwood Dr (Jury AFT 123))`);
@@ -153,6 +154,7 @@ test.describe("Price it", () => {
       await expect(fu.locator("ul[role=alert]")).toContainText("mail service is not set up");
       expect(sql(`select count(*) from change_order_events where change_order_id = ${co.changeOrderId} and detail ? 'followUp'`)).toBe("0");
       // Six days out against a five-day policy: it is on the owners' Tasks as a follow-up, opening this page.
+      await page.setViewportSize({ width: 1280, height: 900 });
       await page.goto("/app/tasks?view=all", { waitUntil: "networkidle" });
       await page.getByPlaceholder("Search").first().fill(co.number);
       await expect(page.getByRole("link", { name: new RegExp(`Follow up: ${co.number}`) }).first()).toHaveAttribute("href", `/app/changes/${co.changeOrderId}`);
