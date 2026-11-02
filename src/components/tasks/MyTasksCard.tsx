@@ -11,13 +11,15 @@ import { ChevronRight } from 'lucide-react'
 
 import { Card, Chip, SectionTitle } from '@/components/bot/ui'
 import { formatValue } from '@/lib/analytics/format'
+import type { CrewLang } from '@/lib/crew/types'
 import type { MineSummary } from '@/lib/tasks/mine'
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
-export default function MyTasksCard() {
+export default function MyTasksCard({ lang = 'en' }: { lang?: CrewLang }) {
+  const es = lang === 'es'
   const [mine, setMine] = useState<MineSummary | null>(null)
 
   useEffect(() => {
@@ -40,18 +42,18 @@ export default function MyTasksCard() {
         count={mine.count}
         action={
           <Link href="/app/tasks" className="text-[13px] text-[var(--color-teal)] underline">
-            See all
+            {es ? 'Ver todas' : 'See all'}
           </Link>
         }
       >
-        Your tasks
+        {es ? 'Tus tareas' : 'Your tasks'}
       </SectionTitle>
       <Card className="divide-y divide-[var(--color-stone)] overflow-hidden">
         {mine.overdue || mine.dueToday || mine.movedUp ? (
           <div className="flex flex-wrap gap-1.5 px-4 py-3">
-            {mine.overdue ? <Chip tone="bad">{mine.overdue} overdue</Chip> : null}
-            {mine.dueToday ? <Chip tone="warn">{mine.dueToday} due today</Chip> : null}
-            {mine.movedUp ? <Chip tone="warn">{mine.movedUp} moved up to you</Chip> : null}
+            {mine.overdue ? <Chip tone="bad">{es ? plural(mine.overdue, 'atrasada', 'atrasadas') : `${mine.overdue} overdue`}</Chip> : null}
+            {mine.dueToday ? <Chip tone="warn">{es ? `${mine.dueToday} para hoy` : `${mine.dueToday} due today`}</Chip> : null}
+            {mine.movedUp ? <Chip tone="warn">{es ? `${mine.movedUp} ${mine.movedUp === 1 ? 'subida a ti' : 'subidas a ti'}` : `${mine.movedUp} moved up to you`}</Chip> : null}
           </div>
         ) : null}
         {mine.top.map((i) => (
@@ -61,8 +63,14 @@ export default function MyTasksCard() {
               <span className="mt-0.5 block text-[13px] leading-snug text-[var(--color-charcoal-light)]">
                 {[
                   i.job,
-                  i.overdueDays ? `${plural(i.overdueDays, 'day', 'days')} late` : i.dueOn ? `due ${formatValue('date', i.dueOn)}` : '',
-                  i.escalated ? 'moved up to you' : '',
+                  i.overdueDays
+                    ? es
+                      ? `${plural(i.overdueDays, 'día', 'días')} tarde`
+                      : `${plural(i.overdueDays, 'day', 'days')} late`
+                    : i.dueOn
+                      ? `${es ? 'vence' : 'due'} ${formatValue('date', i.dueOn)}`
+                      : '',
+                  i.escalated ? (es ? 'subida a ti' : 'moved up to you') : '',
                 ]
                   .filter(Boolean)
                   .join(' · ')}

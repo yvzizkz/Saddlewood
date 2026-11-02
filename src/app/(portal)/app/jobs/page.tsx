@@ -9,6 +9,7 @@ import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import { CATEGORY_LABEL, loadJobCost, type CostLine } from "@/lib/accounting/jobCost";
 import { loadOpenReceivables } from "@/lib/accounting/receivables";
 import { localDay } from "@/lib/crew/time";
+import type { CrewLang } from "@/lib/crew/types";
 import { seesJob, workSeat } from "@/lib/jobs/access";
 import { jobHref, listJobRefs, type JobRef } from "@/lib/jobs/hub";
 
@@ -28,7 +29,7 @@ type SP = Record<string, string | string[] | undefined>;
 export default async function JobsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const seat = await workSeat();
   if (!seat) redirect("/app");
-  if (!seat.money) return <FieldLeadJobs refs={(await listJobRefs()).filter((r) => seesJob(seat, r))} />;
+  if (!seat.money) return <FieldLeadJobs refs={(await listJobRefs()).filter((r) => seesJob(seat, r))} lang={seat.lang} />;
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
   const period = resolvePeriod({ p: one("p"), from: one("from"), to: one("to") }, undefined, "mtd");
@@ -146,25 +147,46 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 }
 
 /** A field lead's jobs: where they are and who runs them, nothing about money. */
-function FieldLeadJobs({ refs }: { refs: JobRef[] }) {
-  const rows: TableRow[] = refs.map((r) => ({ id: r.key, job: r.name, href: jobHref(r.key), status: r.active ? "Active" : "Closed", address: r.address || "—", client: r.client || "—", pm: r.pm.join(", ") || "—" }));
+function FieldLeadJobs({ refs, lang = "en" }: { refs: JobRef[]; lang?: CrewLang }) {
+  const es = lang === "es";
+  const rows: TableRow[] = refs.map((r) => ({
+    id: r.key,
+    job: r.name,
+    href: jobHref(r.key),
+    status: r.active ? (es ? "Activa" : "Active") : es ? "Cerrada" : "Closed",
+    address: r.address || "—",
+    client: r.client || "—",
+    pm: r.pm.join(", ") || "—",
+  }));
   const columns: Column[] = [
-    { key: "job", header: "Job", kind: "text", hrefKey: "href", phone: "title" },
-    { key: "status", header: "Status", kind: "text", filter: true, phone: "value" },
-    { key: "address", header: "Address", kind: "text", phone: "hide" },
-    { key: "client", header: "Client", kind: "text", filter: true, phone: "hide" },
+    { key: "job", header: es ? "Obra" : "Job", kind: "text", hrefKey: "href", phone: "title" },
+    { key: "status", header: es ? "Estado" : "Status", kind: "text", filter: true, phone: "value" },
+    { key: "address", header: es ? "Dirección" : "Address", kind: "text", phone: "hide" },
+    { key: "client", header: es ? "Cliente" : "Client", kind: "text", filter: true, phone: "hide" },
     { key: "pm", header: "PM", kind: "text", filter: true },
   ];
   return (
     <div className="px-4 pb-10 pt-4 md:px-8 md:pt-6">
       <header className="mb-4">
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-gold-accessible)]">Work</p>
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-gold-accessible)]">{es ? "Trabajo" : "Work"}</p>
         <h1 className="text-[var(--color-charcoal)]" style={{ fontFamily: "var(--font-fraunces)" }}>
-          My jobs
+          {es ? "Mis obras" : "My jobs"}
         </h1>
-        <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">The jobs you are on: schedule, log and QA, punch, changes, tasks and crew.</p>
+        <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">
+          {es
+            ? "Las obras en las que estás: calendario, bitácora y calidad, detalles pendientes, cambios, tareas y cuadrilla."
+            : "The jobs you are on: schedule, log and QA, punch, changes, tasks and crew."}
+        </p>
       </header>
-      <DataTable rows={rows} columns={columns} searchKeys={["job", "address", "client", "pm"]} name="jobs-field" rowHrefKey="href" initialSort={{ key: "status", dir: "asc" }} empty="You are not on any job yet. The PM adds you on the job's crew." />
+      <DataTable
+        rows={rows}
+        columns={columns}
+        searchKeys={["job", "address", "client", "pm"]}
+        name="jobs-field"
+        rowHrefKey="href"
+        initialSort={{ key: "status", dir: "asc" }}
+        empty={es ? "Aún no estás en ninguna obra. El gerente de obra te agrega en la cuadrilla." : "You are not on any job yet. The PM adds you on the job's crew."}
+      />
     </div>
   );
 }

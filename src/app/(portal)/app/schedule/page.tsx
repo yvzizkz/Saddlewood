@@ -48,6 +48,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const seat = await workSeat();
   if (!seat) redirect("/app");
   const owner = seat.owner;
+  const es = seat.lang === "es";
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
 
@@ -129,13 +130,13 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
     status: e.status === "overdue" ? "Overdue" : e.status === "done" ? "Done" : "Scheduled",
   }));
   const columns: Column[] = [
-    { key: "day", header: "Date", kind: "date" },
-    { key: "time", header: "Time", kind: "text", phone: "hide" },
-    { key: "title", header: "Event", kind: "text", hrefKey: "href", subKey: "detail", phone: "title" },
-    { key: "kind", header: "Kind", kind: "text", filter: true },
-    { key: "job", header: "Job", kind: "text", filter: true, hrefKey: "jobHref" },
-    { key: "who", header: "Who", kind: "text", filter: true, phone: "hide" },
-    { key: "status", header: "Status", kind: "text", filter: true, phone: "value" },
+    { key: "day", header: es ? "Fecha" : "Date", kind: "date" },
+    { key: "time", header: es ? "Hora" : "Time", kind: "text", phone: "hide" },
+    { key: "title", header: es ? "Evento" : "Event", kind: "text", hrefKey: "href", subKey: "detail", phone: "title" },
+    { key: "kind", header: es ? "Tipo" : "Kind", kind: "text", filter: true },
+    { key: "job", header: es ? "Obra" : "Job", kind: "text", filter: true, hrefKey: "jobHref" },
+    { key: "who", header: es ? "Quién" : "Who", kind: "text", filter: true, phone: "hide" },
+    { key: "status", header: es ? "Estado" : "Status", kind: "text", filter: true, phone: "value" },
   ];
 
   const prevAnchor =
@@ -159,24 +160,26 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
     <div className="px-4 pb-10 pt-4 md:px-8 md:pt-6">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-gold-accessible)]">Work</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-gold-accessible)]">{es ? "Trabajo" : "Work"}</p>
           <h1 className="text-[var(--color-charcoal)]" style={{ fontFamily: "var(--font-fraunces)" }}>
-            Schedule
+            {es ? "Calendario" : "Schedule"}
           </h1>
           <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">
             {owner
               ? "One schedule over crew dispatch, job phases, inspections, deliveries, sub mobilizations, client billing cutoffs and compliance dates."
-              : "Your jobs: crew dispatch, phases, inspections, deliveries, sub mobilizations and your clients' billing cutoffs."}
+              : es
+                ? "Tus obras: cuadrilla, etapas, inspecciones, entregas y subcontratistas."
+                : "Your jobs: crew dispatch, phases, inspections, deliveries, sub mobilizations and your clients' billing cutoffs."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-1 text-[13px] font-medium" role="group" aria-label="Schedule view">
             {(
               [
-                ["day", "My day"],
-                ["week", "Week board"],
-                ["month", "Month"],
-                ["lookahead", "GC look-ahead"],
+                ["day", es ? "Mi día" : "My day"],
+                ["week", es ? "Semana" : "Week board"],
+                ["month", es ? "Mes" : "Month"],
+                ["lookahead", es ? "Próximas 2 sem." : "GC look-ahead"],
               ] as const
             ).map(([k, label]) => (
               <Link
@@ -191,13 +194,13 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
           </div>
           <div className="flex items-center gap-1 rounded-xl border border-[var(--color-stone)] bg-white p-1 text-xs">
             <Link href={hrefOf(PATH, { view, day: prevAnchor })} className="rounded-lg px-2.5 py-1 text-[var(--color-charcoal)] hover:bg-[var(--color-cream)]">
-              ← Prev
+              {es ? "← Ant." : "← Prev"}
             </Link>
             <Link href={hrefOf(PATH, { view })} className="rounded-lg px-2.5 py-1 font-medium text-[var(--color-charcoal)] hover:bg-[var(--color-cream)]">
-              Today
+              {es ? "Hoy" : "Today"}
             </Link>
             <Link href={hrefOf(PATH, { view, day: nextAnchor })} className="rounded-lg px-2.5 py-1 text-[var(--color-charcoal)] hover:bg-[var(--color-cream)]">
-              Next →
+              {es ? "Sig. →" : "Next →"}
             </Link>
           </div>
         </div>
@@ -216,7 +219,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
           <span />
         )}
         <span className="text-xs text-[var(--color-charcoal-light)]">
-          Showing {formatValue("date", rangeFrom)} – {formatValue("date", rangeTo)}
+          {es ? "Mostrando" : "Showing"} {formatValue("date", rangeFrom)} – {formatValue("date", rangeTo)}
           {owner ? (
             <>
               {" · "}
@@ -236,18 +239,18 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
 
       <div className="space-y-5">
         <KpiHeader
-          label={view === "day" ? `Events on ${dayShort(anchor)}` : "Scheduled events"}
+          label={view === "day" ? (es ? `Eventos el ${dayShort(anchor)}` : `Events on ${dayShort(anchor)}`) : es ? "Eventos programados" : "Scheduled events"}
           value={d.rows.length}
           kind="count"
           change={null}
           stats={[
-            { label: "Crew dispatches", value: crewCount, kind: "count" },
-            { label: "Inspections & walks", value: inspectionsCount, kind: "count" },
-            { label: "Cutoffs & pay runs", value: cutoffsCount, kind: "count" },
-            { label: "Overdue items", value: overdueCount, kind: "count" },
+            { label: es ? "Cuadrilla" : "Crew dispatches", value: crewCount, kind: "count" },
+            { label: es ? "Inspecciones y visitas" : "Inspections & walks", value: inspectionsCount, kind: "count" },
+            { label: es ? "Cortes y pagos" : "Cutoffs & pay runs", value: cutoffsCount, kind: "count" },
+            { label: es ? "Atrasados" : "Overdue items", value: overdueCount, kind: "count" },
           ]}
           trend={d.trend}
-          trendLabel="Events by day"
+          trendLabel={es ? "Eventos por día" : "Events by day"}
           breakdown={d.breakdown}
           byOptions={d.byOptions}
         />

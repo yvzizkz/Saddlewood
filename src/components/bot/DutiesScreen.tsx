@@ -325,7 +325,7 @@ function AddDutySheet({ open, onClose }: { open: boolean; onClose: () => void })
   )
 }
 
-function DutyCard({ duty }: { duty: BotDuty }) {
+function DutyCard({ duty, owner }: { duty: BotDuty; owner: boolean }) {
   const { home, act, busy } = useBot()
   const [armed, setArmed] = useState(false)
   const key = `duty:${duty.id}`
@@ -359,35 +359,37 @@ function DutyCard({ duty }: { duty: BotDuty }) {
           <span>Has not run yet</span>
         )}
       </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button busy={working} disabled={!online} onClick={() => act({ kind: 'duty.run', payload: { id: duty.id } }, key)}>
-          <Zap className="size-4" aria-hidden="true" /> Run now
-        </Button>
-        <Button
-          disabled={working || !online}
-          onClick={() => act({ kind: active ? 'duty.pause' : 'duty.resume', payload: { id: duty.id } }, key)}
-        >
-          {active ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
-          {active ? 'Pause' : 'Resume'}
-        </Button>
-        {armed ? (
-          <Button variant="danger" busy={working} onClick={() => act({ kind: 'duty.delete', payload: { id: duty.id } }, key)}>
-            Yes, remove it
+      {owner ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button busy={working} disabled={!online} onClick={() => act({ kind: 'duty.run', payload: { id: duty.id } }, key)}>
+            <Zap className="size-4" aria-hidden="true" /> Run now
           </Button>
-        ) : (
           <Button
-            variant="quiet"
-            aria-label={`Remove ${duty.title}`}
             disabled={working || !online}
-            onClick={() => {
-              setArmed(true)
-              window.setTimeout(() => setArmed(false), 7000)
-            }}
+            onClick={() => act({ kind: active ? 'duty.pause' : 'duty.resume', payload: { id: duty.id } }, key)}
           >
-            <Trash2 className="size-4" aria-hidden="true" />
+            {active ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
+            {active ? 'Pause' : 'Resume'}
           </Button>
-        )}
-      </div>
+          {armed ? (
+            <Button variant="danger" busy={working} onClick={() => act({ kind: 'duty.delete', payload: { id: duty.id } }, key)}>
+              Yes, remove it
+            </Button>
+          ) : (
+            <Button
+              variant="quiet"
+              aria-label={`Remove ${duty.title}`}
+              disabled={working || !online}
+              onClick={() => {
+                setArmed(true)
+                window.setTimeout(() => setArmed(false), 7000)
+              }}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </Button>
+          )}
+        </div>
+      ) : null}
     </Card>
   )
 }
@@ -464,7 +466,7 @@ export default function DutiesScreen() {
           ) : null}
           <div className="mt-3 flex flex-col gap-3">
             {duties.length ? (
-              duties.map((d) => <DutyCard key={d.id} duty={d} />)
+              duties.map((d) => <DutyCard key={d.id} duty={d} owner={owner} />)
             ) : (
               <Empty>
                 Nothing on a schedule yet. A recurring duty is an instruction the bot carries out on its own, like

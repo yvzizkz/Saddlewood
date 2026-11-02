@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { CalendarDays, Clock, Home, Menu, TrendingUp, Users, type LucideIcon } from 'lucide-react'
+import { Briefcase, CalendarDays, Clock, Home, Landmark, ListTodo, Menu, TrendingUp, Users, type LucideIcon } from 'lucide-react'
 
 import { OnboardingFlow, resolveOnboardingRole } from '@/components/auth/OnboardingFlow'
 import { Dot } from '@/components/bot/ui'
@@ -16,6 +16,8 @@ import type { CrewStrings } from './strings'
 // The frame a crew member's screens sit in: a slim header that says whether
 // they are on the clock, and four thumb tabs. A seat whose group has the Crew
 // tab switched on (the supervisor) gets a fifth: what that group may do.
+
+const WIDE = ['/app/accounting', '/app/jobs', '/app/tasks', '/app/schedule']
 
 type Tab = { href: string; label: (t: CrewStrings) => string; icon: LucideIcon }
 
@@ -101,6 +103,45 @@ function TabBar() {
   )
 }
 
+function WorkNav() {
+  const pathname = usePathname()
+  const { home, lang } = useCrew()
+  const perms = home?.me.perms ?? []
+  const money = perms.includes('money.view')
+  const workSeat = money || !!home?.me.fieldLead
+  if (!workSeat) return null
+  const es = lang === 'es'
+  const links: { href: string; label: string; icon: LucideIcon }[] = [
+    { href: '/app/jobs', label: es ? 'Mis obras' : 'Jobs', icon: Briefcase },
+    { href: '/app/tasks', label: es ? 'Tareas' : 'Tasks', icon: ListTodo },
+    { href: '/app/schedule', label: es ? 'Calendario' : 'Schedule', icon: CalendarDays },
+    ...(money ? [{ href: '/app/accounting', label: es ? 'Contabilidad' : 'Accounting', icon: Landmark }] : []),
+  ]
+  return (
+    <nav aria-label="Work" className="border-b border-[var(--color-stone)] bg-white/80">
+      <div className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-4 py-1.5">
+        {links.map((l) => {
+          const Icon = l.icon
+          const active = pathname === l.href || pathname.startsWith(l.href + '/')
+          return (
+            <Link
+              key={l.href}
+              href={l.href}
+              aria-current={active ? 'page' : undefined}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${
+                active ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--color-charcoal)] hover:bg-[var(--color-cream)]'
+              }`}
+            >
+              <Icon className="size-3.5" aria-hidden="true" />
+              <span>{l.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
 function CrewOnboarding() {
   const { home, lang, setLang } = useCrew()
   if (!home?.me.email) return null
@@ -110,6 +151,9 @@ function CrewOnboarding() {
 
 export default function CrewShell({ children, lang, email }: { children: ReactNode; lang: CrewLang; email: string }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const wide = WIDE.some((w) => pathname === w || pathname.startsWith(w + '/'))
+  const col = wide ? 'max-w-7xl' : 'max-w-xl'
 
   // The service worker only exists for notifications (public/app-sw.js).
   useEffect(() => {
@@ -130,7 +174,7 @@ export default function CrewShell({ children, lang, email }: { children: ReactNo
       <div className="bot-app ph-no-capture min-h-dvh">
         <CrewOnboarding />
         <header className="sticky top-0 z-30 border-b border-[var(--color-stone)] bg-[var(--color-background)]/95 pt-[env(safe-area-inset-top,0px)] backdrop-blur">
-          <div className="mx-auto flex h-[52px] max-w-xl items-center justify-between gap-3 px-4">
+          <div className={`mx-auto flex h-[52px] ${col} items-center justify-between gap-3 px-4`}>
             <Link href="/app" className="flex shrink-0 items-center gap-2.5">
               <Image src="/images/logo-roundel.png" alt="" width={30} height={30} className="rounded-full" />
               <span className="text-lg text-[var(--color-charcoal)]" style={{ fontFamily: 'var(--font-fraunces)' }}>
@@ -139,8 +183,9 @@ export default function CrewShell({ children, lang, email }: { children: ReactNo
             </Link>
             <ClockPill />
           </div>
+          <WorkNav />
         </header>
-        <main className="mx-auto max-w-xl pb-[calc(56px+env(safe-area-inset-bottom,0px))]">{children}</main>
+        <main className={`mx-auto ${col} pb-[calc(56px+env(safe-area-inset-bottom,0px))]`}>{children}</main>
         <TabBar />
       </div>
     </CrewProvider>

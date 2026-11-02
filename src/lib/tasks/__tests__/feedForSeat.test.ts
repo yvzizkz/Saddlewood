@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { canCloseHere, feedForSeat, forFieldLead, withoutMoney, type FeedItem } from "../feed";
+import { canApproveBillHere, canCloseHere, feedForSeat, forFieldLead, withoutMoney, type FeedItem } from "../feed";
 
-// A project manager's Tasks: their jobs, their own no-job work, and never the
-// owners' waiting list, the ops board or sub bills.
+// A project manager's Tasks: their jobs (including bill approvals on their
+// jobs, SOP-004), their own no-job work, and never the owners' waiting list,
+// the ops board or finance compliance holds.
 
 const item = (id: string, over: Partial<FeedItem>): FeedItem => ({
   id,
@@ -33,7 +34,8 @@ const feed = [
   item("pc1", { source: "billing", kind: "billing", role: "pm", nowRole: "decisions", escalated: true }),
   item("q1", { source: "waiting", role: "decisions", nowRole: "decisions" }),
   item("o1", { source: "ops", role: "pm" }),
-  item("b1", { source: "bill", kind: "approval", jobKey: "8009-n-ironwood-dr", editable: false }),
+  item("b1", { source: "bill", kind: "approval", jobKey: "8009-n-ironwood-dr", href: "/app/accounting/payables/bill/1", editable: false }),
+  item("b2", { source: "bill", kind: "compliance", role: "finance", nowRole: "finance", jobKey: "8009-n-ironwood-dr", href: "/app/accounting/payables/bill/2", editable: false }),
   item("c1", { source: "crew", role: "field_lead", jobKey: "8009-n-ironwood-dr", editable: false }),
 ];
 
@@ -42,9 +44,20 @@ describe("feedForSeat", () => {
     expect(feedForSeat(feed, null, () => false)).toHaveLength(feed.length);
   });
 
-  it("gives a PM their jobs and their seat's no-job work (also once moved up), never the owners' list, the ops board or bills", () => {
+  it("gives a PM their jobs (including sub bill approvals on their jobs) and their seat's no-job work, never the owners' list, the ops board or finance compliance holds", () => {
     const mine = (i: FeedItem) => i.nowRole === "pm";
-    expect(feedForSeat(feed, new Set(["8009-n-ironwood-dr"]), mine).map((i) => i.id)).toEqual(["w1", "w3", "pc1", "c1"]);
+    const pm = feedForSeat(feed, new Set(["8009-n-ironwood-dr"]), mine);
+    expect(pm.map((i) => i.id)).toEqual(["w1", "w3", "pc1", "b1", "c1"]);
+    expect(pm.find((i) => i.id === "b1")?.href).toBe("/app/jobs/8009-n-ironwood-dr?tab=tasks");
+  });
+});
+
+describe("canApproveBillHere", () => {
+  it("lets an owner or a PM with money approve a bill on their job, never a field lead without money", () => {
+    const bill = item("b1", { source: "bill", kind: "approval", jobKey: "8009-n-ironwood-dr", editable: false });
+    expect(canApproveBillHere(bill, { owner: true, money: true })).toBe(true);
+    expect(canApproveBillHere(bill, { owner: false, money: true })).toBe(true);
+    expect(canApproveBillHere(bill, { owner: false, money: false })).toBe(false);
   });
 });
 

@@ -1227,20 +1227,21 @@ function Screen() {
     ...(can('hours.view') ? [{ value: 'hours' as const, label: 'Hours' }] : []),
     ...(isOwner ? [{ value: 'team' as const, label: 'Team' }] : []),
   ]
+  const activeView: View = options.some((o) => o.value === view) ? view : 'today'
 
   return (
     <div className="px-4 pb-8 pt-6">
       <ScreenTitle eyebrow={dayShort(data.day)} title={isOwner ? 'Crew' : 'Your crew'} />
-      <Segmented label="Crew views" value={view} onChange={setView} options={options} />
+      <Segmented label="Crew views" value={activeView} onChange={setView} options={options} />
       <div className="mt-5">
-        {view === 'today' ? <TodayView data={data} show={show} /> : null}
-        {view === 'projects' && can('projects.view') ? (
+        {activeView === 'today' ? <TodayView data={data} show={show} /> : null}
+        {activeView === 'projects' && can('projects.view') ? (
           // Keyed on the job count so a job added from here shows up once the sheet saves it.
           <ProjectsView key={data.jobs.length} onAddJob={isOwner ? () => show({ kind: 'job', job: null }) : undefined} />
         ) : null}
-        {view === 'schedule' ? <ScheduleView data={data} show={show} /> : null}
-        {view === 'runner' ? <RunnerView data={data} show={show} /> : null}
-        {view === 'plan' ? (
+        {activeView === 'schedule' ? <ScheduleView data={data} show={show} /> : null}
+        {activeView === 'runner' ? <RunnerView data={data} show={show} /> : null}
+        {activeView === 'plan' ? (
           <>
             <PlanView data={data} />
             {isOwner || !can('pickups.stage') ? (
@@ -1251,8 +1252,8 @@ function Screen() {
             ) : null}
           </>
         ) : null}
-        {view === 'hours' && can('hours.view') ? <HoursView data={data} show={show} /> : null}
-        {view === 'team' && isOwner ? <TeamView data={data} show={show} /> : null}
+        {activeView === 'hours' && can('hours.view') ? <HoursView data={data} show={show} /> : null}
+        {activeView === 'team' && isOwner ? <TeamView data={data} show={show} /> : null}
       </div>
 
       {open?.kind === 'assign' ? <AssignSheet key={sheetKey} day={open.day} preset={open.preset} onClose={close} /> : null}

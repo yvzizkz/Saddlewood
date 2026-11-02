@@ -19,8 +19,8 @@ import { jobBills, jobCrew, jobLabor, jobMoney, jobPackages, jobPurchases, jobWa
 import { listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
-import { CloseTask, NewTask } from "@/components/tasks/TaskActions";
+import { canApproveBillHere, canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
+import { ApproveBill, CloseTask, NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
 import ProgressBilling from "@/components/billing/ProgressBilling";
 import AgreementCard from "@/components/jobs/AgreementCard";
@@ -147,7 +147,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         span: `${clockText(localClock(r.startedAt))} – ${r.endedAt ? clockText(localClock(r.endedAt)) : "on the clock"}`,
         minutes: r.minutes,
         cost: seat.laborCost ? r.costCents : null,
-        href: `/app/accounting/payroll/entry/${r.id}`,
+        href: seat.money ? `/app/accounting/payroll/entry/${r.id}` : null,
       }));
       const columns: Column[] = [
         { key: "day", header: "Day", kind: "date" },
@@ -160,7 +160,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       return (
         <JobFrame {...frame} period={period} filters={d.filters} actions={seat.money ? <Link className="text-sm underline" href={hrefOf("/app/accounting/payroll", { p: period.key, job: ref.crewId ?? undefined })}>Open in Payroll</Link> : undefined}>
           <KpiHeader label="Labor hours" value={d.total} kind="hours" change={d.change} compareLabel={period.previous.label} stats={[...(cost !== null ? [{ label: "Labor cost", value: cost, kind: "money" as const }] : []), { label: "People", value: new Set(d.rows.map((r) => r.email)).size, kind: "count" }]} trend={d.trend} breakdown={d.breakdown} byOptions={d.byOptions} />
-          <DataTable rows={table} columns={columns} searchKeys={["person", "trade"]} name={`${ref.key}-labor-${period.key}`} rowHrefKey="href" initialSort={{ key: "day", dir: "desc" }} empty="No time on this job in the period." />
+          <DataTable rows={table} columns={columns} searchKeys={["person", "trade"]} name={`${ref.key}-labor-${period.key}`} rowHrefKey={seat.money ? "href" : undefined} initialSort={{ key: "day", dir: "desc" }} empty="No time on this job in the period." />
         </JobFrame>
       );
     }
@@ -367,7 +367,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
     const seated = feedForSeat(await loadFeed(refs, seats, today), owner ? null : new Set([ref.key]), (i) => isMine(i, seat.email, seats, people)).filter((i) => i.jobKey === ref.key);
     const items = seat.money ? seated : forFieldLead(seated, (i) => isMine(i, seat.email, seats, people));
-    const closable = items.filter((i) => canCloseHere(i, owner));
+    const closable = items.filter((i) => canCloseHere(i, owner) || canApproveBillHere(i, seat));
     const table: TableRow[] = items.map((i) => ({
       id: i.id,
       title: i.title,
@@ -382,6 +382,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       <JobFrame {...frame}>
         <NewTask
           job={ref.key}
+          lang={seat.lang}
           roles={(owner ? ROLES : PM_ROLES).map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
           jobs={[{ value: ref.key, label: ref.name }]}
           kinds={Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label }))}
@@ -398,7 +399,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                       {[ROLE_INFO[i.nowRole].label, i.assignee ? (people.find((p) => p.email === i.assignee)?.name ?? i.assignee) : seatHolder(i.nowRole, seats, people).name, i.dueOn ? `due ${formatValue("date", i.dueOn)}` : null].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  <CloseTask id={Number(i.id.slice(1))} />
+                  {canApproveBillHere(i, seat) ? <ApproveBill billId={i.id.slice(1)} lang={seat.lang} /> : <CloseTask id={Number(i.id.slice(1))} lang={seat.lang} />}
                 </li>
               ))}
             </ul>
@@ -678,9 +679,13 @@ export default async function JobPage({ params, searchParams }: { params: Promis
               <ul className="divide-y divide-[var(--color-stone)]">
                 {crew.people.map((p) => (
                   <li key={p.email} className="flex items-center justify-between py-2 text-sm">
-                    <Link className="underline-offset-2 hover:underline" href={hrefOf("/app/accounting/payroll", { p: "wtd", person: p.email })}>
-                      {p.name}
-                    </Link>
+                    {seat.money ? (
+                      <Link className="underline-offset-2 hover:underline" href={hrefOf("/app/accounting/payroll", { p: "wtd", person: p.email })}>
+                        {p.name}
+                      </Link>
+                    ) : (
+                      <span>{p.name}</span>
+                    )}
                     <span className="text-xs text-[var(--color-charcoal-light)]">{[p.role.toUpperCase() === "PM" ? "PM" : p.role, p.trade].filter(Boolean).join(" · ")}</span>
                   </li>
                 ))}

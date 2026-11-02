@@ -7,7 +7,13 @@ import { NextRequest } from "next/server";
 // waiver, and a COI hold clears only once the COI is current.
 
 type Row = Record<string, unknown>;
-const { db } = vi.hoisted(() => ({ db: { tables: {} as Record<string, Row[]> } }));
+const { db, auth } = vi.hoisted(() => ({
+  db: { tables: {} as Record<string, Row[]> },
+  auth: {
+    owner: true,
+    seat: null as null | { owner: boolean; email: string; money: boolean; crewJobs: string[] | null; billingJobs: string[] | null },
+  },
+}));
 
 function from(table: string) {
   const filters: ((r: Row) => boolean)[] = [];
@@ -39,7 +45,17 @@ function from(table: string) {
 }
 
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({ from }) }));
-vi.mock("@/lib/crew/auth", () => ({ getViewer: async () => ({ kind: "staff", email: "lando@example.com" }), viewerIsOwner: async () => true }));
+vi.mock("@/lib/crew/auth", () => ({
+  getViewer: async () => (auth.owner ? { kind: "staff", email: "lando@example.com" } : { kind: "crew", person: { email: auth.seat?.email ?? "eli.pm@example.com" } }),
+  viewerIsOwner: async () => auth.owner,
+}));
+vi.mock("@/lib/jobs/access", () => ({
+  workSeat: async () => auth.seat,
+  seesJob: (seat: { owner: boolean; crewJobs: string[] | null; billingJobs: string[] | null }, ref: { crewId?: string | null; billingId?: string | null }) =>
+    seat.owner ||
+    Boolean(ref.crewId && seat.crewJobs?.includes(ref.crewId)) ||
+    Boolean(ref.billingId && seat.billingJobs?.includes(ref.billingId)),
+}));
 vi.mock("@/lib/crew/time", () => ({ localDay: () => "2026-10-20" }));
 
 import { PATCH } from "../route";
@@ -47,6 +63,8 @@ import { PATCH } from "../route";
 const req = (body: unknown) => new NextRequest("http://localhost/api/accounting/payables", { method: "PATCH", body: JSON.stringify(body) });
 
 beforeEach(() => {
+  auth.owner = true;
+  auth.seat = null;
   db.tables = {
     subs: [
       { id: "s-ok", coi_expires_on: "2027-01-01" },
@@ -126,6 +144,24 @@ describe("record_payment and retainage", () => {
     expect(await res.json()).toMatchObject({ ok: true, status: "paid", totalPaid: 100_000 });
     const notes = db.tables.bill_payments.filter((p) => p.bill_id === "b-ret").map((p) => p.note as string);
     expect(notes[1]).toMatch(/retainage released by lando@example.com \(100\.00\)/);
+  });
+});
+
+describe("PM bill approval (SOP-004)", () => {
+  it("lets a PM approve a bill on their own job, refuses another job's bill, and refuses waiver/payment writes", async () => {
+    auth.owner = false;
+    auth.seat = { owner: false, email: "eli.pm@example.com", money: true, crewJobs: ["8009-n-ironwood-dr"], billingJobs: [] };
+    db.tables.bills.push(
+      { id: "b-pm-own", kind: "sub", sub_id: "s-ok", status: "needs_approval", waiver_status: "conditional_received", amount_cents: 45_000, crew_job_id: "8009-n-ironwood-dr" },
+      { id: "b-pm-other", kind: "sub", sub_id: "s-ok", status: "needs_approval", waiver_status: "conditional_received", amount_cents: 45_000, crew_job_id: "9146-w-hutton-dr" },
+    );
+    expect((await PATCH(req({}))).status).toBe(403);
+    expect((await PATCH(req({ action: "update_bill", billId: "b-held", clearHold: "waiver" }))).status).toBe(403);
+    expect((await PATCH(req({ action: "record_payment", billId: "b-open", amountCents: 10_000, waiverCollected: true }))).status).toBe(403);
+    expect((await PATCH(req({ action: "update_bill", billId: "b-pm-other", clearHold: "approval" }))).status).toBe(404);
+    const ok = await PATCH(req({ action: "update_bill", billId: "b-pm-own", clearHold: "approval" }));
+    expect(ok.status).toBe(200);
+    expect(db.tables.bills.find((b) => b.id === "b-pm-own")).toMatchObject({ status: "scheduled", approved_by: "eli.pm@example.com" });
   });
 });
 

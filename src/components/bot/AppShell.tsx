@@ -48,13 +48,19 @@ function StatusPill() {
     return <span className="text-xs text-[var(--color-charcoal-light)]">{error ? 'No connection' : 'Loading…'}</span>
   }
   const h = healthLine(home)
-  return (
-    <Link
-      href="/app#health"
-      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-stone)] bg-white px-2.5 py-1 text-xs font-medium text-[var(--color-charcoal)]"
-    >
+  const cls = 'inline-flex items-center gap-1.5 rounded-full border border-[var(--color-stone)] bg-white px-2.5 py-1 text-xs font-medium text-[var(--color-charcoal)]'
+  const content = (
+    <>
       <Dot tone={h.tone} />
       <span>Bot {h.label.toLowerCase()}</span>
+    </>
+  )
+  if (home.me.role !== 'owner') {
+    return <span className={cls}>{content}</span>
+  }
+  return (
+    <Link href="/app#health" className={cls}>
+      {content}
     </Link>
   )
 }

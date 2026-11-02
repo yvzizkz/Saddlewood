@@ -5,7 +5,7 @@ import Breadcrumbs from "@/components/data/Breadcrumbs";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
 import { Card } from "@/components/bot/ui";
-import { CloseTask, NewTask } from "@/components/tasks/TaskActions";
+import { ApproveBill, CloseTask, NewTask } from "@/components/tasks/TaskActions";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { resolvePeriod } from "@/lib/analytics/period";
@@ -14,7 +14,7 @@ import { PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
 import { jobHref, listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { canCloseHere, departmentOf, KIND_LABEL, loadFeed, type FeedItem } from "@/lib/tasks/feed";
+import { canApproveBillHere, canCloseHere, departmentOf, KIND_LABEL, loadFeed, type FeedItem } from "@/lib/tasks/feed";
 import { mineOf, seatFeedOf } from "@/lib/tasks/mine";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,7 @@ const SOURCE: Record<FeedItem["source"], string> = { work: "Handed out", waiting
 export default async function TasksPage({ searchParams }: { searchParams: Promise<SP> }) {
   const seat = await workSeat();
   if (!seat) redirect("/app");
+  const es = seat.lang === "es";
   const me = seat.email;
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : (sp[k] as string | undefined));
@@ -91,16 +92,16 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     source: SOURCE[i.source],
   }));
   const columns: Column[] = [
-    { key: "title", header: "Task", kind: "text", hrefKey: "href", subKey: "detail", phone: "title" },
-    { key: "who", header: "With", kind: "text", filter: true },
-    { key: "dept", header: "Department", kind: "text", filter: true, phone: "hide" },
-    { key: "job", header: "Job", kind: "text", filter: true, hrefKey: "jobHref" },
-    { key: "kind", header: "Kind", kind: "text", filter: true, phone: "hide" },
-    { key: "due", header: "Due", kind: "date", phone: "value" },
-    { key: "late", header: "Days late", kind: "count" },
-    { key: "source", header: "From", kind: "text", filter: true, phone: "hide" },
+    { key: "title", header: es ? "Tarea" : "Task", kind: "text", hrefKey: "href", subKey: "detail", phone: "title" },
+    { key: "who", header: es ? "Con" : "With", kind: "text", filter: true },
+    { key: "dept", header: es ? "Departamento" : "Department", kind: "text", filter: true, phone: "hide" },
+    { key: "job", header: es ? "Obra" : "Job", kind: "text", filter: true, hrefKey: "jobHref" },
+    { key: "kind", header: es ? "Tipo" : "Kind", kind: "text", filter: true, phone: "hide" },
+    { key: "due", header: es ? "Vence" : "Due", kind: "date", phone: "value" },
+    { key: "late", header: es ? "Días tarde" : "Days late", kind: "count" },
+    { key: "source", header: es ? "Origen" : "From", kind: "text", filter: true, phone: "hide" },
   ];
-  const myWork = mineAll.filter((i) => canCloseHere(i, seat.owner));
+  const myWork = mineAll.filter((i) => canCloseHere(i, seat.owner) || canApproveBillHere(i, seat));
   const roles = seat.owner ? ROLES : PM_ROLES;
   const opts = (xs: { value: string; label: string }[]) => xs;
 
@@ -108,18 +109,20 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     <div className="px-4 pb-10 pt-4 md:px-8 md:pt-6">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-gold-accessible)]">Work</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-gold-accessible)]">{es ? "Trabajo" : "Work"}</p>
           <h1 className="text-[var(--color-charcoal)]" style={{ fontFamily: "var(--font-fraunces)" }}>
-            Tasks
+            {es ? "Tareas" : "Tasks"}
           </h1>
           <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">
-            {seat.owner ? "Everything waiting on someone, in one list." : "Everything waiting on someone on your jobs."} Work goes to a role; overdue work moves up one.
+            {es
+              ? "Todo lo que espera a alguien en tus obras. El trabajo va a un rol; si se atrasa, sube al siguiente."
+              : `${seat.owner ? "Everything waiting on someone, in one list." : "Everything waiting on someone on your jobs."} Work goes to a role; overdue work moves up one.`}
           </p>
         </div>
         <div className="flex rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-1 text-[13px] font-medium" role="group" aria-label="Whose">
           {(["mine", "all"] as const).map((v) => (
             <Link key={v} href={v === "mine" ? PATH : `${PATH}?view=all`} aria-current={view === v ? "true" : undefined} className={`rounded-lg px-3 py-1.5 ${view === v ? "bg-white text-[var(--color-charcoal)] shadow-sm" : "text-[var(--color-charcoal-light)]"}`}>
-              {v === "mine" ? `Mine (${mineAll.length})` : `${seat.owner ? "Everyone" : "My jobs"} (${feed.length})`}
+              {v === "mine" ? `${es ? "Mías" : "Mine"} (${mineAll.length})` : `${seat.owner ? "Everyone" : es ? "Mis obras" : "My jobs"} (${feed.length})`}
             </Link>
           ))}
         </div>
@@ -127,6 +130,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
       <div className="mb-4">
         <NewTask
+          lang={seat.lang}
           roles={opts(roles.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` })))}
           jobs={opts(refs.filter((r) => r.active).map((r) => ({ value: r.key, label: r.name })))}
           kinds={opts(Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label })))}
@@ -141,48 +145,50 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
       <div className="space-y-4">
         <KpiHeader
-          label={view === "mine" ? "Waiting on you" : "Open tasks"}
+          label={view === "mine" ? (es ? "Esperando por ti" : "Waiting on you") : es ? "Tareas abiertas" : "Open tasks"}
           value={d.rows.length}
           kind="count"
           change={null}
           stats={[
-            { label: "Overdue", value: overdue.length, kind: "count" },
-            { label: "Moved up", value: escalated.length, kind: "count", hint: "past due + grace" },
-            { label: "Due this week", value: thisWeek.length, kind: "count" },
+            { label: es ? "Atrasadas" : "Overdue", value: overdue.length, kind: "count" },
+            { label: es ? "Subidas" : "Moved up", value: escalated.length, kind: "count", hint: es ? "vencidas + gracia" : "past due + grace" },
+            { label: es ? "Para esta semana" : "Due this week", value: thisWeek.length, kind: "count" },
           ]}
           trend={d.trend}
-          trendLabel="Falling due, by week"
+          trendLabel={es ? "Vencimientos por semana" : "Falling due, by week"}
           breakdown={d.breakdown}
           byOptions={d.byOptions}
         />
 
         {myWork.length ? (
           <Card className="p-4">
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Handed to you here</p>
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">
+              {es ? "Asignadas a ti aquí" : "Handed to you here"}
+            </p>
             <ul className="divide-y divide-[var(--color-stone)]">
               {myWork.map((i) => (
                 <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <div className="min-w-0">
                     <p className="text-sm text-[var(--color-charcoal)]">{i.title}</p>
                     <p className="text-xs text-[var(--color-charcoal-light)]">
-                      {[KIND_LABEL[i.kind], i.job, i.dueOn ? `due ${formatValue("date", i.dueOn)}` : null].filter(Boolean).join(" · ")}
+                      {[KIND_LABEL[i.kind], i.job, i.dueOn ? `${es ? "vence" : "due"} ${formatValue("date", i.dueOn)}` : null].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  <CloseTask id={Number(i.id.slice(1))} />
+                  {canApproveBillHere(i, seat) ? <ApproveBill billId={i.id.slice(1)} lang={seat.lang} /> : <CloseTask id={Number(i.id.slice(1))} lang={seat.lang} />}
                 </li>
               ))}
             </ul>
           </Card>
         ) : null}
 
-        <DataTable rows={rows} columns={columns} searchKeys={["title", "detail", "who", "job", "kind", "source"]} name={`tasks-${view}`} rowHrefKey="href" initialSort={{ key: "late", dir: "desc" }} empty={view === "mine" ? "Nothing is waiting on you." : "No open tasks."} />
+        <DataTable rows={rows} columns={columns} searchKeys={["title", "detail", "who", "job", "kind", "source"]} name={`tasks-${view}`} rowHrefKey="href" initialSort={{ key: "late", dir: "desc" }} empty={view === "mine" ? (es ? "Nada espera por ti." : "Nothing is waiting on you.") : es ? "No hay tareas abiertas." : "No open tasks."} />
         <p className="text-xs text-[var(--color-charcoal-light)]">
           {seat.owner ? (
             <>
               Roles and who holds them: <Link className="underline" href="/app/policies/rights">Who decides</Link>.{" "}
             </>
           ) : null}
-          {view === "mine" ? <Link className="underline" href={hrefOf(PATH, { view: "all" })}>See everyone&apos;s</Link> : null}
+          {view === "mine" ? <Link className="underline" href={hrefOf(PATH, { view: "all" })}>{es ? "Ver todas" : "See everyone's"}</Link> : null}
         </p>
       </div>
     </div>

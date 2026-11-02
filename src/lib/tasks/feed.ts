@@ -271,7 +271,10 @@ export function feedForSeat(items: FeedItem[], jobs: Set<string> | null, mine: (
   if (jobs === null) return items;
   // Work with no job shows when it is theirs, or was the PM's or the field's before it moved up overdue.
   const ours = (i: FeedItem) => mine(i) || i.role === "pm" || i.role === "field_lead";
-  return items.filter((i) => i.source !== "waiting" && i.source !== "ops" && i.source !== "bill" && !isPayables(i) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)));
+  const pmBill = (i: FeedItem) => i.source === "bill" && i.kind === "approval";
+  return items
+    .filter((i) => i.source !== "waiting" && i.source !== "ops" && (pmBill(i) || (i.source !== "bill" && !isPayables(i))) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)))
+    .map((i) => (pmBill(i) ? { ...i, href: i.jobKey ? jobHref(i.jobKey, "tasks") : "/app/tasks" } : i));
 }
 
 /** A seat with no money (a field lead, jobs/access.ts): nothing from billing or payables, where every item carries dollars. */
@@ -299,4 +302,9 @@ function isPayables(i: FeedItem): boolean {
 /** Whether this seat closes or moves the item here: owners any work item; a PM work items with the PM's or the field lead's seat. */
 export function canCloseHere(item: Pick<FeedItem, "editable" | "role">, owner: boolean): boolean {
   return item.editable && (owner || item.role === "pm" || item.role === "field_lead");
+}
+
+/** Whether this seat approves a sub bill here (SOP-004): owners, or a PM with money on the bill's job. */
+export function canApproveBillHere(item: Pick<FeedItem, "source" | "kind" | "jobKey">, seat: { owner: boolean; money: boolean }): boolean {
+  return item.source === "bill" && item.kind === "approval" && (seat.owner || (seat.money && !!item.jobKey));
 }
