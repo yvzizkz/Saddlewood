@@ -22,7 +22,7 @@ import type { Lane } from "@/lib/owner/lanes";
 import type { WaitingItem } from "@/lib/owner/waiting";
 import { loadPayables } from "@/lib/accounting/payables";
 import { loadBillingCalendar } from "@/lib/accounting/receivables";
-import { loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
+import { loadChangeOrders, loadWaivers, type CoRow } from "@/lib/billing/registers";
 import { POLICY_DEFAULTS } from "@/lib/policies/rules";
 import { loadPolicies } from "@/lib/policies/store";
 import { loadMissingDailyLogs } from "@/lib/field/ops";
@@ -202,25 +202,7 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
     }
   }
 
-  // Change orders (0040, SOP-002), on the owners' clock (policy "co-pace"):
-  // one awaiting a price, or priced and not sent, is due N days after the ask;
-  // one sent and not signed gets a follow-up N days after it went, with the
-  // email drafted on its page (never sent by itself); a signed one is billed.
-  for (const c of cos) {
-    if (c.registerId === null) continue;
-    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.status === "requested" || c.status === "priced" || c.status === "sent" ? `/app/changes/${c.registerId}` : c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
-    if (c.status === "requested" || c.status === "priced") {
-      const due = c.requestedOn ? addDays(c.requestedOn, pace.priceWithinDays) : null;
-      const title = c.status === "requested" ? `Price: ${c.title}` : `Send: ${c.number} ${c.title}`;
-      out.push({ ...base, id: `co${c.registerId}`, kind: c.status === "requested" ? "co_price" : "follow_up", title, role: "decisions", dueOn: due, ...placeItem("decisions", due, 1, today) });
-    } else if (c.status === "sent") {
-      const from = c.sentOn ?? c.requestedOn;
-      const due = from ? addDays(from, pace.followUpDays) : null;
-      out.push({ ...base, id: `co${c.registerId}`, since: from, kind: "follow_up", title: `Follow up: ${c.number} ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 2, today) });
-    } else if (c.status === "signed") {
-      out.push({ ...base, id: `co${c.registerId}`, kind: "billing", title: `Bill ${c.number} ${c.title}`, role: "finance", dueOn: null, nowRole: "finance", overdueDays: 0, escalated: false });
-    }
-  }
+  out.push(...changeOrderItems(cos, pace, today));
 
   // The invoice package at each client's cutoff (SOP-006 Gate 3, SOP-007 §4):
   // the PM's percent complete 3 business days before, then finance builds it.
@@ -312,4 +294,32 @@ function isPayables(i: FeedItem): boolean {
 /** Whether this seat closes or moves the item here: owners any work item; a PM work items with the PM's or the field lead's seat. */
 export function canCloseHere(item: Pick<FeedItem, "editable" | "role">, owner: boolean): boolean {
   return item.editable && (owner || item.role === "pm" || item.role === "field_lead");
+}
+
+/**
+ * Change orders (0040, SOP-002), on the owners' clock (policy "co-pace"): one
+ * awaiting a price, or priced and not sent, is due N days after the ask; one
+ * sent and not signed gets a follow-up N days after it last went out (the
+ * first send or the latest follow-up, so doing the follow-up clears it until
+ * the next is due), with the email drafted on its page (never sent by itself);
+ * a signed one is billed.
+ */
+export function changeOrderItems(cos: CoRow[], pace: { priceWithinDays: number; followUpDays: number }, today: string): FeedItem[] {
+  const out: FeedItem[] = [];
+  for (const c of cos) {
+    if (c.registerId === null) continue;
+    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.status === "requested" || c.status === "priced" || c.status === "sent" ? `/app/changes/${c.registerId}` : c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
+    if (c.status === "requested" || c.status === "priced") {
+      const due = c.requestedOn ? addDays(c.requestedOn, pace.priceWithinDays) : null;
+      const title = c.status === "requested" ? `Price: ${c.title}` : `Send: ${c.number} ${c.title}`;
+      out.push({ ...base, id: `co${c.registerId}`, kind: c.status === "requested" ? "co_price" : "follow_up", title, role: "decisions", dueOn: due, ...placeItem("decisions", due, 1, today) });
+    } else if (c.status === "sent") {
+      const from = c.sentOn ?? c.requestedOn;
+      const due = from ? addDays(from, pace.followUpDays) : null;
+      out.push({ ...base, id: `co${c.registerId}`, since: from, kind: "follow_up", title: `Follow up: ${c.number} ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 2, today) });
+    } else if (c.status === "signed") {
+      out.push({ ...base, id: `co${c.registerId}`, kind: "billing", title: `Bill ${c.number} ${c.title}`, role: "finance", dueOn: null, nowRole: "finance", overdueDays: 0, escalated: false });
+    }
+  }
+  return out;
 }

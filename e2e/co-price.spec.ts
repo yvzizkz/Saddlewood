@@ -166,6 +166,8 @@ test.describe("Price it", () => {
       // Sent and not signed: its page has the follow-up drafted, checked first, never sent by itself.
       // (Marked sent here, so its document is put out with the client by hand, as a real send would.)
       sql(`update documents set status = 'issued', issued_at = now() - interval '6 days', token = 'e2e${Date.now()}' where id = '${co.documentId}'`);
+      // (and the register's own line for that send, which is what the follow-up clock runs from).
+      sql(`update change_order_events set at = now() - interval '6 days' where change_order_id = ${co.changeOrderId} and kind = 'sent'`);
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto(`/app/changes/${co.changeOrderId}`, { waitUntil: "networkidle" });
       const fu = page.getByRole("region", { name: "Follow up" });

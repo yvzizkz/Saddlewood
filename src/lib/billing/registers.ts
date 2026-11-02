@@ -30,7 +30,7 @@ export type CoRow = {
   status: CoStatus;
   amountCents: number | null;
   requestedOn: string | null;
-  /** The day its document went out (issued), when it has. */
+  /** The day it last went out to the client (the first send or the latest follow-up); else its document's issue day. */
   sentOn: string | null;
   ageDays: number | null;
   documentId: string | null;
@@ -45,9 +45,11 @@ function age(from: string | null, today: string): number | null {
 
 export async function loadChangeOrders(refs: JobRef[], today = localDay()): Promise<CoRow[]> {
   const db = getSupabaseAdmin();
-  const [reg, docs] = await Promise.all([
+  const [reg, docs, sends] = await Promise.all([
     db.from("change_orders").select("*").neq("status", "void").order("requested_on", { ascending: false }),
     db.from("documents").select("id,number,title,job_id,status,total_cents,issued_at").eq("kind", "change_order").neq("status", "void"),
+    // Every time one went out (the first send, marked sent, a follow-up), in one read.
+    db.from("change_order_events").select("change_order_id,at").eq("kind", "sent"),
   ]);
   const name = (k: string | null) => (k ? (refs.find((r) => r.key === k)?.name ?? k) : "No job");
   type R = { id: number; job_id: string | null; crew_job_id: string | null; number: string; title: string; status: CoStatus; amount_cents: number | null; requested_on: string; document_id: string | null; billed_document_id: string | null; source: string };
@@ -55,6 +57,12 @@ export async function loadChangeOrders(refs: JobRef[], today = localDay()): Prom
   type D = { id: string; number: string; title: string; job_id: string | null; status: string; total_cents: number; issued_at: string | null };
   const docRows = (docs.data ?? []) as D[];
   const issuedOn = new Map(docRows.filter((d) => d.issued_at).map((d) => [d.id, localDay(d.issued_at!)]));
+  // The last time each one went out: a follow-up resets the follow-up clock.
+  const lastSent = new Map<number, string>();
+  for (const e of (sends.error ? [] : (sends.data ?? [])) as { change_order_id: number; at: string }[]) {
+    const prev = lastSent.get(e.change_order_id);
+    if (!prev || e.at > prev) lastSent.set(e.change_order_id, e.at);
+  }
   const out: CoRow[] = rows.map((r) => {
     const jobKey = jobKeyOf({ billingId: r.job_id, crewId: r.crew_job_id }, refs);
     return {
@@ -67,7 +75,7 @@ export async function loadChangeOrders(refs: JobRef[], today = localDay()): Prom
       status: r.status,
       amountCents: r.amount_cents === null ? null : Number(r.amount_cents),
       requestedOn: r.requested_on,
-      sentOn: r.document_id ? (issuedOn.get(r.document_id) ?? null) : null,
+      sentOn: lastSent.has(r.id) ? localDay(lastSent.get(r.id)!) : r.document_id ? (issuedOn.get(r.document_id) ?? null) : null,
       ageDays: ["requested", "priced", "sent", "signed"].includes(r.status) ? age(r.requested_on, today) : null,
       documentId: r.document_id,
       billedDocumentId: r.billed_document_id,
