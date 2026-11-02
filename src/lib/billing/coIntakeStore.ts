@@ -1,0 +1,209 @@
+// Change-order intake, the database part (0059). For each change a client
+// asked for: a register row (source 'client', awaiting price) and a $0 draft
+// change order linked to it, numbered when it is made so the app, the PDF and
+// the email agree from the start. Running the same request again finds the
+// same rows: it rewrites a draft that nobody has touched since, and leaves
+// alone one an owner has edited, priced or sent. Server only.
+
+import { sendPush } from "@/lib/bot/push";
+import { laneAddresses } from "@/lib/crew/notify";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { coEvent } from "./coEvents";
+import { queueJoist } from "./joistSyncStore";
+import { getJobRef } from "@/lib/jobs/hub";
+import { createDraft, DocumentError, getDocument, updateDraft, usedNumbers } from "./documents";
+import { draftHash, snapshotFor, type DraftContext, type Intake, type IntakeItem } from "./coIntake";
+import { nextChangeOrderNumber } from "./numbering";
+import type { BillingDocument } from "./types";
+
+const UNIQUE_VIOLATION = "23505";
+
+export class IntakeError extends Error {
+  constructor(
+    message: string,
+    readonly status: 400 | 404 | 409,
+  ) {
+    super(message);
+  }
+}
+
+export type IntakeOutcome = {
+  key: string;
+  changeOrderId: number;
+  number: string;
+  documentId: string | null;
+  /** created: new row and draft; updated: the untouched draft rewritten; unchanged: nothing new; kept: an owner has it now. */
+  action: "created" | "updated" | "unchanged" | "kept";
+  reason?: string;
+};
+
+type CoRow = { id: number; job_id: string | null; number: string; status: string; title: string; detail: string; document_id: string | null; intake_hash: string };
+
+/** The next change-order number on a billing job: past every register row and change-order document it has. */
+export async function nextChangeOrderNumberFor(jobId: string, prefix: string): Promise<string> {
+  const { data, error } = await getSupabaseAdmin().from("change_orders").select("number").eq("job_id", jobId);
+  if (error) throw new Error(`change_orders numbers: ${error.message}`);
+  const reg = ((data ?? []) as { number: string }[]).map((r) => r.number).filter(Boolean);
+  return nextChangeOrderNumber([...reg, ...(await usedNumbers("change_order", jobId))], prefix);
+}
+
+async function findRow(sourceRef: string, key: string): Promise<CoRow | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("change_orders")
+    .select("id,job_id,number,status,title,detail,document_id,intake_hash")
+    .eq("source_ref", sourceRef)
+    .eq("source_key", key)
+    .maybeSingle();
+  if (error) throw new Error(`change_orders read: ${error.message}`);
+  return (data as CoRow | null) ?? null;
+}
+
+type Job = { billingId: string; crewId: string | null; prefix: string; clientId: string | null; ctx: Omit<DraftContext, "requestedBy" | "requestedOn" | "subject" | "terms"> };
+
+async function loadJob(key: string): Promise<Job> {
+  const ref = await getJobRef(key);
+  if (!ref) throw new IntakeError(`no job "${key}"`, 404);
+  if (!ref.billingId) throw new IntakeError(`${ref.name} has no billing record yet, so it cannot have change orders`, 409);
+  const db = getSupabaseAdmin();
+  const { data: job, error } = await db.from("jobs").select("name,address,number_prefix,client_id").eq("id", ref.billingId).maybeSingle();
+  if (error) throw new Error(`jobs read: ${error.message}`);
+  const j = (job ?? {}) as { name?: string; address?: string | null; number_prefix?: string | null; client_id?: string | null };
+  let client: string | undefined;
+  if (j.client_id) {
+    const { data: c, error: cErr } = await db.from("clients").select("name").eq("id", j.client_id).maybeSingle();
+    if (cErr) throw new Error(`clients read: ${cErr.message}`);
+    client = (c as { name?: string } | null)?.name || undefined;
+  }
+  return {
+    billingId: ref.billingId,
+    crewId: ref.crewId,
+    prefix: j.number_prefix ?? "",
+    clientId: j.client_id ?? null,
+    ctx: { jobName: j.name || ref.name, jobAddress: j.address || ref.address || undefined, client },
+  };
+}
+
+/** A new row and its draft. A number taken a moment ago by someone else is taken again, up to three times. */
+async function create(job: Job, input: Intake, it: IntakeItem, ctx: DraftContext, actor: string): Promise<IntakeOutcome> {
+  const snapshot = snapshotFor(it, ctx);
+  const hash = draftHash(it.title, snapshot);
+  let doc: BillingDocument | null = null;
+  for (let attempt = 0; !doc; attempt++) {
+    const number = await nextChangeOrderNumberFor(job.billingId, job.prefix);
+    try {
+      doc = await createDraft({ kind: "change_order", jobId: job.billingId, clientId: job.clientId, number, title: it.title, snapshot, createdBy: actor });
+    } catch (err) {
+      if (!(err instanceof DocumentError && err.status === 409 && attempt < 2)) throw err;
+    }
+  }
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("change_orders")
+    .insert({
+      job_id: job.billingId,
+      crew_job_id: job.crewId,
+      number: doc.number,
+      title: it.title,
+      detail: it.detail ?? "",
+      source: "client",
+      status: "requested",
+      requested_on: input.requestedOn,
+      requested_by: input.requestedBy,
+      document_id: doc.id,
+      source_ref: input.sourceRef,
+      source_key: it.key,
+      intake_hash: hash,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    // Without its row the draft would be a stray CO with no register entry: take it back out.
+    await db.from("documents").delete().eq("id", doc.id).eq("status", "draft");
+    if (error.code === UNIQUE_VIOLATION) throw new IntakeError(`${it.key} is being taken in by another run right now; try again`, 409);
+    throw new Error(`change_orders insert: ${error.message}`);
+  }
+  const id = (data as { id: number }).id;
+  await coEvent(id, "requested", input.requestedBy, { sourceRef: input.sourceRef, subject: input.subject ?? "" });
+  await coEvent(id, "drafted", actor, { documentId: doc.id, number: doc.number });
+  await queueJoist(id, "drafted");
+  return { key: it.key, changeOrderId: id, number: doc.number, documentId: doc.id, action: "created" };
+}
+
+/** The same request again: rewrite the draft only while it is still what intake wrote. */
+async function refresh(row: CoRow, it: IntakeItem, ctx: DraftContext, actor: string): Promise<IntakeOutcome> {
+  const base = { key: it.key, changeOrderId: row.id, number: row.number, documentId: row.document_id };
+  if (row.status !== "requested") return { ...base, action: "kept", reason: `it is ${row.status} now` };
+  const doc = row.document_id ? await getDocument(row.document_id) : null;
+  if (!doc || doc.status !== "draft") return { ...base, action: "kept", reason: "its draft is gone or issued" };
+  if (draftHash(doc.title, doc.snapshot) !== row.intake_hash) return { ...base, action: "kept", reason: "an owner has changed the draft" };
+  const snapshot = snapshotFor(it, ctx);
+  const hash = draftHash(it.title, snapshot);
+  if (hash === row.intake_hash) {
+    // The client-facing draft is the same; the register's own note may still have moved.
+    if ((it.detail ?? "") !== row.detail) {
+      const { error } = await getSupabaseAdmin().from("change_orders").update({ detail: it.detail ?? "" }).eq("id", row.id).eq("status", "requested");
+      if (error) throw new Error(`change_orders update: ${error.message}`);
+      return { ...base, action: "updated" };
+    }
+    return { ...base, action: "unchanged" };
+  }
+  try {
+    await updateDraft(doc.id, { title: it.title, snapshot });
+  } catch (err) {
+    if (err instanceof DocumentError && err.status === 409) return { ...base, action: "kept", reason: err.message };
+    throw err;
+  }
+  const { error } = await getSupabaseAdmin()
+    .from("change_orders")
+    .update({ title: it.title, detail: it.detail ?? "", intake_hash: hash })
+    .eq("id", row.id)
+    .eq("status", "requested");
+  if (error) throw new Error(`change_orders update: ${error.message}`);
+  await coEvent(row.id, "updated", actor, { documentId: doc.id });
+  await queueJoist(row.id, "drafted");
+  return { ...base, action: "updated" };
+}
+
+/** Take in one request: every change it asks for, each once. */
+export async function runIntake(input: Intake, actor: string): Promise<IntakeOutcome[]> {
+  const job = await loadJob(input.job);
+  // A thread's item is one change order on one job. The same thread and key
+  // under another job (a corrected job, or one thread covering two jobs) is
+  // refused before anything is written, so the other job's draft is never rewritten.
+  const rows = await Promise.all(input.items.map((it) => findRow(input.sourceRef, it.key)));
+  const clash = rows.findIndex((r) => r && r.job_id !== job.billingId);
+  if (clash >= 0) {
+    const row = rows[clash]!;
+    throw new IntakeError(`thread ${input.sourceRef} item "${input.items[clash].key}" is already ${row.number || "a change order"} on ${await jobName(row.job_id)}; give it its own key for ${job.ctx.jobName}`, 409);
+  }
+  const out: IntakeOutcome[] = [];
+  for (const [i, it] of input.items.entries()) {
+    const ctx: DraftContext = { ...job.ctx, requestedBy: input.requestedBy, requestedOn: input.requestedOn, subject: input.subject, terms: input.terms };
+    const row = rows[i];
+    out.push(row ? await refresh(row, it, ctx, actor) : await create(job, input, it, ctx, actor));
+  }
+  await tellOwners(out.filter((o) => o.action === "created"), input, job.ctx.jobName);
+  return out;
+}
+
+/** To the phone of whoever prices (the "decisions" lane): what came in, opening the first to price. Never fails the intake. */
+async function tellOwners(created: IntakeOutcome[], input: Intake, jobName: string): Promise<void> {
+  if (!created.length) return;
+  try {
+    const who = input.requestedBy.replace(/\s*\(.*\)\s*$/, "");
+    await sendPush(await laneAddresses("decisions"), {
+      title: `${who} asked for ${created.length === 1 ? "a change order" : `${created.length} change orders`}`.slice(0, 80),
+      body: `${jobName}: ${created.map((c) => c.number).join(", ")} ready to price.`.slice(0, 240),
+      url: `/app/changes/${created[0].changeOrderId}`,
+      tag: `co-intake-${created[0].changeOrderId}`,
+    });
+  } catch (e) {
+    console.error("[co intake] push:", (e as Error).message);
+  }
+}
+
+async function jobName(jobId: string | null): Promise<string> {
+  if (!jobId) return "no job";
+  const { data } = await getSupabaseAdmin().from("jobs").select("name").eq("id", jobId).maybeSingle();
+  return (data as { name?: string } | null)?.name || "another job";
+}

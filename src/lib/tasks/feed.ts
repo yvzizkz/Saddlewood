@@ -22,7 +22,9 @@ import type { Lane } from "@/lib/owner/lanes";
 import type { WaitingItem } from "@/lib/owner/waiting";
 import { loadPayables } from "@/lib/accounting/payables";
 import { loadBillingCalendar } from "@/lib/accounting/receivables";
-import { loadChangeOrders, loadWaivers } from "@/lib/billing/registers";
+import { loadChangeOrders, loadWaivers, type CoRow } from "@/lib/billing/registers";
+import { POLICY_DEFAULTS } from "@/lib/policies/rules";
+import { loadPolicies } from "@/lib/policies/store";
 import { loadMissingDailyLogs } from "@/lib/field/ops";
 import { jobHref, jobKeyOf, type JobRef } from "@/lib/jobs/hub";
 import { escalationOf, ROLE_INFO, seatHolder, type Person, type Role, type Seat } from "@/lib/roles/seats";
@@ -94,6 +96,12 @@ function roleOfOwnerName(name: string, seats: Seat[]): Role {
 }
 
 /** `waiting`: the owners' list when the caller already read it (the 7 AM push reads it once). */
+/** The owners' change-order clock; the recommended one if the policies cannot be read. */
+async function coPace(): Promise<{ priceWithinDays: number; followUpDays: number }> {
+  const p = await loadPolicies().then((r) => r.values).catch(() => POLICY_DEFAULTS);
+  return { priceWithinDays: Number(p["policy.co.priceWithinDays"]), followUpDays: Number(p["policy.co.followUpDays"]) };
+}
+
 export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay(), pre: { waiting?: WaitingItem[] } = {}): Promise<FeedItem[]> {
   const db = getSupabaseAdmin();
   const [work, waiting, crewTasks, cards, payables, cos, calendar, waivers] = await Promise.all([
@@ -107,6 +115,7 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
     loadBillingCalendar(today).catch(() => []),
     loadWaivers(refs).catch(() => []),
   ]);
+  const pace = await coPace();
   const nameOfJob = (key: string | null) => (key ? (refs.find((r) => r.key === key)?.name ?? key) : "");
   const out: FeedItem[] = [];
 
@@ -193,21 +202,7 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
     }
   }
 
-  // Change orders (0040, SOP-002): awaiting a price ages from the request; a
-  // priced one not sent, and a signed one not billed, are follow-ups.
-  for (const c of cos) {
-    if (c.registerId === null) continue;
-    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
-    if (c.status === "requested") {
-      const due = c.requestedOn ? addDays(c.requestedOn, 2) : null;
-      out.push({ ...base, id: `co${c.registerId}`, kind: "co_price", title: `Price: ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 1, today) });
-    } else if (c.status === "priced" || c.status === "sent") {
-      const due = c.requestedOn ? addDays(c.requestedOn, 7) : null;
-      out.push({ ...base, id: `co${c.registerId}`, kind: "follow_up", title: `${c.status === "priced" ? "Send" : "Get signed"}: ${c.number} ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 2, today) });
-    } else if (c.status === "signed") {
-      out.push({ ...base, id: `co${c.registerId}`, kind: "billing", title: `Bill ${c.number} ${c.title}`, role: "finance", dueOn: null, nowRole: "finance", overdueDays: 0, escalated: false });
-    }
-  }
+  out.push(...changeOrderItems(cos, pace, today));
 
   // The invoice package at each client's cutoff (SOP-006 Gate 3, SOP-007 §4):
   // the PM's percent complete 3 business days before, then finance builds it.
@@ -275,7 +270,7 @@ export function feedForSeat(items: FeedItem[], jobs: Set<string> | null, mine: (
   const pmBill = (i: FeedItem) => i.source === "bill" && i.kind === "approval" && !!i.jobKey;
   return items
     .filter((i) => i.source !== "waiting" && i.source !== "ops" && (pmBill(i) || (i.source !== "bill" && !isPayables(i))) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)))
-    .map((i) => (pmBill(i) ? { ...i, href: i.jobKey ? jobHref(i.jobKey, "tasks") : "/app/tasks" } : i));
+    .map((i) => (pmBill(i) ? { ...i, href: jobHref(i.jobKey!, "tasks") } : i));
 }
 
 /** A seat with no money (a field lead, jobs/access.ts): nothing from billing or payables, where every item carries dollars. */
@@ -303,6 +298,34 @@ function isPayables(i: FeedItem): boolean {
 /** Whether this seat closes or moves the item here: owners any work item; a PM work items with the PM's or the field lead's seat. */
 export function canCloseHere(item: Pick<FeedItem, "editable" | "role">, owner: boolean): boolean {
   return item.editable && (owner || item.role === "pm" || item.role === "field_lead");
+}
+
+/**
+ * Change orders (0040, SOP-002), on the owners' clock (policy "co-pace"): one
+ * awaiting a price, or priced and not sent, is due N days after the ask; one
+ * sent and not signed gets a follow-up N days after it last went out (the
+ * first send or the latest follow-up, so doing the follow-up clears it until
+ * the next is due), with the email drafted on its page (never sent by itself);
+ * a signed one is billed.
+ */
+export function changeOrderItems(cos: CoRow[], pace: { priceWithinDays: number; followUpDays: number }, today: string): FeedItem[] {
+  const out: FeedItem[] = [];
+  for (const c of cos) {
+    if (c.registerId === null) continue;
+    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.status === "requested" || c.status === "priced" || c.status === "sent" ? `/app/changes/${c.registerId}` : c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
+    if (c.status === "requested" || c.status === "priced") {
+      const due = c.requestedOn ? addDays(c.requestedOn, pace.priceWithinDays) : null;
+      const title = c.status === "requested" ? `Price: ${c.title}` : `Send: ${c.number} ${c.title}`;
+      out.push({ ...base, id: `co${c.registerId}`, kind: c.status === "requested" ? "co_price" : "follow_up", title, role: "decisions", dueOn: due, ...placeItem("decisions", due, 1, today) });
+    } else if (c.status === "sent") {
+      const from = c.sentOn ?? c.requestedOn;
+      const due = from ? addDays(from, pace.followUpDays) : null;
+      out.push({ ...base, id: `co${c.registerId}`, since: from, kind: "follow_up", title: `Follow up: ${c.number} ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 2, today) });
+    } else if (c.status === "signed") {
+      out.push({ ...base, id: `co${c.registerId}`, kind: "billing", title: `Bill ${c.number} ${c.title}`, role: "finance", dueOn: null, nowRole: "finance", overdueDays: 0, escalated: false });
+    }
+  }
+  return out;
 }
 
 /** Whether this seat approves a sub bill here (SOP-004): owners, or a PM with money on the bill's job. */

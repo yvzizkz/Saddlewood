@@ -1,0 +1,520 @@
+'use client'
+
+// Price it: one change order, priced and sent from a phone. Each line has a
+// price box (or "No charge"); blanks left by intake ("about ______ sq ft") are
+// marked until filled; the total and the client's view update as you type.
+// Send saves, shows the exact email, and sends it on the second tap. Owners
+// only (the page checks; the APIs check again).
+
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useMemo, useState } from 'react'
+import { ArrowLeft, Eye, Paperclip, Send } from 'lucide-react'
+
+import { Button, Card, Chip, Field, INPUT, ScreenTitle } from '@/components/bot/ui'
+import { DocumentView } from '@/app/d/DocumentView'
+import CoTimeline from '@/components/billing/CoTimeline'
+import { applyPrices, BLANK, coEmail, parseDollars, sendBlockers, type PriceEdit } from '@/lib/billing/coPrice'
+import type { PriceIt } from '@/lib/billing/coPriceStore'
+import { usd } from '@/lib/money'
+
+type Line = { description: string; note: string; price: string; noCharge: boolean }
+
+const AREA = `${INPUT} min-h-[4.5rem] resize-y`
+const blankRing = (v: string) => (BLANK.test(v) ? ' border-[#d4af37] bg-[rgba(212,175,55,0.08)]' : '')
+
+async function post(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return { ok: res.ok, status: res.status, data: ((await res.json().catch(() => null)) ?? {}) as Record<string, unknown> }
+}
+
+export default function PriceItScreen({ data }: { data: PriceIt }) {
+  const router = useRouter()
+  const editable = data.doc.status === 'draft' && (data.status === 'requested' || data.status === 'priced')
+  const [title, setTitle] = useState(data.title)
+  const [lines, setLines] = useState<Line[]>(
+    (data.doc.snapshot.lines ?? []).map((l) => ({
+      description: l.description,
+      note: l.note ?? '',
+      price: l.amountCents ? (l.amountCents / 100).toFixed(2) : '',
+      noCharge: !!l.noCharge,
+    })),
+  )
+  const [note, setNote] = useState(data.doc.snapshot.note ?? '')
+  const [to, setTo] = useState<string[]>(data.to)
+  const [cc, setCc] = useState<string[]>([])
+  const [subject, setSubject] = useState<string | null>(null)
+  const [body, setBody] = useState<string | null>(null)
+  // The email preview is for the draft and recipients as they were on the
+  // first tap. Any edit after that (title, a line, a price, the note, who it
+  // goes to) closes it, and a subject or message typed into it goes with it,
+  // so the second tap can never send words written for another total.
+  const [preview, setPreview] = useState<{ key: string } | null>(null)
+  const [showDoc, setShowDoc] = useState(false)
+  const [busy, setBusy] = useState<'' | 'save' | 'check' | 'send' | 'reject' | 'follow'>('')
+  const [follow, setFollow] = useState<{ subject: string; body: string; checked: boolean }>({ subject: data.followUp?.subject ?? '', body: data.followUp?.body ?? '', checked: false })
+  const [err, setErr] = useState<string[]>([])
+  const [sent, setSent] = useState(false)
+
+  const prices = lines.map((l) => (l.noCharge ? 0 : parseDollars(l.price)))
+  const badPrice = prices.findIndex((p) => p === null)
+  const edit: PriceEdit = {
+    title: title.trim(),
+    note,
+    lines: lines.map((l, i) => ({ description: l.description.trim(), note: l.note.trim(), amountCents: prices[i] ?? 0, noCharge: l.noCharge })),
+  }
+  const editKey = JSON.stringify(edit)
+  const previewKey = JSON.stringify([editKey, to, cc])
+  const previewing = preview !== null && preview.key === previewKey
+  const snapshot = useMemo(() => applyPrices(data.doc.snapshot, edit), [data.doc.snapshot, editKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const total = (snapshot.lines ?? []).reduce((s, l) => s + l.amountCents, 0)
+  const blockers = [...(badPrice >= 0 ? [`Line ${badPrice + 1}: the price is not a number.`] : []), ...sendBlockers(edit.title, snapshot)]
+  const person = data.contacts.find((c) => c.email === to[0]) ?? null
+  const email = coEmail({ number: data.number, title: edit.title, job: data.job, totalCents: total, to: person })
+  const liveDoc = { ...data.doc, title: edit.title, snapshot, totalCents: total }
+
+  const set = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)))
+
+  async function save(): Promise<boolean> {
+    if (badPrice >= 0) {
+      setErr([`Line ${badPrice + 1}: the price is not a number.`])
+      return false
+    }
+    const r = await post(`/api/change-orders/${data.id}/price`, edit)
+    if (!r.ok) setErr([String(r.data.error ?? 'Could not save.')])
+    return r.ok
+  }
+
+  // What was typed into the preview counts only while that preview is open.
+  const message = () => ({ to, cc, subject: previewing && subject !== null ? subject : email.subject, body: previewing && body !== null ? body : email.body })
+
+  async function check() {
+    setErr([])
+    setBusy('check')
+    // A new preview starts from the email for what is on screen now.
+    setSubject(null)
+    setBody(null)
+    try {
+      if (!(await save())) return
+      const r = await post(`/api/change-orders/${data.id}/send`, { to, cc, subject: email.subject, body: email.body })
+      if (!r.ok) return setErr([String(r.data.error ?? 'Could not prepare it.'), ...((r.data.blockers as string[]) ?? [])])
+      setPreview({ key: previewKey })
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function send() {
+    if (!previewing || blockers.length > 0 || to.length === 0) return
+    setErr([])
+    setBusy('send')
+    try {
+      if (!(await save())) return
+      const r = await post(`/api/change-orders/${data.id}/send`, { ...message(), confirm: true })
+      if (!r.ok || r.data.sent !== true) return setErr([String(r.data.error ?? 'It did not go out.'), ...((r.data.blockers as string[]) ?? [])])
+      setSent(true)
+      router.refresh()
+    } finally {
+      setBusy('')
+    }
+  }
+
+  // Follow up: the first tap shows what would go (nothing sent), the second sends it.
+  async function followUp() {
+    setErr([])
+    setBusy('follow')
+    try {
+      const r = await post(`/api/change-orders/${data.id}/follow-up`, { to, cc, subject: follow.subject, body: follow.body, ...(follow.checked ? { confirm: true } : {}) })
+      if (!r.ok || (follow.checked && r.data.sent !== true)) return setErr([String(r.data.error ?? 'It did not go out.')])
+      if (!follow.checked) return setFollow((f) => ({ ...f, checked: true }))
+      setFollow((f) => ({ ...f, checked: false }))
+      setSent(true)
+      router.refresh()
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function reject() {
+    const why = window.prompt('Why is it rejected? (kept on the change order)')
+    if (!why?.trim()) return
+    setBusy('reject')
+    const res = await fetch('/api/change-orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: data.id, status: 'rejected', note: why.trim() }) })
+    setBusy('')
+    if (!res.ok) return setErr([((await res.json().catch(() => null))?.error as string) ?? 'Could not reject it.'])
+    router.refresh()
+  }
+
+  const back = data.jobKey ? `/app/jobs/${encodeURIComponent(data.jobKey)}?tab=changes` : '/app/accounting/billing'
+  const docView = (
+    <DocumentView
+      doc={liveDoc}
+      exhibits={data.exhibits}
+      href={(e) => `/d/p/${data.doc.previewToken}/x/${e.id}`}
+      saveHref={(e) => `/d/p/${data.doc.previewToken}/x/${e.id}?dl=1`}
+    />
+  )
+
+  return (
+    <div className="w-full lg:grid lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-8">
+      <div>
+        <Link href={back} className="mb-3 inline-flex items-center gap-1 text-sm text-[var(--color-charcoal-light)]">
+          <ArrowLeft className="size-4" aria-hidden="true" /> {data.job || 'Changes'}
+        </Link>
+        <ScreenTitle eyebrow={`${data.number} · ${data.status === 'requested' ? 'Awaiting price' : data.status}`} title={edit.title || 'Change order'}>
+          <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">
+            Asked by {data.requestedBy || 'the client'} on {new Date(`${data.requestedOn}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+          </p>
+        </ScreenTitle>
+        <JoistLine id={data.id} joist={data.joist} />
+
+        {sent ? (
+          <Card className="mb-4 p-4">
+            <p className="font-medium text-[var(--color-charcoal)]">Sent to {to.join(', ')}.</p>
+            <p className="mt-1 text-sm text-[var(--color-charcoal-light)]">{data.followUp ? 'The follow-up is on its timeline.' : 'It is on the job\u2019s Changes tab as sent.'} You&apos;ll see when they open it.</p>
+            <Link className="mt-3 inline-block text-sm underline" href={back}>
+              Back to the job
+            </Link>
+          </Card>
+        ) : null}
+
+        {!editable && !sent ? (
+          <Card className="mb-4 p-4 text-sm text-[var(--color-charcoal-light)]">This change order is {data.status}; it is shown as the client has it.</Card>
+        ) : null}
+
+        {data.followUp && !sent ? (
+          <section aria-label="Follow up">
+            <Card className="mb-4 space-y-3 p-4">
+              <p className="font-medium text-[var(--color-charcoal)]">Follow up</p>
+              <Recipients contacts={data.contacts} to={to} cc={cc} setTo={setTo} setCc={setCc} onChange={() => setFollow((f) => ({ ...f, checked: false }))} />
+              <Field label="Subject">
+                <input className={INPUT} value={follow.subject} onChange={(e) => setFollow({ ...follow, subject: e.target.value, checked: false })} />
+              </Field>
+              <Field label="Message" hint="The link to the change order goes under it.">
+                <textarea className={`${AREA} min-h-[9rem]`} value={follow.body} onChange={(e) => setFollow({ ...follow, body: e.target.value, checked: false })} />
+              </Field>
+              {err.length ? (
+                <ul className="text-sm text-[#9a2a1f]" role="alert">
+                  {err.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <Button variant="primary" busy={busy === 'follow'} disabled={!!busy || to.length === 0 || !follow.body.trim()} onClick={followUp}>
+                <Send className="size-4" aria-hidden="true" /> {follow.checked ? `Send now to ${person?.name.split(' ')[0] || to[0]}` : 'Check it'}
+              </Button>
+              {follow.checked ? <p className="text-xs text-[var(--color-charcoal-light)]">Checked: nothing has gone yet. Tap again to send.</p> : null}
+            </Card>
+          </section>
+        ) : null}
+
+        {(data.status === 'sent' || (data.status === 'priced' && data.doc.status === 'issued')) && !sent ? (
+          <MarkApproved id={data.id} who={data.contacts.find((c) => c.email === data.to[0])?.name ?? ''} />
+        ) : null}
+
+        {editable && !sent ? (
+          <>
+            <Field label="Title">
+              <input className={INPUT + blankRing(title)} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />
+            </Field>
+
+            <ol className="mt-4 space-y-3">
+              {lines.map((l, i) => (
+                <li key={i}>
+                  <Card className="p-3">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-2.5 text-xs font-mono text-[var(--color-charcoal-light)]">{i + 1}</span>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <input aria-label={`Line ${i + 1}`} className={INPUT + blankRing(l.description)} value={l.description} onChange={(e) => set(i, { description: e.target.value })} />
+                        <textarea aria-label={`Line ${i + 1} detail`} className={AREA + blankRing(l.note)} value={l.note} onChange={(e) => set(i, { note: e.target.value })} />
+                        {BLANK.test(l.description) || BLANK.test(l.note) ? <Chip tone="warn">Fill the blank</Chip> : null}
+                        <div className="flex items-center gap-3">
+                          <label className="flex-1">
+                            <span className="sr-only">Line {i + 1} price</span>
+                            <input
+                              inputMode="decimal"
+                              placeholder="$ price"
+                              disabled={l.noCharge}
+                              className={`${INPUT} text-right tabular-nums${!l.noCharge && !parseDollars(l.price) ? ' border-[#d4af37]' : ''}`}
+                              value={l.noCharge ? '' : l.price}
+                              onChange={(e) => set(i, { price: e.target.value })}
+                            />
+                          </label>
+                          <label className="flex shrink-0 items-center gap-1.5 text-sm text-[var(--color-charcoal)]">
+                            <input type="checkbox" checked={l.noCharge} onChange={(e) => set(i, { noCharge: e.target.checked })} /> No charge
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </li>
+              ))}
+            </ol>
+
+            <div className="mt-4">
+              <Field label="Note under the lines">
+                <textarea className={AREA + blankRing(note)} value={note} onChange={(e) => setNote(e.target.value)} />
+              </Field>
+            </div>
+
+            {data.exhibits.length ? (
+              <div className="mt-4">
+                <p className="mb-1.5 text-sm font-medium text-[var(--color-charcoal)]">With it</p>
+                <ul className="flex flex-wrap gap-2">
+                  {data.exhibits.map((e) => (
+                    <li key={e.id}>
+                      <a className="inline-flex items-center gap-1 rounded-full border border-[var(--color-stone)] px-2.5 py-1 text-sm" href={`/d/p/${data.doc.previewToken}/x/${e.id}`} target="_blank" rel="noreferrer">
+                        <Paperclip className="size-3.5" aria-hidden="true" /> {e.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <div className="mt-5 space-y-3">
+              {blockers.length ? (
+                <ul className="space-y-0.5 text-sm text-[#8f6c18]" data-testid="co-blockers">
+                  {blockers.map((b) => (
+                    <li key={b}>{b}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <Recipients contacts={data.contacts} to={to} cc={cc} setTo={setTo} setCc={setCc} onChange={() => setPreview(null)} />
+
+              {previewing ? (
+                <div className="space-y-2" data-testid="co-email">
+                  <Field label="Subject">
+                    <input className={INPUT} value={subject ?? email.subject} onChange={(e) => setSubject(e.target.value)} />
+                  </Field>
+                  <Field label="Message" hint="The link to the change order goes under it.">
+                    <textarea className={`${AREA} min-h-[9rem]`} value={body ?? email.body} onChange={(e) => setBody(e.target.value)} />
+                  </Field>
+                </div>
+              ) : null}
+
+              {err.length ? (
+                <ul className="text-sm text-[#9a2a1f]" role="alert">
+                  {err.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <Button variant="danger" busy={busy === 'reject'} disabled={!!busy} onClick={reject}>
+                Reject
+              </Button>
+            </div>
+
+            {/* Only the total and the main actions stay pinned, so on a phone the
+                bar never covers the lines being priced. */}
+            <div className="sticky bottom-16 z-10 mt-4 rounded-2xl border border-[var(--color-stone)] bg-white p-3 shadow-sm lg:bottom-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-[var(--color-charcoal-light)]">Total</span>
+                <span className="text-xl font-semibold tabular-nums text-[var(--color-charcoal)]" data-testid="co-total">
+                  {usd(total)}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {previewing ? (
+                  <Button variant="primary" busy={busy === 'send'} disabled={!!busy || blockers.length > 0 || to.length === 0} onClick={send}>
+                    <Send className="size-4" aria-hidden="true" /> Send now to {person?.name.split(' ')[0] || to[0]}
+                  </Button>
+                ) : (
+                  <Button variant="primary" busy={busy === 'check'} disabled={!!busy || blockers.length > 0 || to.length === 0} onClick={check}>
+                    <Send className="size-4" aria-hidden="true" /> Send to {person?.name.split(' ')[0] || to[0] || '…'}
+                  </Button>
+                )}
+                <Button
+                  busy={busy === 'save'}
+                  disabled={!!busy}
+                  onClick={async () => {
+                    setErr([])
+                    setBusy('save')
+                    const ok = await save()
+                    setBusy('')
+                    if (ok) router.refresh()
+                  }}
+                >
+                  Save
+                </Button>
+                <Button variant="quiet" className="lg:hidden" onClick={() => setShowDoc((v) => !v)}>
+                  <Eye className="size-4" aria-hidden="true" /> {showDoc ? 'Hide' : 'As they see it'}
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        <section aria-label="What happened" className="mt-6">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">What happened</p>
+          <CoTimeline lines={data.timeline} />
+        </section>
+      </div>
+
+      <section aria-label="As the client sees it" className={`${showDoc || !editable || sent ? 'mt-6' : 'hidden'} lg:mt-0 lg:block`}>
+        <div className="overflow-hidden rounded-2xl border border-[var(--color-stone)]">{docView}</div>
+      </section>
+    </div>
+  )
+}
+
+const toggle = (list: string[], email: string) => (list.includes(email) ? list.filter((e) => e !== email) : [...list, email])
+
+/** The client's contacts as chips: tap for To, again for Cc, again to drop. */
+function Recipients({ contacts, to, cc, setTo, setCc, onChange }: { contacts: PriceIt['contacts']; to: string[]; cc: string[]; setTo: (f: (t: string[]) => string[]) => void; setCc: (f: (c: string[]) => string[]) => void; onChange: () => void }) {
+  if (!contacts.length) return <p className="text-sm text-[#9a2a1f]">No contact on file for this client. Add one on the client before sending.</p>
+  return (
+    <div>
+      <p className="mb-1 text-xs text-[var(--color-charcoal-light)]">To (tap again for Cc)</p>
+      <div className="flex flex-wrap gap-1.5">
+        {contacts.map((c) => {
+          const state = to.includes(c.email) ? 'To' : cc.includes(c.email) ? 'Cc' : ''
+          return (
+            <button
+              key={c.email}
+              type="button"
+              onClick={() => {
+                onChange()
+                if (state === 'To') {
+                  setTo((t) => toggle(t, c.email))
+                  setCc((x) => toggle(x, c.email))
+                } else if (state === 'Cc') setCc((x) => toggle(x, c.email))
+                else setTo((t) => toggle(t, c.email))
+              }}
+              className={`rounded-full border px-2.5 py-1 text-sm ${state ? 'border-[var(--color-teal)] bg-[rgba(0,95,95,0.08)]' : 'border-[var(--color-stone-mid)]'}`}
+            >
+              {state ? `${state}: ` : ''}
+              {c.name || c.email}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Its copy in Joist, made by the Mac (docs/JOIST-SYNC.md): never in the way of sending from here. */
+function JoistLine({ id, joist }: { id: number; joist: PriceIt['joist'] }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  if (joist.error && !joist.waiting) {
+    return (
+      <p className="-mt-2 mb-4 flex flex-wrap items-center gap-2 text-sm text-[#8f6c18]" data-testid="co-joist">
+        Joist copy failed: {joist.error}
+        <button
+          type="button"
+          className="underline"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            await fetch(`/api/change-orders/${id}/joist`, { method: 'POST' })
+            setBusy(false)
+            router.refresh()
+          }}
+        >
+          Try again
+        </button>
+      </p>
+    )
+  }
+  if (!joist.id && !joist.waiting) return null
+  return (
+    <p className="-mt-2 mb-4 text-sm text-[var(--color-charcoal-light)]" data-testid="co-joist">
+      {joist.id ? (
+        <>
+          In Joist as estimate{' '}
+          {joist.url ? (
+            <a className="underline" href={joist.url} target="_blank" rel="noreferrer">
+              {joist.id}
+            </a>
+          ) : (
+            joist.id
+          )}
+          {joist.waiting ? '; the latest changes are on their way.' : '.'}
+        </>
+      ) : (
+        'Waiting for the Mac to copy it into Joist.'
+      )}
+    </p>
+  )
+}
+
+const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Phoenix' })
+
+/** The file as base64, for the JSON body (PDF, PNG or JPG; the API checks again). */
+function base64Of(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''))
+    r.onerror = () => reject(new Error('Could not read the file.'))
+    r.readAsDataURL(file)
+  })
+}
+
+/**
+ * Approved outside the link (signed on paper, a signed PDF back, a "yes" by
+ * email): who, the day, where it came from, and the proof, kept on the change
+ * order's document (lib/billing/coApprove.ts).
+ */
+function MarkApproved({ id, who }: { id: number; who: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState(who)
+  const [on, setOn] = useState(today())
+  const [note, setNote] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function mark() {
+    setBusy(true)
+    setErr('')
+    try {
+      const proof = file ? { filename: file.name, content: await base64Of(file) } : null
+      const r = await post(`/api/change-orders/${id}/approve`, { name, signedOn: on, note, file: proof })
+      if (!r.ok) return setErr(String(r.data.error ?? 'Could not record it.'))
+      router.refresh()
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section aria-label="Approved another way">
+      <Card className="mb-4 space-y-3 p-4">
+        <button type="button" className="flex w-full items-center justify-between text-left" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          <span className="font-medium text-[var(--color-charcoal)]">Approved another way?</span>
+          <span className="text-sm text-[var(--color-charcoal-light)]">{open ? 'Close' : 'Signed copy or email'}</span>
+        </button>
+        {open ? (
+          <>
+            <p className="text-sm text-[var(--color-charcoal-light)]">Signed on paper, a signed PDF back, or a yes by email. Keep the proof with it.</p>
+            <Field label="Who approved it">
+              <input className={INPUT} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
+            </Field>
+            <Field label="Approved on">
+              <input type="date" className={INPUT} value={on} max={today()} onChange={(e) => setOn(e.target.value)} />
+            </Field>
+            <Field label="Where it came from" hint="Optional: “Reply to the CO email”, “Signed at the site meeting”.">
+              <input className={INPUT} value={note} onChange={(e) => setNote(e.target.value)} />
+            </Field>
+            <Field label="Signed copy or approval email" hint="PDF, PNG or JPG. It goes on the change order, where the client sees it too.">
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="block w-full text-sm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </Field>
+            {err ? (
+              <p className="text-sm text-[#9a2a1f]" role="alert">
+                {err}
+              </p>
+            ) : null}
+            <Button variant="primary" busy={busy} disabled={busy || name.trim().length < 2 || !on} onClick={mark}>
+              <Paperclip className="size-4" aria-hidden="true" /> {file ? 'Mark approved with the proof' : 'Mark approved'}
+            </Button>
+          </>
+        ) : null}
+      </Card>
+    </section>
+  )
+}

@@ -22,8 +22,10 @@ import { loadPeople, loadSeats } from "@/lib/roles/store";
 import { canApproveBillHere, canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
 import { ApproveBill, CloseTask, NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
+import CoTimeline from "@/components/billing/CoTimeline";
 import ProgressBilling from "@/components/billing/ProgressBilling";
 import AgreementCard from "@/components/jobs/AgreementCard";
+import { loadTimelines } from "@/lib/billing/coEvents";
 import { CO_LABEL, loadChangeOrders } from "@/lib/billing/registers";
 import { EDITABLE_SCHEDULE_KINDS, loadScheduleFeed, SCHEDULE_KIND_LABEL } from "@/lib/schedule/feed";
 import { NewScheduleItem, ScheduleStatusButton } from "@/components/schedule/ScheduleActions";
@@ -198,6 +200,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const refs = await listJobRefs();
     const cos = (await loadChangeOrders(refs, today)).filter((c) => c.jobKey === ref.key);
     const waiting = cos.filter((c) => c.registerId !== null && !["billed", "rejected", "void"].includes(c.status));
+    const timelines = await loadTimelines(waiting.map((c) => ({ id: c.registerId!, documentId: c.documentId })), { money: seat.money });
     const table: TableRow[] = cos.map((c) => ({
       id: c.id,
       number: c.number,
@@ -228,7 +231,28 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                       {[CO_LABEL[c.status], c.amountCents !== null && seat.money ? formatValue("money", c.amountCents) : null, c.ageDays !== null ? `${c.ageDays} day${c.ageDays === 1 ? "" : "s"} since asked` : null].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  {owner ? <ChangeOrderStep id={c.registerId!} status={c.status} /> : null}
+                  {owner ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {c.status === "requested" || c.status === "priced" ? (
+                        <Link className="rounded-lg bg-[var(--color-teal)] px-3 py-1.5 text-sm font-medium text-white" href={`/app/changes/${c.registerId}`}>
+                          Price it
+                        </Link>
+                      ) : c.status === "sent" && c.documentId ? (
+                        <Link className="rounded-lg border border-[var(--color-stone-mid)] px-3 py-1.5 text-sm font-medium text-[var(--color-charcoal)]" href={`/app/changes/${c.registerId}`}>
+                          Follow up
+                        </Link>
+                      ) : null}
+                      <ChangeOrderStep id={c.registerId!} status={c.status} />
+                    </div>
+                  ) : null}
+                  {timelines.get(c.registerId!)?.length ? (
+                    <details className="w-full">
+                      <summary className="cursor-pointer text-xs text-[var(--color-charcoal-light)]">
+                        {timelines.get(c.registerId!)!.at(-1)!.text}
+                      </summary>
+                      <CoTimeline lines={timelines.get(c.registerId!)!} className="mt-2" />
+                    </details>
+                  ) : null}
                 </li>
               ))}
             </ul>

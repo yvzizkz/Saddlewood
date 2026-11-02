@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { coEventsAfter } from "@/lib/billing/coEvents";
+import { nextChangeOrderNumberFor } from "@/lib/billing/coIntakeStore";
+import { queueJoist } from "@/lib/billing/joistSyncStore";
 import { nextChangeOrderNumber } from "@/lib/billing/numbering";
 import { CO_STATUS, type CoStatus } from "@/lib/billing/registers";
 import { requireOwner } from "@/lib/crew/auth";
@@ -44,7 +47,9 @@ export async function POST(request: NextRequest) {
     .select("id")
     .single();
   if (error) throw new Error(`change_orders insert: ${error.message}`);
-  return NextResponse.json({ ok: true, id: (data as { id: number }).id });
+  const id = (data as { id: number }).id;
+  await coEventsAfter([id], "requested", seat.email, { via: source === "request" ? "" : source });
+  return NextResponse.json({ ok: true, id });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -74,11 +79,15 @@ export async function PATCH(request: NextRequest) {
     if (to === "priced") {
       patch.priced_at = new Date().toISOString();
       patch.priced_by = owner.email;
-      // Its number, CO-n on the job, when it is first priced.
+      // Its number when it is first priced, unless intake already gave it one (8009-CO7 on a job with a prefix, else CO-n).
       if (!cur.number) {
-        const { data: used } = await db.from("change_orders").select("number").eq("job_id", cur.job_id ?? "00000000-0000-0000-0000-000000000000");
-        const { data: docs } = cur.job_id ? await db.from("documents").select("number").eq("job_id", cur.job_id).eq("kind", "change_order") : { data: [] };
-        patch.number = nextChangeOrderNumber([...((used ?? []) as { number: string }[]), ...((docs ?? []) as { number: string }[])].map((x) => x.number).filter(Boolean));
+        if (cur.job_id) {
+          const { data: job } = await db.from("jobs").select("number_prefix").eq("id", cur.job_id).maybeSingle();
+          patch.number = await nextChangeOrderNumberFor(cur.job_id, (job as { number_prefix?: string | null } | null)?.number_prefix ?? "");
+        } else {
+          const { data: used } = await db.from("change_orders").select("number").is("job_id", null);
+          patch.number = nextChangeOrderNumber(((used ?? []) as { number: string }[]).map((x) => x.number).filter(Boolean));
+        }
       }
     }
     if (to === "signed") patch.signed_on = b.signedOn && isDay(b.signedOn) ? b.signedOn : new Date().toISOString().slice(0, 10);
@@ -89,5 +98,26 @@ export async function PATCH(request: NextRequest) {
   if (!Object.keys(patch).length) return NextResponse.json({ ok: false, error: "Nothing to change." }, { status: 400 });
   const { error } = await db.from("change_orders").update(patch).eq("id", b.id!);
   if (error) throw new Error(`change_orders update: ${error.message}`);
+
+  // The timeline: the step it moved to, else a new price or note.
+  const to = patch.status as CoStatus | undefined;
+  const amountCents = (patch.amount_cents as number | undefined) ?? cur.amount_cents;
+  if (to && to !== cur.status) {
+    const detail: Record<string, unknown> =
+      to === "requested" ? { reopened: true }
+      : to === "priced" ? { amountCents }
+      : to === "signed" ? { signedOn: patch.signed_on, amountCents, marked: true }
+      : to === "billed" ? { invoiceId: b.billedDocumentId ?? null }
+      : to === "rejected" ? { note: patch.note ?? "" }
+      : to === "sent" ? { marked: true }
+      : {};
+    await coEventsAfter([b.id!], to === "requested" ? "requested" : to, owner.email, detail);
+    if (to === "priced" || to === "signed") await queueJoist(b.id!, to);
+  } else if (patch.amount_cents !== undefined && patch.amount_cents !== cur.amount_cents) {
+    await coEventsAfter([b.id!], "updated", owner.email, { amountCents });
+    await queueJoist(b.id!, "priced");
+  } else if (typeof patch.note === "string" && patch.note) {
+    await coEventsAfter([b.id!], "note", owner.email, { note: patch.note });
+  }
   return NextResponse.json({ ok: true, number: patch.number ?? cur.number });
 }
