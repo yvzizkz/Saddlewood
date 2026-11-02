@@ -92,15 +92,39 @@ test.describe("Price it", () => {
       await expect(page.getByLabel("Subject")).toHaveValue(`Change order ${co.number}: Shear Wall Revision at Studio / Garage Door (8009 N Ironwood Dr (Jury AFT 123))`);
       await expect(page.getByLabel("Message")).toHaveValue(/\$3,000\.50/);
       await page.screenshot({ path: `${SHOTS}/phone-email.png`, fullPage: true });
-      // Changing a price while the email is open closes it: the second tap can't send a draft other than the one on screen.
+      // Words typed into the email belong to that preview. Changing a price while it is open closes it and
+      // drops them: the second tap can't send a draft, or a message, other than the one on screen.
+      await page.getByLabel("Subject").fill("Custom subject");
+      await page.getByLabel("Message").fill("Custom message at $3,000.50");
       await page.getByLabel("Line 1 price").fill("1900");
       await expect(page.getByTestId("co-email")).toHaveCount(0);
       await expect(page.getByRole("button", { name: /^Send now/ })).toHaveCount(0);
       await send.click();
       await expect(page.getByLabel("Message")).toHaveValue(/\$3,100\.50/);
+      await expect(page.getByLabel("Message")).not.toHaveValue(/Custom message/);
+      await expect(page.getByLabel("Subject")).toHaveValue(`Change order ${co.number}: Shear Wall Revision at Studio / Garage Door (8009 N Ironwood Dr (Jury AFT 123))`);
       await expect.poll(() => sql(`select amount_cents from change_orders where id = ${co.changeOrderId}`)).toBe("310050");
+      // A change of who it goes to closes it too, and its typed words go with it.
+      await page.getByLabel("Message").fill("Custom message for the first contact");
+      // (A contact tapped goes To → Cc → off → To again.)
+      const chip = page.getByRole("button", { name: /^To: / }).first();
+      const chipName = ((await chip.textContent()) ?? "").replace(/^To: /, "");
+      await chip.click();
+      await expect(page.getByTestId("co-email")).toHaveCount(0);
+      const same = page.getByRole("button", { name: new RegExp(`${chipName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) }).first();
+      await same.click();
+      await same.click();
+      await expect(page.getByRole("button", { name: `To: ${chipName}` })).toBeVisible();
+      await send.click();
+      await expect(page.getByLabel("Message")).not.toHaveValue(/Custom message/);
+      // The second tap sends exactly what the preview shows: the new total, never the old words.
+      const sentReq = page.waitForRequest((r) => r.url().endsWith(`/api/change-orders/${co.changeOrderId}/send`) && (r.postDataJSON() as { confirm?: boolean }).confirm === true);
       // The second tap: locally there is no mail key, so it cannot leave, and the register does not move.
       await page.getByRole("button", { name: /^Send now/ }).click();
+      const sentBody = (await sentReq).postDataJSON() as { subject: string; body: string };
+      expect(sentBody.body).toMatch(/\$3,100\.50/);
+      expect(sentBody.body).not.toMatch(/Custom message|\$3,000\.50/);
+      expect(sentBody.subject).not.toBe("Custom subject");
       await expect(page.locator("ul[role=alert]")).toContainText("mail service is not set up");
       expect(sql(`select status from change_orders where id = ${co.changeOrderId}`)).toBe("requested");
       expect(sql(`select status from documents where id = '${co.documentId}'`)).toBe("draft");
