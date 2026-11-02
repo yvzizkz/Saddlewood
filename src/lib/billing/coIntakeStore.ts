@@ -35,7 +35,7 @@ export type IntakeOutcome = {
   reason?: string;
 };
 
-type CoRow = { id: number; number: string; status: string; title: string; detail: string; document_id: string | null; intake_hash: string };
+type CoRow = { id: number; job_id: string | null; number: string; status: string; title: string; detail: string; document_id: string | null; intake_hash: string };
 
 /** The next change-order number on a billing job: past every register row and change-order document it has. */
 export async function nextChangeOrderNumberFor(jobId: string, prefix: string): Promise<string> {
@@ -53,7 +53,7 @@ async function event(changeOrderId: number, kind: string, actor: string, detail:
 async function findRow(sourceRef: string, key: string): Promise<CoRow | null> {
   const { data, error } = await getSupabaseAdmin()
     .from("change_orders")
-    .select("id,number,status,title,detail,document_id,intake_hash")
+    .select("id,job_id,number,status,title,detail,document_id,intake_hash")
     .eq("source_ref", sourceRef)
     .eq("source_key", key)
     .maybeSingle();
@@ -168,10 +168,19 @@ async function refresh(row: CoRow, it: IntakeItem, ctx: DraftContext, actor: str
 /** Take in one request: every change it asks for, each once. */
 export async function runIntake(input: Intake, actor: string): Promise<IntakeOutcome[]> {
   const job = await loadJob(input.job);
+  // A thread's item is one change order on one job. The same thread and key
+  // under another job (a corrected job, or one thread covering two jobs) is
+  // refused before anything is written, so the other job's draft is never rewritten.
+  const rows = await Promise.all(input.items.map((it) => findRow(input.sourceRef, it.key)));
+  const clash = rows.findIndex((r) => r && r.job_id !== job.billingId);
+  if (clash >= 0) {
+    const row = rows[clash]!;
+    throw new IntakeError(`thread ${input.sourceRef} item "${input.items[clash].key}" is already ${row.number || "a change order"} on ${await jobName(row.job_id)}; give it its own key for ${job.ctx.jobName}`, 409);
+  }
   const out: IntakeOutcome[] = [];
-  for (const it of input.items) {
+  for (const [i, it] of input.items.entries()) {
     const ctx: DraftContext = { ...job.ctx, requestedBy: input.requestedBy, requestedOn: input.requestedOn, subject: input.subject, terms: input.terms };
-    const row = await findRow(input.sourceRef, it.key);
+    const row = rows[i];
     out.push(row ? await refresh(row, it, ctx, actor) : await create(job, input, it, ctx, actor));
   }
   await tellOwners(out.filter((o) => o.action === "created"), input, job.ctx.jobName);
@@ -192,4 +201,10 @@ async function tellOwners(created: IntakeOutcome[], input: Intake, jobName: stri
   } catch (e) {
     console.error("[co intake] push:", (e as Error).message);
   }
+}
+
+async function jobName(jobId: string | null): Promise<string> {
+  if (!jobId) return "no job";
+  const { data } = await getSupabaseAdmin().from("jobs").select("name").eq("id", jobId).maybeSingle();
+  return (data as { name?: string } | null)?.name || "another job";
 }
