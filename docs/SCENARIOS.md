@@ -22,6 +22,7 @@ Each scenario drives the screens a person in that seat would use, writes through
 | 6 | **Subs:** package → invites → leveling → award under $10k by the PM → work order → no-COI block → bill → waiver hold → payment | PM / Finance | `e2e/subs-week.spec.ts` | **done (4/4)** · agy |
 | 7 | **Sales admin:** lead with source → estimate → no follow-up in 5 days escalates → proposal → award builds the job | Sales (Marco covering) | `e2e/sales-week.spec.ts` | **done (2/2)** · agy |
 | 8 | **Powell progress payments:** PM `% complete` report before cutoff (clears client task, pre-fills owner draw), percent complete on the SOV, a minor extra, invoice, check, roll-forward | PM (Eli) / Finance | `e2e/pm-progress.spec.ts`, `e2e/powell-draw.spec.ts`, `e2e/draw-void.spec.ts` | **done (5/5)** · agy, claude |
+| 9 | **A change order's week:** emailed request → numbered $0 draft → owners' Tasks → priced on its page → sent → client approves on the link (phone) → Joist copy → Finance's "Bill" task → billed on the draw | Owner / client / the Mac / Finance | `e2e/co-week.spec.ts` | **done (1/1)** · claude |
 
 ## 1. Finance: the AFT billing week (Ilene)
 
@@ -114,6 +115,17 @@ Each scenario drives the screens a person in that seat would use, writes through
 4. **PM `% complete` report → task clears & owner's draw opens prefilled** (`e2e/pm-progress.spec.ts`).
    - On `9146 W Hutton Dr` (Schifferer Built LLC, closes the 20th), the PM sends `% complete` + note (`Send my % complete`), which clears `"% complete and photos for Schifferer Built LLC (Synthetic)"` from `Tasks`; off-job reports (`404`) and PM draw attempts (`403`) are refused.
    - On `3526 Emerson Street (Powell)`, backward `%` is refused (`400` + UI guard); the PM reports Framing `90% → 95%` (`+$8,250.00`), the owner opens `Job › Money` to see `"Eli Ramirez's % complete"` prefilled at `95%` (`$8,250.00`), clicks `"Make the draft invoice"` to create the `$8,250.00` draft, and the report banner clears once spent by the draw.
+
+## 9. A change order's week (the Jury job, AFT)
+
+One CO end to end, with each step handing to the next (every step also has its own spec: `co-intake`, `co-price`, `co-approve`, `joist-sync`, `powell-draw`).
+1. **Taken in.** The Mac posts Chris Turner's emailed request: a register row awaiting price and a $0 draft numbered `8009-CO<n>` from the start, queued for Joist (`drafted`). The owners' Tasks show `Price: <title>`, opening `/app/changes/<id>`.
+2. **Priced and sent.** One line priced at `$1,240.00` on its page; the draft and the register both carry it, and the waiting Joist job folds to `priced`. Marked sent (local mail has no key, so the document is put out with a link by hand), it leaves the price list.
+3. **Approved on the link.** Not signed in, on a phone: `$1,240.00 added to the contract`, name, consent, `Approve and sign`. The register is `signed` today; Joist's one waiting job is now `signed`.
+4. **In Joist.** The Mac claims it as it is now (`8009-CO<n>`, `$1,240`), reports the estimate id, and its page reads `In Joist as estimate …` with `Approved by Chris Turner on the link` and `Copied to Joist` on its timeline.
+5. **Billed.** Finance's Tasks show `Bill 8009-CO<n>`. On `Job › Money` the signed CO is on Jury's schedule of values; 100% previews `$1,240` gross, makes the draft invoice and issues it. The CO is `billed` against that invoice (its `billed` event names the invoice number), and it leaves Finance's Tasks and the open Changes. The draw is voided after, which puts a billed CO back to signed (`draw-void`), and the run's rows are removed.
+
+**Run note:** the e2e specs share one local database and run one at a time (`workers: 1`). Two suites on the same stack at once interfere, e.g. `joist-sync` parks every queued Joist job, including another run's.
 
 ## What an owner, a PM and finance can and can't do today
 
