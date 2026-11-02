@@ -45,9 +45,10 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
   const [cc, setCc] = useState<string[]>([])
   const [subject, setSubject] = useState<string | null>(null)
   const [body, setBody] = useState<string | null>(null)
-  // The email preview is for the draft as it was saved on the first tap. Any
-  // edit after that (title, a line, a price, the note) closes it, so the second
-  // tap can never send a draft that differs from what is on screen.
+  // The email preview is for the draft and recipients as they were on the
+  // first tap. Any edit after that (title, a line, a price, the note, who it
+  // goes to) closes it, and a subject or message typed into it goes with it,
+  // so the second tap can never send words written for another total.
   const [preview, setPreview] = useState<{ key: string } | null>(null)
   const [showDoc, setShowDoc] = useState(false)
   const [busy, setBusy] = useState<'' | 'save' | 'check' | 'send' | 'reject'>('')
@@ -62,7 +63,8 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
     lines: lines.map((l, i) => ({ description: l.description.trim(), note: l.note.trim(), amountCents: prices[i] ?? 0, noCharge: l.noCharge })),
   }
   const editKey = JSON.stringify(edit)
-  const previewing = preview !== null && preview.key === editKey
+  const previewKey = JSON.stringify([editKey, to, cc])
+  const previewing = preview !== null && preview.key === previewKey
   const snapshot = useMemo(() => applyPrices(data.doc.snapshot, edit), [data.doc.snapshot, editKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const total = (snapshot.lines ?? []).reduce((s, l) => s + l.amountCents, 0)
   const blockers = [...(badPrice >= 0 ? [`Line ${badPrice + 1}: the price is not a number.`] : []), ...sendBlockers(edit.title, snapshot)]
@@ -83,16 +85,20 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
     return r.ok
   }
 
-  const message = () => ({ to, cc, subject: subject ?? email.subject, body: body ?? email.body })
+  // What was typed into the preview counts only while that preview is open.
+  const message = () => ({ to, cc, subject: previewing && subject !== null ? subject : email.subject, body: previewing && body !== null ? body : email.body })
 
   async function check() {
     setErr([])
     setBusy('check')
+    // A new preview starts from the email for what is on screen now.
+    setSubject(null)
+    setBody(null)
     try {
       if (!(await save())) return
-      const r = await post(`/api/change-orders/${data.id}/send`, message())
+      const r = await post(`/api/change-orders/${data.id}/send`, { to, cc, subject: email.subject, body: email.body })
       if (!r.ok) return setErr([String(r.data.error ?? 'Could not prepare it.'), ...((r.data.blockers as string[]) ?? [])])
-      setPreview({ key: editKey })
+      setPreview({ key: previewKey })
     } finally {
       setBusy('')
     }

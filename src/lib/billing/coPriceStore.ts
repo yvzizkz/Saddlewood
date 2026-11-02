@@ -36,6 +36,7 @@ type Row = {
   requested_on: string;
   requested_by: string;
   priced_at: string | null;
+  priced_by: string;
   document_id: string | null;
 };
 
@@ -60,7 +61,7 @@ export type PriceIt = {
 async function readRow(id: number): Promise<Row> {
   const { data, error } = await getSupabaseAdmin()
     .from("change_orders")
-    .select("id,job_id,crew_job_id,number,title,detail,status,amount_cents,requested_on,requested_by,priced_at,document_id")
+    .select("id,job_id,crew_job_id,number,title,detail,status,amount_cents,requested_on,requested_by,priced_at,priced_by,document_id")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`change_orders read: ${error.message}`);
@@ -95,7 +96,8 @@ async function draftFor(row: Row, actor: string): Promise<BillingDocument> {
     snapshot: {
       job: { name: j.name ?? "", ...(j.address ? { address: j.address } : {}) },
       date: row.requested_on,
-      lines: [{ description: row.title, amountCents: 0, ...(row.detail ? { note: row.detail } : {}) }],
+      // One priced on the register before it had a document keeps that price.
+      lines: [{ description: row.title, amountCents: row.amount_cents ?? 0, ...(row.detail ? { note: row.detail } : {}) }],
     },
     createdBy: actor,
   });
@@ -147,15 +149,33 @@ export async function savePrices(id: number, edit: PriceEdit, actor: string): Pr
   if (doc.status !== "draft") throw new PriceError("Its document was already issued.", 409);
   if (edit.lines.length !== (doc.snapshot.lines ?? []).length) throw new PriceError("The lines changed under you; reload and price again.", 409);
   const snapshot = applyPrices(doc.snapshot, edit);
-  const saved = await updateDraft(doc.id, { title: edit.title, snapshot });
   const total = totalOf(snapshot);
   const priced = snapshot.lines?.some((l) => l.amountCents > 0 || l.noCharge) ?? false;
-  const { error } = await getSupabaseAdmin()
+  // Every price taken off one that was priced: it is waiting for its price again
+  // (a priced change order always has an amount, change_orders_priced_check).
+  const unpriced = !priced && row.status === "priced";
+  const db = getSupabaseAdmin();
+  // The register first, then the draft; if the draft cannot be written, the register is put back.
+  const { data: moved, error } = await db
     .from("change_orders")
-    .update({ title: edit.title, amount_cents: priced ? total : null })
+    .update({ title: edit.title, amount_cents: priced ? total : null, ...(unpriced ? { status: "requested", priced_at: null, priced_by: "" } : {}) })
     .eq("id", id)
-    .in("status", ["requested", "priced"]);
+    .eq("status", row.status)
+    .select("id");
   if (error) throw new Error(`change_orders update: ${error.message}`);
+  if (!(moved ?? []).length) throw new PriceError("It changed a moment ago; reload and price again.", 409);
+  let saved: BillingDocument;
+  try {
+    saved = await updateDraft(doc.id, { title: edit.title, snapshot });
+  } catch (err) {
+    const { error: back } = await db
+      .from("change_orders")
+      .update({ title: row.title, amount_cents: row.amount_cents, status: row.status, priced_at: row.priced_at, priced_by: row.priced_by })
+      .eq("id", id);
+    if (back) console.error("change order price not put back:", id, back.message);
+    throw err;
+  }
+  if (unpriced) await event(id, "updated", actor, { status: "requested", note: "every price taken off" });
   return saved;
 }
 
