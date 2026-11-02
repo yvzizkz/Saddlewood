@@ -44,6 +44,7 @@ export function DocumentView({
   saveHref,
   band,
   dateIfUnset,
+  footer,
 }: {
   doc: BillingDocument;
   exhibits: Exhibit[];
@@ -55,6 +56,8 @@ export function DocumentView({
   band?: ReactNode;
   /** The date shown when the document has none of its own and is not issued yet (a preview: today). */
   dateIfUnset?: string;
+  /** Below the document: a change order's approval. */
+  footer?: ReactNode;
 }) {
   const s = doc.snapshot;
   const lines = s.lines ?? [];
@@ -340,6 +343,7 @@ export function DocumentView({
           )}
         </div>
       </article>
+      {footer}
       <p className="mx-auto mt-6 max-w-3xl text-center text-[11px] tracking-wide text-charcoal-light print:hidden">
         Saddlewood Contracting LLC · 480-999-6100
       </p>
