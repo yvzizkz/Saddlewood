@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { totalOf } from "../documents";
 import { readMailReport, verifyMailSignature } from "../mailEvents";
-import { nextChangeOrderNumber, nextNumber, normalizeNumber, sequenceOf } from "../numbering";
+import { changeOrderSequence, nextChangeOrderNumber, nextNumber, normalizeNumber, sequenceOf } from "../numbering";
 import { describeDevice, looksAutomatic, summarizeProof } from "../proof";
 import type { DocumentEvent } from "../types";
 
@@ -47,6 +47,14 @@ describe("document numbers", () => {
     expect(nextChangeOrderNumber([])).toBe("CO-1");
     expect(nextChangeOrderNumber(["CO-1", "co-2"])).toBe("CO-3");
     expect(nextChangeOrderNumber(["CO-9"])).toBe("CO-10");
+  });
+
+  it("numbers a job with a prefix the way clients see it, counting both forms as one sequence", () => {
+    expect(nextChangeOrderNumber([], "8009")).toBe("8009-CO1");
+    expect(nextChangeOrderNumber(["CO-4", "8009-CO7", "8009-co 8"], "8009")).toBe("8009-CO9");
+    expect(nextChangeOrderNumber(["8009-11", "8009-12"], "8009")).toBe("8009-CO1");
+    expect(changeOrderSequence("8009-CO-07")).toBe(7);
+    expect(changeOrderSequence("ABCO-5")).toBeNull();
   });
 });
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { nextChangeOrderNumberFor } from "@/lib/billing/coIntakeStore";
 import { nextChangeOrderNumber } from "@/lib/billing/numbering";
 import { CO_STATUS, type CoStatus } from "@/lib/billing/registers";
 import { requireOwner } from "@/lib/crew/auth";
@@ -74,11 +75,15 @@ export async function PATCH(request: NextRequest) {
     if (to === "priced") {
       patch.priced_at = new Date().toISOString();
       patch.priced_by = owner.email;
-      // Its number, CO-n on the job, when it is first priced.
+      // Its number when it is first priced, unless intake already gave it one (8009-CO7 on a job with a prefix, else CO-n).
       if (!cur.number) {
-        const { data: used } = await db.from("change_orders").select("number").eq("job_id", cur.job_id ?? "00000000-0000-0000-0000-000000000000");
-        const { data: docs } = cur.job_id ? await db.from("documents").select("number").eq("job_id", cur.job_id).eq("kind", "change_order") : { data: [] };
-        patch.number = nextChangeOrderNumber([...((used ?? []) as { number: string }[]), ...((docs ?? []) as { number: string }[])].map((x) => x.number).filter(Boolean));
+        if (cur.job_id) {
+          const { data: job } = await db.from("jobs").select("number_prefix").eq("id", cur.job_id).maybeSingle();
+          patch.number = await nextChangeOrderNumberFor(cur.job_id, (job as { number_prefix?: string | null } | null)?.number_prefix ?? "");
+        } else {
+          const { data: used } = await db.from("change_orders").select("number").is("job_id", null);
+          patch.number = nextChangeOrderNumber(((used ?? []) as { number: string }[]).map((x) => x.number).filter(Boolean));
+        }
       }
     }
     if (to === "signed") patch.signed_on = b.signedOn && isDay(b.signedOn) ? b.signedOn : new Date().toISOString().slice(0, 10);
