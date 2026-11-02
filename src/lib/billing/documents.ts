@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 
+import { coEventsAfter } from "./coEvents";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeNumber } from "./numbering";
 import type {
@@ -403,13 +404,16 @@ export async function voidDocument(id: string, reason: string, now: Date = new D
   if (!data) throw new DocumentError("only an issued document can be voided", 409);
   // A change order this invoice billed (a draw that took it to 100%, or its own
   // invoice) is owed again: back to signed, so it shows to bill on Changes and the schedule.
-  const { error: coError } = await db
+  const { data: reopened, error: coError } = await db
     .from("change_orders")
     .update({ status: "signed", billed_document_id: null })
     .eq("billed_document_id", id)
-    .eq("status", "billed");
+    .eq("status", "billed")
+    .select("id");
   if (coError) fail("reopen change orders", coError.message);
-  return toDocument(data as DocumentRow);
+  const doc = toDocument(data as DocumentRow);
+  await coEventsAfter(((reopened ?? []) as { id: number }[]).map((r) => r.id), "updated", "", { status: "signed", why: `${doc.number || "its invoice"} was voided` });
+  return doc;
 }
 
 export async function getDocument(id: string): Promise<BillingDocument | null> {

@@ -2,6 +2,7 @@
 // billed to date on each line, and creating a draw as a draft invoice.
 // Server only. The math is in progress.ts.
 
+import { coEventsAfter } from "./coEvents";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { localDay } from "@/lib/crew/time";
 import { createDraft, usedNumbers } from "./documents";
@@ -240,7 +241,10 @@ export async function createDrawDraft(billingJobId: string, asked: Record<string
 
   // A signed change order that this draw takes to 100% is billed.
   const done = draw.lines.filter((l) => l.kind === "co" && l.pct >= 100 && l.thisPeriodCents > 0).map((l) => Number(l.key.slice(3)));
-  if (done.length) await db.from("change_orders").update({ status: "billed", billed_document_id: doc.id }).in("id", done).eq("status", "signed");
+  if (done.length) {
+    const { data: billed } = await db.from("change_orders").update({ status: "billed", billed_document_id: doc.id }).in("id", done).eq("status", "signed").select("id");
+    await coEventsAfter(((billed ?? []) as { id: number }[]).map((r) => r.id), "billed", by, { invoiceId: doc.id, invoice: doc.number });
+  }
 
   return { documentId: doc.id, number: doc.number, draw };
 }
@@ -257,8 +261,9 @@ export async function discardDraw(billingJobId: string): Promise<string> {
   const db = getSupabaseAdmin();
   const rows = await db.from("sov_progress").delete().eq("document_id", id);
   if (rows.error) throw new Error(`sov_progress delete: ${rows.error.message}`);
-  const cos = await db.from("change_orders").update({ status: "signed", billed_document_id: null }).eq("billed_document_id", id).eq("status", "billed");
+  const cos = await db.from("change_orders").update({ status: "signed", billed_document_id: null }).eq("billed_document_id", id).eq("status", "billed").select("id");
   if (cos.error) throw new Error(`change_orders reopen: ${cos.error.message}`);
+  await coEventsAfter(((cos.data ?? []) as { id: number }[]).map((r) => r.id), "updated", "", { status: "signed", why: `draft draw ${number} was discarded` });
   const doc = await db.from("documents").delete().eq("id", id).eq("status", "draft");
   if (doc.error) throw new Error(`documents delete: ${doc.error.message}`);
   return number;

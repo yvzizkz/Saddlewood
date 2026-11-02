@@ -22,8 +22,10 @@ import { loadPeople, loadSeats } from "@/lib/roles/store";
 import { canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
 import { CloseTask, NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
+import CoTimeline from "@/components/billing/CoTimeline";
 import ProgressBilling from "@/components/billing/ProgressBilling";
 import AgreementCard from "@/components/jobs/AgreementCard";
+import { loadTimelines } from "@/lib/billing/coEvents";
 import { CO_LABEL, loadChangeOrders } from "@/lib/billing/registers";
 import { EDITABLE_SCHEDULE_KINDS, loadScheduleFeed, SCHEDULE_KIND_LABEL } from "@/lib/schedule/feed";
 import { NewScheduleItem, ScheduleStatusButton } from "@/components/schedule/ScheduleActions";
@@ -198,6 +200,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const refs = await listJobRefs();
     const cos = (await loadChangeOrders(refs, today)).filter((c) => c.jobKey === ref.key);
     const waiting = cos.filter((c) => c.registerId !== null && !["billed", "rejected", "void"].includes(c.status));
+    const timelines = await loadTimelines(waiting.map((c) => ({ id: c.registerId!, documentId: c.documentId })), { money: seat.money });
     const table: TableRow[] = cos.map((c) => ({
       id: c.id,
       number: c.number,
@@ -237,6 +240,14 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                       ) : null}
                       <ChangeOrderStep id={c.registerId!} status={c.status} />
                     </div>
+                  ) : null}
+                  {timelines.get(c.registerId!)?.length ? (
+                    <details className="w-full">
+                      <summary className="cursor-pointer text-xs text-[var(--color-charcoal-light)]">
+                        {timelines.get(c.registerId!)!.at(-1)!.text}
+                      </summary>
+                      <CoTimeline lines={timelines.get(c.registerId!)!} className="mt-2" />
+                    </details>
                   ) : null}
                 </li>
               ))}

@@ -21,8 +21,8 @@ function from(table: string) {
     return hit;
   };
   const b = {
-    insert(row: Row) {
-      (db.tables[table] ??= []).push(row);
+    insert(row: Row | Row[]) {
+      (db.tables[table] ??= []).push(...(Array.isArray(row) ? row : [row]));
       return Promise.resolve({ error: null });
     },
     update(p: Row) {
