@@ -228,7 +228,16 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                       {[CO_LABEL[c.status], c.amountCents !== null && seat.money ? formatValue("money", c.amountCents) : null, c.ageDays !== null ? `${c.ageDays} day${c.ageDays === 1 ? "" : "s"} since asked` : null].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  {owner ? <ChangeOrderStep id={c.registerId!} status={c.status} /> : null}
+                  {owner ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {c.status === "requested" || c.status === "priced" ? (
+                        <Link className="rounded-lg bg-[var(--color-teal)] px-3 py-1.5 text-sm font-medium text-white" href={`/app/changes/${c.registerId}`}>
+                          Price it
+                        </Link>
+                      ) : null}
+                      <ChangeOrderStep id={c.registerId!} status={c.status} />
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>

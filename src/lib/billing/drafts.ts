@@ -59,7 +59,7 @@ function list(v: unknown, where: string, max: number): unknown[] {
 
 function line(raw: unknown, where: string): DocumentLine {
   if (!isObject(raw)) throw new Bad(`${where} must be an object`);
-  only(raw, ["description", "amountCents", "quantity", "unit", "note", "parts"], where);
+  only(raw, ["description", "amountCents", "quantity", "unit", "note", "noCharge", "parts"], where);
   const out: DocumentLine = {
     description: text(raw.description, `${where}.description`, 2000, true)!,
     amountCents: cents(raw.amountCents, `${where}.amountCents`),
@@ -72,6 +72,11 @@ function line(raw: unknown, where: string): DocumentLine {
   if (unit) out.unit = unit;
   const note = text(raw.note, `${where}.note`, 4000);
   if (note) out.note = note;
+  if (raw.noCharge !== undefined) {
+    if (typeof raw.noCharge !== "boolean") throw new Bad(`${where}.noCharge must be true or false`);
+    if (raw.noCharge && out.amountCents !== 0) throw new Bad(`${where} is marked no charge but has a price`);
+    if (raw.noCharge) out.noCharge = true;
+  }
   if (raw.parts !== undefined) {
     out.parts = list(raw.parts, `${where}.parts`, 50).map((p, j) => {
       const w = `${where}.parts[${j}]`;
