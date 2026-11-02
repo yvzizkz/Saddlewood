@@ -2,7 +2,12 @@
 // can't open in Accounting. Signed in as the synthetic PM, a crew-marked seat
 // with money.view and projects.mine. Local stack only (support/env.ts).
 
+import { execSync } from "node:child_process";
+
 import { cents, expect, hours, PM, signIn, test as base } from "./support/env";
+
+const DB = "postgresql://postgres:postgres@127.0.0.1:55322/postgres";
+const sql = (q: string) => execSync(`psql "${DB}" -qAtc ${JSON.stringify(q.replace(/\s+/g, " "))}`, { encoding: "utf8" }).trim();
 
 const test = base.extend<{ pm: import("@playwright/test").Page }>({
   pm: async ({ context, page }, provide) => {
@@ -11,7 +16,33 @@ const test = base.extend<{ pm: import("@playwright/test").Page }>({
   },
 });
 
+const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Phoenix" });
+const monthFirst = `${today.slice(0, 7)}-01`;
+
 test.describe("PM access: his jobs, no pay, no payables", () => {
+  test.beforeAll(() => {
+    sql(`delete from crew_shifts where client_in like 'e2e-pm-access-%'`);
+    const days = monthFirst === today ? [today] : [monthFirst, today];
+    for (const day of days) {
+      sql(`
+        insert into crew_shifts (email, job_id, job_name, day, started_at, ended_at, break_min, trade, note, source, end_source, status, client_in)
+        values
+          ('tacho.framing@example.com', '9146-w-hutton-dr', '9146 W Hutton Dr (Bellevue AC938)', '${day}',
+           ('${day}'::date + time '06:30') at time zone 'America/Phoenix',
+           ('${day}'::date + time '14:30') at time zone 'America/Phoenix',
+           30, 'framing', 'e2e pm-access PM job shift', 'app', 'app', 'ok', 'e2e-pm-access-pm-${day}'),
+          ('omar.runner@example.com', '4125-e-camelback-rd', '4125 E Camelback Rd (Carder AFT 129)', '${day}',
+           ('${day}'::date + time '07:00') at time zone 'America/Phoenix',
+           ('${day}'::date + time '13:30') at time zone 'America/Phoenix',
+           30, 'general', 'e2e pm-access non-PM job shift', 'app', 'app', 'ok', 'e2e-pm-access-other-${day}')
+      `);
+    }
+  });
+
+  test.afterAll(() => {
+    sql(`delete from crew_shifts where client_in like 'e2e-pm-access-%'`);
+  });
+
   test("opens Overview, Payroll, Purchases, Receivables and Billing; the section row lists only those", async ({ pm: page }) => {
     for (const path of ["/app/accounting", "/app/accounting/payroll?p=mtd", "/app/accounting/purchases?p=ytd", "/app/accounting/receivables", "/app/accounting/billing?p=ytd"]) {
       const res = await page.goto(path);
@@ -30,15 +61,13 @@ test.describe("PM access: his jobs, no pay, no payables", () => {
   });
 
   test("sees hours on his jobs only, and never labor dollars, even when he asks", async ({ owner: page, browser }) => {
-    // Pin to a seeded month so month-to-date isn't 0 on the 1st of a new month.
-    const period = "p=custom&from=2026-10-01&to=2026-10-31";
-    await page.goto(`/app/accounting/payroll?${period}`);
+    await page.goto("/app/accounting/payroll?p=mtd");
     const ownerHours = hours(await page.locator('[data-kpi="value"]').textContent())!;
 
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await signIn(ctx, PM, { crew: true });
     const pm = await ctx.newPage();
-    await pm.goto(`/app/accounting/payroll?${period}&m=cost`);
+    await pm.goto("/app/accounting/payroll?p=mtd&m=cost");
     const pmHours = hours(await pm.locator('[data-kpi="value"]').textContent())!;
     expect(pmHours).toBeGreaterThan(0);
     expect(pmHours).toBeLessThan(ownerHours);
