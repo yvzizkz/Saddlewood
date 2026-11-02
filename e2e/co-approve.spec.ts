@@ -107,4 +107,61 @@ test.describe("Change order approval on the link", () => {
            commit;`);
     }
   });
+
+  test("an owner marks one approved another way on a phone, with the signed copy kept on it; once only", async ({ owner: page, browser }) => {
+    const ref = `e2e-co-mark-${Date.now()}`;
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Phoenix" });
+    const bot = await http.newContext({ baseURL: BASE, extraHTTPHeaders: { Authorization: `Bearer ${TOKEN}`, "X-Ops-Actor": "bot" } });
+    const clientCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    try {
+      const made = await bot.post("/api/change-orders/intake", {
+        data: { sourceRef: ref, job: "8009-n-ironwood-dr", requestedBy: "Chris Turner (AFT)", requestedOn: "2026-11-02", items: [{ key: "bib", title: "Extra hose bib at the patio", lines: [{ description: "Hose bib and line" }] }] },
+      });
+      expect(made.status()).toBe(201);
+      const [co] = (await made.json()).changeOrders as { changeOrderId: number; number: string; documentId: string }[];
+      expect((await page.request.post(`/api/change-orders/${co.changeOrderId}/price`, { data: { title: "Extra hose bib at the patio", note: "", lines: [{ description: "Hose bib and line", note: "", amountCents: 48500, noCharge: false }] } })).status()).toBe(200);
+      for (const status of ["priced", "sent"]) expect((await page.request.patch("/api/change-orders", { data: { id: co.changeOrderId, status } })).status()).toBe(200);
+      const token = randomBytes(16).toString("hex");
+      sql(`update documents set status = 'issued', issued_at = now(), token = '${token}' where id = '${co.documentId}'`);
+
+      // Chris signed the PDF and emailed it back: the owner records it from the phone, with the file.
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`/app/changes/${co.changeOrderId}`, { waitUntil: "networkidle" });
+      const box = page.getByRole("region", { name: "Approved another way" });
+      await box.getByRole("button", { name: /Approved another way/ }).click();
+      await box.getByLabel("Who approved it").fill("Chris Turner");
+      await box.getByLabel("Where it came from").fill("Signed PDF back by email");
+      await box.getByLabel("Signed copy or approval email").setInputFiles({ name: "CO signed.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n% e2e signed copy\n") });
+      await page.screenshot({ path: `${SHOTS}/mark-phone.png`, fullPage: true });
+      await box.getByRole("button", { name: "Mark approved with the proof" }).click();
+      await expect(page.getByRole("region", { name: "What happened" })).toContainText(`Approved by Chris Turner (signed ${today}), signed copy on file: Signed PDF back by email`);
+      await expect(page.getByRole("region", { name: "Approved another way" })).toHaveCount(0);
+
+      expect(sql(`select status || '|' || signed_on from change_orders where id = ${co.changeOrderId}`)).toBe(`signed|${today}`);
+      expect(sql(`select count(*) || '|' || max(label) || '|' || max(content_type) from document_exhibits where document_id = '${co.documentId}' and kind = 'file' and removed_at is null`)).toBe("1|Signed copy|application/pdf");
+      expect(sql(`select string_agg(status || ':' || reason, ',') from joist_jobs where change_order_id = ${co.changeOrderId} and status = 'queued'`)).toBe("queued:signed");
+
+      // Once only, and the client's link now says it is approved and shows their signed copy.
+      const again = await page.request.post(`/api/change-orders/${co.changeOrderId}/approve`, { data: { name: "Someone", signedOn: today } });
+      expect(again.status()).toBe(409);
+      const c = await clientCtx.newPage();
+      await c.goto(`/d/${token}`, { waitUntil: "networkidle" });
+      await expect(c.getByTestId("co-approve-blocked")).toContainText("already approved");
+      await expect(c.getByText("Signed copy").first()).toBeVisible();
+    } finally {
+      await bot.dispose();
+      await clientCtx.close();
+      const docs = `select document_id from change_orders where source_ref = '${ref}' and document_id is not null`;
+      sql(`begin; set local session_replication_role = replica;
+           create temp table co_docs on commit drop as ${docs};
+           delete from storage.objects where bucket_id = 'billing' and name in (select storage_path from document_exhibits where document_id in (select document_id from co_docs) and storage_path is not null);
+           delete from document_exhibits where document_id in (select document_id from co_docs);
+           delete from document_events where document_id in (select document_id from co_docs);
+           delete from change_order_events where change_order_id in (select id from change_orders where source_ref = '${ref}');
+           delete from joist_jobs where change_order_id in (select id from change_orders where source_ref = '${ref}');
+           delete from change_orders where source_ref = '${ref}';
+           delete from documents where id in (select document_id from co_docs);
+           commit;`);
+    }
+  });
 });
