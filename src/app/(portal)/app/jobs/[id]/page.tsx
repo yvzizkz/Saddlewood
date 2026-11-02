@@ -237,6 +237,10 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                         <Link className="rounded-lg bg-[var(--color-teal)] px-3 py-1.5 text-sm font-medium text-white" href={`/app/changes/${c.registerId}`}>
                           Price it
                         </Link>
+                      ) : c.status === "sent" && c.documentId ? (
+                        <Link className="rounded-lg border border-[var(--color-stone-mid)] px-3 py-1.5 text-sm font-medium text-[var(--color-charcoal)]" href={`/app/changes/${c.registerId}`}>
+                          Follow up
+                        </Link>
                       ) : null}
                       <ChangeOrderStep id={c.registerId!} status={c.status} />
                     </div>

@@ -83,7 +83,7 @@ vi.mock("../exhibits", () => ({ listExhibits: async () => [] }));
 vi.mock("@/lib/jobs/hub", () => ({ listJobRefs: async () => [], jobKeyOf: () => null }));
 vi.mock("../coIntakeStore", () => ({ nextChangeOrderNumberFor: async () => "8009-CO10" }));
 
-import { PriceError, sendChangeOrder } from "../coPriceStore";
+import { followUpChangeOrder, PriceError, sendChangeOrder } from "../coPriceStore";
 
 const co = () => db.tables.change_orders[0];
 const events = () => (db.tables.change_order_events ?? []).map((e) => e.kind);
@@ -137,5 +137,36 @@ describe("sendChangeOrder", () => {
     co().status = "sent";
     await expect(sendChangeOrder(7, { ...msg, confirm: true }, "marco")).rejects.toBeInstanceOf(PriceError);
     expect(mail.calls).toEqual([]);
+  });
+});
+
+describe("followUpChangeOrder", () => {
+  const msg = { to: ["chris@aft.example"], subject: "Following up", body: "b" };
+  const sentOne = () => {
+    Object.assign(co(), { status: "sent" });
+    db.tables.doc[0].status = "issued";
+  };
+
+  it("only follows up on one that is out and not signed", async () => {
+    await expect(followUpChangeOrder(7, msg, "marco")).rejects.toMatchObject({ status: 409, message: "It has not been sent yet." });
+    co().status = "signed";
+    await expect(followUpChangeOrder(7, msg, "marco")).rejects.toMatchObject({ status: 409 });
+    expect(mail.calls).toEqual([]);
+  });
+
+  it("checks first and sends nothing; once sent, the register stays sent and the timeline has the follow-up", async () => {
+    sentOne();
+    expect((await followUpChangeOrder(7, msg, "marco")).body).toMatchObject({ sent: false });
+    expect(events()).toEqual([]);
+    await followUpChangeOrder(7, { ...msg, confirm: true }, "marco");
+    expect(co().status).toBe("sent");
+    expect(db.tables.change_order_events).toEqual([{ change_order_id: 7, kind: "sent", actor: "marco", detail: { documentId: DOC.id, emailId: "em_1", to: msg.to, followUp: true } }]);
+  });
+
+  it("a follow-up that does not leave is not on the timeline", async () => {
+    sentOne();
+    mail.result = { status: 503, body: { ok: false, error: "mail service is not set up" } };
+    expect((await followUpChangeOrder(7, { ...msg, confirm: true }, "marco")).status).toBe(503);
+    expect(events()).toEqual([]);
   });
 });

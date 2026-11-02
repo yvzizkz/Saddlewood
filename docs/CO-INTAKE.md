@@ -7,7 +7,7 @@ A client asks for a change by email. The system turns that request into a number
 | 1. The Mac reads the email, decides whether it is a CO request from a known client contact on a known job, and posts it | KB `bot/triage.py` → this API | KB PR |
 | 2. Each change becomes a register row (awaiting price) and a $0 draft, numbered now | `POST /api/change-orders/intake` (0059) | #70 |
 | 3. The owner opens "Price it" from the push, types the prices and presses Send | `/app/changes/<id>` | #71 |
-| 4. A timeline per CO (every register move, plus the client's openings from the document's proof record), then nudges when it ages | `change_order_events` (0059), `lib/billing/coTimeline.ts`; job Changes tab and `/app/changes/<id>` | timeline: #72; nudges: next |
+| 4. A timeline per CO (every register move, plus the client's openings from the document's proof record), then nudges when it ages | `change_order_events` (0059), `lib/billing/coTimeline.ts`; job Changes tab and `/app/changes/<id>` | timeline: #72; nudges (policy `co-pace`, the follow-up drafted on `/app/changes/<id>`, never sent by itself): #73 |
 | 5. The client approves on the CO's own link (click, signature, upload), or the owner confirms an approval that came in by email | `/d/<token>` | next |
 
 ## Numbers

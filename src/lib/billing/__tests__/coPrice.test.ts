@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyPrices, coEmail, defaultTo, parseDollars, readPriceEdit, sendBlockers } from "../coPrice";
+import { applyPrices, coEmail, coFollowUpEmail, defaultTo, parseDollars, readPriceEdit, sendBlockers } from "../coPrice";
 import type { DocumentSnapshot } from "../types";
 
 const DRAFT: DocumentSnapshot = {
@@ -111,5 +111,14 @@ describe("a line marked no charge, as every draft is read", () => {
     expect(readSnapshot({ lines: [{ description: "Materials", amountCents: 0, noCharge: true }] })).toEqual({ ok: true, value: { lines: [{ description: "Materials", amountCents: 0, noCharge: true }] } });
     expect(readSnapshot({ lines: [{ description: "Materials", amountCents: 500, noCharge: true }] })).toEqual({ ok: false, error: "snapshot.lines[0] is marked no charge but has a price" });
     expect(readSnapshot({ lines: [{ description: "Materials", amountCents: 0, noCharge: "yes" }] })).toMatchObject({ ok: false });
+  });
+});
+
+describe("coFollowUpEmail", () => {
+  it("says which change order, what it comes to and when it went", () => {
+    const m = coFollowUpEmail({ number: "8009-CO50", title: "Shear wall", job: "8009 N Ironwood Dr", totalCents: 310050, sentOn: "2026-10-30", to: { name: "Chris Turner", email: "c@x", role: "" } });
+    expect(m.subject).toBe("Following up: change order 8009-CO50, Shear wall (8009 N Ironwood Dr)");
+    expect(m.body).toMatch(/^Hi Chris,/);
+    expect(m.body).toContain("$3,100.50, which we sent on October 30.");
   });
 });
