@@ -52,6 +52,24 @@ describe("feedForSeat", () => {
   });
 });
 
+describe("feedForSeat and overhead bills", () => {
+  // A bill with no job is overhead: owners only. A PM cannot approve it (canApproveBillHere,
+  // the PATCH route), so it must not sit on their Tasks, MyTasksCard or the morning push.
+  const overhead = item("b3", { source: "bill", kind: "approval", jobKey: null, title: "Approve Desert Supply 4410", detail: "$1,240.00", href: "/app/accounting/payables/bill/3", editable: false });
+  const withOverhead = [...feed, overhead];
+
+  it("never reaches a PM, even though bill approvals carry the PM's role", () => {
+    const pm = feedForSeat(withOverhead, new Set(["8009-n-ironwood-dr"]), (i) => i.nowRole === "pm");
+    expect(pm.map((i) => i.id)).not.toContain("b3");
+    // The approval on the PM's own job still does.
+    expect(pm.map((i) => i.id)).toContain("b1");
+  });
+
+  it("stays with the owners", () => {
+    expect(feedForSeat(withOverhead, null, () => false).map((i) => i.id)).toContain("b3");
+  });
+});
+
 describe("canApproveBillHere", () => {
   it("lets an owner or a PM with money approve a bill on their job, never a field lead without money", () => {
     const bill = item("b1", { source: "bill", kind: "approval", jobKey: "8009-n-ironwood-dr", editable: false });

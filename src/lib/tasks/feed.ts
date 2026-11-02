@@ -271,7 +271,8 @@ export function feedForSeat(items: FeedItem[], jobs: Set<string> | null, mine: (
   if (jobs === null) return items;
   // Work with no job shows when it is theirs, or was the PM's or the field's before it moved up overdue.
   const ours = (i: FeedItem) => mine(i) || i.role === "pm" || i.role === "field_lead";
-  const pmBill = (i: FeedItem) => i.source === "bill" && i.kind === "approval";
+  // A bill to approve on one of their jobs. One with no job is overhead: owners only (canApproveBillHere refuses it too).
+  const pmBill = (i: FeedItem) => i.source === "bill" && i.kind === "approval" && !!i.jobKey;
   return items
     .filter((i) => i.source !== "waiting" && i.source !== "ops" && (pmBill(i) || (i.source !== "bill" && !isPayables(i))) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)))
     .map((i) => (pmBill(i) ? { ...i, href: i.jobKey ? jobHref(i.jobKey, "tasks") : "/app/tasks" } : i));
