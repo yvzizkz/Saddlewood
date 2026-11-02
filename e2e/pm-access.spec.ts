@@ -30,13 +30,15 @@ test.describe("PM access: his jobs, no pay, no payables", () => {
   });
 
   test("sees hours on his jobs only, and never labor dollars, even when he asks", async ({ owner: page, browser }) => {
-    await page.goto("/app/accounting/payroll?p=mtd");
+    // Pin to a seeded month so month-to-date isn't 0 on the 1st of a new month.
+    const period = "p=custom&from=2026-10-01&to=2026-10-31";
+    await page.goto(`/app/accounting/payroll?${period}`);
     const ownerHours = hours(await page.locator('[data-kpi="value"]').textContent())!;
 
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await signIn(ctx, PM, { crew: true });
     const pm = await ctx.newPage();
-    await pm.goto("/app/accounting/payroll?p=mtd&m=cost");
+    await pm.goto(`/app/accounting/payroll?${period}&m=cost`);
     const pmHours = hours(await pm.locator('[data-kpi="value"]').textContent())!;
     expect(pmHours).toBeGreaterThan(0);
     expect(pmHours).toBeLessThan(ownerHours);
