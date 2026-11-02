@@ -22,19 +22,20 @@ const monthFirst = `${today.slice(0, 7)}-01`;
 test.describe("PM access: his jobs, no pay, no payables", () => {
   test.beforeAll(() => {
     sql(`delete from crew_shifts where client_in like 'e2e-pm-access-%'`);
+    // Evening shifts: the seed's day shifts end by 15:00, so these never overlap a seeded shift for the same person.
     const days = monthFirst === today ? [today] : [monthFirst, today];
     for (const day of days) {
       sql(`
         insert into crew_shifts (email, job_id, job_name, day, started_at, ended_at, break_min, trade, note, source, end_source, status, client_in)
         values
           ('tacho.framing@example.com', '9146-w-hutton-dr', '9146 W Hutton Dr (Bellevue AC938)', '${day}',
-           ('${day}'::date + time '06:30') at time zone 'America/Phoenix',
-           ('${day}'::date + time '14:30') at time zone 'America/Phoenix',
-           30, 'framing', 'e2e pm-access PM job shift', 'app', 'app', 'ok', 'e2e-pm-access-pm-${day}'),
+           ('${day}'::date + time '18:00') at time zone 'America/Phoenix',
+           ('${day}'::date + time '20:30') at time zone 'America/Phoenix',
+           0, 'framing', 'e2e pm-access PM job shift', 'app', 'app', 'ok', 'e2e-pm-access-pm-${day}'),
           ('omar.runner@example.com', '4125-e-camelback-rd', '4125 E Camelback Rd (Carder AFT 129)', '${day}',
-           ('${day}'::date + time '07:00') at time zone 'America/Phoenix',
-           ('${day}'::date + time '13:30') at time zone 'America/Phoenix',
-           30, 'general', 'e2e pm-access non-PM job shift', 'app', 'app', 'ok', 'e2e-pm-access-other-${day}')
+           ('${day}'::date + time '18:00') at time zone 'America/Phoenix',
+           ('${day}'::date + time '20:00') at time zone 'America/Phoenix',
+           0, 'general', 'e2e pm-access non-PM job shift', 'app', 'app', 'ok', 'e2e-pm-access-other-${day}')
       `);
     }
   });
