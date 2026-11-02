@@ -104,4 +104,48 @@ test.describe("Joist sync", () => {
            commit;`);
     }
   });
+
+  test("a change order recorded by hand goes to Joist from its own row; one with no job is never queued", async ({ owner: page }) => {
+    const bot = await http.newContext({ baseURL: BASE, extraHTTPHeaders: { Authorization: `Bearer ${TOKEN}`, "X-Ops-Actor": "bot" } });
+    const others = sql(`select coalesce(string_agg(id::text, ','), '0') from joist_jobs where status in ('queued', 'claimed')`);
+    sql(`update joist_jobs set status = 'failed', error = 'e2e parked' where id in (${others})`);
+    const ids: number[] = [];
+    try {
+      // Recorded on the register, priced and signed there: never opened on Price it, so no document.
+      const made = await page.request.post("/api/change-orders", { data: { job: "8009-n-ironwood-dr", title: "Extra hose bib at the patio", detail: "Owner asked on site", source: "field" } });
+      expect(made.status()).toBe(200);
+      const id = (await made.json()).id as number;
+      ids.push(id);
+      expect((await page.request.patch("/api/change-orders", { data: { id, amountCents: 48500, status: "priced" } })).status()).toBe(200);
+      expect((await page.request.patch("/api/change-orders", { data: { id, status: "signed" } })).status()).toBe(200);
+      expect(sql(`select coalesce(document_id::text, 'none') from change_orders where id = ${id}`)).toBe("none");
+      expect(sql(`select string_agg(status || ':' || reason, ',' order by id) from joist_jobs where change_order_id = ${id}`)).toBe("queued:signed");
+
+      const claimed = ((await (await bot.post("/api/bot/joist-sync", { data: {} })).json()).jobs as { jobId: number; changeOrderId: number; number: string; totalCents: number; client: { name: string }; job: { name: string }; lines: { description: string; note: string; amountCents: number }[]; attachments: unknown[] }[]).filter((j) => j.changeOrderId === id);
+      expect(claimed).toHaveLength(1);
+      const [job] = claimed;
+      expect(job.number).toMatch(/CO/);
+      expect(job).toMatchObject({ totalCents: 48500, attachments: [], lines: [{ description: "Extra hose bib at the patio", note: "Owner asked on site", amountCents: 48500 }] });
+      expect(job.job.name).not.toBe("");
+      expect((await (await bot.post(`/api/bot/joist-sync/${job.jobId}`, { data: { ok: true, joistId: 52790001, joistUrl: "https://pro.joistapp.com/estimates/52790001" } })).json()).status).toBe("done");
+      expect(sql(`select joist_id from change_orders where id = ${id}`)).toBe("52790001");
+
+      // No document and no billing job: nothing to put it under in Joist, so nothing is queued.
+      const loose = Number(sql(`insert into change_orders (title, requested_by) values ('e2e loose change', 'e2e') returning id`));
+      ids.push(loose);
+      expect((await page.request.patch("/api/change-orders", { data: { id: loose, amountCents: 1000, status: "priced" } })).status()).toBe(200);
+      expect(sql(`select count(*) from joist_jobs where change_order_id = ${loose}`)).toBe("0");
+    } finally {
+      await bot.dispose();
+      sql(`update joist_jobs set status = 'queued', error = '' where id in (${others}) and error = 'e2e parked'`);
+      if (ids.length) {
+        const list = ids.join(",");
+        sql(`begin; set local session_replication_role = replica;
+             delete from change_order_events where change_order_id in (${list});
+             delete from joist_jobs where change_order_id in (${list});
+             delete from change_orders where id in (${list});
+             commit;`);
+      }
+    }
+  });
 });

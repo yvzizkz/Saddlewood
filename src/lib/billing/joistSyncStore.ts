@@ -24,6 +24,11 @@ type Job = { id: number; change_order_id: number; reason: JoistReason; status: s
 export async function queueJoist(changeOrderId: number, reason: JoistReason): Promise<void> {
   try {
     const db = getSupabaseAdmin();
+    // One with neither a document nor a billing job has no client to put it under in Joist.
+    const { data: co, error: coErr } = await db.from("change_orders").select("document_id,job_id").eq("id", changeOrderId).maybeSingle();
+    if (coErr) throw new Error(coErr.message);
+    const c = co as { document_id: string | null; job_id: string | null } | null;
+    if (!c || (!c.document_id && !c.job_id)) return;
     const now = new Date().toISOString();
     const { data, error } = await db.from("joist_jobs").update({ reason, updated_at: now }).eq("change_order_id", changeOrderId).eq("status", "queued").select("id");
     if (error) throw new Error(error.message);
@@ -64,16 +69,17 @@ export async function claimJoistJobs(by: string, limit = MAX_CLAIM, now = new Da
     if (!(won ?? []).length) continue;
     const payload = await payloadFor({ ...j, attempts: j.attempts + 1 });
     if (payload) out.push(payload);
-    else await finish(j.id, { status: "failed", error: "the change order or its document is gone" });
+    else await finish(j.id, { status: "failed", error: "the change order, its document or its job is gone" });
   }
   return out;
 }
 
 async function payloadFor(j: Job): Promise<JoistPayload | null> {
   const db = getSupabaseAdmin();
-  const { data } = await db.from("change_orders").select("id,number,title,status,document_id,joist_id").eq("id", j.change_order_id).maybeSingle();
-  const co = data as { id: number; number: string; title: string; status: string; document_id: string | null; joist_id: number | string | null } | null;
-  if (!co?.document_id) return null;
+  const { data } = await db.from("change_orders").select("id,number,title,detail,status,amount_cents,requested_on,job_id,document_id,joist_id").eq("id", j.change_order_id).maybeSingle();
+  const co = data as CoRow | null;
+  if (!co) return null;
+  if (!co.document_id) return rowPayload(j, co);
   const doc = await getDocument(co.document_id);
   if (!doc) return null;
   const site = siteUrl().replace(/\/+$/, "");
@@ -92,6 +98,50 @@ async function payloadFor(j: Job): Promise<JoistPayload | null> {
     status: co.status,
     snapshot: doc.snapshot,
     attachments,
+  });
+}
+
+type CoRow = {
+  id: number;
+  number: string;
+  title: string;
+  detail: string | null;
+  status: string;
+  amount_cents: number | null;
+  requested_on: string | null;
+  job_id: string | null;
+  document_id: string | null;
+  joist_id: number | string | null;
+};
+
+/**
+ * A change order priced or signed on the register by hand has no document:
+ * Joist gets it from the row itself, one line at its price, under the job's
+ * client. (Drafting one here would put a $0 line in Joist.)
+ */
+async function rowPayload(j: Job, co: CoRow): Promise<JoistPayload | null> {
+  if (!co.job_id) return null;
+  const db = getSupabaseAdmin();
+  const { data: job } = await db.from("jobs").select("name,address,client_id").eq("id", co.job_id).maybeSingle();
+  const jr = (job ?? {}) as { name?: string; address?: string | null; client_id?: string | null };
+  const { data: client } = jr.client_id ? await db.from("clients").select("name").eq("id", jr.client_id).maybeSingle() : { data: null };
+  const clientName = (client as { name?: string } | null)?.name ?? "";
+  return joistPayload({
+    jobId: j.id,
+    changeOrderId: co.id,
+    reason: j.reason,
+    attempt: j.attempts,
+    joistId: co.joist_id === null ? null : Number(co.joist_id),
+    number: co.number,
+    title: co.title,
+    status: co.status,
+    snapshot: {
+      ...(clientName ? { billTo: { name: clientName } } : {}),
+      job: { name: jr.name ?? "", ...(jr.address ? { address: jr.address } : {}) },
+      ...(co.requested_on ? { date: co.requested_on } : {}),
+      lines: [{ description: co.title, amountCents: co.amount_cents ?? 0, ...(co.detail ? { note: co.detail } : {}) }],
+    },
+    attachments: [],
   });
 }
 

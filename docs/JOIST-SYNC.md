@@ -17,6 +17,7 @@ While Joist is still in use, every change order the app drafts, prices or gets s
 
 - **One waiting job per change order.** More changes before the Mac claims it fold into that job, which takes the newest reason. A change made while a job is claimed queues a new one, so the latest always gets written.
 - **The claim hands over the change order as it is now,** not as it was when queued.
+- **A change order with no document** (recorded by hand, then priced or signed on the register) is handed over from its own row: one line, its title at its price, its detail as the note, under the job's client, no attachments. One with no document and no billing job is never queued.
 - **A claim lasts 15 minutes.** A job claimed and never reported can be claimed again after that.
 - **Failures:** a failed write goes back in line, up to 3 tries in total. After the last one, the change order is flagged (`joist_error`). The CO page shows the error with **Try again**, and the timeline shows a warning line.
 - **Success:** stores `joist_id`, `joist_url` and `joist_synced_at` on the change order and adds a timeline line ("Copied to Joist (estimate N)"). While the document is still a draft, it also adds the link as an exhibit labelled "Joist estimate". An issued document is never changed.
