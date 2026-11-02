@@ -28,8 +28,8 @@ function from(table: string) {
     return { data: hit.map((r) => ({ ...r })), error: null };
   };
   const b = {
-    insert(row: Row) {
-      (db.tables[table] ??= []).push(row);
+    insert(rows: Row | Row[]) {
+      (db.tables[table] ??= []).push(...(Array.isArray(rows) ? rows : [rows]));
       return Promise.resolve({ error: null });
     },
     update(p: Row) {
@@ -49,6 +49,7 @@ function from(table: string) {
       return b;
     },
     select: () => b,
+    order: () => b,
     maybeSingle: async () => {
       const r = run();
       return { data: r.data?.[0] ?? null, error: r.error };
