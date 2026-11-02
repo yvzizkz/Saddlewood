@@ -182,7 +182,7 @@ export async function savePrices(id: number, edit: PriceEdit, actor: string): Pr
     if (back) console.error("change order price not put back:", id, back.message);
     throw err;
   }
-  if (unpriced) await event(id, "updated", actor, { status: "requested", note: "every price taken off" });
+  if (unpriced) await coEventsAfter([id], "updated", actor, { status: "requested", note: "every price taken off" });
   return saved;
 }
 
