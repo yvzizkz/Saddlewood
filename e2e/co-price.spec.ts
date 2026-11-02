@@ -183,6 +183,7 @@ test.describe("Price it", () => {
            delete from document_exhibits where document_id in (select document_id from co_docs);
            delete from document_events where document_id in (select document_id from co_docs);
            delete from change_order_events where change_order_id in (select id from change_orders where source_ref = '${ref}');
+           delete from joist_jobs where change_order_id in (select id from change_orders where source_ref = '${ref}');
            delete from change_orders where source_ref = '${ref}';
            delete from documents where id in (select document_id from co_docs);
            commit;`);

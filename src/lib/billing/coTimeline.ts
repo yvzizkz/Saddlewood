@@ -56,6 +56,7 @@ function registerLine(e: CoEvent, showMoney: boolean): TimelineLine | null {
     case "void":
       return line(`Voided${by(e.actor)}`, "warn");
     case "note":
+      if (d.joist && str(d.note)) return line(str(d.note)!, d.joist === "failed" ? "warn" : "plain");
       return str(d.note) ? line(`Note${by(e.actor)}: ${str(d.note)}`) : null;
     case "viewed":
       return line("Opened by the client");

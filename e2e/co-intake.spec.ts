@@ -137,6 +137,7 @@ test.describe("Change-order intake", () => {
            delete from document_events where document_id in (${docs});
            create temp table co_docs on commit drop as ${docs};
            delete from change_order_events where change_order_id in (select id from change_orders where source_ref = '${ref}');
+           delete from joist_jobs where change_order_id in (select id from change_orders where source_ref = '${ref}');
            delete from change_orders where source_ref = '${ref}';
            delete from documents where id in (select document_id from co_docs);
            commit;`);

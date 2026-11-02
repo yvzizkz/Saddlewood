@@ -9,6 +9,7 @@ import { sendPush } from "@/lib/bot/push";
 import { laneAddresses } from "@/lib/crew/notify";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { coEvent } from "./coEvents";
+import { queueJoist } from "./joistSyncStore";
 import { getJobRef } from "@/lib/jobs/hub";
 import { createDraft, DocumentError, getDocument, updateDraft, usedNumbers } from "./documents";
 import { draftHash, snapshotFor, type DraftContext, type Intake, type IntakeItem } from "./coIntake";
@@ -124,6 +125,7 @@ async function create(job: Job, input: Intake, it: IntakeItem, ctx: DraftContext
   const id = (data as { id: number }).id;
   await coEvent(id, "requested", input.requestedBy, { sourceRef: input.sourceRef, subject: input.subject ?? "" });
   await coEvent(id, "drafted", actor, { documentId: doc.id, number: doc.number });
+  await queueJoist(id, "drafted");
   return { key: it.key, changeOrderId: id, number: doc.number, documentId: doc.id, action: "created" };
 }
 
@@ -158,6 +160,7 @@ async function refresh(row: CoRow, it: IntakeItem, ctx: DraftContext, actor: str
     .eq("status", "requested");
   if (error) throw new Error(`change_orders update: ${error.message}`);
   await coEvent(row.id, "updated", actor, { documentId: doc.id });
+  await queueJoist(row.id, "drafted");
   return { ...base, action: "updated" };
 }
 

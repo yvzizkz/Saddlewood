@@ -6,6 +6,7 @@
 import { localDay } from "@/lib/crew/time";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { coEvent, coEventsAfter, loadTimelines } from "./coEvents";
+import { queueJoist } from "./joistSyncStore";
 import type { TimelineLine } from "./coTimeline";
 import { jobKeyOf, listJobRefs } from "@/lib/jobs/hub";
 import { deliver, type DeliverResult } from "./deliver";
@@ -58,6 +59,8 @@ export type PriceIt = {
   /** Sent and not signed: the follow-up, drafted for an owner to send (never sent by itself). */
   followUp: { subject: string; body: string } | null;
   timeline: TimelineLine[];
+  /** Its copy in Joist (docs/JOIST-SYNC.md): where it is, whether one is on the way, or why it failed. */
+  joist: { id: number | null; url: string; error: string; waiting: boolean };
 };
 
 async function readRow(id: number): Promise<Row> {
@@ -119,7 +122,7 @@ async function contactsOf(clientId: string | null): Promise<Contact[]> {
 export async function loadPriceIt(id: number, actor: string): Promise<PriceIt> {
   const row = await readRow(id);
   const doc = await draftFor(row, actor);
-  const [exhibits, contacts, refs, timelines] = await Promise.all([listExhibits(doc.id), contactsOf(doc.clientId), listJobRefs(), loadTimelines([{ id: row.id, documentId: doc.id }])]);
+  const [exhibits, contacts, refs, timelines, joist] = await Promise.all([listExhibits(doc.id), contactsOf(doc.clientId), listJobRefs(), loadTimelines([{ id: row.id, documentId: doc.id }]), joistState(row.id)]);
   const jobKey = jobKeyOf({ billingId: row.job_id, crewId: row.crew_job_id }, refs);
   const job = (jobKey ? refs.find((r) => r.key === jobKey)?.name : null) ?? doc.snapshot.job?.name ?? "";
   const sentTo = (row.status === "sent" ? await lastSentTo(row.id) : []).filter((e) => contacts.some((c) => c.email === e));
@@ -143,6 +146,7 @@ export async function loadPriceIt(id: number, actor: string): Promise<PriceIt> {
     email: coEmail({ number: doc.number, title: doc.title || row.title, job, totalCents: doc.totalCents, to: person }),
     followUp: row.status === "sent" && doc.status === "issued" ? coFollowUpEmail({ number: doc.number, title: doc.title || row.title, job, totalCents: doc.totalCents, sentOn, to: person }) : null,
     timeline: timelines.get(row.id) ?? [],
+    joist,
   };
 }
 
@@ -163,6 +167,7 @@ export async function savePrices(id: number, edit: PriceEdit, actor: string): Pr
     .eq("id", id)
     .in("status", ["requested", "priced"]);
   if (error) throw new Error(`change_orders update: ${error.message}`);
+  if (priced) await queueJoist(id, "priced");
   return saved;
 }
 
@@ -199,7 +204,18 @@ export async function sendChangeOrder(id: number, input: Record<string, unknown>
   // It went out: a lost timeline line must not turn that into an error.
   if (wasRequested) await coEventsAfter([id], "priced", actor, { amountCents: doc.totalCents });
   await coEventsAfter([id], "sent", actor, { documentId: doc.id, emailId: result.body.emailId ?? null, to: input.to ?? [] });
+  await queueJoist(id, "priced");
   return result;
+}
+
+async function joistState(id: number): Promise<PriceIt["joist"]> {
+  const db = getSupabaseAdmin();
+  const [co, jobs] = await Promise.all([
+    db.from("change_orders").select("joist_id,joist_url,joist_error").eq("id", id).maybeSingle(),
+    db.from("joist_jobs").select("id").eq("change_order_id", id).in("status", ["queued", "claimed"]).limit(1),
+  ]);
+  const c = (co.data ?? {}) as { joist_id?: number | string | null; joist_url?: string; joist_error?: string };
+  return { id: c.joist_id == null ? null : Number(c.joist_id), url: c.joist_url ?? "", error: c.joist_error ?? "", waiting: (jobs.data ?? []).length > 0 };
 }
 
 /** Who it last went to, so the follow-up goes to the same people. */
