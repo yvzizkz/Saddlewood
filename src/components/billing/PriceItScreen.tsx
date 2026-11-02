@@ -208,6 +208,10 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
           </section>
         ) : null}
 
+        {(data.status === 'sent' || (data.status === 'priced' && data.doc.status === 'issued')) && !sent ? (
+          <MarkApproved id={data.id} who={data.contacts.find((c) => c.email === data.to[0])?.name ?? ''} />
+        ) : null}
+
         {editable && !sent ? (
           <>
             <Field label="Title">
@@ -433,5 +437,84 @@ function JoistLine({ id, joist }: { id: number; joist: PriceIt['joist'] }) {
         'Waiting for the Mac to copy it into Joist.'
       )}
     </p>
+  )
+}
+
+const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Phoenix' })
+
+/** The file as base64, for the JSON body (PDF, PNG or JPG; the API checks again). */
+function base64Of(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''))
+    r.onerror = () => reject(new Error('Could not read the file.'))
+    r.readAsDataURL(file)
+  })
+}
+
+/**
+ * Approved outside the link (signed on paper, a signed PDF back, a "yes" by
+ * email): who, the day, where it came from, and the proof, kept on the change
+ * order's document (lib/billing/coApprove.ts).
+ */
+function MarkApproved({ id, who }: { id: number; who: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState(who)
+  const [on, setOn] = useState(today())
+  const [note, setNote] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function mark() {
+    setBusy(true)
+    setErr('')
+    try {
+      const proof = file ? { filename: file.name, content: await base64Of(file) } : null
+      const r = await post(`/api/change-orders/${id}/approve`, { name, signedOn: on, note, file: proof })
+      if (!r.ok) return setErr(String(r.data.error ?? 'Could not record it.'))
+      router.refresh()
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section aria-label="Approved another way">
+      <Card className="mb-4 space-y-3 p-4">
+        <button type="button" className="flex w-full items-center justify-between text-left" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          <span className="font-medium text-[var(--color-charcoal)]">Approved another way?</span>
+          <span className="text-sm text-[var(--color-charcoal-light)]">{open ? 'Close' : 'Signed copy or email'}</span>
+        </button>
+        {open ? (
+          <>
+            <p className="text-sm text-[var(--color-charcoal-light)]">Signed on paper, a signed PDF back, or a yes by email. Keep the proof with it.</p>
+            <Field label="Who approved it">
+              <input className={INPUT} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
+            </Field>
+            <Field label="Approved on">
+              <input type="date" className={INPUT} value={on} max={today()} onChange={(e) => setOn(e.target.value)} />
+            </Field>
+            <Field label="Where it came from" hint="Optional: “Reply to the CO email”, “Signed at the site meeting”.">
+              <input className={INPUT} value={note} onChange={(e) => setNote(e.target.value)} />
+            </Field>
+            <Field label="Signed copy or approval email" hint="PDF, PNG or JPG. It goes on the change order, where the client sees it too.">
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="block w-full text-sm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </Field>
+            {err ? (
+              <p className="text-sm text-[#9a2a1f]" role="alert">
+                {err}
+              </p>
+            ) : null}
+            <Button variant="primary" busy={busy} disabled={busy || name.trim().length < 2 || !on} onClick={mark}>
+              <Paperclip className="size-4" aria-hidden="true" /> {file ? 'Mark approved with the proof' : 'Mark approved'}
+            </Button>
+          </>
+        ) : null}
+      </Card>
+    </section>
   )
 }

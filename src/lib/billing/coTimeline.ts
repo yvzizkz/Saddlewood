@@ -46,6 +46,8 @@ function registerLine(e: CoEvent, showMoney: boolean): TimelineLine | null {
       return line(`Sent${to.length ? ` to ${to.join(", ")}` : ""}${by(e.actor)}`);
     }
     case "signed":
+      if (d.via === "mark")
+        return line(`Approved by ${str(d.name) ?? "the client"}${str(d.signedOn) ? ` (signed ${str(d.signedOn)})` : ""}${d.proof ? ", signed copy on file" : ""}${str(d.note) ? `: ${str(d.note)}` : ""}; recorded${by(e.actor)}`, "good");
       if (d.via === "link") return line(`Approved by ${str(d.name) ?? "the client"} on the link${str(d.signedOn) ? ` (signed ${str(d.signedOn)})` : ""}`, "good");
       return line(`${d.marked ? "Marked approved" : "Approved"}${str(d.signedOn) ? ` (signed ${str(d.signedOn)})` : ""}${by(e.actor)}`, "good");
     case "rejected":

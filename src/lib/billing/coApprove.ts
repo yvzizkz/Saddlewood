@@ -9,7 +9,9 @@ import { localDay } from "@/lib/crew/time";
 import { signaturesOf, snapshotHash, type Signature, type SignatureInput, type SignatureRecord } from "@/lib/sales/signing";
 import { coEventsAfter } from "./coEvents";
 import { DocumentError, listEvents, recordEvent } from "./documents";
+import { addFileExhibit, removeExhibit } from "./exhibits";
 import { queueJoist } from "./joistSyncStore";
+import type { MailAttachment } from "./send";
 import type { BillingDocument } from "./types";
 
 /** What the client agrees to by signing (kept word for word in the signature record). */
@@ -85,4 +87,55 @@ export async function approveChangeOrder(
   await coEventsAfter([co!.id], "signed", "client link", { signedOn, amountCents: co!.amountCents ?? doc.totalCents, name: record.name, via: "link" });
   await queueJoist(co!.id, "signed");
   return { changeOrderId: co!.id, signature, signedOn };
+}
+
+export type MarkInput = {
+  /** Who approved it, as the client would sign: "Chris Turner". */
+  name: string;
+  /** The day they signed or said yes (YYYY-MM-DD, not in the future). */
+  signedOn: string;
+  /** Where the yes came from, in a few words ("reply to the CO email, Nov 1"). */
+  note?: string;
+  /** The signed copy or the approval email, as a PDF, PNG or JPG. */
+  file?: MailAttachment | null;
+};
+
+/**
+ * An owner records an approval that came back outside the link (signed on
+ * paper, a signed PDF, a "yes" by email), with the proof when there is one:
+ * the file goes on the change order's document (so the client's page shows
+ * their signed copy), the register moves to signed with that day, one line on
+ * the timeline, and the Joist copy is queued. Once, and only from sent or
+ * priced. A file put up for an approval that loses the race is taken down.
+ */
+export async function markChangeOrderApproved(id: number, input: MarkInput, actor: string, today = localDay()): Promise<{ signedOn: string; exhibitId: string | null }> {
+  const name = input.name.trim().replace(/\s+/g, " ");
+  if (name.length < 2 || name.length > 120) throw new DocumentError("Say who approved it.", 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.signedOn) || Number.isNaN(Date.parse(`${input.signedOn}T12:00:00Z`))) throw new DocumentError("The day it was approved is not a date.", 400);
+  if (input.signedOn > today) throw new DocumentError("The day it was approved cannot be in the future.", 400);
+  const note = (input.note ?? "").trim().slice(0, 300);
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.from("change_orders").select("id,status,amount_cents,document_id").eq("id", id).maybeSingle();
+  if (error) throw new Error(`change_orders read: ${error.message}`);
+  const co = data as { id: number; status: string; amount_cents: number | null; document_id: string | null } | null;
+  if (!co) throw new DocumentError("No such change order.", 404);
+  if (co.status === "signed" || co.status === "billed") throw new DocumentError("This change order is already approved.", 409);
+  if (!OPEN.includes(co.status)) throw new DocumentError(`A ${co.status} change order cannot be approved; open it again first.`, 409);
+  if (co.amount_cents === null) throw new DocumentError("Price it first.", 409);
+  if (input.file && !co.document_id) throw new DocumentError("This change order has no document to keep the signed copy on. Open it to price first.", 409);
+
+  let exhibitId: string | null = null;
+  if (input.file && co.document_id) {
+    const label = input.file.contentType === "application/pdf" ? "Signed copy" : "Approval";
+    exhibitId = (await addFileExhibit({ documentId: co.document_id, lineIndex: null, label, filename: input.file.filename, content: input.file.content, contentType: input.file.contentType, addedBy: actor })).id;
+  }
+  const { data: moved, error: upErr } = await db.from("change_orders").update({ status: "signed", signed_on: input.signedOn }).eq("id", id).in("status", OPEN).select("id");
+  if (upErr || !(moved ?? []).length) {
+    if (exhibitId && co.document_id) await removeExhibit(exhibitId, co.document_id, "the approval was not recorded").catch(() => false);
+    if (upErr) throw new Error(`change_orders approve: ${upErr.message}`);
+    throw new DocumentError("This change order changed a moment ago. Load the page again.", 409);
+  }
+  await coEventsAfter([id], "signed", actor, { signedOn: input.signedOn, amountCents: co.amount_cents, name, via: "mark", proof: exhibitId, ...(note ? { note } : {}) });
+  await queueJoist(id, "signed");
+  return { signedOn: input.signedOn, exhibitId };
 }

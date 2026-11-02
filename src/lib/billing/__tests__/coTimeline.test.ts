@@ -90,3 +90,10 @@ describe("buildTimeline: approved on the link", () => {
     expect(lines.map((l) => l.text)).toEqual(["The client signed it on the link", "Marked approved (signed 2026-11-02) by marco@x.com"]);
   });
 });
+
+describe("buildTimeline: approved another way, recorded by an owner", () => {
+  it("names who, the day, the proof and where it came from, and who recorded it", () => {
+    const lines = buildTimeline([co("signed", "2026-11-02T17:00:00Z", "marco@x.com", { via: "mark", name: "Chris Turner", signedOn: "2026-11-01", proof: "ex-1", note: "Signed at the site meeting" })]);
+    expect(lines.map((l) => [l.text, l.tone])).toEqual([["Approved by Chris Turner (signed 2026-11-01), signed copy on file: Signed at the site meeting; recorded by marco@x.com", "good"]]);
+  });
+});
