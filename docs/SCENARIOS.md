@@ -137,13 +137,15 @@ The office, a PM or a field lead logs what the client said on the job's Tasks ta
 
 An owner makes a job's link on the job's Overview (**Client link**) and copies it to send: nothing here emails anyone. The client opens `/c/<token>` with no sign-in, as they do every document we send. A new link shows the job's name, address and PM (by name, never an email), and nothing else until an owner turns a section on:
 
+- **Timeline:** the job's phases with planned and done dates, and the promised finish date. Never a phase's note or who verified it. With no date anywhere on the job, the section doesn't appear, and the owner's card says so.
+- **Payments:** Contract, Billed, Paid and Open, the same totals as the job's money card, with statements placed. Money still in Joist isn't in the app, so with nothing billed or paid here the section doesn't appear rather than read "Paid $0". The owner's card shows the exact figures before it goes on.
 - **Documents:** proposals, agreements, change orders and invoices issued on the job, current revision only, each opening on its own `/d/<token>`. A proposal issued before its job existed has no `job_id` and can't be given one, so it comes in through the sale linked to the job. A change order says whether it needs their approval or is approved, and one rejected or voided on the register leaves the list even though its document stays issued. Never a draft, a void, a statement or a notice.
 - **Daily log:** the last 14 end-of-day logs: the day, the weather and the work done, in the crew's words, without their `ASK:` lines. Never who wrote it, the crew count, what was asked or decided, what's stuck, or safety notes. Progress notes and photos stay off.
 - **Complaint form:** the same record as §10, with the job's PM on the Policies clock, logged by `client portal`. They can leave a phone or email, for when someone else in the house writes in. The client sees the day we'll answer by, and no more than 5 go in per job per day.
 
 A PM or a field lead doesn't get the card. Turning a link off is for good: the old one reads "not active", the same as a made-up one, and a new link gets a new token.
 
-**Not in this slice:** invoice paid or open (a payment can sit on a statement rather than the invoice, and "open" on something a client paid is worse than nothing), photos, the client's own uploads, allowances, the timeline, and a password or passkey in place of the link.
+**Not in this slice:** invoice paid or open (a payment can sit on a statement rather than the invoice, and "open" on something a client paid is worse than nothing), money from Joist, photos, the client's own uploads, allowances, the timeline, and a password or passkey in place of the link.
 
 ## What an owner, a PM and finance can and can't do today
 
