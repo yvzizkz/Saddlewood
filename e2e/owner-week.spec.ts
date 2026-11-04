@@ -3,7 +3,7 @@
 // work, a task handed out and moved up when overdue, and the job page agreeing
 // with Accounting. Local stack only (support/env.ts).
 
-import { cents, expect, test } from "./support/env";
+import { cents, cutoffInDays, expect, test } from "./support/env";
 
 const JOB = "8009-n-ironwood-dr";
 const JOB_BILLING = "b0000001-0000-4000-8000-000000008009";
@@ -59,7 +59,11 @@ test.describe("Owner: the owner's week", () => {
       await card.getByRole("button", { name: "Save" }).click();
       await expect(card.getByText("Saved")).toBeVisible();
     };
+    // Finance's invoice package shows up only within a week of a cutoff, so set AFT's
+    // 3 days out (as finance-week does) for this to hold on every day of the month.
+    const cutoff = (day: number) => page.request.post(`/api/jobs/${JOB}/progress`, { data: { action: "cutoff", cutoffDay: day } });
     try {
+      expect((await cutoff(cutoffInDays(3))).ok()).toBeTruthy();
       await seat("Lando");
       await page.goto("/app/departments/finance");
       await expect(page.getByText(/held by\s*Lando/)).toBeVisible();
@@ -70,6 +74,7 @@ test.describe("Owner: the owner's week", () => {
       await expect(mine.getByRole("row").filter({ hasText: "Invoice package for" }).first()).toBeVisible();
     } finally {
       await seat("Ilene");
+      await cutoff(23);
     }
     await page.goto("/app/departments/finance");
     await expect(page.getByText(/held by\s*Ilene/)).toBeVisible();
