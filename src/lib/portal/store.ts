@@ -5,6 +5,7 @@
 import { newToken } from "@/lib/billing/documents";
 import { logComplaint } from "@/lib/complaints/store";
 import { getJobRef, type JobRef } from "@/lib/jobs/hub";
+import { proposalNumber } from "@/lib/sales/store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { cleanSections, clientDocuments, clientLogText, COMPLAINTS_PER_DAY, LOG_DAYS, withApprovals, type ClientDoc, type PortalDocRow, type PortalSection } from "./rules";
 
@@ -69,12 +70,30 @@ export async function portalByToken(token: string): Promise<{ portal: Portal; re
   return ref ? { portal, ref } : null;
 }
 
+const DOC_COLS = "id,kind,number,title,status,total_cents,token,issued_at,supersedes";
+
+/**
+ * A proposal goes out before its job exists, and an issued document's job_id is
+ * frozen (0012), so it stays null after award. It comes in through the sale
+ * linked to this job: only that sale's number, only issued, only with no job.
+ */
+async function saleProposals(jobId: string): Promise<PortalDocRow[]> {
+  const db = getSupabaseAdmin();
+  const { data: sales, error } = await db.from("sales_opportunities").select("number").eq("job_id", jobId);
+  if (error) throw new Error(`portal sales: ${error.message}`);
+  const numbers = ((sales ?? []) as { number: string }[]).map(proposalNumber);
+  if (!numbers.length) return [];
+  const { data, error: docError } = await db.from("documents").select(DOC_COLS).eq("kind", "estimate").eq("status", "issued").is("job_id", null).in("number", numbers);
+  if (docError) throw new Error(`portal proposals: ${docError.message}`);
+  return (data ?? []) as PortalDocRow[];
+}
+
 /** What we issued on the job, with each change order's standing. */
 export async function portalDocuments(jobId: string): Promise<ClientDoc[]> {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("documents").select("id,kind,number,title,status,total_cents,token,issued_at,supersedes").eq("job_id", jobId).eq("status", "issued");
+  const [{ data, error }, proposals] = await Promise.all([db.from("documents").select(DOC_COLS).eq("job_id", jobId).eq("status", "issued"), saleProposals(jobId)]);
   if (error) throw new Error(`portal documents: ${error.message}`);
-  const docs = clientDocuments((data ?? []) as PortalDocRow[]);
+  const docs = clientDocuments([...((data ?? []) as PortalDocRow[]), ...proposals]);
   const cos = docs.filter((d) => d.kind === "change_order").map((d) => d.id);
   const { data: register, error: coError } = cos.length ? await db.from("change_orders").select("document_id,status").in("document_id", cos) : { data: [], error: null };
   if (coError) throw new Error(`portal change orders: ${coError.message}`);

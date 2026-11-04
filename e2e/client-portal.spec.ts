@@ -64,6 +64,21 @@ test.describe("The client's link", () => {
       register(`P${n}-CO3`, "rejected", doc("change_order", `P${n}-CO3`, "issued", tok("f")).split("\n")[0]);
       sql(`insert into public.crew_entries (email, kind, day, job_id, body, data) values ('${PM}', 'eod', (now() at time zone 'America/Phoenix')::date, '${JOB}', E'Hung board in the hall ${n}.\\nASK: who eats the extra sheets ${n}', '{"weather":"Clear","crewCount":4,"stuck":"Waiting on the sub ${n}","asked":"Owner wants a niche ${n}"}')`);
 
+      // Proposals go out before the job exists, so job_id stays null; award links the sale. Revision 2 is
+      // the current one, the draft and void after it aren't. Another job's sale stays on that job.
+      const proposal = (sale: string, rev: number, status: string, cents: number, t: string | null, replaces = "null") =>
+        sql(`insert into public.documents (kind, number, title, status, revision, total_cents, token, issued_at, void_reason, voided_at, supersedes) values ('estimate', 'EST-${sale}', '${tag}', '${status}', ${rev}, ${cents}, ${t ? `'${t}'` : "null"}, ${t ? "now()" : "null"}, ${status === "void" ? "'test', now()" : "'', null"}, ${replaces}) returning id`).split("\n")[0];
+      const opportunity = (number: string) => sql(`insert into public.sales_opportunities (number, title) values ('${number}', '${tag}')`);
+      opportunity(`S${n}`);
+      opportunity(`T${n}`);
+      const first = proposal(`S${n}`, 1, "issued", 500000, tok("g"));
+      proposal(`S${n}`, 2, "issued", 987600, tok("h"), `'${first}'`);
+      proposal(`S${n}`, 3, "void", 111100, tok("i"));
+      proposal(`S${n}`, 4, "draft", 222200, null);
+      proposal(`T${n}`, 1, "issued", 333300, tok("j"));
+      sql(`update public.sales_opportunities set job_id = '${jobId}' where number = 'S${n}'`);
+      sql(`update public.sales_opportunities set job_id = (select id from public.jobs where id <> '${jobId}' order by id limit 1) where number = 'T${n}'`);
+
       // Documents on: issued and current only. The rest stays off until asked for.
       await turnOn(/^Documents/);
       await client.reload();
@@ -72,6 +87,9 @@ test.describe("The client's link", () => {
       await expect(docs).toContainText("$1,234.00");
       await expect(docs.getByRole("listitem").filter({ hasText: `P${n}-CO1` })).toContainText("Needs your approval");
       await expect(docs.getByRole("listitem").filter({ hasText: `P${n}-CO2` })).toContainText("Approved");
+      await expect(docs.getByRole("listitem").filter({ hasText: `EST-S${n}` })).toHaveCount(1);
+      await expect(docs.getByRole("listitem").filter({ hasText: `EST-S${n}` })).toContainText("$9,876.00");
+      await expect(docs).not.toContainText(`EST-T${n}`);
       await expect(docs.getByRole("listitem").filter({ hasText: `P${n}-NEW` })).not.toContainText("Needs your approval");
       for (const hidden of ["-OLD", "-DRAFT", "-VOID", "-CO3"]) await expect(docs).not.toContainText(`P${n}${hidden}`);
       await expect(client.getByRole("heading", { name: "Daily log" })).toHaveCount(0);
@@ -154,6 +172,7 @@ test.describe("The client's link", () => {
         sql(`delete from public.work_items where title like '${tag}%'`);
         sql(`delete from public.crew_entries where job_id = '${JOB}' and body like '%${n}%'`);
         sql(`delete from public.change_orders where title = '${tag}'`);
+        sql(`delete from public.sales_opportunities where title = '${tag}'`);
         sql(
           `set session_replication_role = replica; ` +
             `delete from public.document_events where document_id in (select id from public.documents where title = '${tag}'); ` +
