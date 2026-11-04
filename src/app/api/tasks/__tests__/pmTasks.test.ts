@@ -52,6 +52,13 @@ beforeEach(() => {
     { id: 10, role: "pm", created_by: "lando@saddlewoodcontracting.com", job_id: null, crew_job_id: null },
     { id: 11, role: "field_lead", created_by: "eli.pm@example.com", job_id: null, crew_job_id: null },
     { id: 12, role: "pm", created_by: "arnold@example.com", job_id: null, crew_job_id: null },
+    // A complaint on the PM's job, and one on a job they are not on.
+    { id: 13, kind: "complaint", status: "open", role: "pm", created_by: "lando@saddlewoodcontracting.com", job_id: null, crew_job_id: "8009-n-ironwood-dr" },
+    { id: 14, kind: "complaint", status: "open", role: "pm", created_by: "lando@saddlewoodcontracting.com", job_id: null, crew_job_id: "4125-camelback" },
+    // Already closed, already dropped, and one the PM logged that sits with Owner decisions.
+    { id: 15, kind: "complaint", status: "done", role: "pm", created_by: "lando@saddlewoodcontracting.com", job_id: null, crew_job_id: "8009-n-ironwood-dr" },
+    { id: 16, kind: "complaint", status: "dropped", role: "pm", created_by: "lando@saddlewoodcontracting.com", job_id: null, crew_job_id: "8009-n-ironwood-dr" },
+    { id: 17, kind: "complaint", status: "open", role: "decisions", created_by: "eli.pm@example.com", job_id: null, crew_job_id: "8009-n-ironwood-dr" },
   ];
 });
 
@@ -123,5 +130,75 @@ describe("/api/tasks as a field lead (no money, jobs/access.ts)", () => {
 
   it("does not change what a PM may do with the PM's work with no job", async () => {
     expect((await PATCH(req("PATCH", { id: 10, status: "done" }))).status).toBe(200);
+  });
+});
+
+describe("a complaint through /api/tasks", () => {
+  const OWNER = { owner: true, email: "lando@saddlewoodcontracting.com", money: true };
+  const LEAD = { owner: false, email: "lead@example.com", money: false };
+
+  it("is never handed out as a task: its seat and clock are set on the job", async () => {
+    state.seat = OWNER;
+    const res = await POST(req("POST", { title: "Dust", role: "field_lead", kind: "complaint" }));
+    expect(res.status).toBe(400);
+    expect(state.inserted).toEqual([]);
+  });
+
+  it("closes only with what was done", async () => {
+    const res = await PATCH(req("PATCH", { id: 13, status: "done", resolution: "  " }));
+    expect(res.status).toBe(400);
+    expect(state.updated).toEqual([]);
+  });
+
+  it("a PM closes theirs with what was done, and it is kept", async () => {
+    const res = await PATCH(req("PATCH", { id: 13, status: "done", resolution: "Cleaned and called the client" }));
+    expect(res.status).toBe(200);
+    expect(state.updated[0]).toMatchObject({ id: 13, status: "done", resolution: "Cleaned and called the client" });
+  });
+
+  it.each([
+    ["push the date", { dueOn: "2026-12-31" }],
+    ["hand it to the field lead", { role: "field_lead" }],
+    ["give it to someone else", { assignee: "x@example.com" }],
+    ["drop it", { status: "dropped", resolution: "No" }],
+    ["reopen it", { status: "open" }],
+    ["close it and move the date at once", { status: "done", resolution: "Done", dueOn: "2026-12-31" }],
+  ])("a PM cannot %s", async (_what, change) => {
+    const res = await PATCH(req("PATCH", { id: 13, ...change }));
+    expect(res.status).toBe(403);
+    expect(state.updated).toEqual([]);
+  });
+
+  it.each([
+    ["rewrite the note on a closed one", 15],
+    ["turn an owner's drop into a close", 16],
+    ["close one with Owner decisions, even one they logged", 17],
+  ])("a PM cannot %s", async (_what, id) => {
+    const res = await PATCH(req("PATCH", { id, status: "done", resolution: "Handled" }));
+    expect(res.status).toBe(403);
+    expect(state.updated).toEqual([]);
+  });
+
+  it("a field lead logs one but does not close it", async () => {
+    state.seat = LEAD;
+    const res = await PATCH(req("PATCH", { id: 13, status: "done", resolution: "Done" }));
+    expect(res.status).toBe(403);
+    expect(state.updated).toEqual([]);
+  });
+
+  it("a PM cannot reach one on a job they are not on", async () => {
+    const res = await PATCH(req("PATCH", { id: 14, status: "done", resolution: "Done" }));
+    expect(res.status).toBe(404);
+  });
+
+  it("an owner moves, drops with a note, and reopens, which clears the note", async () => {
+    state.seat = OWNER;
+    expect((await PATCH(req("PATCH", { id: 13, dueOn: "2026-12-31" }))).status).toBe(200);
+    expect((await PATCH(req("PATCH", { id: 13, status: "dropped" }))).status).toBe(400);
+    expect((await PATCH(req("PATCH", { id: 13, status: "dropped", resolution: "Logged on the wrong job" }))).status).toBe(200);
+    expect((await PATCH(req("PATCH", { id: 13, status: "open" }))).status).toBe(200);
+    expect(state.updated).toHaveLength(3);
+    expect(state.updated[1]).toMatchObject({ status: "dropped", resolution: "Logged on the wrong job" });
+    expect(state.updated[2]).toMatchObject({ status: "open", resolution: "" });
   });
 });

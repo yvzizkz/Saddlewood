@@ -19,8 +19,10 @@ import { jobBills, jobCrew, jobLabor, jobMoney, jobPackages, jobPurchases, jobWa
 import { listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { canApproveBillHere, canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed } from "@/lib/tasks/feed";
-import { ApproveBill, CloseTask, NewTask } from "@/components/tasks/TaskActions";
+import { canCloseComplaint } from "@/lib/complaints/rules";
+import { loadJobComplaints } from "@/lib/complaints/store";
+import { canApproveBillHere, canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed, NEW_TASK_KINDS } from "@/lib/tasks/feed";
+import { ApproveBill, CloseTask, NewComplaint, NewTask } from "@/components/tasks/TaskActions";
 import { ChangeOrderStep, RequestChangeOrder } from "@/components/billing/ChangeOrderActions";
 import CoTimeline from "@/components/billing/CoTimeline";
 import ProgressBilling from "@/components/billing/ProgressBilling";
@@ -391,7 +393,10 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const [refs, seats, people] = await Promise.all([listJobRefs(), loadSeats(), loadPeople()]);
     const seated = feedForSeat(await loadFeed(refs, seats, today), owner ? null : new Set([ref.key]), (i) => isMine(i, seat.email, seats, people)).filter((i) => i.jobKey === ref.key);
     const items = seat.money ? seated : forFieldLead(seated, (i) => isMine(i, seat.email, seats, people));
-    const closable = items.filter((i) => canCloseHere(i, owner) || canApproveBillHere(i, seat));
+    const closable = items.filter((i) => i.kind !== "complaint" && (canCloseHere(i, owner) || canApproveBillHere(i, seat)));
+    const complaints = await loadJobComplaints(ref);
+    const es = seat.lang === "es";
+    const nameOf = (email: string) => people.find((p) => p.email === email)?.name ?? email;
     const table: TableRow[] = items.map((i) => ({
       id: i.id,
       title: i.title,
@@ -409,8 +414,33 @@ export default async function JobPage({ params, searchParams }: { params: Promis
           lang={seat.lang}
           roles={(owner ? ROLES : PM_ROLES).map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` }))}
           jobs={[{ value: ref.key, label: ref.name }]}
-          kinds={Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label }))}
+          kinds={NEW_TASK_KINDS}
         />
+        <section id="complaints" aria-label="Client complaints" className="scroll-mt-24">
+        <Card className="p-4">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">{es ? "Quejas del cliente" : "Client complaints"}</p>
+          {!complaints ? <p className="mb-3 text-sm text-[var(--color-charcoal-light)]">{es ? "No se pudieron cargar las quejas." : "Complaints couldn't be loaded right now."}</p> : null}
+          {complaints?.length ? (
+            <ul className="mb-3 divide-y divide-[var(--color-stone)]">
+              {complaints.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--color-charcoal)]">{c.title}</p>
+                    {c.detail ? <p className="text-xs text-[var(--color-charcoal-light)]">{c.detail}</p> : null}
+                    {c.status === "open" ? (
+                      <p className="text-xs text-[var(--color-charcoal-light)]">{[c.assignee ? nameOf(c.assignee) : seatHolder(c.role, seats, people).name, c.dueOn ? `${es ? "vence" : "reply by"} ${formatValue("date", c.dueOn)}` : null].filter(Boolean).join(" · ")}</p>
+                    ) : (
+                      <p className="text-xs text-[var(--color-charcoal-light)]">{[c.status === "done" ? (es ? "Cerrada" : "Closed") : es ? "Descartada" : "Dropped", c.closedOn ? formatValue("date", c.closedOn) : null, nameOf(c.closedBy), c.resolution].filter(Boolean).join(" · ")}</p>
+                    )}
+                  </div>
+                  {c.status === "open" && canCloseComplaint(seat, c) ? <CloseTask id={c.id} lang={seat.lang} noteRequired canDrop={owner} /> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <NewComplaint job={ref.key} lang={seat.lang} />
+        </Card>
+        </section>
         {closable.length ? (
           <Card className="p-4">
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Handed out on this job</p>
