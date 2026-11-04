@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import AccountingFrame from "@/components/accounting/AccountingFrame";
+import { ChangeOrderStep } from "@/components/billing/ChangeOrderActions";
 import { Card } from "@/components/bot/ui";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
@@ -66,6 +67,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     amount: w.amountCents,
   }));
   const awaitingPrice = register.filter((c) => c.status === "requested").length;
+  // From an "Other job" log: no job page has these, so owners move them here.
+  const noJob = seat.owner ? register.filter((c) => c.registerId !== null && c.jobKey === null && !["billed", "rejected", "void"].includes(c.status)) : [];
   const missingWaivers = waivers.filter((w) => w.status === "missing").length;
   const spec: DrillSpec<IssuedRow> = {
     path: PATH,
@@ -185,6 +188,25 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Change orders, every job</p>
           {awaitingPrice ? <p className="text-xs font-medium text-[#9a2a1f]">{awaitingPrice} awaiting a price</p> : null}
         </div>
+        {noJob.length ? (
+          <Card className="p-4">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">On no job</p>
+            <ul className="divide-y divide-[var(--color-stone)]">
+              {noJob.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--color-charcoal)]">
+                      {c.number ? <span className="font-medium">{c.number} </span> : null}
+                      {c.title}
+                    </p>
+                    <p className="text-xs text-[var(--color-charcoal-light)]">{[CO_LABEL[c.status], c.amountCents !== null ? formatValue("money", c.amountCents) : null].filter(Boolean).join(" · ")}</p>
+                  </div>
+                  <ChangeOrderStep id={c.registerId!} status={c.status} hasDocument={!!c.documentId} billHref={null} invoices={[]} noCharge={c.amountCents === 0} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
         <DataTable
           rows={coRows}
           columns={[

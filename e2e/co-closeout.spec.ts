@@ -98,4 +98,26 @@ test.describe("Closing a signed change order", () => {
       sql(`delete from crew_jobs where id = '${crew}'`);
     }
   });
+
+  test("one from an Other job log, on no job at all, moves on Billing's list and can be voided", async ({ owner: page }) => {
+    const title = `E2E other-job ask ${Date.now()}`;
+    const id = Number(sql(`insert into change_orders (title, source, requested_by) values ('${title}', 'directive', 'e2e') returning id`).split("\n")[0]);
+    ids.push(id);
+
+    // Its Price task opens this list; the change order's own page has nothing for it.
+    await page.goto(`/app/changes/${id}`, { waitUntil: "networkidle" });
+    await expect(page).toHaveURL(/\/app\/accounting\/billing/);
+    const row = page.getByRole("listitem").filter({ hasText: title });
+    await row.getByPlaceholder("$ price").fill("250");
+    await row.getByRole("button", { name: "Price it" }).click();
+    await expect(row).toContainText("$250");
+    await row.getByRole("button", { name: "Signed" }).click();
+    await expect(row).toContainText("No billing job");
+    await expect(row.getByRole("link", { name: "Bill it" })).toHaveCount(0);
+
+    page.once("dialog", (d) => void d.accept());
+    await row.getByRole("button", { name: "Void" }).click();
+    await expect(row).toHaveCount(0);
+    expect(sql(`select status from change_orders where id = ${id}`)).toBe("void");
+  });
 });

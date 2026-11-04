@@ -92,8 +92,8 @@ describe("a signed change order", () => {
     expect(item).toMatchObject({ title: "No billing job: 8009-CO7 Shear wall", role: "decisions", href: "/app/jobs/8009-n-ironwood-dr?tab=changes" });
   });
 
-  it("opens the change order itself when it is on no job at all", () => {
+  it("opens Billing's list when it is on no job at all: no job page has it", () => {
     const [item] = changeOrderItems([{ ...signed, noBillingJob: true, jobKey: null }], PACE, TODAY);
-    expect(item.href).toBe("/app/changes/7");
+    expect(item.href).toBe("/app/accounting/billing#changes");
   });
 });

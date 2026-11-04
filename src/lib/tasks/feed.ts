@@ -325,7 +325,7 @@ export function changeOrderItems(cos: CoRow[], pace: { priceWithinDays: number; 
     } else if (c.status === "signed" && c.amountCents === 0) {
       continue;
     } else if (c.status === "signed" && c.noBillingJob) {
-      const href = c.jobKey ? jobHref(c.jobKey, "changes") : `/app/changes/${c.registerId}`;
+      const href = c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes";
       out.push({ ...base, id: `co${c.registerId}`, href, kind: "decision", title: `No billing job: ${c.number} ${c.title}`, role: "decisions", dueOn: null, ...placeItem("decisions", null, 1, today) });
     } else if (c.status === "signed") {
       out.push({ ...base, id: `co${c.registerId}`, kind: "billing", title: `Bill ${c.number} ${c.title}`, role: "finance", dueOn: null, nowRole: "finance", overdueDays: 0, escalated: false });

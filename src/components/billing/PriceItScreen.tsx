@@ -12,7 +12,6 @@ import { useMemo, useState } from 'react'
 import { ArrowLeft, Eye, Paperclip, Send } from 'lucide-react'
 
 import { Button, Card, Chip, Field, INPUT, ScreenTitle } from '@/components/bot/ui'
-import { ChangeOrderStep } from './ChangeOrderActions'
 import { DocumentView } from '@/app/d/DocumentView'
 import CoTimeline from '@/components/billing/CoTimeline'
 import { applyPrices, BLANK, coEmail, parseDollars, sendBlockers, type PriceEdit } from '@/lib/billing/coPrice'
@@ -181,13 +180,6 @@ export default function PriceItScreen({ data }: { data: PriceIt }) {
 
         {!editable && !sent ? (
           <Card className="mb-4 p-4 text-sm text-[var(--color-charcoal-light)]">This change order is {data.status}; it is shown as the client has it.</Card>
-        ) : null}
-
-        {/* On no job, this page is the only place left to close it. */}
-        {data.status === 'signed' && !data.jobKey ? (
-          <Card className="mb-4 p-4">
-            <ChangeOrderStep id={data.id} status={data.status} hasDocument billHref={null} invoices={[]} noCharge={data.amountCents === 0} />
-          </Card>
         ) : null}
 
         {data.followUp && !sent ? (
