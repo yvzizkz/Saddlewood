@@ -228,9 +228,9 @@ export async function syncEodDirectivesAndDecisions(
     const crewJobId = crewJobIdOf(input.jobId);
     if (asked.length >= 2) {
       const title = asked.slice(0, 200);
-      // A voided one does not count: the same ask again is a new change order.
-      const lookup = db.from("change_orders").select("id").eq("title", title).neq("status", "void");
-      const { data: existingCo, error: coSelErr } = await (crewJobId ? lookup.eq("crew_job_id", crewJobId) : lookup.is("crew_job_id", null)).maybeSingle();
+      // Only one still open counts: the same ask after it was billed, rejected or voided is a new change order.
+      const lookup = db.from("change_orders").select("id").eq("title", title).in("status", ["requested", "priced", "sent", "signed"]);
+      const { data: existingCo, error: coSelErr } = await (crewJobId ? lookup.eq("crew_job_id", crewJobId) : lookup.is("crew_job_id", null)).limit(1).maybeSingle();
       if (coSelErr) console.error("syncEodDirectivesAndDecisions change_orders lookup failed:", coSelErr);
       if (!existingCo) {
         const { data: insertedCo, error: coInsErr } = await db

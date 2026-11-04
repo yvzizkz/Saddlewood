@@ -146,10 +146,10 @@ describe("field operations helpers", () => {
         return {
           select: () => ({
             eq: () => ({
-              neq: () => ({
-                is: () => ({ maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }) }),
+              in: () => ({
+                is: () => ({ limit: () => ({ maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }) }) }),
                 eq: () => ({
-                  maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }),
+                  limit: () => ({ maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }) }),
                 }),
               }),
             }),
@@ -230,8 +230,9 @@ describe("field operations helpers", () => {
       const chain = (data: unknown) => {
         const q = {
           eq: (col: string, v: unknown) => (filters.push(`${col}=${v}`), q),
-          neq: (col: string, v: unknown) => (filters.push(`${col}!=${v}`), q),
+          in: (col: string, v: string[]) => (filters.push(`${col} in ${v.join(",")}`), q),
           is: () => q,
+          limit: () => q,
           maybeSingle: async () => ({ data, error: null }),
         };
         return q;
@@ -266,12 +267,12 @@ describe("field operations helpers", () => {
       expect(written.work_items.map((w) => w.kind)).toEqual(["decision"]);
     });
 
-    it("does not repeat one still on the register, and looks past a voided one", async () => {
+    it("does not repeat one still open, and looks past one billed, rejected or voided", async () => {
       const { written, filters } = tables({ id: 41 });
       const res = await syncEodDirectivesAndDecisions({ ...EOD, asked: "Add batts" });
       expect(written.change_orders).toEqual([]);
       expect(res.changeOrderId).toBe(41);
-      expect(filters).toContain("status!=void");
+      expect(filters).toContain("status in requested,priced,sent,signed");
     });
   });
 });
