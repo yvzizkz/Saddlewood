@@ -87,9 +87,14 @@ test.describe("A change order's week", () => {
       await expect(onJob.getByRole("button", { name: "Sent" })).toHaveCount(0);
       await expect(onJob.getByRole("button", { name: "Signed" })).toHaveCount(0);
 
-      // Chris approves on his phone, not signed in.
+      // Chris approves on his phone, not signed in. His first try saved the signature but the
+      // register never moved: reloading must not read Approved, and the form must finish it.
+      const dot = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+      const signedEvent = JSON.stringify({ role: "client", name: "Chris Turner", method: "draw", image: dot });
+      sql(`insert into document_events (document_id, kind, actor, dedupe, detail) values ('${co.documentId}', 'signed', 'client link', 'signed:client:${co.documentId}', '${signedEvent}')`);
       const c = await clientCtx.newPage();
       await c.goto(`/d/${token}`, { waitUntil: "networkidle" });
+      await expect(c.getByTestId("co-approved")).toHaveCount(0);
       const box = c.getByRole("region", { name: "Approve this change order" });
       await expect(box).toContainText(`Approve change order ${co.number}`);
       await expect(box).toContainText("$1,240.00 added to the contract");
@@ -98,6 +103,7 @@ test.describe("A change order's week", () => {
       await box.getByRole("button", { name: "Approve and sign" }).click();
       await expect(c.getByTestId("co-approved")).toContainText("Chris Turner");
       expect(sql(`select status || '|' || signed_on from change_orders where id = ${co.changeOrderId}`)).toBe(`signed|${today}`);
+      expect(sql(`select count(*) from document_events where document_id = '${co.documentId}' and kind = 'signed'`)).toBe("1");
       // Still one waiting Joist job, now for the signature.
       expect(joist()).toBe("queued:signed");
 

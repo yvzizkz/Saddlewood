@@ -55,6 +55,7 @@ describe("PATCH /api/change-orders: billed", () => {
 
   it("refuses something that is not a document id", async () => {
     expect((await patch({ id: 7, status: "billed", billedDocumentId: "8009-14" })).status).toBe(400);
+    expect((await patch({ id: 7, status: "billed", billedDocumentId: [INVOICE] })).status).toBe(400);
     expect(db.updates).toEqual([]);
   });
 

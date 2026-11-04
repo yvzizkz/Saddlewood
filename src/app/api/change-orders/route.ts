@@ -97,7 +97,7 @@ export async function PATCH(request: NextRequest) {
     }
     if (to === "signed") patch.signed_on = b.signedOn && isDay(b.signedOn) ? b.signedOn : localDay();
     if (to === "billed" && cur.status !== "billed") {
-      if (!b.billedDocumentId || !UUID.test(b.billedDocumentId)) return NextResponse.json({ ok: false, error: "Say which invoice billed it, or bill it on the job's Money tab." }, { status: 400 });
+      if (typeof b.billedDocumentId !== "string" || !UUID.test(b.billedDocumentId)) return NextResponse.json({ ok: false, error: "Say which invoice billed it, or bill it on the job's Money tab." }, { status: 400 });
       const { data: doc, error: docErr } = await db.from("documents").select("number,kind,status,job_id").eq("id", b.billedDocumentId).maybeSingle();
       if (docErr) throw new Error(`documents read: ${docErr.message}`);
       const found = doc as { number: string; kind: string; status: string; job_id: string | null } | null;

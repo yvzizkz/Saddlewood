@@ -44,6 +44,17 @@ export function approvalBlock(doc: Pick<BillingDocument, "status">, co: Pick<CoF
   return null;
 }
 
+/**
+ * The signature the client's page shows as Approved. The signature is saved
+ * before the register moves, so one can be on file while the change order is
+ * still sent (the move failed: the form stays up and the retry finishes it) or
+ * after it was withdrawn (the owner won the race). Only a live, signed or billed
+ * change order reads approved.
+ */
+export function approvalToShow<S>(doc: Pick<BillingDocument, "status">, co: Pick<CoForLink, "status"> | null, sig: S | null): S | null {
+  return sig && doc.status !== "void" && (co?.status === "signed" || co?.status === "billed") ? sig : null;
+}
+
 export async function approveChangeOrder(
   doc: BillingDocument,
   sig: SignatureInput,
