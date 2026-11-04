@@ -46,10 +46,11 @@ site change that reads them with the server key must be live first.
 
 ## Production state
 
-As of 2026-11-02 (checked live against production): everything through 0060
-is applied, including 0029–0035, 0040–0045, 0050–0058, 0059 (`change_order_events`)
-and 0060 (`joist_jobs`). 0061 (complaints) is not applied yet: apply it before
-the site change. Check before applying anything,
+As of 2026-11-04 (checked live against production): everything through 0061
+is applied, including 0029–0035, 0040–0045, 0050–0058, 0059 (`change_order_events`),
+0060 (`joist_jobs`) and 0061 (`work_items.resolution`). The migration history
+table lists 0029 on; 0001–0028 went in before it and aren't in it, so don't use
+`supabase db push` here. Check before applying anything,
 since this note can go stale: a migration is in if the table it creates exists.
 
 ```sql
