@@ -310,13 +310,14 @@ export function canCloseHere(item: Pick<FeedItem, "editable" | "role">, owner: b
  * sent and not signed gets a follow-up N days after it last went out (the
  * first send or the latest follow-up, so doing the follow-up clears it until
  * the next is due), with the email drafted on its page (never sent by itself);
- * a signed one is billed.
+ * a signed one is billed. A no-charge one has nothing to bill, and one with no
+ * billing job goes back to the owners: Finance cannot bill it.
  */
 export function changeOrderItems(cos: CoRow[], pace: { priceWithinDays: number; followUpDays: number }, today: string): FeedItem[] {
   const out: FeedItem[] = [];
   for (const c of cos) {
     if (c.registerId === null) continue;
-    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.status === "requested" || c.status === "priced" || c.status === "sent" ? `/app/changes/${c.registerId}` : c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
+    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.status === "requested" || c.status === "priced" || c.status === "sent" ? `/app/changes/${c.registerId}` : c.jobKey ? jobHref(c.jobKey, c.status === "signed" ? "money" : "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
     if (c.status === "requested" || c.status === "priced") {
       const due = c.requestedOn ? addDays(c.requestedOn, pace.priceWithinDays) : null;
       const title = c.status === "requested" ? `Price: ${c.title}` : `Send: ${c.number} ${c.title}`;
@@ -325,6 +326,11 @@ export function changeOrderItems(cos: CoRow[], pace: { priceWithinDays: number; 
       const from = c.sentOn ?? c.requestedOn;
       const due = from ? addDays(from, pace.followUpDays) : null;
       out.push({ ...base, id: `co${c.registerId}`, since: from, kind: "follow_up", title: `Follow up: ${c.number} ${c.title}`, role: "decisions", dueOn: due, ...placeItem("decisions", due, 2, today) });
+    } else if (c.status === "signed" && c.amountCents === 0) {
+      continue;
+    } else if (c.status === "signed" && c.noBillingJob) {
+      const href = c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes";
+      out.push({ ...base, id: `co${c.registerId}`, href, kind: "decision", title: `No billing job: ${c.number} ${c.title}`, role: "decisions", dueOn: null, ...placeItem("decisions", null, 1, today) });
     } else if (c.status === "signed") {
       out.push({ ...base, id: `co${c.registerId}`, kind: "billing", title: `Bill ${c.number} ${c.title}`, role: "finance", dueOn: null, nowRole: "finance", overdueDays: 0, escalated: false });
     }

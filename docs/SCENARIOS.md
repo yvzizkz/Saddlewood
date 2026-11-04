@@ -6,7 +6,7 @@
 ```
 supabase start -x vector,logflare,edge-runtime,realtime
 scripts/local-db.sh --reset        # schema, migrations, synthetic seed
-npm run dev -- -p 3100             # in another terminal
+NODE_OPTIONS=--max-old-space-size=12288 npm run dev -- -p 3100  # or: npm run dev:e2e -- -p 3100 (12 GB heap prevents Next dev's ~6.9 GB restart mid-suite)
 npx playwright test                # all scenarios; or e2e/finance-week.spec.ts
 ```
 
@@ -125,15 +125,29 @@ One CO end to end, with each step handing to the next (every step also has its o
 4. **In Joist.** The Mac claims it as it is now (`8009-CO<n>`, `$1,240`), reports the estimate id, and its page reads `In Joist as estimate …` with `Approved by Chris Turner on the link` and `Copied to Joist` on its timeline.
 5. **Billed.** Finance's Tasks show `Bill 8009-CO<n>`. On `Job › Money` the signed CO is on Jury's schedule of values; 100% previews `$1,240` gross, makes the draft invoice and issues it. The CO is `billed` against that invoice (its `billed` event names the invoice number), and it leaves Finance's Tasks and the open Changes. The draw is voided after, which puts a billed CO back to signed (`draw-void`), and the run's rows are removed.
 
+**One way through:** a CO with a document moves only on `/app/changes/<id>` (Price it, Send, Mark approved), so the job's Changes row has no price box, Sent or Signed for it. One recorded by hand can still be priced and marked signed there, but never marked sent. A signed CO is billed on `Job › Money` (`Bill it`, also where Finance's task opens) or on an issued invoice of its job picked on the row; `Billed` with no invoice is refused (`400`), so its money can't leave Tasks, Changes and the schedule unbilled.
+
 **Run note:** the e2e specs share one local database and run one at a time (`workers: 1`). Two suites on the same stack at once interfere, e.g. `joist-sync` parks every queued Joist job, including another run's.
 
 ## 10. A client complaint (first slice of the client side, `e2e/complaint-week.spec.ts`)
 
-The office, a PM or a field lead logs what the client said on the job's Tasks tab. It goes to that job's PM, or to Owner decisions on a job with no PM, due on the `complaints` policy (1 business day by default), and it is one row in Tasks. A day past due it moves up to Owner decisions. A PM closes an open one of theirs, once, with what was done, which stays on the job; they can't move it, re-date it, drop it, rewrite it or close one with Owner decisions. Only an owner can, and a drop needs a note too. The portal's Submit a complaint is meant to write the same record.
+The office, a PM or a field lead logs what the client said on the job's Tasks tab. It goes to that job's PM, or to Owner decisions on a job with no PM, due on the `complaints` policy (1 business day by default), and it is one row in Tasks. A day past due it moves up to Owner decisions. A PM closes an open one of theirs, once, with what was done, which stays on the job; they can't move it, re-date it, drop it, rewrite it or close one with Owner decisions. Only an owner can, and a drop needs a note too. A complaint from the client's link (§12) writes the same record.
 
 ## 11. Who the job is for (`e2e/job-contact.spec.ts`)
 
 On the job's Overview, an owner links a job that has only a typed name to a client on file, or makes the client record from that name. They pick the job's contact from that client, or add one, and the database copies the contact's email and phone onto the job. A first contact keeps any email or phone already on the job that the record lacks; moving to another contact replaces them. A job's client is set once: moving a job to another client moves its money, so the app doesn't offer it. A PM reads the card and can't change it; a field lead's seat doesn't get it. A contact's email is also an address the client's documents may be mailed to, so adding one is owners only, and tests add them through this form, never with SQL.
+
+## 12. The client's link (client portal, first slice, `e2e/client-portal.spec.ts`)
+
+An owner makes a job's link on the job's Overview (**Client link**) and copies it to send: nothing here emails anyone. The client opens `/c/<token>` with no sign-in, as they do every document we send. A new link shows the job's name, address and PM (by name, never an email), and nothing else until an owner turns a section on:
+
+- **Documents:** proposals, agreements, change orders and invoices issued on the job, current revision only, each opening on its own `/d/<token>`. A proposal issued before its job existed has no `job_id` and can't be given one, so it comes in through the sale linked to the job. A change order says whether it needs their approval or is approved, and one rejected or voided on the register leaves the list even though its document stays issued. Never a draft, a void, a statement or a notice.
+- **Daily log:** the last 14 end-of-day logs: the day, the weather and the work done, in the crew's words, without their `ASK:` lines. Never who wrote it, the crew count, what was asked or decided, what's stuck, or safety notes. Progress notes and photos stay off.
+- **Complaint form:** the same record as §10, with the job's PM on the Policies clock, logged by `client portal`. They can leave a phone or email, for when someone else in the house writes in. The client sees the day we'll answer by, and no more than 5 go in per job per day.
+
+A PM or a field lead doesn't get the card. Turning a link off is for good: the old one reads "not active", the same as a made-up one, and a new link gets a new token.
+
+**Not in this slice:** invoice paid or open (a payment can sit on a statement rather than the invoice, and "open" on something a client paid is worse than nothing), photos, the client's own uploads, allowances, the timeline, and a password or passkey in place of the link.
 
 ## What an owner, a PM and finance can and can't do today
 

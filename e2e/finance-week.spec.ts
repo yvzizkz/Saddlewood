@@ -2,12 +2,15 @@
 // AFT's 23rd cutoff, driven through the screens she uses, asserting the
 // numbers on each. Local stack only (support/env.ts).
 
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 import { cents, cutoffInDays, expect, hours, test } from "./support/env";
 
 const JOB = "8009-n-ironwood-dr";
 const CO_NUMBER = /(?:\d+-)?CO-?\d+/;
+const DB = "postgresql://postgres:postgres@127.0.0.1:55322/postgres";
+const sql = (q: string) => execSync(`psql "${DB}" -qAtc ${JSON.stringify(q.replace(/\s+/g, " "))}`, { encoding: "utf8" }).trim();
 
 test.describe("Finance: the AFT billing week", () => {
   test("Billing shows AFT's cutoff, what goes with it, and the PM's date before it", async ({ owner: page }) => {
@@ -59,6 +62,8 @@ test.describe("Finance: the AFT billing week", () => {
       // A job with a street-number prefix numbers its COs <prefix>-CO<n> (8009-CO7), others CO-<n> (billing/numbering.ts).
       await expect(row).toContainText(CO_NUMBER);
       await expect(row).toContainText("Priced, not sent");
+      // Nothing is sent from here: it goes out from its own page, or is signed on paper.
+      await expect(row.getByRole("button", { name: "Sent" })).toHaveCount(0);
       const number = (await row.textContent())?.match(CO_NUMBER)?.[0] ?? "";
 
       await row.getByRole("button", { name: "Signed" }).click();
@@ -69,16 +74,28 @@ test.describe("Finance: the AFT billing week", () => {
       const tasks = page.locator('[data-table="tasks-all"]');
       await tasks.getByRole("searchbox").fill(title);
       await expect(tasks.getByRole("row").filter({ hasText: `Bill ${number}` })).toContainText("Finance");
+      await expect(tasks.getByRole("link", { name: new RegExp(`Bill ${number}`) }).first()).toHaveAttribute("href", `/app/jobs/${JOB}?tab=money`);
 
+      // Billed names its invoice: with none it is refused, and the row offers Bill it or an invoice already out.
+      expect((await page.request.patch("/api/change-orders", { data: { id: coId, status: "billed" } })).status()).toBe(400);
       await page.goto(`/app/jobs/${JOB}?tab=changes`);
-      await page.getByRole("listitem").filter({ hasText: title }).getByRole("button", { name: "Billed" }).click();
+      const signed = page.getByRole("listitem").filter({ hasText: title });
+      await expect(signed.getByRole("link", { name: "Bill it" })).toHaveAttribute("href", `/app/jobs/${JOB}?tab=money`);
+      await expect(signed.getByRole("button", { name: "Billed" })).toBeDisabled();
+      await signed.getByLabel("Already billed on").selectOption({ label: "8009-14" });
+      await signed.getByRole("button", { name: "Billed" }).click();
       await expect(page.getByRole("listitem").filter({ hasText: title })).toHaveCount(0);
       await page.goto("/app/tasks?view=all");
       await page.locator('[data-table="tasks-all"]').getByRole("searchbox").fill(title);
       await expect(page.locator('[data-table="tasks-all"]').getByRole("row").filter({ hasText: `Bill ${number}` })).toHaveCount(0);
     } finally {
+      // A billed change order has no way back, so the test row is taken out by hand.
       if (coId !== null) {
-        await page.request.patch("/api/change-orders", { data: { id: coId, status: "void" } });
+        sql(`begin; set local session_replication_role = replica;
+             delete from change_order_events where change_order_id = ${coId};
+             delete from joist_jobs where change_order_id = ${coId};
+             delete from change_orders where id = ${coId};
+             commit;`);
       }
     }
   });

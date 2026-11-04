@@ -3,7 +3,7 @@
 // single-draft guards, draft -> issue -> check payment -> next draw roll-forward,
 // plus a signed change order joining the schedule with retainage held.
 
-import { cents, expect, sovKeys, test } from "./support/env";
+import { cents, cleanChangeOrder, expect, sovKeys, test } from "./support/env";
 
 const POWELL = "3526-emerson-street";
 const BELLEVUE = "9146-w-hutton-dr";
@@ -184,6 +184,7 @@ test.describe("Powell: schedule-of-values progress draws", () => {
           data: { reason: "e2e cleanup" },
         });
       }
+      if (coId !== null) cleanChangeOrder(coId);
     }
   });
 });

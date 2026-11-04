@@ -100,8 +100,10 @@ export function buildNormalizedReceiptPurchase(input: {
 }
 
 /**
- * Pure helper: extracts CO intake (`co_price`) and owner Decision (`decision`)
- * work items from an EOD daily log's `asked`, `decision`, and `ASK:` lines.
+ * Pure helper: extracts the owner Decision (`decision`) work item from an EOD
+ * daily log's `decision` and `ASK:` lines. A client or GC directive (`asked`)
+ * makes no item here: it becomes a change order, and the register's own task
+ * follows it from Price to Send to Bill.
  */
 export function extractEodWorkItems(input: {
   entryId: number;
@@ -110,13 +112,12 @@ export function extractEodWorkItems(input: {
   jobName: string;
   billingJobId?: string | null;
   done: string;
-  asked: string;
   decision: string;
   stuck: string;
   createdBy: string;
 }) {
   const items: {
-    kind: "co_price" | "decision";
+    kind: "decision";
     title: string;
     detail: string;
     role: "decisions";
@@ -128,23 +129,6 @@ export function extractEodWorkItems(input: {
     href: string;
     created_by: string;
   }[] = [];
-
-  const asked = input.asked.trim();
-  if (asked.length >= 2) {
-    items.push({
-      kind: "co_price",
-      title: `CO awaiting price · ${input.jobName}: ${asked.slice(0, 130)}`,
-      detail: `Directive captured on ${input.day} EOD log (#${input.entryId}). Price before billing cutoff.`,
-      role: "decisions",
-      job_id: input.billingJobId ?? null,
-      crew_job_id: crewJobIdOf(input.jobId),
-      due_on: input.day,
-      escalate_days: 2,
-      source: `eod:asked:${input.entryId}`,
-      href: crewJobIdOf(input.jobId) ? `/app/jobs/${encodeURIComponent(input.jobId)}?tab=changes` : "/app/tasks",
-      created_by: input.createdBy,
-    });
-  }
 
   let decisionText = input.decision.trim();
   if (!decisionText) {
@@ -205,9 +189,9 @@ export async function syncReceiptEntryToPurchases(input: Parameters<typeof build
   }
 }
 
-/** Writes directive (`co_price`) and `ASK:` (`decision`) rows from an EOD log into `work_items` and `change_orders`. Never throws to caller. */
+/** Writes an EOD log's `ASK:` (`decision`) into `work_items` and its directive into `change_orders`. Never throws to caller. */
 export async function syncEodDirectivesAndDecisions(
-  input: Parameters<typeof extractEodWorkItems>[0],
+  input: Parameters<typeof extractEodWorkItems>[0] & { asked: string },
 ): Promise<{ workItemIds: number[]; changeOrderId: number | null }> {
   const workItemIds: number[] = [];
   let changeOrderId: number | null = null;
@@ -243,9 +227,13 @@ export async function syncEodDirectivesAndDecisions(
     const asked = input.asked.trim();
     const crewJobId = crewJobIdOf(input.jobId);
     if (asked.length >= 2) {
-      const title = asked.slice(0, 200);
-      const lookup = db.from("change_orders").select("id").eq("title", title);
-      const { data: existingCo, error: coSelErr } = await (crewJobId ? lookup.eq("crew_job_id", crewJobId) : lookup.is("crew_job_id", null)).maybeSingle();
+      // A CO on no job has only its title to say whose it is, so an "Other job" log's typed name goes there.
+      const typedJob = !crewJobId && !billingJobId ? input.jobName.trim().slice(0, 80) : "";
+      const title = (typedJob ? `${typedJob}: ${asked}` : asked).slice(0, 200);
+      // Only one still open on this same job counts: the same ask after it was billed, rejected or voided is a new change order.
+      const lookup = db.from("change_orders").select("id").eq("title", title).in("status", ["requested", "priced", "sent", "signed"]);
+      const onThisJob = crewJobId ? lookup.eq("crew_job_id", crewJobId) : billingJobId ? lookup.is("crew_job_id", null).eq("job_id", billingJobId) : lookup.is("crew_job_id", null).is("job_id", null);
+      const { data: existingCo, error: coSelErr } = await onThisJob.limit(1).maybeSingle();
       if (coSelErr) console.error("syncEodDirectivesAndDecisions change_orders lookup failed:", coSelErr);
       if (!existingCo) {
         const { data: insertedCo, error: coInsErr } = await db

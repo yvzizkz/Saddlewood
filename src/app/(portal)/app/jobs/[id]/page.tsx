@@ -4,10 +4,13 @@ import { notFound, redirect } from "next/navigation";
 import { Card } from "@/components/bot/ui";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
+import ClientPortalCard, { type PortalState } from "@/components/jobs/ClientPortalCard";
 import JobClientCard from "@/components/jobs/JobClientCard";
 import JobFrame, { type JobTab, type Stage } from "@/components/jobs/JobFrame";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
+import { siteUrl } from "@/lib/billing/http";
+import { livePortal } from "@/lib/portal/store";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import type { LaborRow } from "@/lib/accounting/labor";
 import type { PurchaseItemRow } from "@/lib/accounting/purchases";
@@ -204,6 +207,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const refs = await listJobRefs();
     const cos = (await loadChangeOrders(refs, today)).filter((c) => c.jobKey === ref.key);
     const waiting = cos.filter((c) => c.registerId !== null && !["billed", "rejected", "void"].includes(c.status));
+    const invoices = money.issued.filter((d) => d.kind === "invoice" && d.status === "issued").map((d) => ({ id: d.id, number: d.number }));
     const timelines = await loadTimelines(waiting.map((c) => ({ id: c.registerId!, documentId: c.documentId })), { money: seat.money });
     const table: TableRow[] = cos.map((c) => ({
       id: c.id,
@@ -246,7 +250,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                           Follow up
                         </Link>
                       ) : null}
-                      <ChangeOrderStep id={c.registerId!} status={c.status} />
+                      <ChangeOrderStep id={c.registerId!} status={c.status} hasDocument={!!c.documentId} billHref={c.noBillingJob ? null : `${base}?tab=money`} invoices={invoices} noCharge={c.amountCents === 0} />
                     </div>
                   ) : null}
                   {timelines.get(c.registerId!)?.length ? (
@@ -795,6 +799,18 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   // A failed read says so instead of taking the whole Overview down.
   const clientCard: JobClient | null | "failed" = seat.money ? await loadJobClient(ref, { clients: owner }).catch(() => "failed" as const) : null;
 
+  // The client's link: an owner's, on a job with a billing record. Undefined hides the card, as when 0062 can't be read.
+  const portal: PortalState | undefined =
+    owner && ref.billingId
+      ? await livePortal(ref.billingId).then(
+          (p) => (p ? { href: `${siteUrl()}/c/${p.token}`, sections: p.sections } : null),
+          (err) => {
+            console.error("client portal:", err);
+            return undefined;
+          },
+        )
+      : undefined;
+
   return (
     <JobFrame {...frame}>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
@@ -893,6 +909,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             ) : null}
           </ul>
         </Card>
+        {portal !== undefined ? <ClientPortalCard job={ref.key} origin={siteUrl()} initial={portal} /> : null}
       </div>
     </JobFrame>
   );

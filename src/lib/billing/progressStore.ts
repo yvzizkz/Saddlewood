@@ -20,7 +20,7 @@ export class ProgressError extends Error {
   }
 }
 
-type JobRow = { id: string; name: string; address: string | null; client_id: string | null; number_prefix: string | null; billing: Record<string, unknown> | null };
+type JobRow = { id: string; name: string; address: string | null; client_id: string | null; crew_job_id: string | null; number_prefix: string | null; billing: Record<string, unknown> | null };
 
 export type ProgressState = {
   jobId: string;
@@ -43,7 +43,7 @@ export type ProgressState = {
 
 export async function loadProgress(billingJobId: string): Promise<ProgressState> {
   const db = getSupabaseAdmin();
-  const { data: job, error } = await db.from("jobs").select("id,name,address,client_id,number_prefix,billing").eq("id", billingJobId).maybeSingle();
+  const { data: job, error } = await db.from("jobs").select("id,name,address,client_id,crew_job_id,number_prefix,billing").eq("id", billingJobId).maybeSingle();
   if (error) throw new Error(`jobs: ${error.message}`);
   if (!job) throw new ProgressError("No such job.", 404);
   const j = job as JobRow;
@@ -52,7 +52,12 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
   const [sov, client, cos, rows, dep] = await Promise.all([
     loadSovLines([j.id]),
     j.client_id ? db.from("clients").select("billing").eq("id", j.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-    db.from("change_orders").select("id,number,title,amount_cents,status").eq("job_id", j.id).in("status", ["signed", "billed"]),
+    // One recorded while the job had no billing record is still this job's to bill.
+    db
+      .from("change_orders")
+      .select("id,number,title,amount_cents,status")
+      .or(j.crew_job_id ? `job_id.eq.${j.id},and(job_id.is.null,crew_job_id.eq."${j.crew_job_id}")` : `job_id.eq.${j.id}`)
+      .in("status", ["signed", "billed"]),
     db.from("sov_progress").select("line_key,pct_to_date,amount_cents,document_id,documents!inner(id,number,status,created_at)").eq("job_id", j.id),
     depositId ? db.from("documents").select("id,number,status,total_cents").eq("id", depositId).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
@@ -242,7 +247,7 @@ export async function createDrawDraft(billingJobId: string, asked: Record<string
   // A signed change order that this draw takes to 100% is billed.
   const done = draw.lines.filter((l) => l.kind === "co" && l.pct >= 100 && l.thisPeriodCents > 0).map((l) => Number(l.key.slice(3)));
   if (done.length) {
-    const { data: billed } = await db.from("change_orders").update({ status: "billed", billed_document_id: doc.id }).in("id", done).eq("status", "signed").select("id");
+    const { data: billed } = await db.from("change_orders").update({ status: "billed", billed_document_id: doc.id, job_id: billingJobId }).in("id", done).eq("status", "signed").select("id");
     await coEventsAfter(((billed ?? []) as { id: number }[]).map((r) => r.id), "billed", by, { invoiceId: doc.id, invoice: doc.number });
   }
 
