@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Card } from "@/components/bot/ui";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
+import JobClientCard from "@/components/jobs/JobClientCard";
 import JobFrame, { type JobTab, type Stage } from "@/components/jobs/JobFrame";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
@@ -20,6 +21,7 @@ import { listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
 import { canCloseComplaint } from "@/lib/complaints/rules";
+import { loadJobClient, type JobClient } from "@/lib/clients/jobClient";
 import { loadJobComplaints } from "@/lib/complaints/store";
 import { canApproveBillHere, canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed, NEW_TASK_KINDS } from "@/lib/tasks/feed";
 import { ApproveBill, CloseTask, NewComplaint, NewTask } from "@/components/tasks/TaskActions";
@@ -789,6 +791,10 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     </Card>
   );
 
+  // Owners set who the job is for; a PM reads it; a field lead's seat doesn't get it.
+  // A failed read says so instead of taking the whole Overview down.
+  const clientCard: JobClient | null | "failed" = seat.money ? await loadJobClient(ref, { clients: owner }).catch(() => "failed" as const) : null;
+
   return (
     <JobFrame {...frame}>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
@@ -805,6 +811,12 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         {tile("Labor this week", hoursWeek, "hours", `${base}?tab=labor&p=wtd`)}
         {seat.money ? tile("Materials", materials, "money", `${base}?tab=purchases&p=ytd`) : null}
       </div>
+
+      {clientCard === "failed" ? (
+        <p className="text-sm text-[var(--color-charcoal-light)]">The client and contact couldn&apos;t be loaded right now.</p>
+      ) : clientCard ? (
+        <JobClientCard job={ref.key} data={clientCard} canEdit={owner} />
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-4">
