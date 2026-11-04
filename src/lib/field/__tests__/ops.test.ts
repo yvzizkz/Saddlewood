@@ -146,8 +146,11 @@ describe("field operations helpers", () => {
         return {
           select: () => ({
             eq: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }),
+              neq: () => ({
+                is: () => ({ maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }) }),
+                eq: () => ({
+                  maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }),
+                }),
               }),
             }),
           }),
@@ -183,7 +186,7 @@ describe("field operations helpers", () => {
       jobName: "9146 W Hutton Dr",
       done: "",
       asked: "Super asked for extra blocking",
-      decision: "",
+      decision: "ASK: Which backing?",
       stuck: "",
       createdBy: "jorge@saddlewood.crew",
     });
@@ -193,45 +196,82 @@ describe("field operations helpers", () => {
     errSpy.mockRestore();
   });
 
-  it("extracts CO awaiting price and owner ASK decision items from EOD daily logs", () => {
-    const items = extractEodWorkItems({
-      entryId: 77,
-      day: "2026-10-20",
-      jobId: "9146-w-hutton-dr",
-      jobName: "9146 W Hutton Dr",
-      billingJobId: "20000000-0000-0000-0000-000000000001",
-      done: "Hung 38 sheets of 5/8 Type X.\nASK: Should we fur out the north niche 1.5in for flush tile?",
-      asked: "GC superintendent asked to add sound attenuation batts in powder room wall.",
-      decision: "",
-      stuck: "",
-      createdBy: "jorge@saddlewood.crew",
-    });
+  const EOD = {
+    entryId: 77,
+    day: "2026-10-20",
+    jobId: "9146-w-hutton-dr",
+    jobName: "9146 W Hutton Dr",
+    billingJobId: "20000000-0000-0000-0000-000000000001",
+    done: "Hung 38 sheets of 5/8 Type X.",
+    decision: "",
+    stuck: "",
+    createdBy: "jorge@saddlewood.crew",
+  };
 
-    expect(items).toHaveLength(2);
-    const co = items.find((i) => i.kind === "co_price");
-    const dec = items.find((i) => i.kind === "decision");
-    expect(co?.role).toBe("decisions");
-    expect(co?.title).toContain("CO awaiting price");
-    expect(dec?.role).toBe("decisions");
-    expect(dec?.title).toContain("Should we fur out the north niche 1.5in for flush tile?");
+  it("extracts the owner ASK decision item from EOD daily logs", () => {
+    const items = extractEodWorkItems({ ...EOD, done: "Hung 38 sheets of 5/8 Type X.\nASK: Should we fur out the north niche 1.5in for flush tile?" });
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toBe("decision");
+    expect(items[0].role).toBe("decisions");
+    expect(items[0].title).toContain("Should we fur out the north niche 1.5in for flush tile?");
   });
 
   it("puts EOD items from an 'Other job' log on no job (no crew_jobs foreign key to break)", () => {
-    const items = extractEodWorkItems({
-      entryId: 77,
-      day: "2026-10-20",
-      jobId: OTHER_JOB,
-      jobName: "Smith garage",
-      done: "Framed",
-      asked: "Add a header over the side door",
-      decision: "ASK: T&M or CO?",
-      stuck: "",
-      createdBy: "jorge@saddlewood.crew",
-    });
-    expect(items).toHaveLength(2);
-    for (const i of items) {
-      expect(i.crew_job_id).toBeNull();
-      expect(i.href).toBe("/app/tasks");
+    const items = extractEodWorkItems({ ...EOD, jobId: OTHER_JOB, jobName: "Smith garage", billingJobId: undefined, done: "Framed", decision: "ASK: T&M or CO?" });
+    expect(items).toHaveLength(1);
+    expect(items[0].crew_job_id).toBeNull();
+    expect(items[0].href).toBe("/app/tasks");
+  });
+
+  describe("a directive on the EOD log", () => {
+    function tables(existing: { id: number } | null) {
+      const written: Record<string, Record<string, unknown>[]> = { work_items: [], change_orders: [] };
+      const filters: string[] = [];
+      const chain = (data: unknown) => {
+        const q = {
+          eq: (col: string, v: unknown) => (filters.push(`${col}=${v}`), q),
+          neq: (col: string, v: unknown) => (filters.push(`${col}!=${v}`), q),
+          is: () => q,
+          maybeSingle: async () => ({ data, error: null }),
+        };
+        return q;
+      };
+      fromMock.mockImplementation((table: string) => {
+        if (table === "work_items" || table === "change_orders") {
+          return {
+            select: () => chain(table === "change_orders" ? existing : null),
+            insert: (row: Record<string, unknown>) => {
+              written[table].push(row);
+              return { select: () => ({ single: async () => ({ data: { id: 900 }, error: null }) }) };
+            },
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      });
+      return { written, filters };
     }
+
+    it("makes a change order and no task of its own: the register's task is the one", async () => {
+      const { written } = tables(null);
+      const res = await syncEodDirectivesAndDecisions({ ...EOD, asked: "GC asked to add sound batts in the powder room wall." });
+      expect(written.work_items).toEqual([]);
+      expect(written.change_orders).toHaveLength(1);
+      expect(written.change_orders[0]).toMatchObject({ title: "GC asked to add sound batts in the powder room wall.", source: "directive" });
+      expect(res).toEqual({ workItemIds: [], changeOrderId: 900 });
+    });
+
+    it("keeps the ASK decision on the same log", async () => {
+      const { written } = tables(null);
+      await syncEodDirectivesAndDecisions({ ...EOD, asked: "Add batts", decision: "ASK: T&M or CO?" });
+      expect(written.work_items.map((w) => w.kind)).toEqual(["decision"]);
+    });
+
+    it("does not repeat one still on the register, and looks past a voided one", async () => {
+      const { written, filters } = tables({ id: 41 });
+      const res = await syncEodDirectivesAndDecisions({ ...EOD, asked: "Add batts" });
+      expect(written.change_orders).toEqual([]);
+      expect(res.changeOrderId).toBe(41);
+      expect(filters).toContain("status!=void");
+    });
   });
 });
