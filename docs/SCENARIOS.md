@@ -129,6 +129,10 @@ One CO end to end, with each step handing to the next (every step also has its o
 
 **Run note:** the e2e specs share one local database and run one at a time (`workers: 1`). Two suites on the same stack at once interfere, e.g. `joist-sync` parks every queued Joist job, including another run's.
 
+## 10. A client complaint (first slice of the client side, `e2e/complaint-week.spec.ts`)
+
+The office, a PM or a field lead logs what the client said on the job's Tasks tab. It goes to that job's PM, or to Owner decisions on a job with no PM, due on the `complaints` policy (1 business day by default), and it is one row in Tasks. A day past due it moves up to Owner decisions. A PM closes an open one of theirs, once, with what was done, which stays on the job; they can't move it, re-date it, drop it, rewrite it or close one with Owner decisions. Only an owner can, and a drop needs a note too. The portal's Submit a complaint is meant to write the same record.
+
 ## What an owner, a PM and finance can and can't do today
 
 From the runs on 2026-10-20: `npx playwright test` passes **39/39**, twice in a row (Finance 6, Owner 5, PM access & week 8, Field 5, Purchasing 4, Subs 4, Sales 2, Powell SOV draws & PM report 5).

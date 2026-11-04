@@ -29,7 +29,7 @@ import { loadMissingDailyLogs } from "@/lib/field/ops";
 import { jobHref, jobKeyOf, type JobRef } from "@/lib/jobs/hub";
 import { escalationOf, ROLE_INFO, seatHolder, type Person, type Role, type Seat } from "@/lib/roles/seats";
 
-export type TaskKind = "task" | "punch" | "follow_up" | "approval" | "co_price" | "decision" | "compliance" | "billing" | "daily_log" | "friction";
+export type TaskKind = "task" | "punch" | "follow_up" | "approval" | "co_price" | "decision" | "compliance" | "billing" | "daily_log" | "friction" | "complaint";
 
 export const KIND_LABEL: Record<TaskKind, string> = {
   task: "Task",
@@ -42,6 +42,7 @@ export const KIND_LABEL: Record<TaskKind, string> = {
   billing: "Billing",
   daily_log: "Daily log",
   friction: "Friction",
+  complaint: "Client complaint",
 };
 
 export type FeedItem = {
@@ -75,6 +76,9 @@ function daysLate(due: string | null, today: string): number {
 }
 
 /** Escalation: due date plus grace passed → one role up. Pure, for tests. */
+/** What a person can hand out as a task: a complaint is logged on its job, where its seat and clock are set (complaints/store.ts). */
+export const NEW_TASK_KINDS = (Object.entries(KIND_LABEL) as [TaskKind, string][]).filter(([k]) => k !== "complaint").map(([value, label]) => ({ value, label }));
+
 export function placeItem(role: Role, dueOn: string | null, graceDays: number, today: string): { nowRole: Role; overdueDays: number; escalated: boolean } {
   const late = daysLate(dueOn, today);
   const escalated = Boolean(dueOn) && dueOn! < today && late > graceDays;

@@ -159,6 +159,17 @@ export const DECISIONS: DecisionDef[] = [
     ],
   },
   {
+    id: "complaints",
+    title: "How fast a client complaint gets a reply",
+    question: "How soon does a client hear back on a complaint, and who owns it?",
+    recommendation: "The job's PM owns it and replies within 1 business day. Not closed a day after that, it moves up to Owner decisions.",
+    why: "Every complaint reaching Marco first is what this replaces: the person running the job answers, and the owners hear only about the ones that sit. It closes with what was done, so the job keeps the record.",
+    sources: "Owner's client portal note (10/20): set who owns client messages and complaints, with a triage and response-time rule. Past complaint emails: 48 hours of silence is where a fixable problem became a formal escalation, and Marco has said he is not a 24/7 contractor, so the clock counts business days.",
+    liveIn: "Tasks and the job's Tasks tab: a complaint goes to the job's PM, or to Owner decisions on a job with no PM, due this many business days after it is logged.",
+    laterIn: "The client portal's Submit a complaint.",
+    policies: [{ key: "policy.complaint.replyWithinDays", label: "Reply within", recommended: 1, control: { type: "days", max: 14 }, hint: "Business days: weekends don't count." }],
+  },
+  {
     id: "purchases",
     title: "Purchase approvals",
     question: "Who approves a purchase, and up to what amount?",
