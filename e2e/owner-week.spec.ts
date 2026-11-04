@@ -3,10 +3,14 @@
 // work, a task handed out and moved up when overdue, and the job page agreeing
 // with Accounting. Local stack only (support/env.ts).
 
+import { execSync } from "node:child_process";
+
 import { cents, cutoffInDays, expect, test } from "./support/env";
 
 const JOB = "8009-n-ironwood-dr";
 const JOB_BILLING = "b0000001-0000-4000-8000-000000008009";
+const DB = "postgresql://postgres:postgres@127.0.0.1:55322/postgres";
+const sql = (q: string) => execSync(`psql "${DB}" -qAtc ${JSON.stringify(q.replace(/\s+/g, " "))}`, { encoding: "utf8" }).trim();
 
 async function tile(page: import("@playwright/test").Page, label: string): Promise<number> {
   const card = page.locator("dl > div").filter({ has: page.locator("dt", { hasText: label }) });
@@ -39,15 +43,13 @@ test.describe("Owner: the owner's week", () => {
 
       await page.goto("/app/departments/decisions");
       expect(await tile(page, "Change orders to price")).toBe(before);
-      // Close it out so reruns start clean.
-      await page.goto("/app/jobs/9146-w-hutton-dr?tab=changes");
-      const co = page.getByRole("listitem").filter({ hasText: title });
-      await co.getByRole("button", { name: "Signed" }).click();
-      await expect(co).toContainText("Signed, not billed");
-      await co.getByRole("button", { name: "Billed" }).click();
-      await expect(page.getByRole("listitem").filter({ hasText: title })).toHaveCount(0);
     } finally {
-      await page.request.patch("/api/change-orders", { data: { id: coId, status: "void" } });
+      // Taken out so reruns start clean.
+      sql(`begin; set local session_replication_role = replica;
+           delete from change_order_events where change_order_id = ${coId};
+           delete from joist_jobs where change_order_id = ${coId};
+           delete from change_orders where id = ${coId};
+           commit;`);
     }
   });
 

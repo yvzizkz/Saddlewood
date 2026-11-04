@@ -200,6 +200,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     const refs = await listJobRefs();
     const cos = (await loadChangeOrders(refs, today)).filter((c) => c.jobKey === ref.key);
     const waiting = cos.filter((c) => c.registerId !== null && !["billed", "rejected", "void"].includes(c.status));
+    const invoices = money.issued.filter((d) => d.kind === "invoice" && d.status === "issued").map((d) => ({ id: d.id, number: d.number }));
     const timelines = await loadTimelines(waiting.map((c) => ({ id: c.registerId!, documentId: c.documentId })), { money: seat.money });
     const table: TableRow[] = cos.map((c) => ({
       id: c.id,
@@ -242,7 +243,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                           Follow up
                         </Link>
                       ) : null}
-                      <ChangeOrderStep id={c.registerId!} status={c.status} />
+                      <ChangeOrderStep id={c.registerId!} status={c.status} hasDocument={!!c.documentId} billHref={`${base}?tab=money`} invoices={invoices} />
                     </div>
                   ) : null}
                   {timelines.get(c.registerId!)?.length ? (

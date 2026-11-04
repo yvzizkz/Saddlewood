@@ -4,6 +4,7 @@
 // T&M ticket, the client), price it, and move it along. The CO document is
 // still made and sent from Billing; this keeps the request from getting lost.
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
@@ -80,20 +81,35 @@ export function RequestChangeOrder({ job }: { job: string }) {
   )
 }
 
-const STEPS: Record<string, { to: string; label: string }[]> = {
-  requested: [{ to: 'rejected', label: 'Reject' }],
-  priced: [
-    { to: 'sent', label: 'Sent' },
-    { to: 'signed', label: 'Signed' },
-  ],
-  sent: [{ to: 'signed', label: 'Signed' }],
-  signed: [{ to: 'billed', label: 'Billed' }],
-  rejected: [{ to: 'requested', label: 'Reopen' }],
+// A change order with a document moves on its own page (Price it, Send, Mark
+// approved), where the email, the signature and the proof are kept; only one
+// recorded by hand, with nothing to send or sign, takes these steps. "Sent" is
+// not one: nothing is sent from here.
+function stepsFor(status: string, hasDocument: boolean): { to: string; label: string }[] {
+  if (status === 'requested') return [{ to: 'rejected', label: 'Reject' }]
+  if (status === 'rejected') return [{ to: 'requested', label: 'Reopen' }]
+  if ((status === 'priced' || status === 'sent') && !hasDocument) return [{ to: 'signed', label: 'Signed' }]
+  return []
 }
 
-export function ChangeOrderStep({ id, status }: { id: number; status: string }) {
+export function ChangeOrderStep({
+  id,
+  status,
+  hasDocument,
+  billHref,
+  invoices,
+}: {
+  id: number
+  status: string
+  hasDocument: boolean
+  /** Where a signed one is billed: the job's Money tab. */
+  billHref: string
+  /** The job's issued invoices, for one that already went out on its own. */
+  invoices: { id: string; number: string }[]
+}) {
   const router = useRouter()
   const [price, setPrice] = useState('')
+  const [invoice, setInvoice] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState('')
   const go = async (body: Record<string, unknown>, key: string) => {
@@ -105,7 +121,7 @@ export function ChangeOrderStep({ id, status }: { id: number; status: string }) 
   }
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {status === 'requested' ? (
+      {status === 'requested' && !hasDocument ? (
         <>
           <label className="sr-only" htmlFor={`co-price-${id}`}>
             Price
@@ -128,7 +144,7 @@ export function ChangeOrderStep({ id, status }: { id: number; status: string }) 
           </button>
         </>
       ) : null}
-      {(STEPS[status] ?? []).map((s) => (
+      {stepsFor(status, hasDocument).map((s) => (
         <button
           key={s.to}
           type="button"
@@ -139,6 +155,41 @@ export function ChangeOrderStep({ id, status }: { id: number; status: string }) 
           {busy === s.to ? '…' : s.label}
         </button>
       ))}
+      {status === 'signed' ? (
+        <>
+          <Link href={billHref} className="rounded-lg bg-[var(--color-teal)] px-2.5 py-1 text-xs font-medium text-white">
+            Bill it
+          </Link>
+          {invoices.length ? (
+            <>
+              <label className="sr-only" htmlFor={`co-invoice-${id}`}>
+                Already billed on
+              </label>
+              <select
+                id={`co-invoice-${id}`}
+                value={invoice}
+                onChange={(e) => setInvoice(e.target.value)}
+                className="rounded-lg border border-[var(--color-stone-mid)] px-2 py-1 text-base md:text-xs"
+              >
+                <option value="">Already on an invoice?</option>
+                {invoices.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.number}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!!busy || !invoice}
+                onClick={() => go({ status: 'billed', billedDocumentId: invoice }, 'billed')}
+                className="rounded-lg border border-[var(--color-stone-mid)] px-2.5 py-1 text-xs font-medium hover:bg-[var(--color-cream)] disabled:opacity-50"
+              >
+                {busy === 'billed' ? '…' : 'Billed'}
+              </button>
+            </>
+          ) : null}
+        </>
+      ) : null}
       {err ? <span className="text-xs text-[#9a2a1f]">{err}</span> : null}
     </div>
   )

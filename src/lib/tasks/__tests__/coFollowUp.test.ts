@@ -74,3 +74,12 @@ describe("the follow-up clock on a sent change order", () => {
     expect(db.reads.filter((t) => t === "change_order_events")).toHaveLength(1);
   });
 });
+
+describe("a signed change order", () => {
+  const signed = { registerId: 7, status: "signed", jobKey: "8009-n-ironwood-dr", job: "8009 N Ironwood Dr", number: "8009-CO7", title: "Shear wall", amountCents: 124000, requestedOn: "2026-10-30", sentOn: null } as unknown as Parameters<typeof changeOrderItems>[0][number];
+
+  it("tells Finance to bill it, and the task opens the job's Money tab, where it is billed", () => {
+    const [item] = changeOrderItems([signed], PACE, TODAY);
+    expect(item).toMatchObject({ title: "Bill 8009-CO7 Shear wall", role: "finance", href: "/app/jobs/8009-n-ironwood-dr?tab=money" });
+  });
+});

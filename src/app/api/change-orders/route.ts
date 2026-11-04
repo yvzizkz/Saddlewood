@@ -7,7 +7,7 @@ import { queueJoist } from "@/lib/billing/joistSyncStore";
 import { nextChangeOrderNumber } from "@/lib/billing/numbering";
 import { CO_STATUS, type CoStatus } from "@/lib/billing/registers";
 import { requireOwner } from "@/lib/crew/auth";
-import { isDay } from "@/lib/crew/time";
+import { isDay, localDay } from "@/lib/crew/time";
 import { jobForWrite, workSeat } from "@/lib/jobs/access";
 
 export const runtime = "nodejs";
@@ -18,7 +18,11 @@ export const dynamic = "force-dynamic";
 // price and approve (SOP-002, Who decides); the document itself is still made
 // and sent from Billing like any other. A project manager records the request
 // on their own jobs (the day it is asked for, SOP-002); pricing it is not theirs.
+// A change order is billed on an invoice, named here or by the draw that takes it
+// to 100%: marked billed with none, its money would leave Tasks, Changes and the
+// schedule and never be billed.
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 // The order a change order moves in; it never goes back except to rejected/void.
@@ -63,6 +67,7 @@ export async function PATCH(request: NextRequest) {
   if (!row) return NextResponse.json({ ok: false, error: "No such change order." }, { status: 404 });
   const cur = row as { status: CoStatus; number: string; job_id: string | null; amount_cents: number | null };
   const patch: Record<string, unknown> = {};
+  let invoice = "";
 
   if (b.amountCents !== undefined) {
     if (!Number.isInteger(b.amountCents) || b.amountCents < 0) return NextResponse.json({ ok: false, error: "The price is in cents, zero or more." }, { status: 400 });
@@ -90,10 +95,20 @@ export async function PATCH(request: NextRequest) {
         }
       }
     }
-    if (to === "signed") patch.signed_on = b.signedOn && isDay(b.signedOn) ? b.signedOn : new Date().toISOString().slice(0, 10);
+    if (to === "signed") patch.signed_on = b.signedOn && isDay(b.signedOn) ? b.signedOn : localDay();
+    if (to === "billed" && cur.status !== "billed") {
+      if (!b.billedDocumentId || !UUID.test(b.billedDocumentId)) return NextResponse.json({ ok: false, error: "Say which invoice billed it, or bill it on the job's Money tab." }, { status: 400 });
+      const { data: doc, error: docErr } = await db.from("documents").select("number,kind,status,job_id").eq("id", b.billedDocumentId).maybeSingle();
+      if (docErr) throw new Error(`documents read: ${docErr.message}`);
+      const found = doc as { number: string; kind: string; status: string; job_id: string | null } | null;
+      if (!found || found.kind !== "invoice" || found.status !== "issued" || !cur.job_id || found.job_id !== cur.job_id) {
+        return NextResponse.json({ ok: false, error: "That is not an issued invoice on this job." }, { status: 409 });
+      }
+      patch.billed_document_id = b.billedDocumentId;
+      invoice = found.number;
+    }
   }
   if (b.documentId) patch.document_id = b.documentId;
-  if (b.billedDocumentId) patch.billed_document_id = b.billedDocumentId;
   if (b.note !== undefined) patch.note = text(b.note, 2000);
   if (!Object.keys(patch).length) return NextResponse.json({ ok: false, error: "Nothing to change." }, { status: 400 });
   const { error } = await db.from("change_orders").update(patch).eq("id", b.id!);
@@ -107,7 +122,7 @@ export async function PATCH(request: NextRequest) {
       to === "requested" ? { reopened: true }
       : to === "priced" ? { amountCents }
       : to === "signed" ? { signedOn: patch.signed_on, amountCents, marked: true }
-      : to === "billed" ? { invoiceId: b.billedDocumentId ?? null }
+      : to === "billed" ? { invoiceId: b.billedDocumentId ?? null, invoice }
       : to === "rejected" ? { note: patch.note ?? "" }
       : to === "sent" ? { marked: true }
       : {};

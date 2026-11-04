@@ -312,7 +312,7 @@ export function changeOrderItems(cos: CoRow[], pace: { priceWithinDays: number; 
   const out: FeedItem[] = [];
   for (const c of cos) {
     if (c.registerId === null) continue;
-    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.status === "requested" || c.status === "priced" || c.status === "sent" ? `/app/changes/${c.registerId}` : c.jobKey ? jobHref(c.jobKey, "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
+    const base = { source: "billing" as const, assignee: "", jobKey: c.jobKey, job: c.job, since: c.requestedOn, href: c.status === "requested" || c.status === "priced" || c.status === "sent" ? `/app/changes/${c.registerId}` : c.jobKey ? jobHref(c.jobKey, c.status === "signed" ? "money" : "changes") : "/app/accounting/billing#changes", editable: false, detail: c.amountCents !== null ? (c.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "" };
     if (c.status === "requested" || c.status === "priced") {
       const due = c.requestedOn ? addDays(c.requestedOn, pace.priceWithinDays) : null;
       const title = c.status === "requested" ? `Price: ${c.title}` : `Send: ${c.number} ${c.title}`;
