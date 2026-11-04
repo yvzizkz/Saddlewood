@@ -41,12 +41,14 @@ site change that reads them with the server key must be live first.
 | 0058 | `jobs_mirror_first_contact` (after 0056; any time, no site change needs it) | 0058 PR |
 | 0059 | `change_order_intake` (before the Mac posts to `/api/change-orders/intake`; nothing else needs it) | CO intake PR |
 | 0060 | `joist_sync` (before the Mac syncs queued COs into Joist) | Joist sync PR |
+| 0061 | `complaints` (before the site change) | Complaints PR |
 
 ## Production state
 
 As of 2026-11-02 (checked live against production): everything through 0060
 is applied, including 0029–0035, 0040–0045, 0050–0058, 0059 (`change_order_events`)
-and 0060 (`joist_jobs`). Check before applying anything,
+and 0060 (`joist_jobs`). 0061 (complaints) is not applied yet: apply it before
+the site change. Check before applying anything,
 since this note can go stale: a migration is in if the table it creates exists.
 
 ```sql
@@ -114,6 +116,14 @@ back); 0056's check still passes after it.
 timeline (`change_order_events`). Only `/api/change-orders/intake` uses them,
 so it can go in any time before the Mac's intake is switched on. Check it with
 `select to_regclass('public.change_order_events')` (not null).
+0061 adds `work_items.resolution` and the `complaint` kind, and requires a
+note to close a complaint. It changes no rows. Apply it before the site change:
+without it the job's Tasks tab still opens, but its Client complaints card says
+complaints couldn't be loaded and logging one fails. Check it with
+`select count(*) from information_schema.columns where table_schema = 'public'
+and table_name = 'work_items' and column_name = 'resolution'` (1) and
+`select pg_get_constraintdef(oid) from pg_constraint where conname =
+'work_items_kind_check'` (lists 'complaint').
 
 ## Rules
 

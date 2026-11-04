@@ -419,7 +419,8 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         <section id="complaints" aria-label="Client complaints" className="scroll-mt-24">
         <Card className="p-4">
           <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">{es ? "Quejas del cliente" : "Client complaints"}</p>
-          {complaints.length ? (
+          {!complaints ? <p className="mb-3 text-sm text-[var(--color-charcoal-light)]">{es ? "No se pudieron cargar las quejas." : "Complaints couldn't be loaded right now."}</p> : null}
+          {complaints?.length ? (
             <ul className="mb-3 divide-y divide-[var(--color-stone)]">
               {complaints.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2">

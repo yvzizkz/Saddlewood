@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = Record<string, unknown>;
 const { db, pushed, owners } = vi.hoisted(() => ({
-  db: { inserted: [] as Row[], people: [] as { jobId: string; email: string; role: string }[], days: 1, today: "2026-11-03" },
+  db: { inserted: [] as Row[], read: { data: [] as Row[] | null, error: null as { message: string } | null }, people: [] as { jobId: string; email: string; role: string }[], days: 1, today: "2026-11-03" },
   pushed: [] as { to: string[]; note: Row }[],
   owners: [] as Row[],
 }));
@@ -14,6 +14,10 @@ vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => ({
     from: () => ({
       insert: (r: Row) => (db.inserted.push(r), { select: () => ({ single: async () => ({ data: { id: 5 }, error: null }) }) }),
+      select: () => {
+        const q = { eq: () => q, or: () => q, order: () => q, limit: async () => db.read };
+        return q;
+      },
     }),
   }),
 }));
@@ -24,7 +28,7 @@ vi.mock("@/lib/bot/push", () => ({ sendPush: async (to: string[], note: Row) => 
 vi.mock("@/lib/crew/notify", () => ({ notifyOwners: async (note: Row) => void owners.push(note) }));
 
 import { placeItem } from "@/lib/tasks/feed";
-import { logComplaint, routeComplaint } from "../store";
+import { loadJobComplaints, logComplaint, routeComplaint } from "../store";
 
 const REF = { key: "keim", billingId: "b1", crewId: "keim", name: "12729 W Keim Dr" } as Parameters<typeof logComplaint>[0];
 const on = (email: string, role = "pm", jobId = "keim") => ({ jobId, email, role }) as Parameters<typeof routeComplaint>[1][number];
@@ -34,6 +38,7 @@ beforeEach(() => {
   db.people = [];
   db.days = 1;
   db.today = "2026-11-03";
+  db.read = { data: [], error: null };
   pushed.length = 0;
   owners.length = 0;
 });
@@ -84,5 +89,24 @@ describe("logComplaint", () => {
   it("moves up to Owner decisions the day after it is due, not before", () => {
     expect(placeItem("pm", "2026-11-04", 0, "2026-11-04")).toMatchObject({ nowRole: "pm", escalated: false });
     expect(placeItem("pm", "2026-11-04", 0, "2026-11-05")).toMatchObject({ nowRole: "decisions", escalated: true });
+  });
+});
+
+describe("loadJobComplaints", () => {
+  it("reads nothing for a job with no ids", async () => {
+    expect(await loadJobComplaints({ billingId: null, crewId: null })).toEqual([]);
+  });
+
+  it("returns what is on the job", async () => {
+    db.read = { data: [{ id: 1, title: "Leak", detail: "", role: "pm", assignee: "eli@x.com", due_on: "2026-11-04", status: "done", resolution: "Fixed", created_by: "lando@x.com", created_at: "2026-11-03T18:00:00Z", done_by: "eli@x.com", done_at: "2026-11-04T18:00:00Z" }], error: null };
+    expect((await loadJobComplaints(REF))?.[0]).toMatchObject({ id: 1, status: "done", resolution: "Fixed", closedBy: "eli@x.com" });
+  });
+
+  it("gives null, not a thrown error, when the read fails: the Tasks tab still opens before 0061", async () => {
+    db.read = { data: null, error: { message: "column work_items.resolution does not exist" } };
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(loadJobComplaints(REF)).resolves.toBeNull();
+    expect(err).toHaveBeenCalledWith("[complaints] read:", "column work_items.resolution does not exist");
+    err.mockRestore();
   });
 });

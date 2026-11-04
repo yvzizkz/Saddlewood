@@ -63,8 +63,12 @@ export async function logComplaint(ref: JobRef, input: { title: string; detail: 
 
 type Row = { id: number; title: string; detail: string; role: Role; assignee: string; due_on: string | null; status: Complaint["status"]; resolution: string; created_by: string; created_at: string; done_by: string; done_at: string | null };
 
-/** Every complaint on the job, newest first: the open ones and how the closed ones ended. */
-export async function loadJobComplaints(ref: Pick<JobRef, "billingId" | "crewId">): Promise<Complaint[]> {
+/**
+ * Every complaint on the job, newest first: the open ones and how the closed
+ * ones ended. Null when the read fails (0061 not applied yet, say), so the
+ * job's Tasks tab still opens with everything else on it. Never throws.
+ */
+export async function loadJobComplaints(ref: Pick<JobRef, "billingId" | "crewId">): Promise<Complaint[] | null> {
   const ids = [ref.billingId ? `job_id.eq.${ref.billingId}` : "", ref.crewId ? `crew_job_id.eq.${ref.crewId}` : ""].filter(Boolean);
   if (!ids.length) return [];
   const { data, error } = await getSupabaseAdmin()
@@ -74,7 +78,10 @@ export async function loadJobComplaints(ref: Pick<JobRef, "billingId" | "crewId"
     .or(ids.join(","))
     .order("created_at", { ascending: false })
     .limit(100);
-  if (error) throw new Error(`work_items complaints: ${error.message}`);
+  if (error) {
+    console.error("[complaints] read:", error.message);
+    return null;
+  }
   return ((data ?? []) as Row[]).map((r) => ({
     id: r.id,
     title: r.title,
