@@ -102,8 +102,12 @@ test.describe("The client's link", () => {
       await client.getByRole("button", { name: "Send it" }).click();
       await expect(client.getByRole("status")).toContainText("You'll hear from us by");
 
-      const row = sql(`select kind || '|' || role || '|' || assignee || '|' || created_by || '|' || (due_on is not null) from public.work_items where title = '${tag} paint on the floor'`);
+      const row = sql(`select kind || '|' || role || '|' || assignee || '|' || created_by || '|' || (extract(isodow from due_on) < 6 and due_on - (now() at time zone 'America/Phoenix')::date between 1 and 3) from public.work_items where title = '${tag} paint on the floor'`);
+      // Due the next business day on the Policies clock: never a weekend, at most three days out. The client is told that same day.
       expect(row).toBe(`complaint|pm|${PM}|client portal|true`);
+      const due = sql(`select due_on from public.work_items where title = '${tag} paint on the floor'`);
+      const told = new Date(`${due}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+      await expect(client.getByRole("status")).toContainText(told);
       expect(sql(`select detail from public.work_items where title = '${tag} paint on the floor'`)).toContain("From Pat Homeowner, on their client link. Reach them at 480-555-0100.");
 
       await pm.goto("/app/tasks");
