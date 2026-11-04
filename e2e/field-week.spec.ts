@@ -4,7 +4,7 @@
 // 6 PM EOD daily log directive flowing into Changes & Owner decisions, and
 // pre-cover quality checklists gating phase verification + punch list closeout.
 
-import { expect, hours, test } from "./support/env";
+import { cleanChangeOrder, expect, hours, sql, test } from "./support/env";
 
 const JOB = "9146-w-hutton-dr";
 
@@ -115,73 +115,72 @@ test.describe("Field and crew: the field week", () => {
       await expect(taskRow).toContainText("Owner");
       await expect(taskRow).toContainText("Change order to price");
     } finally {
-      if (changeOrderId !== null) {
-        await page.request.patch("/api/change-orders", {
-          data: { id: changeOrderId, status: "void" },
-        });
-      }
-      for (const wid of workItemIds) {
-        await page.request.patch("/api/tasks", {
-          data: { id: wid, status: "dropped" },
-        });
+      cleanChangeOrder(changeOrderId);
+      if (workItemIds.length) {
+        sql(`delete from public.work_items where id in (${workItemIds.filter((n) => Number.isInteger(n)).join(",")});`);
       }
     }
   });
 
   test("Pre-cover quality checklist blocks phase verification until passed, and punch items track by room and wall face", async ({ owner: page }) => {
     const location = `E2E Corridor North Shaft ${Date.now()}`;
-    await page.goto(`/app/jobs/${JOB}?tab=log`);
-    await page.getByRole("button", { name: "+ Inspection checklist" }).click();
-
-    const gateForm = page.locator("form").filter({ hasText: "Add gate" });
-    const phaseSelect = gateForm.getByLabel("Checklist phase");
-    const hangOpt = phaseSelect.locator("option").filter({ hasText: "Hang 5/8 XP Hi-Abuse Drywall" });
-    const phaseId = Number(await hangOpt.getAttribute("value"));
-    expect(phaseId).toBeGreaterThan(0);
-
-    await phaseSelect.selectOption(String(phaseId));
-    await gateForm.getByPlaceholder(/Room \/ wall face/i).fill(location);
-    await gateForm.getByRole("button", { name: "Add gate" }).click();
-
-    const card = page.locator("div.rounded-lg").filter({ hasText: location }).first();
-    await expect(card).toBeVisible();
-
-    // Attempting to verify the phase while the checklist is open must fail with 409
-    const blockedRes = await page.request.post("/api/crew/admin", {
-      data: { kind: "phase.verify", id: phaseId, note: "Attempt before checklist passed" },
-    });
-    expect(blockedRes.status()).toBe(409);
-    const blockedJson = await blockedRes.json();
-    expect(blockedJson.error).toContain("Pre-cover quality gate still open");
-
-    // Pass the gate on the Log and QA tab
-    await card.getByRole("button", { name: "Pass gate" }).click();
-    await expect(card.getByRole("button", { name: "Reopen" })).toBeVisible();
-
-    // Add two open room/wall-face punch items on the same job and resolve both (T44)
     const punchTitle1 = `E2E Skim coat nick ${Date.now()}`;
     const punchTitle2 = `E2E Corner bead touchup ${Date.now()}`;
-    await page.getByRole("button", { name: "+ Punch item" }).click();
-    const punchForm1 = page.locator("form").filter({ hasText: "Add punch" });
-    await punchForm1.getByPlaceholder(/Punch item/i).fill(punchTitle1);
-    await punchForm1.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — West Wall");
-    await punchForm1.getByRole("button", { name: "Add punch" }).click();
+    try {
+      await page.goto(`/app/jobs/${JOB}?tab=log`);
+      await page.getByRole("button", { name: "+ Inspection checklist" }).click();
 
-    const punchRow1 = page.locator("li").filter({ hasText: punchTitle1 });
-    await expect(punchRow1).toContainText("Room 104 — West Wall");
+      const gateForm = page.locator("form").filter({ hasText: "Add gate" });
+      const phaseSelect = gateForm.getByLabel("Checklist phase");
+      const hangOpt = phaseSelect.locator("option").filter({ hasText: "Hang 5/8 XP Hi-Abuse Drywall" });
+      const phaseId = Number(await hangOpt.getAttribute("value"));
+      expect(phaseId).toBeGreaterThan(0);
 
-    await page.getByRole("button", { name: "+ Punch item" }).click();
-    const punchForm2 = page.locator("form").filter({ hasText: "Add punch" });
-    await punchForm2.getByPlaceholder(/Punch item/i).fill(punchTitle2);
-    await punchForm2.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — East Wall");
-    await punchForm2.getByRole("button", { name: "Add punch" }).click();
+      await phaseSelect.selectOption(String(phaseId));
+      await gateForm.getByPlaceholder(/Room \/ wall face/i).fill(location);
+      await gateForm.getByRole("button", { name: "Add gate" }).click();
 
-    const punchRow2 = page.locator("li").filter({ hasText: punchTitle2 });
-    await expect(punchRow2).toContainText("Room 104 — East Wall");
+      const card = page.locator("div.rounded-lg").filter({ hasText: location }).first();
+      await expect(card).toBeVisible();
 
-    await punchRow1.getByRole("button", { name: "Mark done" }).click();
-    await expect(punchRow1.getByRole("button", { name: "Reopen" })).toBeVisible();
-    await punchRow2.getByRole("button", { name: "Mark done" }).click();
-    await expect(punchRow2.getByRole("button", { name: "Reopen" })).toBeVisible();
+      // Attempting to verify the phase while the checklist is open must fail with 409
+      const blockedRes = await page.request.post("/api/crew/admin", {
+        data: { kind: "phase.verify", id: phaseId, note: "Attempt before checklist passed" },
+      });
+      expect(blockedRes.status()).toBe(409);
+      const blockedJson = await blockedRes.json();
+      expect(blockedJson.error).toContain("Pre-cover quality gate still open");
+
+      // Pass the gate on the Log and QA tab
+      await card.getByRole("button", { name: "Pass gate" }).click();
+      await expect(card.getByRole("button", { name: "Reopen" })).toBeVisible();
+
+      // Add two open room/wall-face punch items on the same job and resolve both (T44)
+      await page.getByRole("button", { name: "+ Punch item" }).click();
+      const punchForm1 = page.locator("form").filter({ hasText: "Add punch" });
+      await punchForm1.getByPlaceholder(/Punch item/i).fill(punchTitle1);
+      await punchForm1.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — West Wall");
+      await punchForm1.getByRole("button", { name: "Add punch" }).click();
+
+      const punchRow1 = page.locator("li").filter({ hasText: punchTitle1 });
+      await expect(punchRow1).toContainText("Room 104 — West Wall");
+
+      await page.getByRole("button", { name: "+ Punch item" }).click();
+      const punchForm2 = page.locator("form").filter({ hasText: "Add punch" });
+      await punchForm2.getByPlaceholder(/Punch item/i).fill(punchTitle2);
+      await punchForm2.getByPlaceholder(/Room \/ wall face/i).fill("Room 104 — East Wall");
+      await punchForm2.getByRole("button", { name: "Add punch" }).click();
+
+      const punchRow2 = page.locator("li").filter({ hasText: punchTitle2 });
+      await expect(punchRow2).toContainText("Room 104 — East Wall");
+
+      await punchRow1.getByRole("button", { name: "Mark done" }).click();
+      await expect(punchRow1.getByRole("button", { name: "Reopen" })).toBeVisible();
+      await punchRow2.getByRole("button", { name: "Mark done" }).click();
+      await expect(punchRow2.getByRole("button", { name: "Reopen" })).toBeVisible();
+    } finally {
+      sql(`delete from public.checklists where location_label = '${location.replace(/'/g, "''")}';`);
+      sql(`delete from public.work_items where title in ('${punchTitle1.replace(/'/g, "''")}', '${punchTitle2.replace(/'/g, "''")}');`);
+    }
   });
 });

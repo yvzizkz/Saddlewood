@@ -104,15 +104,15 @@ export async function sovKeys(page: Page, job: string): Promise<string[]> {
 
 const sqlLit = (v: string) => `'${v.replace(/'/g, "''")}'`;
 
-function execLocalSql(q: string): string {
+export function sql(q: string): string {
   stack();
   return execSync(`psql "${LOCAL_DB}" -qAtc ${JSON.stringify(q.replace(/\s+/g, " "))}`, { encoding: "utf8" }).trim();
 }
 
 /** Remove a test change order and its events, Joist queue rows, and draft/issued document. */
-export function cleanChangeOrder(id: number): void {
-  if (!Number.isInteger(id) || id <= 0) return;
-  execLocalSql(`
+export function cleanChangeOrder(id: number | null | undefined): void {
+  if (typeof id !== "number" || !Number.isInteger(id) || id <= 0) return;
+  sql(`
     begin;
     set local session_replication_role = replica;
     create temp table co_docs on commit drop as
@@ -139,7 +139,7 @@ export function cleanAward(ids: { oppId?: string | null; jobId?: string | null; 
   const client = ids.clientId?.trim() || "";
   if (!opp && !job && !crew && !client) return;
 
-  execLocalSql(`
+  sql(`
     begin;
     set local session_replication_role = replica;
     create temp table clean_opps on commit drop as

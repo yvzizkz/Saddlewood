@@ -2,7 +2,7 @@
 // change order is owed again, back on Changes as signed and back on the
 // schedule of values at 0%, so its money is not lost. Local stack only.
 
-import { cents, expect, test } from "./support/env";
+import { cents, cleanChangeOrder, expect, test } from "./support/env";
 
 const BELLEVUE = "9146-w-hutton-dr";
 
@@ -42,6 +42,6 @@ test("voiding the draw that billed a change order puts it back to bill", async (
     await row.getByLabel(`${line.description} percent complete`).fill("100");
     expect(cents(await page.locator('[data-draw="gross"]').textContent())).toBe(180_000);
   } finally {
-    await page.request.patch("/api/change-orders", { data: { id: coId, status: "void" } });
+    cleanChangeOrder(coId);
   }
 });

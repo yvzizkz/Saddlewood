@@ -6,12 +6,14 @@
 // live PID holds it, reclaims stale locks left by SIGKILL, and releases on exit.
 
 import { execSync } from "node:child_process";
-import { closeSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { linkSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const LOCAL_API = "http://127.0.0.1:55321";
 const DEFAULT_DB_KEY = "127.0.0.1-55322";
+const CORRUPT_GRACE_MS = 5_000;
+const RECLAIM_SETTLE_MS = 25;
 
 export type LockHolder = {
   pid: number;
@@ -89,40 +91,83 @@ export async function acquireRunLock(opts?: {
 
   const deadline = Date.now() + Math.max(0, waitMs);
   let loggedWait = false;
+  let reclaimedStale = false;
+  let myIno: number | null = null;
 
   while (true) {
+    // Write the payload to a private temp file first and hard-link it into place so
+    // lockPath is never observed as a 0-byte file on disk.
+    const tmpPath = `${lockPath}.${pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+    let linked = false;
+    let tmpIno = 0;
     try {
-      const fd = openSync(lockPath, "wx");
-      try {
-        const payload: LockHolder = { pid, cwd, base, db: dbKey, startedAt: new Date().toISOString() };
-        writeFileSync(fd, JSON.stringify(payload), "utf8");
-      } finally {
-        closeSync(fd);
-      }
-      break;
+      const payload: LockHolder = { pid, cwd, base, db: dbKey, startedAt: new Date().toISOString() };
+      writeFileSync(tmpPath, JSON.stringify(payload), { encoding: "utf8", flag: "wx" });
+      tmpIno = statSync(tmpPath).ino;
+      linkSync(tmpPath, lockPath);
+      linked = true;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      const holder = readHolder(lockPath);
-      if (!holder || !alive(holder.pid)) {
-        try {
-          unlinkSync(lockPath);
-        } catch {
-          // Another process already removed or replaced it; retry.
-        }
-        continue;
+    } finally {
+      try {
+        unlinkSync(tmpPath);
+      } catch {
+        // Temp file already cleaned up.
       }
-      if (holder.pid === pid) break;
-      if (Date.now() >= deadline) {
-        throw new Error(
-          `Another Playwright suite holds the local DB lock (${dbKey}): pid ${holder.pid} in ${holder.cwd} (${holder.base}, started ${holder.startedAt}).`,
-        );
-      }
-      if (!loggedWait) {
-        console.log(`[e2e lock] waiting for pid ${holder.pid} (${holder.cwd}) on ${dbKey}…`);
-        loggedWait = true;
-      }
-      await new Promise((r) => setTimeout(r, pollMs));
     }
+
+    if (linked) {
+      if (reclaimedStale) {
+        // If two processes reclaimed the same dead lock concurrently, let any racing
+        // unlink finish and verify our inode still owns lockPath before proceeding.
+        await new Promise((r) => setTimeout(r, RECLAIM_SETTLE_MS));
+        try {
+          if (statSync(lockPath).ino !== tmpIno) continue;
+        } catch {
+          continue;
+        }
+      }
+      myIno = tmpIno;
+      break;
+    }
+
+    let staleIno: number | null = null;
+    let ageMs = 0;
+    try {
+      const st = statSync(lockPath);
+      staleIno = st.ino;
+      ageMs = Date.now() - st.mtimeMs;
+    } catch {
+      continue;
+    }
+    const holder = readHolder(lockPath);
+    const deadHolder = holder ? !alive(holder.pid) : ageMs > CORRUPT_GRACE_MS;
+    if (deadHolder) {
+      try {
+        if (statSync(lockPath).ino === staleIno) {
+          unlinkSync(lockPath);
+          reclaimedStale = true;
+        }
+      } catch {
+        // Another process already removed or replaced it; retry.
+      }
+      continue;
+    }
+    if (!holder) {
+      await new Promise((r) => setTimeout(r, Math.min(pollMs, 50)));
+      continue;
+    }
+    if (holder.pid === pid) break;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Another Playwright suite holds the local DB lock (${dbKey}): pid ${holder.pid} in ${holder.cwd} (${holder.base}, started ${holder.startedAt}).`,
+      );
+    }
+    if (!loggedWait) {
+      console.log(`[e2e lock] waiting for pid ${holder.pid} (${holder.cwd}) on ${dbKey}…`);
+      loggedWait = true;
+    }
+    await new Promise((r) => setTimeout(r, pollMs));
   }
 
   let released = false;
@@ -130,8 +175,12 @@ export async function acquireRunLock(opts?: {
     if (released) return;
     released = true;
     try {
-      const current = readHolder(lockPath);
-      if (!current || current.pid === pid) unlinkSync(lockPath);
+      if (myIno !== null) {
+        if (statSync(lockPath).ino === myIno) unlinkSync(lockPath);
+      } else {
+        const current = readHolder(lockPath);
+        if (current && current.pid === pid) unlinkSync(lockPath);
+      }
     } catch {
       // Already gone.
     }

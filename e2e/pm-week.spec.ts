@@ -1,6 +1,6 @@
 import { expect, test as base, type Page } from "@playwright/test";
 
-import { OWNER, PM, signIn } from "./support/env";
+import { cleanChangeOrder, PM, signIn } from "./support/env";
 
 // Scenario 9 (docs/SCENARIOS.md): Eli (project manager) runs his week from the
 // job list, his job pages, and his scoped task list — without seeing labor
@@ -44,7 +44,6 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
 
   test("opens an assigned job across tabs without cost/margin/sub-bills/draw controls and records a field change request", async ({
     pmPage: page,
-    browser,
   }) => {
     for (const tab of ["overview", "schedule", "money", "labor", "subs", "log"] as const) {
       const res = await page.goto(`/app/jobs/8009-n-ironwood-dr?tab=${tab}`, {
@@ -102,14 +101,7 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
       });
       expect(offJobRes.status()).toBe(404);
     } finally {
-      if (createdCoId !== null) {
-        const ownerCtx = await browser.newContext();
-        await signIn(ownerCtx, OWNER);
-        await ownerCtx.request.patch("/api/change-orders", {
-          data: { id: createdCoId, status: "void" },
-        });
-        await ownerCtx.close();
-      }
+      cleanChangeOrder(createdCoId);
     }
   });
 

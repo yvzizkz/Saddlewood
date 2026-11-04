@@ -86,4 +86,33 @@ describe("e2e globalSetup run lock", () => {
     release();
     expect(existsSync(lockPath)).toBe(false);
   });
+
+  it("serializes two callers reclaiming the same stale lock concurrently", async () => {
+    const lockPath = tempLock();
+    writeFileSync(
+      lockPath,
+      JSON.stringify({ pid: 999999, cwd: "/dead-worktree", base: "http://localhost:3100", db: "127.0.0.1-55322", startedAt: "2026-11-03T00:00:00Z" }),
+      "utf8",
+    );
+    const active: number[] = [];
+    let maxConcurrent = 0;
+    const run = async (pid: number) => {
+      const release = await acquireRunLock({
+        lockPath,
+        dbKey: "127.0.0.1-55322",
+        pid,
+        waitMs: 1_000,
+        pollMs: 15,
+        alive: (p) => p === 4001 || p === 4002,
+      });
+      active.push(pid);
+      maxConcurrent = Math.max(maxConcurrent, active.length);
+      await new Promise((r) => setTimeout(r, 40));
+      active.splice(active.indexOf(pid), 1);
+      release();
+    };
+    await Promise.all([run(4001), run(4002)]);
+    expect(maxConcurrent).toBe(1);
+    expect(existsSync(lockPath)).toBe(false);
+  });
 });
