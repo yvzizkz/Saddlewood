@@ -227,10 +227,13 @@ export async function syncEodDirectivesAndDecisions(
     const asked = input.asked.trim();
     const crewJobId = crewJobIdOf(input.jobId);
     if (asked.length >= 2) {
-      const title = asked.slice(0, 200);
-      // Only one still open counts: the same ask after it was billed, rejected or voided is a new change order.
+      // A CO on no job has only its title to say whose it is, so an "Other job" log's typed name goes there.
+      const typedJob = !crewJobId && !billingJobId ? input.jobName.trim().slice(0, 80) : "";
+      const title = (typedJob ? `${typedJob}: ${asked}` : asked).slice(0, 200);
+      // Only one still open on this same job counts: the same ask after it was billed, rejected or voided is a new change order.
       const lookup = db.from("change_orders").select("id").eq("title", title).in("status", ["requested", "priced", "sent", "signed"]);
-      const { data: existingCo, error: coSelErr } = await (crewJobId ? lookup.eq("crew_job_id", crewJobId) : lookup.is("crew_job_id", null)).limit(1).maybeSingle();
+      const onThisJob = crewJobId ? lookup.eq("crew_job_id", crewJobId) : billingJobId ? lookup.is("crew_job_id", null).eq("job_id", billingJobId) : lookup.is("crew_job_id", null).is("job_id", null);
+      const { data: existingCo, error: coSelErr } = await onThisJob.limit(1).maybeSingle();
       if (coSelErr) console.error("syncEodDirectivesAndDecisions change_orders lookup failed:", coSelErr);
       if (!existingCo) {
         const { data: insertedCo, error: coInsErr } = await db
