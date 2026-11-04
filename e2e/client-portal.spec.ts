@@ -35,6 +35,11 @@ test.describe("The client's link", () => {
       const card = page.getByRole("region", { name: "Client link" });
       await card.getByRole("button", { name: "Make a client link" }).click();
       const link = card.getByLabel("The client's link");
+      const turnOn = async (name: RegExp) => {
+        const saved = page.waitForResponse((r) => r.url().endsWith("/portal") && r.request().method() === "PATCH");
+        await card.getByRole("checkbox", { name }).check();
+        expect((await saved).status()).toBe(200);
+      };
       await expect(link).toHaveValue(/\/c\/[0-9a-f]{32}$/);
       token = (await link.inputValue()).split("/c/")[1];
       jobId = sql(`select job_id from public.client_portals where token = '${token}'`);
@@ -56,8 +61,7 @@ test.describe("The client's link", () => {
       sql(`insert into public.crew_entries (email, kind, day, job_id, body, data) values ('${PM}', 'eod', (now() at time zone 'America/Phoenix')::date, '${JOB}', E'Hung board in the hall ${n}.\\nASK: who eats the extra sheets ${n}', '{"weather":"Clear","crewCount":4,"stuck":"Waiting on the sub ${n}","asked":"Owner wants a niche ${n}"}')`);
 
       // Documents on: issued and current only. The rest stays off until asked for.
-      await card.getByRole("checkbox", { name: /^Documents/ }).check();
-      await expect(card.getByRole("checkbox", { name: /^Documents/ })).toBeChecked();
+      await turnOn(/^Documents/);
       await client.reload();
       const docs = client.getByTestId("portal-documents");
       await expect(docs).toContainText(`Invoice P${n}-NEW`);
@@ -73,18 +77,18 @@ test.describe("The client's link", () => {
       await expect(client).toHaveURL(new RegExp(`/d/${tok("b")}$`));
 
       // Daily log on: the day, the weather and the work. Nothing written to the office.
-      await card.getByRole("checkbox", { name: /^Daily log/ }).check();
-      await expect(card.getByRole("checkbox", { name: /^Daily log/ })).toBeChecked();
+      await turnOn(/^Daily log/);
       await client.goto(`/c/${token}`);
       const log = client.getByTestId("portal-log");
       await expect(log).toContainText(`Hung board in the hall ${n}.`);
       await expect(log).toContainText("Clear");
-      const page_text = (await client.locator("main").innerText()) + (await client.content());
-      for (const hidden of [`who eats the extra sheets ${n}`, `Waiting on the sub ${n}`, `Owner wants a niche ${n}`, PM]) expect(page_text).not.toContain(hidden);
+      // The raw page too: what's in the HTML or its data reaches the client even if nothing renders it.
+      const raw = await client.content();
+      for (const hidden of [`who eats the extra sheets ${n}`, `Waiting on the sub ${n}`, `Owner wants a niche ${n}`, PM]) expect(raw).not.toContain(hidden);
+      expect(await client.locator("main").innerText()).not.toMatch(/margin|labor|cost to date|payroll/i);
 
       // A complaint: the same record the office logs, with the job's PM, on the clock.
-      await card.getByRole("checkbox", { name: /^Complaint form/ }).check();
-      await expect(card.getByRole("checkbox", { name: /^Complaint form/ })).toBeChecked();
+      await turnOn(/^Complaint form/);
       await client.reload();
       await client.getByLabel("Your name").fill("Pat Homeowner");
       await client.getByLabel("What's wrong").fill(`${tag} paint on the floor`);
@@ -100,6 +104,14 @@ test.describe("The client's link", () => {
       const mine = pm.locator('[data-table="tasks-mine"]');
       await mine.getByRole("searchbox").fill(`${tag} paint on the floor`);
       await expect(mine.getByRole("row").filter({ hasText: tag })).toContainText("Client complaint");
+
+      // Reads on a phone with nothing off the side.
+      await client.setViewportSize({ width: 390, height: 844 });
+      await client.reload();
+      await expect(client.getByTestId("portal-documents")).toBeVisible();
+      expect(await client.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await client.screenshot({ path: "docs/screenshots/client-portal/phone.png", fullPage: true });
+      await card.screenshot({ path: "docs/screenshots/client-portal/owner-card.png" });
 
       // A pasted link can't flood the PM.
       const post = () => client.request.post(`/api/c/${token}/complaint`, { data: { name: "Pat", title: `${tag} again` } });

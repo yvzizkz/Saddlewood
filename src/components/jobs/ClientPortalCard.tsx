@@ -36,8 +36,10 @@ export default function ClientPortalCard({ job, origin, initial }: { job: string
   const toggle = async (s: PortalSection, on: boolean) => {
     if (!portal) return
     const next = PORTAL_SECTIONS.filter((x) => (x === s ? on : portal.sections.includes(x)))
+    // The box moves on the click; a refused save puts it back and says why.
+    setPortal({ ...portal, sections: next })
     const r = await call('PATCH', { sections: next })
-    if (r?.sections) setPortal({ ...portal, sections: r.sections })
+    setPortal({ ...portal, sections: r?.sections ?? portal.sections })
   }
   const turnOff = async () => {
     if (await call('DELETE')) {

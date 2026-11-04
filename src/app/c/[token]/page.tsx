@@ -36,7 +36,7 @@ function Off() {
 function Section({ title, id, children }: { title: string; id: string; children: React.ReactNode }) {
   return (
     <section aria-labelledby={id} className="mt-8">
-      <h2 id={id} className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+      <h2 id={id} className="text-xl font-semibold text-slate-900">
         {title}
       </h2>
       <div className="mt-3">{children}</div>
