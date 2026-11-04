@@ -57,6 +57,12 @@ test.describe("A change order's week", () => {
       await page.getByPlaceholder("Search").first().fill(title);
       await expect(page.getByRole("link", { name: `Price: ${title}` }).first()).toHaveAttribute("href", `/app/changes/${co.changeOrderId}`);
 
+      // On the job's Changes tab it has a document, so it moves on its own page: no price box, no Sent, no Signed.
+      await page.goto(`/app/jobs/${JOB}?tab=changes`, { waitUntil: "networkidle" });
+      const onJob = page.getByRole("listitem").filter({ hasText: title });
+      await expect(onJob.getByRole("link", { name: "Price it" })).toHaveAttribute("href", `/app/changes/${co.changeOrderId}`);
+      await expect(onJob.getByPlaceholder("$ price")).toHaveCount(0);
+
       // Priced on its page: one line, $1,240.
       await page.goto(`/app/changes/${co.changeOrderId}`, { waitUntil: "networkidle" });
       await expect(page.getByText(`${co.number} · Awaiting price`)).toBeVisible();
@@ -76,10 +82,19 @@ test.describe("A change order's week", () => {
       await page.goto("/app/tasks?view=all", { waitUntil: "networkidle" });
       await page.getByPlaceholder("Search").first().fill(title);
       await expect(page.getByRole("link", { name: `Price: ${title}` })).toHaveCount(0);
+      await page.goto(`/app/jobs/${JOB}?tab=changes`, { waitUntil: "networkidle" });
+      await expect(onJob.getByRole("link", { name: "Follow up" })).toHaveAttribute("href", `/app/changes/${co.changeOrderId}`);
+      await expect(onJob.getByRole("button", { name: "Sent" })).toHaveCount(0);
+      await expect(onJob.getByRole("button", { name: "Signed" })).toHaveCount(0);
 
-      // Chris approves on his phone, not signed in.
+      // Chris approves on his phone, not signed in. His first try saved the signature but the
+      // register never moved: reloading must not read Approved, and the form must finish it.
+      const dot = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+      const signedEvent = JSON.stringify({ role: "client", name: "Chris Turner", method: "draw", image: dot });
+      sql(`insert into document_events (document_id, kind, actor, dedupe, detail) values ('${co.documentId}', 'signed', 'client link', 'signed:client:${co.documentId}', '${signedEvent}')`);
       const c = await clientCtx.newPage();
       await c.goto(`/d/${token}`, { waitUntil: "networkidle" });
+      await expect(c.getByTestId("co-approved")).toHaveCount(0);
       const box = c.getByRole("region", { name: "Approve this change order" });
       await expect(box).toContainText(`Approve change order ${co.number}`);
       await expect(box).toContainText("$1,240.00 added to the contract");
@@ -88,6 +103,7 @@ test.describe("A change order's week", () => {
       await box.getByRole("button", { name: "Approve and sign" }).click();
       await expect(c.getByTestId("co-approved")).toContainText("Chris Turner");
       expect(sql(`select status || '|' || signed_on from change_orders where id = ${co.changeOrderId}`)).toBe(`signed|${today}`);
+      expect(sql(`select count(*) from document_events where document_id = '${co.documentId}' and kind = 'signed'`)).toBe("1");
       // Still one waiting Joist job, now for the signature.
       expect(joist()).toBe("queued:signed");
 

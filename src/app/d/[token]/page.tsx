@@ -9,7 +9,7 @@ import { ProposalView } from "@/components/sales/ProposalView";
 import { AgreementSignView } from "@/components/agreements/AgreementSignView";
 import { AGREEMENT_CONSENT, clientSignature } from "@/lib/agreements/store";
 import { loadSettings } from "@/lib/sales/settingsStore";
-import { approvalBlock, CO_CONSENT, coClientSignature, coForDocument } from "@/lib/billing/coApprove";
+import { approvalBlock, approvalToShow, CO_CONSENT, coClientSignature, coForDocument } from "@/lib/billing/coApprove";
 import { CoApprovePanel, type CoApproved } from "@/components/billing/CoApprovePanel";
 import type { SignatureFont } from "@/lib/sales/settings";
 import { DocumentView } from "../DocumentView";
@@ -159,7 +159,8 @@ export default async function DocumentPage({
           .then((x) => x.signing.fonts)
           .catch(() => []),
       ]);
-      const approved = sig ? { name: sig.name, image: sig.image, at: sig.at, snapshotSha256: sig.snapshotSha256 } : null;
+      const shown = approvalToShow(doc, co, sig);
+      const approved = shown ? { name: shown.name, image: shown.image, at: shown.at, snapshotSha256: shown.snapshotSha256 } : null;
       if (approved || !ownCopy) approval = { blocked: approvalBlock(doc, co), approved, fonts };
     } catch (err) {
       console.error("change-order approval not loaded:", err);

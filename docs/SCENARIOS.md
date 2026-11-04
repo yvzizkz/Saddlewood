@@ -125,6 +125,8 @@ One CO end to end, with each step handing to the next (every step also has its o
 4. **In Joist.** The Mac claims it as it is now (`8009-CO<n>`, `$1,240`), reports the estimate id, and its page reads `In Joist as estimate …` with `Approved by Chris Turner on the link` and `Copied to Joist` on its timeline.
 5. **Billed.** Finance's Tasks show `Bill 8009-CO<n>`. On `Job › Money` the signed CO is on Jury's schedule of values; 100% previews `$1,240` gross, makes the draft invoice and issues it. The CO is `billed` against that invoice (its `billed` event names the invoice number), and it leaves Finance's Tasks and the open Changes. The draw is voided after, which puts a billed CO back to signed (`draw-void`), and the run's rows are removed.
 
+**One way through:** a CO with a document moves only on `/app/changes/<id>` (Price it, Send, Mark approved), so the job's Changes row has no price box, Sent or Signed for it. One recorded by hand can still be priced and marked signed there, but never marked sent. A signed CO is billed on `Job › Money` (`Bill it`, also where Finance's task opens) or on an issued invoice of its job picked on the row; `Billed` with no invoice is refused (`400`), so its money can't leave Tasks, Changes and the schedule unbilled.
+
 **Run note:** the e2e specs share one local database and run one at a time (`workers: 1`). Two suites on the same stack at once interfere, e.g. `joist-sync` parks every queued Joist job, including another run's.
 
 ## 10. A client complaint (first slice of the client side, `e2e/complaint-week.spec.ts`)

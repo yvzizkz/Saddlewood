@@ -44,6 +44,17 @@ export function approvalBlock(doc: Pick<BillingDocument, "status">, co: Pick<CoF
   return null;
 }
 
+/**
+ * The signature the client's page shows as Approved. The signature is saved
+ * before the register moves, so one can be on file while the change order is
+ * still sent (the move failed: the form stays up and the retry finishes it) or
+ * after it was withdrawn (the owner won the race). Only a live, signed or billed
+ * change order reads approved.
+ */
+export function approvalToShow<S>(doc: Pick<BillingDocument, "status">, co: Pick<CoForLink, "status"> | null, sig: S | null): S | null {
+  return sig && doc.status !== "void" && (co?.status === "signed" || co?.status === "billed") ? sig : null;
+}
+
 export async function approveChangeOrder(
   doc: BillingDocument,
   sig: SignatureInput,
@@ -54,18 +65,8 @@ export async function approveChangeOrder(
   const blocked = approvalBlock(doc, co);
   if (blocked) throw new DocumentError(blocked, 409);
   const signedOn = meta.today ?? localDay();
-  const db = getSupabaseAdmin();
-  // Guarded: an owner voiding it, or a second tap, in the same moment loses here.
-  const { data: moved, error } = await db
-    .from("change_orders")
-    .update({ status: "signed", signed_on: signedOn })
-    .eq("id", co!.id)
-    .eq("document_id", doc.id)
-    .in("status", OPEN)
-    .select("id");
-  if (error) throw new Error(`change_orders approve: ${error.message}`);
-  if (!(moved ?? []).length) throw new DocumentError(approvalBlock(doc, await coForDocument(doc.id)) ?? "This change order changed a moment ago. Load the page again.", 409);
-
+  // The signature first: a change order never reads signed without its proof. If the
+  // move below fails, the client's retry lands here again and the dedupe keeps one signature.
   const record: SignatureRecord = {
     role: "client",
     name: sig.name.trim().replace(/\s+/g, " "),
@@ -82,6 +83,18 @@ export async function approveChangeOrder(
     totalCents: doc.totalCents,
   };
   await recordEvent({ documentId: doc.id, kind: "signed", actor: "client link", dedupe: `signed:client:${doc.id}`, detail: record });
+  const db = getSupabaseAdmin();
+  // Guarded: an owner voiding it, or a second tap, in the same moment loses here.
+  const { data: moved, error } = await db
+    .from("change_orders")
+    .update({ status: "signed", signed_on: signedOn })
+    .eq("id", co!.id)
+    .eq("document_id", doc.id)
+    .in("status", OPEN)
+    .select("id");
+  if (error) throw new Error(`change_orders approve: ${error.message}`);
+  if (!(moved ?? []).length) throw new DocumentError(approvalBlock(doc, await coForDocument(doc.id)) ?? "This change order changed a moment ago. Load the page again.", 409);
+
   const signature = await coClientSignature(doc.id);
   if (!signature) throw new Error("change order: the signature was recorded but could not be read back");
   await coEventsAfter([co!.id], "signed", "client link", { signedOn, amountCents: co!.amountCents ?? doc.totalCents, name: record.name, via: "link" });

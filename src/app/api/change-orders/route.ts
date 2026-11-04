@@ -7,7 +7,7 @@ import { queueJoist } from "@/lib/billing/joistSyncStore";
 import { nextChangeOrderNumber } from "@/lib/billing/numbering";
 import { CO_STATUS, type CoStatus } from "@/lib/billing/registers";
 import { requireOwner } from "@/lib/crew/auth";
-import { isDay } from "@/lib/crew/time";
+import { isDay, localDay } from "@/lib/crew/time";
 import { jobForWrite, workSeat } from "@/lib/jobs/access";
 
 export const runtime = "nodejs";
@@ -18,7 +18,13 @@ export const dynamic = "force-dynamic";
 // price and approve (SOP-002, Who decides); the document itself is still made
 // and sent from Billing like any other. A project manager records the request
 // on their own jobs (the day it is asked for, SOP-002); pricing it is not theirs.
+// A change order is billed on an invoice, named here or by the draw that takes it
+// to 100%: marked billed with none, its money would leave Tasks, Changes and the
+// schedule and never be billed. A no-charge one has nothing to bill and closes
+// without one. One recorded before its job had a billing record takes that job's
+// invoices once it does.
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 // The order a change order moves in; it never goes back except to rejected/void.
@@ -58,11 +64,12 @@ export async function PATCH(request: NextRequest) {
   const b = ((await request.json().catch(() => null)) ?? {}) as { id?: number; status?: string; amountCents?: number; signedOn?: string; documentId?: string; billedDocumentId?: string; note?: string };
   if (!Number.isInteger(b.id)) return NextResponse.json({ ok: false, error: "Which change order?" }, { status: 400 });
   const db = getSupabaseAdmin();
-  const { data: row, error: readErr } = await db.from("change_orders").select("id,status,number,job_id,amount_cents").eq("id", b.id!).maybeSingle();
+  const { data: row, error: readErr } = await db.from("change_orders").select("id,status,number,job_id,crew_job_id,amount_cents").eq("id", b.id!).maybeSingle();
   if (readErr) throw new Error(`change_orders read: ${readErr.message}`);
   if (!row) return NextResponse.json({ ok: false, error: "No such change order." }, { status: 404 });
-  const cur = row as { status: CoStatus; number: string; job_id: string | null; amount_cents: number | null };
+  const cur = row as { status: CoStatus; number: string; job_id: string | null; crew_job_id: string | null; amount_cents: number | null };
   const patch: Record<string, unknown> = {};
+  let invoice = "";
 
   if (b.amountCents !== undefined) {
     if (!Number.isInteger(b.amountCents) || b.amountCents < 0) return NextResponse.json({ ok: false, error: "The price is in cents, zero or more." }, { status: 400 });
@@ -90,10 +97,28 @@ export async function PATCH(request: NextRequest) {
         }
       }
     }
-    if (to === "signed") patch.signed_on = b.signedOn && isDay(b.signedOn) ? b.signedOn : new Date().toISOString().slice(0, 10);
+    if (to === "signed") patch.signed_on = b.signedOn && isDay(b.signedOn) ? b.signedOn : localDay();
+    const noCharge = (patch.amount_cents ?? cur.amount_cents) === 0 && b.billedDocumentId === undefined;
+    if (to === "billed" && cur.status !== "billed" && !noCharge) {
+      if (typeof b.billedDocumentId !== "string" || !UUID.test(b.billedDocumentId)) return NextResponse.json({ ok: false, error: "Say which invoice billed it, or bill it on the job's Money tab." }, { status: 400 });
+      const { data: doc, error: docErr } = await db.from("documents").select("number,kind,status,job_id").eq("id", b.billedDocumentId).maybeSingle();
+      if (docErr) throw new Error(`documents read: ${docErr.message}`);
+      const found = doc as { number: string; kind: string; status: string; job_id: string | null } | null;
+      let jobId = cur.job_id;
+      if (!jobId && cur.crew_job_id) {
+        const { data: linked, error: jobErr } = await db.from("jobs").select("id").eq("crew_job_id", cur.crew_job_id).maybeSingle();
+        if (jobErr) throw new Error(`jobs read: ${jobErr.message}`);
+        jobId = (linked as { id: string } | null)?.id ?? null;
+      }
+      if (!found || found.kind !== "invoice" || found.status !== "issued" || !jobId || found.job_id !== jobId) {
+        return NextResponse.json({ ok: false, error: "That is not an issued invoice on this job." }, { status: 409 });
+      }
+      if (!cur.job_id) patch.job_id = jobId;
+      patch.billed_document_id = b.billedDocumentId;
+      invoice = found.number;
+    }
   }
   if (b.documentId) patch.document_id = b.documentId;
-  if (b.billedDocumentId) patch.billed_document_id = b.billedDocumentId;
   if (b.note !== undefined) patch.note = text(b.note, 2000);
   if (!Object.keys(patch).length) return NextResponse.json({ ok: false, error: "Nothing to change." }, { status: 400 });
   const { error } = await db.from("change_orders").update(patch).eq("id", b.id!);
@@ -107,7 +132,7 @@ export async function PATCH(request: NextRequest) {
       to === "requested" ? { reopened: true }
       : to === "priced" ? { amountCents }
       : to === "signed" ? { signedOn: patch.signed_on, amountCents, marked: true }
-      : to === "billed" ? { invoiceId: b.billedDocumentId ?? null }
+      : to === "billed" ? { invoiceId: b.billedDocumentId ?? null, invoice }
       : to === "rejected" ? { note: patch.note ?? "" }
       : to === "sent" ? { marked: true }
       : {};
