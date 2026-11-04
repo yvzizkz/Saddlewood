@@ -133,7 +133,7 @@ The office, a PM or a field lead logs what the client said on the job's Tasks ta
 
 ## 11. Who the job is for (`e2e/job-contact.spec.ts`)
 
-On the job's Overview, an owner links a job that has only a typed name to a client on file, or makes the client record from that name. They pick the job's contact from that client, or add one, and the database copies the contact's email and phone onto the job. A first contact can't wipe an email or phone already on the job; moving to another contact replaces them. A job's client is set once: moving a job to another client moves its money, so the app doesn't offer it. A PM reads the card and can't change it; a field lead's seat doesn't get it. A contact's email is also an address the client's documents may be mailed to, so adding one is owners only, and tests add them through this form, never with SQL.
+On the job's Overview, an owner links a job that has only a typed name to a client on file, or makes the client record from that name. They pick the job's contact from that client, or add one, and the database copies the contact's email and phone onto the job. A first contact keeps any email or phone already on the job that the record lacks; moving to another contact replaces them. A job's client is set once: moving a job to another client moves its money, so the app doesn't offer it. A PM reads the card and can't change it; a field lead's seat doesn't get it. A contact's email is also an address the client's documents may be mailed to, so adding one is owners only, and tests add them through this form, never with SQL.
 
 ## What an owner, a PM and finance can and can't do today
 

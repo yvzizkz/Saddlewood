@@ -5,7 +5,9 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 // Who a job is for, set on the job itself. The job points at a client and at
 // one of that client's contacts; the database mirrors their name, email and
 // phone onto the job (one client record, 0056), so this only ever writes
-// client_id and contact_id. A job's client is set once: moving a job between
+// client_id and contact_id. A job's first contact keeps any email or phone the
+// record lacks; moving to another contact takes that record's, empty ones too
+// (jobs_client_mirror, 0058). A job's client is set once: moving a job between
 // clients moves its money, so that stays out of here.
 
 export const CLIENT_KINDS = ["gc", "homeowner", "other"] as const;
@@ -41,24 +43,6 @@ export type JobClient = {
 
 type JobRow = { id: string; client_id: string | null; contact_id: string | null; client_name: string | null; client_email: string | null; client_phone: string | null };
 const JOB_COLS = "id, client_id, contact_id, client_name, client_email, client_phone";
-
-/**
- * What a first contact would wipe off the job. Linking copies the record's
- * email and phone, empty ones too (jobs_client_mirror), so a job with no
- * contact yet keeps what it has unless the record has it (0056's rule). A job
- * moving from one contact to another drops the last person's on purpose. Pure.
- */
-export function dropsDetail(job: Pick<JobRow, "contact_id" | "client_email" | "client_phone">, contact: { email: string; phone: string }): "email" | "phone" | null {
-  if (job.contact_id) return null;
-  if (!contact.email.trim() && (job.client_email ?? "").trim()) return "email";
-  if (!contact.phone.trim() && (job.client_phone ?? "").trim()) return "phone";
-  return null;
-}
-
-function refuseDrop(job: JobRow, contact: { email: string; phone: string }) {
-  const lost = dropsDetail(job, contact);
-  if (lost) throw new JobClientError(`This job has a client ${lost} and that contact doesn't. Add a contact with it instead.`);
-}
 
 async function readJob(ref: JobRef): Promise<JobRow> {
   if (!ref.billingId) throw new JobClientError("This job has no billing record yet.");
@@ -102,11 +86,9 @@ async function pointAt(job: JobRow, contactId: string) {
 export async function setJobContact(ref: JobRef, contactId: string): Promise<void> {
   const job = await readJob(ref);
   if (!job.client_id) throw new JobClientError("Give the job a client first.");
-  const { data, error } = await getSupabaseAdmin().from("client_contacts").select("email, phone, active").eq("id", contactId).eq("client_id", job.client_id).maybeSingle();
+  const { data, error } = await getSupabaseAdmin().from("client_contacts").select("active").eq("id", contactId).eq("client_id", job.client_id).maybeSingle();
   if (error) throw new Error(`job client: read contact failed: ${error.message}`);
-  const contact = data as { email: string; phone: string; active: boolean } | null;
-  if (!contact?.active) throw new JobClientError("That contact isn't on this job's client.", 404);
-  refuseDrop(job, contact);
+  if (!(data as { active: boolean } | null)?.active) throw new JobClientError("That contact isn't on this job's client.", 404);
   await pointAt(job, contactId);
 }
 
@@ -116,7 +98,6 @@ export async function addJobContact(ref: JobRef, input: { name: string; email: s
   if (!job.client_id) throw new JobClientError("Give the job a client first.");
   const found = await findContact(job.client_id, input.name, input.email);
   if (found) return setJobContact(ref, found);
-  refuseDrop(job, input);
   const { data, error } = await getSupabaseAdmin().from("client_contacts").insert({ client_id: job.client_id, ...input }).select("id").single();
   if (error) throw new Error(`job client: add contact failed: ${error.message}`);
   await pointAt(job, (data as { id: string }).id);
