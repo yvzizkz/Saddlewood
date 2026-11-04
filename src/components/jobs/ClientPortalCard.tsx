@@ -60,7 +60,7 @@ export default function ClientPortalCard({ job, origin, initial }: { job: string
         <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-charcoal-light)]">Client link</p>
         {!portal ? (
           <>
-            <p className="mb-3 text-sm text-[var(--color-charcoal-light)]">A page for this job the client opens with no sign-in. It shares nothing until you turn a section on.</p>
+            <p className="mb-3 text-sm text-[var(--color-charcoal-light)]">A page for this job the client opens with no sign-in. It shows the job's name, address and PM, and nothing else until you turn a section on.</p>
             <Button variant="quiet" busy={busy} onClick={make}>
               Make a client link
             </Button>

@@ -13,12 +13,12 @@ const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slic
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const live = await portalByToken((await params).token);
   if (!live?.portal.sections.includes("complaint")) return NextResponse.json({ ok: false, error: "This link doesn't take complaints." }, { status: 404 });
-  const b = ((await request.json().catch(() => null)) ?? {}) as { name?: unknown; title?: unknown; detail?: unknown };
+  const b = ((await request.json().catch(() => null)) ?? {}) as { name?: unknown; reach?: unknown; title?: unknown; detail?: unknown };
   const name = text(b.name, 120);
   const title = text(b.title, 200);
   if (!name || !title) return NextResponse.json({ ok: false, error: "Tell us your name and what's wrong." }, { status: 400 });
   try {
-    const { replyBy } = await submitComplaint(live.ref, { name, title, detail: text(b.detail, 2000) });
+    const { replyBy } = await submitComplaint(live.ref, { name, reach: text(b.reach, 120), title, detail: text(b.detail, 2000) });
     return NextResponse.json({ ok: true, replyBy });
   } catch (err) {
     if (err instanceof PortalLimit) return NextResponse.json({ ok: false, error: "We've had several from this link today. Please email info@saddlewoodcontracting.com." }, { status: 429 });

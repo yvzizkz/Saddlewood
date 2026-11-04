@@ -2,12 +2,11 @@
 // everything the page shows is read here, column by column, so a new column on
 // a table never reaches a client by accident. Server only.
 
-import { approvalBlock } from "@/lib/billing/coApprove";
 import { newToken } from "@/lib/billing/documents";
 import { logComplaint } from "@/lib/complaints/store";
 import { getJobRef, type JobRef } from "@/lib/jobs/hub";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { cleanSections, clientDocuments, clientLogText, COMPLAINTS_PER_DAY, LOG_DAYS, type PortalDoc, type PortalDocRow, type PortalSection } from "./rules";
+import { cleanSections, clientDocuments, clientLogText, COMPLAINTS_PER_DAY, LOG_DAYS, withApprovals, type ClientDoc, type PortalDocRow, type PortalSection } from "./rules";
 
 const UNIQUE_VIOLATION = "23505";
 /** How the app shows who logged a complaint that came in on a link. */
@@ -70,22 +69,16 @@ export async function portalByToken(token: string): Promise<{ portal: Portal; re
   return ref ? { portal, ref } : null;
 }
 
-export type ClientDoc = PortalDoc & { needsApproval: boolean };
-
-/** What we issued on the job, with the change orders still waiting on the client's approval marked. */
+/** What we issued on the job, with each change order's standing. */
 export async function portalDocuments(jobId: string): Promise<ClientDoc[]> {
   const db = getSupabaseAdmin();
   const { data, error } = await db.from("documents").select("id,kind,number,title,status,total_cents,token,issued_at,supersedes").eq("job_id", jobId).eq("status", "issued");
   if (error) throw new Error(`portal documents: ${error.message}`);
   const docs = clientDocuments((data ?? []) as PortalDocRow[]);
   const cos = docs.filter((d) => d.kind === "change_order").map((d) => d.id);
-  const { data: open, error: coError } = cos.length ? await db.from("change_orders").select("document_id,status").in("document_id", cos) : { data: [], error: null };
+  const { data: register, error: coError } = cos.length ? await db.from("change_orders").select("document_id,status").in("document_id", cos) : { data: [], error: null };
   if (coError) throw new Error(`portal change orders: ${coError.message}`);
-  const coStatus = new Map(((open ?? []) as { document_id: string; status: string }[]).map((c) => [c.document_id, c.status]));
-  return docs.map((d) => {
-    const status = coStatus.get(d.id);
-    return { ...d, needsApproval: d.kind === "change_order" && status !== undefined && approvalBlock({ status: "issued" }, { status }) === null };
-  });
+  return withApprovals(docs, new Map(((register ?? []) as { document_id: string; status: string }[]).map((c) => [c.document_id, c.status])));
 }
 
 export type ClientLog = { id: number; day: string; weather: string; text: string };
@@ -110,14 +103,15 @@ export async function portalLog(ref: Pick<JobRef, "crewId">): Promise<ClientLog[
 export class PortalLimit extends Error {}
 
 /** The same record the office logs (0061): the job's PM, on the Policies clock. The client gets the day, never the seat. */
-export async function submitComplaint(ref: JobRef, input: { name: string; title: string; detail: string }): Promise<{ replyBy: string }> {
+export async function submitComplaint(ref: JobRef, input: { name: string; reach: string; title: string; detail: string }): Promise<{ replyBy: string }> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const db = getSupabaseAdmin();
   const q = db.from("work_items").select("id", { count: "exact", head: true }).eq("kind", "complaint").eq("created_by", PORTAL_AUTHOR).gte("created_at", since);
   const { count, error } = await (ref.billingId ? q.eq("job_id", ref.billingId) : q.eq("crew_job_id", ref.crewId ?? ""));
   if (error) throw new Error(`portal complaints: ${error.message}`);
   if ((count ?? 0) >= COMPLAINTS_PER_DAY) throw new PortalLimit();
-  const detail = [`From ${input.name}, on their client link.`, input.detail].filter(Boolean).join("\n\n");
+  const from = `From ${input.name}, on their client link.${input.reach ? ` Reach them at ${input.reach}.` : ""}`;
+  const detail = [from, input.detail].filter(Boolean).join("\n\n");
   const { dueOn } = await logComplaint(ref, { title: input.title, detail, by: PORTAL_AUTHOR });
   return { replyBy: dueOn };
 }

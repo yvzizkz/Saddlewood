@@ -54,6 +54,31 @@ export function clientDocuments(rows: readonly PortalDocRow[]): PortalDoc[] {
     .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
 }
 
+export type Approval = "needed" | "approved" | null;
+export type ClientDoc = PortalDoc & { approval: Approval };
+
+const CO_GONE = ["rejected", "void"];
+const CO_OPEN = ["sent", "priced"];
+const CO_APPROVED = ["signed", "billed"];
+
+/**
+ * Where each change order stands, by the register's status. One rejected or
+ * voided there keeps its issued document, so it leaves the list here; one with
+ * no register row (an old import) stays, with no badge.
+ */
+export function withApprovals(docs: readonly PortalDoc[], coStatus: ReadonlyMap<string, string>): ClientDoc[] {
+  return docs.flatMap((d) => {
+    const status = d.kind === "change_order" ? coStatus.get(d.id) : undefined;
+    if (status && CO_GONE.includes(status)) return [];
+    return [{ ...d, approval: status && CO_OPEN.includes(status) ? ("needed" as const) : status && CO_APPROVED.includes(status) ? ("approved" as const) : null }];
+  });
+}
+
+/** Names only: a person with no name on file comes through as their email, and that stays ours. */
+export function clientPeople(names: readonly string[]): string[] {
+  return names.filter((n) => !n.includes("@"));
+}
+
 /** The crew's work done, without the ASK: lines they write to the office. */
 export function clientLogText(body: string): string {
   return body

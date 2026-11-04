@@ -3,8 +3,8 @@ import Link from "next/link";
 
 import { localDay } from "@/lib/crew/time";
 import { usd } from "@/lib/money";
-import { KIND_LABEL, type PortalSection } from "@/lib/portal/rules";
-import { portalByToken, portalDocuments, portalLog, type ClientDoc, type ClientLog } from "@/lib/portal/store";
+import { clientPeople, KIND_LABEL, type ClientDoc, type PortalSection } from "@/lib/portal/rules";
+import { portalByToken, portalDocuments, portalLog, type ClientLog } from "@/lib/portal/store";
 import { ComplaintForm } from "./ComplaintForm";
 
 // The client's page for their job: /c/<token>. No sign-in, like every document
@@ -60,7 +60,8 @@ function Documents({ docs }: { docs: ClientDoc[] }) {
               <span className="block truncate text-xs text-slate-600">
                 {[d.title, dayOf(localDay(d.issuedAt))].filter(Boolean).join(" · ")}
               </span>
-              {d.needsApproval ? <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Needs your approval</span> : null}
+              {d.approval === "needed" ? <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Needs your approval</span> : null}
+              {d.approval === "approved" ? <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">Approved</span> : null}
             </span>
             <span className="shrink-0 text-sm font-medium text-slate-900">{usd(d.totalCents)}</span>
           </Link>
@@ -93,6 +94,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
   if (!live) return <Off />;
   const { portal, ref } = live;
   const on = (s: PortalSection) => portal.sections.includes(s);
+  const pm = clientPeople(ref.pm);
   const quiet = <T,>(p: Promise<T>) =>
     p.catch((err) => {
       console.error("portal section:", err);
@@ -105,7 +107,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
       <div className="mx-auto max-w-2xl">
         <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Saddlewood Contracting</p>
         <h1 className="mt-1 text-2xl font-semibold text-slate-900">{ref.name}</h1>
-        <p className="mt-1 text-sm text-slate-600">{[ref.address, ref.pm.length ? `Project manager: ${ref.pm.join(", ")}` : null].filter(Boolean).join(" · ")}</p>
+        <p className="mt-1 text-sm text-slate-600">{[ref.address, pm.length ? `Project manager: ${pm.join(", ")}` : null].filter(Boolean).join(" · ")}</p>
 
         {!portal.sections.length ? <p className="mt-8 text-sm text-slate-600">Nothing has been shared here yet.</p> : null}
         {on("documents") ? <Section title="Documents" id="documents">{docs ? <Documents docs={docs} /> : <Failed />}</Section> : null}

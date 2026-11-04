@@ -57,7 +57,11 @@ test.describe("The client's link", () => {
       doc("invoice", `P${n}-DRAFT`, "draft", null);
       doc("invoice", `P${n}-VOID`, "void", tok("c"));
       const co = doc("change_order", `P${n}-CO1`, "issued", tok("d")).split("\n")[0];
-      sql(`insert into public.change_orders (job_id, number, title, status, amount_cents, document_id, priced_at) values ('${jobId}', 'P${n}-CO1', '${tag}', 'sent', 123400, '${co}', now())`);
+      const register = (number: string, status: string, id: string) =>
+        sql(`insert into public.change_orders (job_id, number, title, status, amount_cents, document_id, priced_at, signed_on) values ('${jobId}', '${number}', '${tag}', '${status}', 123400, '${id}', now(), ${status === "signed" ? "current_date" : "null"})`);
+      register(`P${n}-CO1`, "sent", co);
+      register(`P${n}-CO2`, "signed", doc("change_order", `P${n}-CO2`, "issued", tok("e")).split("\n")[0]);
+      register(`P${n}-CO3`, "rejected", doc("change_order", `P${n}-CO3`, "issued", tok("f")).split("\n")[0]);
       sql(`insert into public.crew_entries (email, kind, day, job_id, body, data) values ('${PM}', 'eod', (now() at time zone 'America/Phoenix')::date, '${JOB}', E'Hung board in the hall ${n}.\\nASK: who eats the extra sheets ${n}', '{"weather":"Clear","crewCount":4,"stuck":"Waiting on the sub ${n}","asked":"Owner wants a niche ${n}"}')`);
 
       // Documents on: issued and current only. The rest stays off until asked for.
@@ -67,8 +71,9 @@ test.describe("The client's link", () => {
       await expect(docs).toContainText(`Invoice P${n}-NEW`);
       await expect(docs).toContainText("$1,234.00");
       await expect(docs.getByRole("listitem").filter({ hasText: `P${n}-CO1` })).toContainText("Needs your approval");
+      await expect(docs.getByRole("listitem").filter({ hasText: `P${n}-CO2` })).toContainText("Approved");
       await expect(docs.getByRole("listitem").filter({ hasText: `P${n}-NEW` })).not.toContainText("Needs your approval");
-      for (const hidden of ["-OLD", "-DRAFT", "-VOID"]) await expect(docs).not.toContainText(`P${n}${hidden}`);
+      for (const hidden of ["-OLD", "-DRAFT", "-VOID", "-CO3"]) await expect(docs).not.toContainText(`P${n}${hidden}`);
       await expect(client.getByRole("heading", { name: "Daily log" })).toHaveCount(0);
       await expect(client.getByRole("heading", { name: "Something wrong?" })).toHaveCount(0);
 
@@ -91,6 +96,7 @@ test.describe("The client's link", () => {
       await turnOn(/^Complaint form/);
       await client.reload();
       await client.getByLabel("Your name").fill("Pat Homeowner");
+      await client.getByLabel("Best phone or email to reach you").fill("480-555-0100");
       await client.getByLabel("What's wrong").fill(`${tag} paint on the floor`);
       await client.getByLabel("Anything else we should know").fill("Master bedroom");
       await client.getByRole("button", { name: "Send it" }).click();
@@ -98,7 +104,7 @@ test.describe("The client's link", () => {
 
       const row = sql(`select kind || '|' || role || '|' || assignee || '|' || created_by || '|' || (due_on is not null) from public.work_items where title = '${tag} paint on the floor'`);
       expect(row).toBe(`complaint|pm|${PM}|client portal|true`);
-      expect(sql(`select detail from public.work_items where title = '${tag} paint on the floor'`)).toContain("From Pat Homeowner");
+      expect(sql(`select detail from public.work_items where title = '${tag} paint on the floor'`)).toContain("From Pat Homeowner, on their client link. Reach them at 480-555-0100.");
 
       await pm.goto("/app/tasks");
       const mine = pm.locator('[data-table="tasks-mine"]');

@@ -8,7 +8,7 @@ const dayOf = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US
 
 /** Files a complaint and says by when we'll answer. */
 export function ComplaintForm({ token }: { token: string }) {
-  const [f, setF] = useState({ name: "", title: "", detail: "" });
+  const [f, setF] = useState({ name: "", reach: "", title: "", detail: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [replyBy, setReplyBy] = useState("");
@@ -38,6 +38,10 @@ export function ComplaintForm({ token }: { token: string }) {
       <label className="text-sm font-medium text-slate-800">
         Your name
         <input className={INPUT} value={f.name} onChange={set("name")} maxLength={120} required autoComplete="name" />
+      </label>
+      <label className="text-sm font-medium text-slate-800">
+        Best phone or email to reach you (optional)
+        <input className={INPUT} value={f.reach} onChange={set("reach")} maxLength={120} />
       </label>
       <label className="text-sm font-medium text-slate-800">
         What&apos;s wrong

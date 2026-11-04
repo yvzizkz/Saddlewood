@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { cleanSections, clientDocuments, clientLogText, type PortalDocRow } from "../rules";
+import { approvalBlock } from "@/lib/billing/coApprove";
+import { CO_STATUS } from "@/lib/billing/registers";
+
+import { cleanSections, clientDocuments, clientLogText, clientPeople, withApprovals, type PortalDoc, type PortalDocRow } from "../rules";
 
 const row = (over: Partial<PortalDocRow>): PortalDocRow => ({
   id: "a",
@@ -35,6 +38,43 @@ describe("clientDocuments", () => {
 
   it("keeps statements and notices off the list", () => {
     expect(clientDocuments([row({ kind: "statement" }), row({ kind: "notice" })])).toEqual([]);
+  });
+});
+
+describe("withApprovals", () => {
+  const doc = (id: string, kind: PortalDoc["kind"] = "change_order"): PortalDoc => ({ id, kind, number: id, title: "", totalCents: 100, token: "t", issuedAt: "2026-10-01T15:00:00Z" });
+  const one = (status?: string) => withApprovals([doc("co")], new Map(status ? [["co", status]] : []));
+
+  it("takes a rejected or voided change order off the list, though its document is still issued", () => {
+    expect(one("rejected")).toEqual([]);
+    expect(one("void")).toEqual([]);
+  });
+
+  it("marks what's waiting on the client and what they approved", () => {
+    expect(one("sent")[0].approval).toBe("needed");
+    expect(one("signed")[0].approval).toBe("approved");
+    expect(one("billed")[0].approval).toBe("approved");
+  });
+
+  it("keeps a change order with no register row, with no badge", () => {
+    expect(one()[0].approval).toBeNull();
+  });
+
+  it("leaves other documents alone, whatever a stray status says", () => {
+    expect(withApprovals([doc("inv", "invoice")], new Map([["inv", "void"]]))[0].approval).toBeNull();
+  });
+
+  it("says needed exactly when the document's link still takes an approval", () => {
+    for (const status of CO_STATUS) {
+      const canApprove = approvalBlock({ status: "issued" }, { status }) === null;
+      expect(one(status)[0]?.approval === "needed", status).toBe(canApprove);
+    }
+  });
+});
+
+describe("clientPeople", () => {
+  it("drops an email standing in for a name", () => {
+    expect(clientPeople(["Eli Ramirez", "pm@saddlewoodcontracting.com"])).toEqual(["Eli Ramirez"]);
   });
 });
 

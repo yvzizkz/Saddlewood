@@ -135,11 +135,11 @@ The office, a PM or a field lead logs what the client said on the job's Tasks ta
 
 ## 12. The client's link (client portal, first slice, `e2e/client-portal.spec.ts`)
 
-An owner makes a job's link on the job's Overview (**Client link**) and copies it to send: nothing here emails anyone. The client opens `/c/<token>` with no sign-in, as they do every document we send. A new link shares nothing until an owner turns a section on:
+An owner makes a job's link on the job's Overview (**Client link**) and copies it to send: nothing here emails anyone. The client opens `/c/<token>` with no sign-in, as they do every document we send. A new link shows the job's name, address and PM (by name, never an email), and nothing else until an owner turns a section on:
 
-- **Documents:** proposals, agreements, change orders and invoices issued on the job, current revision only, each opening on its own `/d/<token>`. A change order still open for approval says so. Never a draft, a void, a statement or a notice.
+- **Documents:** proposals, agreements, change orders and invoices issued on the job, current revision only, each opening on its own `/d/<token>`. A change order says whether it needs their approval or is approved, and one rejected or voided on the register leaves the list even though its document stays issued. Never a draft, a void, a statement or a notice.
 - **Daily log:** the last 14 end-of-day logs: the day, the weather and the work done, in the crew's words, without their `ASK:` lines. Never who wrote it, the crew count, what was asked or decided, what's stuck, or safety notes. Progress notes and photos stay off.
-- **Complaint form:** the same record as §10, with the job's PM on the Policies clock, logged by `client portal`. The client sees the day we'll answer by, and no more than 5 go in per link per day.
+- **Complaint form:** the same record as §10, with the job's PM on the Policies clock, logged by `client portal`. They can leave a phone or email, for when someone else in the house writes in. The client sees the day we'll answer by, and no more than 5 go in per job per day.
 
 A PM or a field lead doesn't get the card. Turning a link off is for good: the old one reads "not active", the same as a made-up one, and a new link gets a new token.
 
