@@ -6,7 +6,7 @@
 ```
 supabase start -x vector,logflare,edge-runtime,realtime
 scripts/local-db.sh --reset        # schema, migrations, synthetic seed
-npm run dev -- -p 3100             # in another terminal
+NODE_OPTIONS=--max-old-space-size=12288 npm run dev -- -p 3100  # or: npm run dev:e2e -- -p 3100 (12 GB heap prevents Next dev's ~6.9 GB restart mid-suite)
 npx playwright test                # all scenarios; or e2e/finance-week.spec.ts
 ```
 
