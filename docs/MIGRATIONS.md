@@ -42,6 +42,7 @@ site change that reads them with the server key must be live first.
 | 0059 | `change_order_intake` (before the Mac posts to `/api/change-orders/intake`; nothing else needs it) | CO intake PR |
 | 0060 | `joist_sync` (before the Mac syncs queued COs into Joist) | Joist sync PR |
 | 0061 | `complaints` (before the site change) | Complaints PR |
+| 0062 | `client_portals` (before the site change; the job page hides the card and `/c/<token>` reads as off without it, so the order is safe either way) | Client portal PR |
 
 ## Production state
 

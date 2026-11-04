@@ -4,9 +4,12 @@ import { notFound, redirect } from "next/navigation";
 import { Card } from "@/components/bot/ui";
 import DataTable, { type Column, type TableRow } from "@/components/data/DataTable";
 import KpiHeader from "@/components/data/KpiHeader";
+import ClientPortalCard, { type PortalState } from "@/components/jobs/ClientPortalCard";
 import JobFrame, { type JobTab, type Stage } from "@/components/jobs/JobFrame";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
+import { siteUrl } from "@/lib/billing/http";
+import { livePortal } from "@/lib/portal/store";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import type { LaborRow } from "@/lib/accounting/labor";
 import type { PurchaseItemRow } from "@/lib/accounting/purchases";
@@ -790,6 +793,18 @@ export default async function JobPage({ params, searchParams }: { params: Promis
     </Card>
   );
 
+  // The client's link: an owner's, on a job with a billing record. Undefined hides the card, as when 0062 can't be read.
+  const portal: PortalState | undefined =
+    owner && ref.billingId
+      ? await livePortal(ref.billingId).then(
+          (p) => (p ? { href: `${siteUrl()}/c/${p.token}`, sections: p.sections } : null),
+          (err) => {
+            console.error("client portal:", err);
+            return undefined;
+          },
+        )
+      : undefined;
+
   return (
     <JobFrame {...frame}>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
@@ -882,6 +897,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             ) : null}
           </ul>
         </Card>
+        {portal !== undefined ? <ClientPortalCard job={ref.key} origin={siteUrl()} initial={portal} /> : null}
       </div>
     </JobFrame>
   );

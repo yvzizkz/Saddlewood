@@ -131,7 +131,19 @@ One CO end to end, with each step handing to the next (every step also has its o
 
 ## 10. A client complaint (first slice of the client side, `e2e/complaint-week.spec.ts`)
 
-The office, a PM or a field lead logs what the client said on the job's Tasks tab. It goes to that job's PM, or to Owner decisions on a job with no PM, due on the `complaints` policy (1 business day by default), and it is one row in Tasks. A day past due it moves up to Owner decisions. A PM closes an open one of theirs, once, with what was done, which stays on the job; they can't move it, re-date it, drop it, rewrite it or close one with Owner decisions. Only an owner can, and a drop needs a note too. The portal's Submit a complaint is meant to write the same record.
+The office, a PM or a field lead logs what the client said on the job's Tasks tab. It goes to that job's PM, or to Owner decisions on a job with no PM, due on the `complaints` policy (1 business day by default), and it is one row in Tasks. A day past due it moves up to Owner decisions. A PM closes an open one of theirs, once, with what was done, which stays on the job; they can't move it, re-date it, drop it, rewrite it or close one with Owner decisions. Only an owner can, and a drop needs a note too. A complaint from the client's link (§12) writes the same record.
+
+## 12. The client's link (client portal, first slice, `e2e/client-portal.spec.ts`)
+
+An owner makes a job's link on the job's Overview (**Client link**) and copies it to send: nothing here emails anyone. The client opens `/c/<token>` with no sign-in, as they do every document we send. A new link shares nothing until an owner turns a section on:
+
+- **Documents:** proposals, agreements, change orders and invoices issued on the job, current revision only, each opening on its own `/d/<token>`. A change order still open for approval says so. Never a draft, a void, a statement or a notice.
+- **Daily log:** the last 14 end-of-day logs: the day, the weather and the work done, in the crew's words, without their `ASK:` lines. Never who wrote it, the crew count, what was asked or decided, what's stuck, or safety notes. Progress notes and photos stay off.
+- **Complaint form:** the same record as §10, with the job's PM on the Policies clock, logged by `client portal`. The client sees the day we'll answer by, and no more than 5 go in per link per day.
+
+A PM or a field lead doesn't get the card. Turning a link off is for good: the old one reads "not active", the same as a made-up one, and a new link gets a new token.
+
+**Not in this slice:** invoice paid or open (a payment can sit on a statement rather than the invoice, and "open" on something a client paid is worse than nothing), photos, the client's own uploads, allowances, the timeline, and a password or passkey in place of the link.
 
 ## What an owner, a PM and finance can and can't do today
 
