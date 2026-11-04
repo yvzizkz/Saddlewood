@@ -19,6 +19,7 @@ import { jobBills, jobCrew, jobLabor, jobMoney, jobPackages, jobPurchases, jobWa
 import { listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
+import { canCloseComplaint } from "@/lib/complaints/rules";
 import { loadJobComplaints } from "@/lib/complaints/store";
 import { canApproveBillHere, canCloseHere, feedForSeat, forFieldLead, isMine, KIND_LABEL, loadFeed, NEW_TASK_KINDS } from "@/lib/tasks/feed";
 import { ApproveBill, CloseTask, NewComplaint, NewTask } from "@/components/tasks/TaskActions";
@@ -431,7 +432,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                       <p className="text-xs text-[var(--color-charcoal-light)]">{[c.status === "done" ? (es ? "Cerrada" : "Closed") : es ? "Descartada" : "Dropped", c.closedOn ? formatValue("date", c.closedOn) : null, nameOf(c.closedBy), c.resolution].filter(Boolean).join(" · ")}</p>
                     )}
                   </div>
-                  {c.status === "open" && seat.money ? <CloseTask id={c.id} lang={seat.lang} noteRequired canDrop={owner} /> : null}
+                  {c.status === "open" && canCloseComplaint(seat, c) ? <CloseTask id={c.id} lang={seat.lang} noteRequired canDrop={owner} /> : null}
                 </li>
               ))}
             </ul>

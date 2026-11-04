@@ -65,6 +65,11 @@ test.describe("A client complaint", () => {
       await pmCard.getByRole("button", { name: "Close it" }).click();
       await expect(pmCard).toContainText("Closed");
       await expect(pmCard).toContainText("Walked it with the drywall lead, repair set for Tuesday");
+      await expect(pmCard.getByRole("button", { name: "Done" })).toHaveCount(0);
+
+      // What was done stays as written: the PM can't close it twice.
+      expect((await pm.request.patch("/api/tasks", { data: { id, status: "done", resolution: "Rewritten" } })).status()).toBe(403);
+      expect(sql(`select resolution from public.work_items where id = ${id}`)).toBe("Walked it with the drywall lead, repair set for Tuesday");
 
       await page.goto("/app/tasks?view=all");
       await tasks.getByRole("searchbox").fill(said);

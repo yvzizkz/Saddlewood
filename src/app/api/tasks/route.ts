@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { canCloseComplaint } from "@/lib/complaints/rules";
 import { isDay } from "@/lib/crew/time";
 import { jobForWrite, PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
 import { ROLES, type Role } from "@/lib/roles/seats";
@@ -60,8 +61,8 @@ export async function PATCH(request: NextRequest) {
   const b = ((await request.json().catch(() => null)) ?? {}) as Body;
   if (!Number.isInteger(b.id)) return NextResponse.json({ ok: false, error: "Which task?" }, { status: 400 });
   const db = getSupabaseAdmin();
-  const { data: cur } = await db.from("work_items").select("kind,role,created_by,job_id,crew_job_id").eq("id", b.id!).maybeSingle();
-  const w = cur as { kind: string; role: Role; created_by: string; job_id: string | null; crew_job_id: string | null } | null;
+  const { data: cur } = await db.from("work_items").select("kind,status,role,created_by,job_id,crew_job_id").eq("id", b.id!).maybeSingle();
+  const w = cur as { kind: string; status: string; role: Role; created_by: string; job_id: string | null; crew_job_id: string | null } | null;
   if (!seat.owner) {
     // Work with the PM's or the field lead's seat, on their jobs (or on none), or work they handed out.
     if (!w) return NextResponse.json({ ok: false, error: "No such task." }, { status: 404 });
@@ -74,9 +75,9 @@ export async function PATCH(request: NextRequest) {
   const complaint = w?.kind === "complaint";
   const resolution = text(b.resolution, 2000);
   if (complaint) {
-    // The clock and the seat are the point: only an owner moves, drops or reopens one. A PM closes theirs with what was done.
-    const closesOnly = seat.money && b.status === "done" && b.role === undefined && b.assignee === undefined && b.dueOn === undefined;
-    if (!seat.owner && !closesOnly) return NextResponse.json({ ok: false, error: "A PM closes a complaint with what was done. Only an owner moves or drops one." }, { status: 403 });
+    // The clock, the seat and the record are the point: only an owner moves, drops or reopens one, or closes one with Owner decisions. A PM closes an open one of theirs, once, with what was done.
+    const closesOnly = canCloseComplaint(seat, w) && b.status === "done" && b.role === undefined && b.assignee === undefined && b.dueOn === undefined;
+    if (!seat.owner && !closesOnly) return NextResponse.json({ ok: false, error: "A PM closes an open complaint of theirs with what was done. Anything else on it is an owner's." }, { status: 403 });
     if ((b.status === "done" || b.status === "dropped") && !resolution) return NextResponse.json({ ok: false, error: "Say what was done." }, { status: 400 });
   }
   const patch: Record<string, unknown> = {};
