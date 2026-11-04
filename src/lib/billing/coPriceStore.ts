@@ -48,6 +48,7 @@ export type PriceIt = {
   title: string;
   detail: string;
   status: string;
+  amountCents: number | null;
   requestedBy: string;
   requestedOn: string;
   jobKey: string | null;
@@ -137,6 +138,7 @@ export async function loadPriceIt(id: number, actor: string): Promise<PriceIt> {
     title: doc.title || row.title,
     detail: row.detail,
     status: row.status,
+    amountCents: row.amount_cents,
     requestedBy: row.requested_by,
     requestedOn: row.requested_on,
     jobKey,

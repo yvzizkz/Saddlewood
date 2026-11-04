@@ -82,4 +82,18 @@ describe("a signed change order", () => {
     const [item] = changeOrderItems([signed], PACE, TODAY);
     expect(item).toMatchObject({ title: "Bill 8009-CO7 Shear wall", role: "finance", href: "/app/jobs/8009-n-ironwood-dr?tab=money" });
   });
+
+  it("asks nothing of anyone at no charge: there is nothing to bill", () => {
+    expect(changeOrderItems([{ ...signed, amountCents: 0 }], PACE, TODAY)).toEqual([]);
+  });
+
+  it("goes back to the owners with no billing job, since Finance cannot bill it", () => {
+    const [item] = changeOrderItems([{ ...signed, noBillingJob: true }], PACE, TODAY);
+    expect(item).toMatchObject({ title: "No billing job: 8009-CO7 Shear wall", role: "decisions", href: "/app/jobs/8009-n-ironwood-dr?tab=changes" });
+  });
+
+  it("opens the change order itself when it is on no job at all", () => {
+    const [item] = changeOrderItems([{ ...signed, noBillingJob: true, jobKey: null }], PACE, TODAY);
+    expect(item.href).toBe("/app/changes/7");
+  });
 });

@@ -243,7 +243,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                           Follow up
                         </Link>
                       ) : null}
-                      <ChangeOrderStep id={c.registerId!} status={c.status} hasDocument={!!c.documentId} billHref={`${base}?tab=money`} invoices={invoices} />
+                      <ChangeOrderStep id={c.registerId!} status={c.status} hasDocument={!!c.documentId} billHref={c.noBillingJob ? null : `${base}?tab=money`} invoices={invoices} noCharge={c.amountCents === 0} />
                     </div>
                   ) : null}
                   {timelines.get(c.registerId!)?.length ? (

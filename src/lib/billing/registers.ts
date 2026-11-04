@@ -36,6 +36,8 @@ export type CoRow = {
   documentId: string | null;
   billedDocumentId: string | null;
   source: string;
+  /** On no billing job, and its job has none: no draw or invoice can take it. */
+  noBillingJob: boolean;
 };
 
 function age(from: string | null, today: string): number | null {
@@ -80,6 +82,7 @@ export async function loadChangeOrders(refs: JobRef[], today = localDay()): Prom
       documentId: r.document_id,
       billedDocumentId: r.billed_document_id,
       source: r.source,
+      noBillingJob: !r.job_id && !refs.find((x) => x.key === jobKey)?.billingId,
     };
   });
   // Change orders issued before the register existed still belong in it.
@@ -102,6 +105,7 @@ export async function loadChangeOrders(refs: JobRef[], today = localDay()): Prom
       documentId: d.id,
       billedDocumentId: null,
       source: "document",
+      noBillingJob: !d.job_id,
     });
   }
   return out;

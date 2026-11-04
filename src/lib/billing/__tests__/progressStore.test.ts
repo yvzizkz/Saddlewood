@@ -35,6 +35,11 @@ function from(table: string) {
     delete: () => ((mode = "delete"), b),
     eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), b),
     in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), b),
+    or: (expr: string) => {
+      const job = /^job_id\.eq\.([^,]+)/.exec(expr)?.[1];
+      const crew = /crew_job_id\.eq\."([^"]+)"/.exec(expr)?.[1];
+      return filters.push((r) => r.job_id === job || (!!crew && r.job_id == null && r.crew_job_id === crew)), b;
+    },
     order: (c: string) => ((sortBy = c), b),
     maybeSingle: async () => {
       const res = run();
@@ -87,6 +92,24 @@ describe("loadProgress", () => {
       db.fail = { [`${t}:select`]: "connection reset" };
       await expect(loadProgress(JOB), t).rejects.toThrow(/connection reset/);
     }
+  });
+});
+
+describe("a change order recorded before the job had a billing record", () => {
+  const orphan = { id: 8, job_id: null, crew_job_id: "crew-1", number: "CO-2", title: "Header", amount_cents: 30_000, status: "signed", billed_document_id: null };
+
+  it("is on the job's schedule, and billing it puts it on the job", async () => {
+    db.t.jobs = [{ ...job({}), crew_job_id: "crew-1" }];
+    db.t.change_orders = [{ ...orphan }, { ...orphan, id: 9, crew_job_id: "another-job" }];
+    expect((await loadProgress(JOB)).lines.map((l) => l.key)).toEqual([FRAMING, DRYWALL, "co:8"]);
+    await createDrawDraft(JOB, { "co:8": 100 }, "lando");
+    expect(db.t.change_orders[0]).toMatchObject({ status: "billed", job_id: JOB });
+    expect(db.t.change_orders[1]).toMatchObject({ status: "signed", job_id: null });
+  });
+
+  it("stays off a job with no crew job", async () => {
+    db.t.change_orders = [{ ...orphan }];
+    expect((await loadProgress(JOB)).lines.map((l) => l.key)).toEqual([FRAMING, DRYWALL]);
   });
 });
 

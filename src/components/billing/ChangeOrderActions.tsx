@@ -98,14 +98,17 @@ export function ChangeOrderStep({
   hasDocument,
   billHref,
   invoices,
+  noCharge = false,
 }: {
   id: number
   status: string
   hasDocument: boolean
-  /** Where a signed one is billed: the job's Money tab. */
-  billHref: string
+  /** Where a signed one is billed: the job's Money tab. Null with no billing job, so nothing can bill it. */
+  billHref: string | null
   /** The job's issued invoices, for one that already went out on its own. */
   invoices: { id: string; number: string }[]
+  /** Signed at $0: nothing to bill, so it closes here. */
+  noCharge?: boolean
 }) {
   const router = useRouter()
   const [price, setPrice] = useState('')
@@ -155,7 +158,32 @@ export function ChangeOrderStep({
           {busy === s.to ? '…' : s.label}
         </button>
       ))}
-      {status === 'signed' ? (
+      {status === 'signed' && noCharge ? (
+        <button
+          type="button"
+          disabled={!!busy}
+          onClick={() => go({ status: 'billed' }, 'close')}
+          className="rounded-lg bg-[var(--color-teal)] px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {busy === 'close' ? '…' : 'No charge: close it'}
+        </button>
+      ) : null}
+      {status === 'signed' && !noCharge && !billHref ? (
+        <>
+          <span className="text-xs text-[var(--color-charcoal-light)]">No billing job, so this can&apos;t be billed yet. Set one up for the job, or void it.</span>
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => {
+              if (window.confirm('Void this signed change order? This cannot be undone.')) void go({ status: 'void' }, 'void')
+            }}
+            className="rounded-lg border border-[var(--color-stone-mid)] px-2.5 py-1 text-xs font-medium hover:bg-[var(--color-cream)] disabled:opacity-50"
+          >
+            {busy === 'void' ? '…' : 'Void'}
+          </button>
+        </>
+      ) : null}
+      {status === 'signed' && !noCharge && billHref ? (
         <>
           <Link href={billHref} className="rounded-lg bg-[var(--color-teal)] px-2.5 py-1 text-xs font-medium text-white">
             Bill it

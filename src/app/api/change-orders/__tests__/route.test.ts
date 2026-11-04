@@ -8,13 +8,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type Row = Record<string, unknown>;
 
 const { db, coEventsAfter, queueJoist } = vi.hoisted(() => ({
-  db: { co: null as Row | null, doc: null as Row | null, updates: [] as Row[] },
+  db: { co: null as Row | null, doc: null as Row | null, job: null as Row | null, updates: [] as Row[] },
   coEventsAfter: vi.fn(),
   queueJoist: vi.fn(),
 }));
 
 function from(table: string) {
-  const one = { eq: () => one, maybeSingle: async () => ({ data: table === "documents" ? db.doc : db.co, error: null }) };
+  const one = { eq: () => one, maybeSingle: async () => ({ data: table === "documents" ? db.doc : table === "jobs" ? db.job : db.co, error: null }) };
   return {
     select: () => one,
     update(patch: Row) {
@@ -39,6 +39,7 @@ const patch = (body: Row) => PATCH(new NextRequest("http://x/api/change-orders",
 beforeEach(() => {
   db.co = { id: 7, status: "signed", number: "8009-CO7", job_id: "job-1", amount_cents: 124000 };
   db.doc = { number: "8009-14", kind: "invoice", status: "issued", job_id: "job-1" };
+  db.job = null;
   db.updates = [];
   coEventsAfter.mockReset();
   queueJoist.mockReset();
@@ -75,6 +76,44 @@ describe("PATCH /api/change-orders: billed", () => {
     db.co = { ...db.co, job_id: null };
     db.doc = { ...db.doc, job_id: null };
     expect((await patch({ id: 7, status: "billed", billedDocumentId: INVOICE })).status).toBe(409);
+  });
+
+  it("refuses a crew job's change order when that job still has no billing record", async () => {
+    db.co = { ...db.co, job_id: null, crew_job_id: "crew-1" };
+    expect((await patch({ id: 7, status: "billed", billedDocumentId: INVOICE })).status).toBe(409);
+    expect(db.updates).toEqual([]);
+  });
+
+  it("bills a crew job's change order on the billing job it has since, and puts it on that job", async () => {
+    db.co = { ...db.co, job_id: null, crew_job_id: "crew-1" };
+    db.job = { id: "job-1" };
+    const res = await patch({ id: 7, status: "billed", billedDocumentId: INVOICE });
+    expect(res.status).toBe(200);
+    expect(db.updates).toEqual([{ status: "billed", job_id: "job-1", billed_document_id: INVOICE }]);
+  });
+
+  it("closes a no-charge change order with no invoice: there is nothing to bill", async () => {
+    db.co = { ...db.co, amount_cents: 0 };
+    const res = await patch({ id: 7, status: "billed" });
+    expect(res.status).toBe(200);
+    expect(db.updates).toEqual([{ status: "billed" }]);
+    expect(coEventsAfter).toHaveBeenCalledWith([7], "billed", "ilene@saddlewoodcontracting.com", { invoiceId: null, invoice: "" });
+  });
+
+  it("closes a no-charge one on a job with no billing record", async () => {
+    db.co = { ...db.co, amount_cents: 0, job_id: null };
+    expect((await patch({ id: 7, status: "billed" })).status).toBe(200);
+  });
+
+  it("still checks an invoice if one is named on a no-charge change order", async () => {
+    db.co = { ...db.co, amount_cents: 0 };
+    expect((await patch({ id: 7, status: "billed", billedDocumentId: "8009-14" })).status).toBe(400);
+    expect(db.updates).toEqual([]);
+  });
+
+  it("does not let an unpriced change order close as no charge", async () => {
+    db.co = { ...db.co, amount_cents: null };
+    expect((await patch({ id: 7, status: "billed" })).status).toBe(400);
   });
 
   it("bills it on an issued invoice of its job, and names the invoice on the timeline", async () => {
