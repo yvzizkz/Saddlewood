@@ -161,7 +161,7 @@ test.describe("PM week: Eli's jobs, tabs, change requests, and tasks", () => {
       expect(offJobRes.status()).toBe(404);
 
       // Open /app/tasks: toggle is Mine / My jobs; task is visible and can be closed.
-      await page.goto("/app/tasks", { waitUntil: "domcontentloaded" });
+      await page.goto("/app/tasks", { waitUntil: "networkidle" }); // A Done click before hydration sends nothing.
       const whose = page.getByRole("group", { name: "Whose" });
       await expect(whose.getByRole("link", { name: /^Mine \(/ })).toBeVisible();
       await expect(whose.getByRole("link", { name: /^My jobs \(/ })).toBeVisible();
