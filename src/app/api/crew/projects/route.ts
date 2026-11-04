@@ -1,22 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireSwitch } from "@/lib/crew/auth";
+import { requireSwitch, type Manager } from "@/lib/crew/auth";
 import { buildProjects, type ProjectsView } from "@/lib/crew/projects";
 import { listBillingJobs, listJobPeople, listJobs, listPeople, listReports, listSchedule, listTasks } from "@/lib/crew/queries";
 import { isNarrowed, scopeFrom } from "@/lib/crew/scope";
 import { stageJobs } from "@/lib/crew/stages";
 import { addDays, localDay } from "@/lib/crew/time";
+import { authorizeOps } from "@/lib/ops/auth";
 
 // The Projects screen's read (projects.view). An owner sees every job; a
-// project manager with projects.mine sees the jobs they are on. Field facts
-// only: the money card has its own route and switch.
+// project manager with projects.mine sees the jobs they are on; an office seat
+// on the portal allowlist sees field facts read-only. Field facts only: the
+// money card has its own route and switch.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const viewer = await requireSwitch(request, "projects.view");
+    let viewer: Manager | null = await requireSwitch(request, "projects.view");
+    if (!viewer) {
+      const staff = await authorizeOps(request);
+      if (staff && staff.via === "session") {
+        viewer = { role: "member", email: staff.actor, name: staff.actor, perms: ["projects.view"] };
+      }
+    }
     if (!viewer) return NextResponse.json({ ok: false, error: "Projects are not switched on for you." }, { status: 403 });
     const now = new Date();
     const day = localDay(now);

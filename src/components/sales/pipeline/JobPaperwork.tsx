@@ -61,7 +61,7 @@ export function JobPaperwork({ opportunityId, job, today, canEdit, onChange, toa
       )}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        {job.depositId ? (
+        {canEdit && job.depositId ? (
           <Link href={`/app/money/${job.depositId}`} className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--color-stone)] bg-white px-3 text-sm text-[var(--color-teal)]">
             Deposit invoice <ChevronRight className="size-4" aria-hidden="true" />
           </Link>

@@ -256,8 +256,21 @@ describe("the 7 AM push reads the one task feed", () => {
     });
   });
 
-  it("gives a worker their own list from the feed, late first", () => {
+  it("gives a worker their own list from the feed, late first, and ignores office work_items a plain worker cannot see on Today", () => {
     expect(noteFor(notes, ARNOLD)?.body).toBe("12729 W Keim Dr a las 7:00 AM. 1 tarea (1 atrasada), primero: Hang the garage ceiling.");
+    const withWorkItem = buildMorning(
+      input({
+        ...quiet,
+        ...withFeed([
+          ...FEED,
+          feedItem("w99", { source: "work", title: "Hidden office work item", role: "field_lead", nowRole: "field_lead", assignee: ARNOLD, jobKey: "keim", ...due("2026-10-01") }),
+        ]),
+        people: pmPeople,
+        jobPeople: [{ jobId: "keim", email: ELI, role: "pm" }],
+        schedule: [slot({ ack: "ok" })],
+      }),
+    );
+    expect(noteFor(withWorkItem, ARNOLD)?.body).toBe("12729 W Keim Dr a las 7:00 AM. 1 tarea (1 atrasada), primero: Hang the garage ceiling.");
   });
 
   it("buzzes nobody extra for a seat with nothing on it", () => {

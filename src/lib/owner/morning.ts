@@ -213,7 +213,11 @@ export function buildMorning(input: MorningInput): MorningNote[] {
     notified.add(p.email); // a worker is heard from here or not at all, never as a seat below
     if (!mine.length) continue; // not working today: no buzz
     const where = mine.map((s) => `${s.jobName}${s.startTime ? ` ${p.lang === "es" ? "a las" : "at"} ${clockText(s.startTime)}` : ""}`).join(", ");
-    const tasks = feedFor(input, p.email, { owner: false, crew: true, scope: scopeFrom({ role: "member", email: p.email, perms: p.perms }, input.jobPeople ?? []), money: p.perms.includes("money.view") }).sort(byAge);
+    // Plain crew see only crew_tasks on Today (TodayScreen renders MyTasksCard only for money.view or fieldLead).
+    const hasMineCard = p.perms.includes("money.view") || holdsFieldLead(p.email, input.seats ?? [], input.seatPeople ?? []);
+    const tasks = feedFor(input, p.email, { owner: false, crew: true, scope: scopeFrom({ role: "member", email: p.email, perms: p.perms }, input.jobPeople ?? []), money: p.perms.includes("money.view") })
+      .filter((i) => hasMineCard || i.source === "crew")
+      .sort(byAge);
     const lead = leadOf(tasks, day);
     const first = tasks[0];
     const late = { en: [lead.overdue ? `${lead.overdue} overdue` : "", lead.dueToday ? `${lead.dueToday} due today` : ""].filter(Boolean), es: [lead.overdue ? `${lead.overdue} ${lead.overdue === 1 ? "atrasada" : "atrasadas"}` : "", lead.dueToday ? `${lead.dueToday} para hoy` : ""].filter(Boolean) };

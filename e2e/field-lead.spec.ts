@@ -62,7 +62,7 @@ test.describe("Field lead: their jobs and tasks, no money", () => {
 
   test("My jobs lists only the job they are on, with no dollars", async ({ lead: page }) => {
     expect((await page.goto("/app/jobs"))?.status()).toBe(200);
-    await expect(page.getByRole("heading", { level: 1, name: "My jobs" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^(My jobs|Mis obras)$/ })).toBeVisible();
     const rows = page.locator('[data-table="jobs-field"] tbody tr');
     await expect(rows).toHaveCount(1);
     await expect(rows.first()).toContainText("8009 N Ironwood");
@@ -120,7 +120,7 @@ test.describe("Field lead: their jobs and tasks, no money", () => {
 
   test("the PM's work with no job is not on the lead's Tasks, and the lead cannot change it", async ({ lead: page }) => {
     await page.goto("/app/tasks?view=all");
-    await expect(page.getByRole("heading", { level: 1, name: "Tasks" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^(Tasks|Tareas)$/ })).toBeVisible();
     await expect(page.getByText(`E2E PM no job ${n}`)).toHaveCount(0);
     expect(await page.locator("main").innerText()).not.toMatch(DOLLARS);
     for (const change of [{ status: "done" }, { status: "dropped" }, { status: "open" }, { role: "field_lead" }]) {

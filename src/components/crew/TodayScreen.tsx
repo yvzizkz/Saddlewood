@@ -431,7 +431,7 @@ export default function TodayScreen() {
       ) : null}
 
       {/* A project manager's or field lead's Mine on Tasks: punch, logs, billing steps (PM only), work moved up to them. */}
-      {home.me.perms.includes('money.view') || home.me.fieldLead ? <MyTasksCard /> : null}
+      {home.me.perms.includes('money.view') || home.me.fieldLead ? <MyTasksCard lang={lang} /> : null}
 
       {openTasks.length ? (
         <>

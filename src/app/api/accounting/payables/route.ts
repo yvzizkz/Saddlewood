@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
 import { localDay } from "@/lib/crew/time";
+import { seesJob, workSeat } from "@/lib/jobs/access";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { clearHold, paymentBlock, SETTABLE_STATUSES, splitBalance, waiverCollectedFor, type BillFacts, type Hold } from "@/lib/accounting/payablesRules";
 
@@ -9,15 +10,27 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Owners act on a bill: set its status, clear one hold, record a payment out.
+// A project manager (jobs/access.ts) approves a bill on their own job
+// (clearHold = "approval", SOP-004).
 // The rules (SOP-004) are in lib/accounting/payablesRules.ts: a held, void or
 // expired-COI bill is never paid, a sub is paid only with the payer's word
 // that the lien waiver for this payment is in hand, and a payment never
 // records a waiver.
 
-type BillRow = { id: string; kind: string; status: string; waiver_status: string; amount_cents: number; retainage_cents: number | null; sub_id: string | null };
+type BillRow = {
+  id: string;
+  kind: string;
+  status: string;
+  waiver_status: string;
+  amount_cents: number;
+  retainage_cents: number | null;
+  sub_id: string | null;
+  job_id?: string | null;
+  crew_job_id?: string | null;
+};
 
 async function factsOf(db: ReturnType<typeof getSupabaseAdmin>, billId: string): Promise<{ bill: BillRow; facts: BillFacts } | null> {
-  const { data, error } = await db.from("bills").select("id,kind,status,waiver_status,amount_cents,retainage_cents,sub_id").eq("id", billId).maybeSingle();
+  const { data, error } = await db.from("bills").select("id,kind,status,waiver_status,amount_cents,retainage_cents,sub_id,job_id,crew_job_id").eq("id", billId).maybeSingle();
   if (error) throw new Error(`bills read: ${error.message}`);
   if (!data) return null;
   const bill = data as BillRow;
@@ -35,10 +48,16 @@ async function factsOf(db: ReturnType<typeof getSupabaseAdmin>, billId: string):
 
 export async function PATCH(request: NextRequest) {
   const viewer = await getViewer();
-  if (!(await viewerIsOwner(viewer))) {
+  const isOwner = await viewerIsOwner(viewer);
+  const seat = isOwner ? null : await workSeat();
+  if (!isOwner && (!seat || !seat.money)) {
     return NextResponse.json({ ok: false, error: "owner access required" }, { status: 403 });
   }
-  const actor = "email" in viewer && typeof viewer.email === "string" ? viewer.email : "owner";
+  const actor = isOwner
+    ? "email" in viewer && typeof viewer.email === "string"
+      ? viewer.email
+      : "owner"
+    : seat!.email;
 
   let body: Record<string, unknown>;
   try {
@@ -48,6 +67,9 @@ export async function PATCH(request: NextRequest) {
   }
 
   const action = String(body.action ?? "");
+  if (!isOwner && !(action === "update_bill" && body.clearHold === "approval")) {
+    return NextResponse.json({ ok: false, error: "owner access required" }, { status: 403 });
+  }
   const billId = String(body.billId ?? "").trim();
   if (!billId) {
     return NextResponse.json({ ok: false, error: "billId is required" }, { status: 400 });
@@ -57,6 +79,10 @@ export async function PATCH(request: NextRequest) {
   const found = await factsOf(db, billId);
   if (!found) return NextResponse.json({ ok: false, error: "No such bill." }, { status: 404 });
   const { bill, facts } = found;
+  if (!isOwner && seat) {
+    const onJob = Boolean((bill.job_id || bill.crew_job_id) && seesJob(seat, { billingId: bill.job_id ?? null, crewId: bill.crew_job_id ?? null }));
+    if (!onJob) return NextResponse.json({ ok: false, error: "No such bill." }, { status: 404 });
+  }
 
   if (action === "update_bill") {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };

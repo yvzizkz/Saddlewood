@@ -40,14 +40,13 @@ site change that reads them with the server key must be live first.
 | 0057 | `agreement_documents` (before the site change; 0056 is held for T119) | T112 PR |
 | 0058 | `jobs_mirror_first_contact` (after 0056; any time, no site change needs it) | 0058 PR |
 | 0059 | `change_order_intake` (before the Mac posts to `/api/change-orders/intake`; nothing else needs it) | CO intake PR |
+| 0060 | `joist_sync` (before the Mac syncs queued COs into Joist) | Joist sync PR |
 
 ## Production state
 
-As of 2026-10-22 (checked live by the KB session): everything through 0050
-is applied, including 0029–0035, 0040–0045 and the 0044 trip_key
-expression. 0051 through 0055 (the cleanup stack) are not. They go in, in
-order, as the stack merges, each before the code that needs it is live
-(0051 is the exception, after; see above). Check before applying anything,
+As of 2026-11-02 (checked live against production): everything through 0060
+is applied, including 0029–0035, 0040–0045, 0050–0058, 0059 (`change_order_events`)
+and 0060 (`joist_jobs`). Check before applying anything,
 since this note can go stale: a migration is in if the table it creates exists.
 
 ```sql

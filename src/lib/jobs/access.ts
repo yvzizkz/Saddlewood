@@ -15,6 +15,7 @@
 import { moneySeatForPage, seesBillingJob, seesCrewJob, type MoneySeat } from "@/lib/accounting/access";
 import { getViewer } from "@/lib/crew/auth";
 import { listJobPeople } from "@/lib/crew/queries";
+import type { CrewLang } from "@/lib/crew/types";
 import { getJobRef, type JobRef } from "@/lib/jobs/hub";
 import { holdsFieldLead, type Role } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
@@ -22,27 +23,30 @@ import { loadPeople, loadSeats } from "@/lib/roles/store";
 export type WorkSeat = MoneySeat & {
   /** Money on the job (contract, invoices, payments, purchases, changes priced): owners and PMs; never a field lead. */
   money: boolean;
+  /** The viewer's preferred language on the crew side ('en' by default). */
+  lang?: CrewLang;
 };
 
 /** The roles a PM hands work to: their own seat and the field below it. */
 export const PM_ROLES: Role[] = ["pm", "field_lead"];
 
 /** A field lead's seat: the field jobs they are on (crew_job_people), never every job, and no money. */
-export function fieldLeadSeat(email: string, crewJobs: string[]): WorkSeat {
-  return { owner: false, email, crewJobs, billingJobs: [], laborCost: false, margin: false, sections: [], money: false };
+export function fieldLeadSeat(email: string, crewJobs: string[], lang?: CrewLang): WorkSeat {
+  return { owner: false, email, crewJobs, billingJobs: [], laborCost: false, margin: false, sections: [], money: false, ...(lang === "es" ? { lang } : {}) };
 }
 
 /** The caller's seat for the job pages and Tasks, or null when they have none. */
 export async function workSeat(): Promise<WorkSeat | null> {
-  const money = await moneySeatForPage("overview");
-  if (money) return { ...money, money: true };
   const viewer = await getViewer();
+  const lang = viewer.kind === "crew" && viewer.person.lang === "es" ? ("es" as const) : undefined;
+  const money = await moneySeatForPage("overview");
+  if (money) return { ...money, money: true, ...(lang ? { lang } : {}) };
   if (viewer.kind !== "crew") return null;
   const email = viewer.person.email;
   const [seats, people] = await Promise.all([loadSeats(), loadPeople()]);
   if (!holdsFieldLead(email, seats, people)) return null;
   const on = await listJobPeople({ email });
-  return fieldLeadSeat(email, [...new Set(on.map((a) => a.jobId))]);
+  return fieldLeadSeat(email, [...new Set(on.map((a) => a.jobId))], lang);
 }
 
 export function seesJob(seat: WorkSeat, ref: Pick<JobRef, "crewId" | "billingId">): boolean {

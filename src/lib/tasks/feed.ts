@@ -266,7 +266,11 @@ export function feedForSeat(items: FeedItem[], jobs: Set<string> | null, mine: (
   if (jobs === null) return items;
   // Work with no job shows when it is theirs, or was the PM's or the field's before it moved up overdue.
   const ours = (i: FeedItem) => mine(i) || i.role === "pm" || i.role === "field_lead";
-  return items.filter((i) => i.source !== "waiting" && i.source !== "ops" && i.source !== "bill" && !isPayables(i) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)));
+  // A bill to approve on one of their jobs. One with no job is overhead: owners only (canApproveBillHere refuses it too).
+  const pmBill = (i: FeedItem) => i.source === "bill" && i.kind === "approval" && !!i.jobKey;
+  return items
+    .filter((i) => i.source !== "waiting" && i.source !== "ops" && (pmBill(i) || (i.source !== "bill" && !isPayables(i))) && (i.jobKey ? jobs.has(i.jobKey) : ours(i)))
+    .map((i) => (pmBill(i) ? { ...i, href: jobHref(i.jobKey!, "tasks") } : i));
 }
 
 /** A seat with no money (a field lead, jobs/access.ts): nothing from billing or payables, where every item carries dollars. */
@@ -322,4 +326,9 @@ export function changeOrderItems(cos: CoRow[], pace: { priceWithinDays: number; 
     }
   }
   return out;
+}
+
+/** Whether this seat approves a sub bill here (SOP-004): owners, or a PM with money on the bill's job. */
+export function canApproveBillHere(item: Pick<FeedItem, "source" | "kind" | "jobKey">, seat: { owner: boolean; money: boolean }): boolean {
+  return item.source === "bill" && item.kind === "approval" && (seat.owner || (seat.money && !!item.jobKey));
 }
