@@ -14,7 +14,7 @@ import { PM_ROLES, seesJob, workSeat } from "@/lib/jobs/access";
 import { jobHref, listJobRefs } from "@/lib/jobs/hub";
 import { ROLE_INFO, ROLES, seatHolder } from "@/lib/roles/seats";
 import { loadPeople, loadSeats } from "@/lib/roles/store";
-import { canApproveBillHere, canCloseHere, departmentOf, KIND_LABEL, loadFeed, type FeedItem } from "@/lib/tasks/feed";
+import { canApproveBillHere, canCloseHere, departmentOf, KIND_LABEL, loadFeed, NEW_TASK_KINDS, type FeedItem } from "@/lib/tasks/feed";
 import { mineOf, seatFeedOf } from "@/lib/tasks/mine";
 
 export const dynamic = "force-dynamic";
@@ -133,7 +133,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           lang={seat.lang}
           roles={opts(roles.map((r) => ({ value: r, label: `${ROLE_INFO[r].label} (${seatHolder(r, seats, people).name})` })))}
           jobs={opts(refs.filter((r) => r.active).map((r) => ({ value: r.key, label: r.name })))}
-          kinds={opts(Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label })))}
+          kinds={opts(NEW_TASK_KINDS)}
         />
       </div>
 
@@ -174,7 +174,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                       {[KIND_LABEL[i.kind], i.job, i.dueOn ? `${es ? "vence" : "due"} ${formatValue("date", i.dueOn)}` : null].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  {canApproveBillHere(i, seat) ? <ApproveBill billId={i.id.slice(1)} lang={seat.lang} /> : <CloseTask id={Number(i.id.slice(1))} lang={seat.lang} />}
+                  {canApproveBillHere(i, seat) ? <ApproveBill billId={i.id.slice(1)} lang={seat.lang} /> : i.kind !== "complaint" ? <CloseTask id={Number(i.id.slice(1))} lang={seat.lang} /> : seat.money ? <CloseTask id={Number(i.id.slice(1))} lang={seat.lang} noteRequired canDrop={seat.owner} /> : null}
                 </li>
               ))}
             </ul>

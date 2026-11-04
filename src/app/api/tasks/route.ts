@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // work that sits with those two seats. Items from other sources are acted on
 // where they live (their own screens), never here.
 
-type Body = { id?: number; title?: string; detail?: string; kind?: string; role?: string; assignee?: string; job?: string; dueOn?: string | null; status?: string; escalateDays?: number };
+type Body = { id?: number; resolution?: string; title?: string; detail?: string; kind?: string; role?: string; assignee?: string; job?: string; dueOn?: string | null; status?: string; escalateDays?: number };
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
   const title = text(b.title, 200);
   if (!title) return NextResponse.json({ ok: false, error: "A task needs a title." }, { status: 400 });
   if (!b.role || !(ROLES as readonly string[]).includes(b.role)) return NextResponse.json({ ok: false, error: "Pick who it goes to." }, { status: 400 });
+  if (b.kind === "complaint") return NextResponse.json({ ok: false, error: "Log a complaint on its job." }, { status: 400 });
   const kind = b.kind && b.kind in KIND_LABEL ? b.kind : "task";
   if (b.dueOn && !isDay(b.dueOn)) return NextResponse.json({ ok: false, error: "That due date is not a day." }, { status: 400 });
   if (!seat.owner && !PM_ROLES.includes(b.role as Role)) return notYours();
@@ -59,10 +60,10 @@ export async function PATCH(request: NextRequest) {
   const b = ((await request.json().catch(() => null)) ?? {}) as Body;
   if (!Number.isInteger(b.id)) return NextResponse.json({ ok: false, error: "Which task?" }, { status: 400 });
   const db = getSupabaseAdmin();
+  const { data: cur } = await db.from("work_items").select("kind,role,created_by,job_id,crew_job_id").eq("id", b.id!).maybeSingle();
+  const w = cur as { kind: string; role: Role; created_by: string; job_id: string | null; crew_job_id: string | null } | null;
   if (!seat.owner) {
     // Work with the PM's or the field lead's seat, on their jobs (or on none), or work they handed out.
-    const { data: cur } = await db.from("work_items").select("role,created_by,job_id,crew_job_id").eq("id", b.id!).maybeSingle();
-    const w = cur as { role: Role; created_by: string; job_id: string | null; crew_job_id: string | null } | null;
     if (!w) return NextResponse.json({ ok: false, error: "No such task." }, { status: 404 });
     // Work with no job: a PM's own, or a field lead's (no money seat) only with the field lead's seat or handed out by them.
     const onJob = w.job_id || w.crew_job_id ? seesJob(seat, { billingId: w.job_id, crewId: w.crew_job_id }) : seat.money || w.role === "field_lead" || w.created_by === seat.email;
@@ -70,11 +71,20 @@ export async function PATCH(request: NextRequest) {
     if (!PM_ROLES.includes(w.role) && w.created_by !== seat.email) return notYours();
     if (b.role !== undefined && !PM_ROLES.includes(b.role as Role)) return notYours();
   }
+  const complaint = w?.kind === "complaint";
+  const resolution = text(b.resolution, 2000);
+  if (complaint) {
+    // The clock and the seat are the point: only an owner moves, drops or reopens one. A PM closes theirs with what was done.
+    const closesOnly = seat.money && b.status === "done" && b.role === undefined && b.assignee === undefined && b.dueOn === undefined;
+    if (!seat.owner && !closesOnly) return NextResponse.json({ ok: false, error: "A PM closes a complaint with what was done. Only an owner moves or drops one." }, { status: 403 });
+    if ((b.status === "done" || b.status === "dropped") && !resolution) return NextResponse.json({ ok: false, error: "Say what was done." }, { status: 400 });
+  }
   const patch: Record<string, unknown> = {};
   if (b.status === "done" || b.status === "dropped" || b.status === "open") {
     patch.status = b.status;
     patch.done_at = b.status === "open" ? null : new Date().toISOString();
     patch.done_by = b.status === "open" ? "" : seat.email;
+    if (complaint) patch.resolution = b.status === "open" ? "" : resolution;
   }
   if (b.role !== undefined) {
     if (!(ROLES as readonly string[]).includes(b.role)) return NextResponse.json({ ok: false, error: "No such role." }, { status: 400 });

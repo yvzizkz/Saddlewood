@@ -101,25 +101,113 @@ export function NewTask({ roles, jobs, kinds, job, lang = 'en' }: { roles: Opt[]
   )
 }
 
-export function CloseTask({ id, lang = 'en' }: { id: number; lang?: CrewLang }) {
+export function CloseTask({ id, lang = 'en', noteRequired = false, canDrop = true }: { id: number; lang?: CrewLang; noteRequired?: boolean; canDrop?: boolean }) {
   const es = lang === 'es'
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
+  const [asking, setAsking] = useState<'done' | 'dropped' | null>(null)
+  const [note, setNote] = useState('')
+  const [err, setErr] = useState('')
   const act = async (status: 'done' | 'dropped') => {
+    if (noteRequired && asking !== status) {
+      setAsking(status)
+      return
+    }
     setBusy(status)
-    await fetch('/api/tasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
+    setErr('')
+    const res = await fetch('/api/tasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status, ...(noteRequired ? { resolution: note } : {}) }) })
     setBusy(null)
+    if (!res.ok) {
+      setErr(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? (es ? 'No se pudo guardar' : 'Could not save'))
+      return
+    }
+    setAsking(null)
     router.refresh()
+  }
+  if (asking) {
+    return (
+      <span className="flex w-full flex-wrap items-center gap-2">
+        <input
+          className={`${INPUT} min-w-0 flex-1`}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={2000}
+          autoFocus
+          aria-label={es ? 'Qué se hizo' : 'What was done'}
+          placeholder={es ? 'Qué se hizo' : 'What was done'}
+        />
+        <Button variant="primary" busy={!!busy} onClick={() => act(asking)}>
+          {asking === 'done' ? (es ? 'Cerrar' : 'Close it') : es ? 'Descartar' : 'Drop it'}
+        </Button>
+        <Button variant="quiet" onClick={() => setAsking(null)}>
+          {es ? 'Cancelar' : 'Cancel'}
+        </Button>
+        {err ? <span className="text-xs text-[#9a2a1f]">{err}</span> : null}
+      </span>
+    )
   }
   return (
     <span className="inline-flex gap-1">
-      <button type="button" disabled={!!busy} onClick={() => act('done')} className="rounded-lg border border-[var(--color-stone-mid)] px-2 py-1 text-xs font-medium hover:bg-[var(--color-cream)] disabled:opacity-50">
+      <button type="button" disabled={!!busy} onClick={() => act('done')} className="rounded-lg border border-[var(--color-stone-mid)] px-2 py-1 text-xs font-medium hover:bg-[var(--color-stone)] disabled:opacity-50">
         {busy === 'done' ? '…' : es ? 'Listo' : 'Done'}
       </button>
-      <button type="button" disabled={!!busy} onClick={() => act('dropped')} className="rounded-lg px-2 py-1 text-xs text-[var(--color-charcoal-light)] hover:bg-[var(--color-cream)] disabled:opacity-50">
-        {es ? 'Descartar' : 'Drop'}
-      </button>
+      {canDrop ? (
+        <button type="button" disabled={!!busy} onClick={() => act('dropped')} className="rounded-lg px-2 py-1 text-xs text-[var(--color-charcoal-light)] hover:bg-[var(--color-stone)] disabled:opacity-50">
+          {es ? 'Descartar' : 'Drop'}
+        </button>
+      ) : null}
     </span>
+  )
+}
+
+/** Log a client complaint on this job. Who gets it and when it is due are the server's (complaints/store.ts). */
+export function NewComplaint({ job, lang = 'en' }: { job: string; lang?: CrewLang }) {
+  const es = lang === 'es'
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [title, setTitle] = useState('')
+  const [detail, setDetail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  if (!open) {
+    return (
+      <Button variant="quiet" onClick={() => setOpen(true)}>
+        <Plus className="size-4" aria-hidden="true" /> {es ? 'Registrar queja' : 'Log a complaint'}
+      </Button>
+    )
+  }
+  const save = async () => {
+    setBusy(true)
+    setErr('')
+    const res = await fetch('/api/complaints', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job, title, detail }) })
+    setBusy(false)
+    if (!res.ok) {
+      setErr(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? (es ? 'No se pudo guardar' : 'Could not save'))
+      return
+    }
+    setOpen(false)
+    setTitle('')
+    setDetail('')
+    router.refresh()
+  }
+  return (
+    <div className="grid w-full gap-3">
+      <Field label={es ? 'Qué dijo el cliente' : 'What the client said'}>
+        <input className={INPUT} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus />
+      </Field>
+      <Field label={es ? 'Quién y cómo llegó' : 'Who raised it, and how'}>
+        <input className={INPUT} value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={2000} />
+      </Field>
+      <div className="flex items-center gap-2">
+        <Button variant="primary" busy={busy} onClick={save}>
+          {es ? 'Registrar' : 'Log it'}
+        </Button>
+        <Button variant="quiet" onClick={() => setOpen(false)}>
+          {es ? 'Cancelar' : 'Cancel'}
+        </Button>
+        {err ? <span className="text-sm text-[#9a2a1f]">{err}</span> : null}
+      </div>
+    </div>
   )
 }
 
