@@ -107,11 +107,12 @@ test.describe("Field and crew: the field week", () => {
       const coRow = page.getByRole("listitem").filter({ hasText: directive });
       await expect(coRow).toContainText("Awaiting price");
 
-      // And a co_price work item in Tasks for Owner decisions
+      // And one task for Owner decisions: the register's, not a second copy
       await page.goto("/app/tasks?view=all");
       const tasks = page.locator('[data-table="tasks-all"]');
       await tasks.getByRole("searchbox").fill(directive);
-      const taskRow = tasks.getByRole("row").filter({ hasText: directive }).first();
+      const taskRow = tasks.getByRole("row").filter({ hasText: directive });
+      await expect(taskRow).toHaveCount(1);
       await expect(taskRow).toContainText("Owner");
       await expect(taskRow).toContainText("Change order to price");
     } finally {

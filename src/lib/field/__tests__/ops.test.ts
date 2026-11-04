@@ -16,7 +16,9 @@ import {
   syncEodDirectivesAndDecisions,
   syncReceiptEntryToPurchases,
 } from "../ops";
+import type { CoRow } from "@/lib/billing/registers";
 import { OTHER_JOB } from "@/lib/crew/types";
+import { changeOrderItems } from "@/lib/tasks/feed";
 
 describe("field operations helpers", () => {
   it("provides SOP-009 pre-cover checklist items with photo requirements for each stage", () => {
@@ -146,8 +148,11 @@ describe("field operations helpers", () => {
         return {
           select: () => ({
             eq: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }),
+              in: () => ({
+                is: () => ({ limit: () => ({ maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }) }) }),
+                eq: () => ({
+                  limit: () => ({ maybeSingle: async () => ({ data: null, error: { message: "change_orders select failed" } }) }),
+                }),
               }),
             }),
           }),
@@ -183,7 +188,7 @@ describe("field operations helpers", () => {
       jobName: "9146 W Hutton Dr",
       done: "",
       asked: "Super asked for extra blocking",
-      decision: "",
+      decision: "ASK: Which backing?",
       stuck: "",
       createdBy: "jorge@saddlewood.crew",
     });
@@ -193,45 +198,166 @@ describe("field operations helpers", () => {
     errSpy.mockRestore();
   });
 
-  it("extracts CO awaiting price and owner ASK decision items from EOD daily logs", () => {
-    const items = extractEodWorkItems({
-      entryId: 77,
-      day: "2026-10-20",
-      jobId: "9146-w-hutton-dr",
-      jobName: "9146 W Hutton Dr",
-      billingJobId: "20000000-0000-0000-0000-000000000001",
-      done: "Hung 38 sheets of 5/8 Type X.\nASK: Should we fur out the north niche 1.5in for flush tile?",
-      asked: "GC superintendent asked to add sound attenuation batts in powder room wall.",
-      decision: "",
-      stuck: "",
-      createdBy: "jorge@saddlewood.crew",
-    });
+  const EOD = {
+    entryId: 77,
+    day: "2026-10-20",
+    jobId: "9146-w-hutton-dr",
+    jobName: "9146 W Hutton Dr",
+    billingJobId: "20000000-0000-0000-0000-000000000001",
+    done: "Hung 38 sheets of 5/8 Type X.",
+    decision: "",
+    stuck: "",
+    createdBy: "jorge@saddlewood.crew",
+  };
 
-    expect(items).toHaveLength(2);
-    const co = items.find((i) => i.kind === "co_price");
-    const dec = items.find((i) => i.kind === "decision");
-    expect(co?.role).toBe("decisions");
-    expect(co?.title).toContain("CO awaiting price");
-    expect(dec?.role).toBe("decisions");
-    expect(dec?.title).toContain("Should we fur out the north niche 1.5in for flush tile?");
+  it("extracts the owner ASK decision item from EOD daily logs", () => {
+    const items = extractEodWorkItems({ ...EOD, done: "Hung 38 sheets of 5/8 Type X.\nASK: Should we fur out the north niche 1.5in for flush tile?" });
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toBe("decision");
+    expect(items[0].role).toBe("decisions");
+    expect(items[0].title).toContain("Should we fur out the north niche 1.5in for flush tile?");
   });
 
   it("puts EOD items from an 'Other job' log on no job (no crew_jobs foreign key to break)", () => {
-    const items = extractEodWorkItems({
-      entryId: 77,
-      day: "2026-10-20",
-      jobId: OTHER_JOB,
-      jobName: "Smith garage",
-      done: "Framed",
-      asked: "Add a header over the side door",
-      decision: "ASK: T&M or CO?",
-      stuck: "",
-      createdBy: "jorge@saddlewood.crew",
-    });
-    expect(items).toHaveLength(2);
-    for (const i of items) {
-      expect(i.crew_job_id).toBeNull();
-      expect(i.href).toBe("/app/tasks");
+    const items = extractEodWorkItems({ ...EOD, jobId: OTHER_JOB, jobName: "Smith garage", billingJobId: undefined, done: "Framed", decision: "ASK: T&M or CO?" });
+    expect(items).toHaveLength(1);
+    expect(items[0].crew_job_id).toBeNull();
+    expect(items[0].href).toBe("/app/tasks");
+  });
+
+  describe("a directive on the EOD log", () => {
+    type Co = Record<string, unknown>;
+    /** A stand-in for work_items and change_orders that applies the lookup's filters to the rows it holds. */
+    function tables(seed: Co[] = []) {
+      const cos: Co[] = [...seed];
+      const workItems: Record<string, unknown>[] = [];
+      const lookup = (rows: Co[]) => {
+        const tests: ((r: Co) => boolean)[] = [];
+        const q = {
+          eq: (col: string, v: unknown) => (tests.push((r) => r[col] === v), q),
+          in: (col: string, v: unknown[]) => (tests.push((r) => v.includes(r[col])), q),
+          is: (col: string, v: unknown) => (tests.push((r) => (r[col] ?? null) === v), q),
+          limit: () => q,
+          maybeSingle: async () => ({ data: rows.find((r) => tests.every((t) => t(r))) ?? null, error: null }),
+        };
+        return q;
+      };
+      fromMock.mockImplementation((table: string) => {
+        if (table === "work_items") {
+          return {
+            select: () => lookup([]),
+            insert: (row: Record<string, unknown>) => {
+              workItems.push(row);
+              return { select: () => ({ single: async () => ({ data: { id: 900 }, error: null }) }) };
+            },
+          };
+        }
+        if (table === "change_orders") {
+          return {
+            select: () => lookup(cos),
+            insert: (row: Co) => {
+              const id = 900 + cos.length;
+              cos.push({ id, status: "requested", ...row });
+              return { select: () => ({ single: async () => ({ data: { id }, error: null }) }) };
+            },
+          };
+        }
+        if (table === "change_order_events") return { insert: async () => ({ error: null }) };
+        if (table === "jobs") return { select: () => lookup([]) };
+        throw new Error(`unexpected table ${table}`);
+      });
+      return { cos, workItems };
     }
+    const other = (jobName: string, entryId = 77) => ({ ...EOD, entryId, jobId: OTHER_JOB, jobName, billingJobId: undefined, asked: "Add a header over the side door" });
+    /** The Tasks row a change order makes, as the register would read it on no job. */
+    const taskOf = (c: Co) =>
+      changeOrderItems(
+        [{ id: `r${c.id}`, registerId: c.id as number, number: "", title: c.title as string, jobKey: null, job: "", status: "requested", amountCents: null, requestedOn: "2026-10-20", sentOn: null, ageDays: 0, documentId: null, billedDocumentId: null, source: "directive" } as CoRow],
+        { priceWithinDays: 2, followUpDays: 5 },
+        "2026-10-20",
+      )[0];
+
+    it("makes a change order and no task of its own: the register's task is the one", async () => {
+      const { cos, workItems } = tables();
+      const res = await syncEodDirectivesAndDecisions({ ...EOD, asked: "GC asked to add sound batts in the powder room wall." });
+      expect(workItems).toEqual([]);
+      expect(cos).toHaveLength(1);
+      expect(cos[0]).toMatchObject({ title: "GC asked to add sound batts in the powder room wall.", source: "directive" });
+      expect(res).toEqual({ workItemIds: [], changeOrderId: 900 });
+    });
+
+    it("keeps the ASK decision on the same log", async () => {
+      const { workItems } = tables();
+      await syncEodDirectivesAndDecisions({ ...EOD, asked: "Add batts", decision: "ASK: T&M or CO?" });
+      expect(workItems.map((w) => w.kind)).toEqual(["decision"]);
+    });
+
+    it("does not repeat one still open on the job", async () => {
+      const { cos } = tables([{ id: 41, title: "Add batts", status: "priced", crew_job_id: EOD.jobId, job_id: EOD.billingJobId }]);
+      const res = await syncEodDirectivesAndDecisions({ ...EOD, asked: "Add batts" });
+      expect(cos).toHaveLength(1);
+      expect(res.changeOrderId).toBe(41);
+    });
+
+    it.each(["billed", "rejected", "void"])("makes a new one when the last was %s", async (status) => {
+      const { cos } = tables([{ id: 41, title: "Add batts", status, crew_job_id: EOD.jobId, job_id: EOD.billingJobId }]);
+      await syncEodDirectivesAndDecisions({ ...EOD, asked: "Add batts" });
+      expect(cos).toHaveLength(2);
+    });
+
+    it("carries the typed Other-job name to the change order and its task", async () => {
+      const { cos } = tables();
+      await syncEodDirectivesAndDecisions(other("Smith garage"));
+      expect(cos[0]).toMatchObject({ title: "Smith garage: Add a header over the side door", job_id: null, crew_job_id: null });
+      expect(taskOf(cos[0]).title).toBe("Price: Smith garage: Add a header over the side door");
+    });
+
+    it("keeps a job's title plain: the job is already on the row", async () => {
+      const { cos } = tables();
+      await syncEodDirectivesAndDecisions({ ...EOD, asked: "Add batts" });
+      expect(cos[0].title).toBe("Add batts");
+    });
+
+    it("stays inside the title limit with a long name and a long ask", async () => {
+      const { cos } = tables();
+      await syncEodDirectivesAndDecisions({ ...other("S".repeat(300)), asked: "A".repeat(300) });
+      expect(cos[0].title).toHaveLength(200);
+      expect(String(cos[0].title).startsWith(`${"S".repeat(80)}: A`)).toBe(true);
+    });
+
+    it("the same ask on two Other jobs is two change orders and two tasks", async () => {
+      const { cos } = tables();
+      await syncEodDirectivesAndDecisions(other("Smith garage", 77));
+      await syncEodDirectivesAndDecisions(other("Jones casita", 78));
+      expect(cos.map((c) => c.title)).toEqual(["Smith garage: Add a header over the side door", "Jones casita: Add a header over the side door"]);
+      expect(cos.map((c) => taskOf(c).id)).toEqual(["co900", "co901"]);
+    });
+
+    it("a retry of the same Other-job log stays one", async () => {
+      const { cos } = tables();
+      const first = await syncEodDirectivesAndDecisions(other("Smith garage"));
+      const again = await syncEodDirectivesAndDecisions(other("Smith garage"));
+      expect(cos).toHaveLength(1);
+      expect(again.changeOrderId).toBe(first.changeOrderId);
+    });
+
+    it("an Other-job log does not match an open one on a billing job with no crew link", async () => {
+      const title = "Smith garage: Add a header over the side door";
+      const { cos } = tables([{ id: 41, title, status: "requested", crew_job_id: null, job_id: EOD.billingJobId }]);
+      const res = await syncEodDirectivesAndDecisions(other("Smith garage"));
+      expect(cos).toHaveLength(2);
+      expect(res.changeOrderId).not.toBe(41);
+    });
+
+    it("a billing job with no crew link only repeats its own", async () => {
+      const other2 = "20000000-0000-0000-0000-000000000002";
+      const { cos } = tables([{ id: 41, title: "Add batts", status: "requested", crew_job_id: null, job_id: other2 }]);
+      const base = { ...EOD, jobId: "", asked: "Add batts" };
+      const first = await syncEodDirectivesAndDecisions(base);
+      const again = await syncEodDirectivesAndDecisions(base);
+      expect(cos).toHaveLength(2);
+      expect(cos[1]).toMatchObject({ title: "Add batts", job_id: EOD.billingJobId, crew_job_id: null });
+      expect(again.changeOrderId).toBe(first.changeOrderId);
+    });
   });
 });
