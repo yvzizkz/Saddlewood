@@ -2,10 +2,11 @@
 // due are worked out here, never by the caller, so a complaint can't be parked
 // on a quiet seat or a far date. Server only.
 
+import { addBusinessDays } from "@/lib/billing/ladder";
 import { sendPush } from "@/lib/bot/push";
 import { notifyOwners } from "@/lib/crew/notify";
 import { listJobPeople } from "@/lib/crew/queries";
-import { addDays, localDay } from "@/lib/crew/time";
+import { localDay } from "@/lib/crew/time";
 import type { CrewJobPerson } from "@/lib/crew/types";
 import { jobHref, type JobRef } from "@/lib/jobs/hub";
 import { POLICY_DEFAULTS } from "@/lib/policies/rules";
@@ -37,11 +38,11 @@ export function routeComplaint(crewJobId: string | null, jobPeople: readonly Cre
   return pm ? { role: "pm", assignee: pm } : { role: "decisions", assignee: "" };
 }
 
-/** Logs it on the job and tells whoever has it. Late by one day, it moves up a role. */
+/** Logs it on the job and tells whoever has it. The clock counts business days (Marco, 2020: not a 24/7 contractor). Late by one day, it moves up a role. */
 export async function logComplaint(ref: JobRef, input: { title: string; detail: string; by: string }): Promise<{ id: number; role: Role; assignee: string; dueOn: string }> {
   const [people, policies] = await Promise.all([ref.crewId ? listJobPeople() : Promise.resolve([]), loadPolicies().then((r) => r.values).catch(() => POLICY_DEFAULTS)]);
   const { role, assignee } = routeComplaint(ref.crewId, people);
-  const dueOn = addDays(localDay(), Number(policies["policy.complaint.replyWithinDays"]));
+  const dueOn = addBusinessDays(localDay(), Number(policies["policy.complaint.replyWithinDays"]));
   const href = `${jobHref(ref.key, "tasks")}#complaints`;
   const { data, error } = await getSupabaseAdmin()
     .from("work_items")

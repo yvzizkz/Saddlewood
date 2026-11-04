@@ -14,7 +14,7 @@ const WITH_PM = "8009-n-ironwood-dr";
 test.describe("A client complaint", () => {
   test("goes to the job's PM, moves up when late, and closes with what was done", async ({ owner: page, browser }) => {
     const n = Date.now().toString().slice(-8);
-    const said = `E2E dust on the kitchen floor ${n}`;
+    const said = `E2E ceiling bubbling after the weekend rain ${n}`;
     const pmCtx = await browser.newContext();
     await signIn(pmCtx, PM, { crew: true });
     const pm = await pmCtx.newPage();
@@ -23,14 +23,15 @@ test.describe("A client complaint", () => {
       await page.goto(`/app/jobs/${WITH_PM}?tab=tasks`, { waitUntil: "networkidle" });
       await page.getByRole("button", { name: "Log a complaint" }).click();
       await page.getByLabel("What the client said").fill(said);
-      await page.getByLabel("Who raised it, and how").fill("Homeowner, phone to the office");
+      await page.getByLabel("Who raised it, and how").fill("Homeowner, email to info@ with photos");
       await page.getByRole("button", { name: "Log it" }).click();
       const card = page.locator("#complaints").getByRole("listitem").filter({ hasText: said });
       await expect(card).toContainText("reply by");
-      await expect(card).toContainText("Homeowner, phone to the office");
+      await expect(card).toContainText("Homeowner, email to info@ with photos");
 
-      const row = sql(`select role || '|' || assignee || '|' || (due_on - (now() at time zone 'America/Phoenix')::date) from public.work_items where title = '${said}'`);
-      expect(row).toBe(`pm|${PM}|1`);
+      // Due the next business day: never a weekend, and at most three days out.
+      const row = sql(`select role || '|' || assignee || '|' || (extract(isodow from due_on) < 6 and due_on - (now() at time zone 'America/Phoenix')::date between 1 and 3) from public.work_items where title = '${said}'`);
+      expect(row).toBe(`pm|${PM}|true`);
 
       // One task, in Everyone and in the PM's Mine.
       await page.goto("/app/tasks?view=all");
@@ -60,10 +61,10 @@ test.describe("A client complaint", () => {
       const pmCard = pm.locator("#complaints").getByRole("listitem").filter({ hasText: said });
       await expect(pmCard.getByRole("button", { name: "Drop" })).toHaveCount(0);
       await pmCard.getByRole("button", { name: "Done" }).click();
-      await pmCard.getByLabel("What was done").fill("Cleaned the floor and called the client");
+      await pmCard.getByLabel("What was done").fill("Walked it with the drywall lead, repair set for Tuesday");
       await pmCard.getByRole("button", { name: "Close it" }).click();
       await expect(pmCard).toContainText("Closed");
-      await expect(pmCard).toContainText("Cleaned the floor and called the client");
+      await expect(pmCard).toContainText("Walked it with the drywall lead, repair set for Tuesday");
 
       await page.goto("/app/tasks?view=all");
       await tasks.getByRole("searchbox").fill(said);

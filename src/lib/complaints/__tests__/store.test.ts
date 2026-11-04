@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = Record<string, unknown>;
 const { db, pushed, owners } = vi.hoisted(() => ({
-  db: { inserted: [] as Row[], people: [] as { jobId: string; email: string; role: string }[], days: 1 },
+  db: { inserted: [] as Row[], people: [] as { jobId: string; email: string; role: string }[], days: 1, today: "2026-11-03" },
   pushed: [] as { to: string[]; note: Row }[],
   owners: [] as Row[],
 }));
@@ -19,7 +19,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 vi.mock("@/lib/crew/queries", () => ({ listJobPeople: async () => db.people }));
 vi.mock("@/lib/policies/store", () => ({ loadPolicies: async () => ({ values: { "policy.complaint.replyWithinDays": db.days } }) }));
-vi.mock("@/lib/crew/time", async (orig) => ({ ...(await orig<typeof import("@/lib/crew/time")>()), localDay: () => "2026-11-03" }));
+vi.mock("@/lib/crew/time", async (orig) => ({ ...(await orig<typeof import("@/lib/crew/time")>()), localDay: () => db.today }));
 vi.mock("@/lib/bot/push", () => ({ sendPush: async (to: string[], note: Row) => (pushed.push({ to, note }), { sent: 1, removed: 0 }) }));
 vi.mock("@/lib/crew/notify", () => ({ notifyOwners: async (note: Row) => void owners.push(note) }));
 
@@ -33,6 +33,7 @@ beforeEach(() => {
   db.inserted = [];
   db.people = [];
   db.days = 1;
+  db.today = "2026-11-03";
   pushed.length = 0;
   owners.length = 0;
 });
@@ -58,6 +59,14 @@ describe("logComplaint", () => {
     expect(pushed).toHaveLength(1);
     expect(pushed[0].to).toEqual(["eli@x.com"]);
     expect(owners).toEqual([]);
+  });
+
+  it.each([
+    ["Friday", "2026-11-06"],
+    ["Saturday", "2026-11-07"],
+  ])("logged on a %s, the reply is due Monday", async (_day, today) => {
+    db.today = today;
+    expect((await logComplaint(REF, { title: "Leak", detail: "", by: "lando@x.com" })).dueOn).toBe("2026-11-09");
   });
 
   it("does not tell the PM what they logged themselves", async () => {
