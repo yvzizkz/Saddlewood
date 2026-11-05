@@ -14,4 +14,4 @@ create table if not exists public.payroll_runs (
 alter table public.payroll_runs enable row level security;
 revoke all on table public.payroll_runs from anon, authenticated, service_role;
 grant select, insert, update on table public.payroll_runs to service_role;
-comment on table public.payroll_runs is 'One payroll run per pay date: lines of name, kind (employee by hours, sub by amount), hours, amount_cents and note. Service-role access only.';
+comment on table public.payroll_runs is 'One payroll run per pay date: lines of name, kind (employee by hours, sub by amount), hours, amountCents, note, the crew email once linked, and byRate when the amount comes from the clock. Service-role access only.';

@@ -204,8 +204,10 @@ Run on 2026-10-25 against the local stack: one grid of every seat against every 
 ## The Wednesday payroll run (`e2e/payroll-run.spec.ts`)
 
 Finance runs payroll on Wednesday for that Friday, at `Accounting › Payroll › Wednesday run`. Owners only.
-1. **First run.** Paste a past payroll email (KB #435038). Saved, it gives the same email back to copy to the accountant.
+1. **First run.** Paste a past payroll email (KB #435038), even with people on the clock. Saved, it gives the same email back to copy to the accountant.
 2. **Next week.** The run starts from the last one: amounts carry, hours come from the clock and are blank until filled in, and a line with no figure can't be saved.
-3. **A one-off.** Add a company with a note: `Belico’s Mora LLC: $1,600 (W9 attached)` (KB #455577).
+3. **Who's who.** A line is a person by the crew email saved on it, or by name ignoring accents and case (`Omar Peña` is `Omar Pena`). Anyone else on the clock is listed for Finance to link or add, never added on their own, so `Arnoldo Mujica` can't be paid beside `Arnold Mujica`. The same person twice can't be saved.
+4. **Flat stays flat.** An amount carries as it was, whatever the clock says. Only a line marked `Hours × rate` is recomputed, and it shows what it was last run.
+5. **A one-off.** Add a company with a note: `Belico’s Mora LLC: $1,600 (W9 attached)` (KB #455577).
 
 The app doesn't send it. Amounts aren't in Job Costing unless the person has an hourly rate and clocks in.

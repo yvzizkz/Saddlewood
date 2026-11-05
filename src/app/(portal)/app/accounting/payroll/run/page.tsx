@@ -27,12 +27,13 @@ export default async function PayrollRunPage({ searchParams }: { searchParams: P
   const [saved, previous, labor, seats] = await Promise.all([loadRun(payDate), runBefore(payDate), loadLabor(from, addDays(from, 6), { withPay: true }), loadSeats()]);
   const byPerson = new Map<string, Clocked>();
   for (const r of labor.rows) {
-    const c = byPerson.get(r.person) ?? { name: r.person, hours: 0, costCents: null };
+    const c = byPerson.get(r.email) ?? { email: r.email, name: r.person, hours: 0, costCents: null };
     c.hours += r.minutes / 60;
     if (r.costCents !== null) c.costCents = (c.costCents ?? 0) + r.costCents;
-    byPerson.set(r.person, c);
+    byPerson.set(r.email, c);
   }
-  const lines = saved?.lines ?? startLines(previous?.lines ?? [], [...byPerson.values()]);
+  const clocked = [...byPerson.values()];
+  const lines = saved?.lines ?? startLines(previous?.lines ?? [], clocked);
   const signer = seats.find((s) => s.role === "finance")?.holder ?? "";
 
   return (
@@ -42,7 +43,7 @@ export default async function PayrollRunPage({ searchParams }: { searchParams: P
           Payroll and labor
         </Link>
       </p>
-      <PayrollRunEditor key={payDate} payDate={payDate} initial={lines} saved={!!saved} startedFrom={saved ? null : (previous?.payDate ?? null)} signer={signer} />
+      <PayrollRunEditor key={payDate} payDate={payDate} initial={lines} clocked={clocked} saved={!!saved} startedFrom={saved ? null : (previous?.payDate ?? null)} signer={signer} />
     </div>
   );
 }

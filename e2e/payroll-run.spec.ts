@@ -55,4 +55,54 @@ test.describe("The Wednesday payroll run", () => {
       sql(`delete from public.payroll_runs where pay_date in ('${first}', '${next}')`);
     }
   });
+
+  test("a first run on a week with clock data: paste it, link who it can't, and flat stays flat", async ({ owner: page }) => {
+    const first = "2098-11-07";
+    const next = "2098-11-14";
+    const nextWeek = "2098-11-07"; // Monday-to-Sunday week before each pay date
+    const firstWeek = "2098-10-31";
+    const shift = (email: string, name: string, day: string, hours: number) =>
+      `insert into public.crew_shifts (email, job_id, job_name, day, started_at, ended_at, status) values ('${email}', '8009-n-ironwood-dr', 'E2E', '${day}', '${day}T15:00:00Z', timestamptz '${day}T15:00:00Z' + interval '${hours} hours', 'ok');`;
+    const people = [["filiberto.framing@example.com", "Filiberto Villegas", 40], ["omar.runner@example.com", "Omar Pena", 2], ["arnold.framing@example.com", "Arnoldo Mujica", 30]] as const;
+    sql(people.map(([e, n, h]) => shift(e, n, firstWeek, h) + shift(e, n, nextWeek, h)).join(" "));
+    try {
+      await page.goto(`/app/accounting/payroll/run?date=${first}`, { waitUntil: "networkidle" });
+      const flagged = page.getByRole("region", { name: "On the clock, not on this run" });
+      await expect(flagged).toContainText("Filiberto Villegas, 40 hours");
+      await expect(page.getByLabel("Name")).toHaveCount(0);
+
+      await page.getByLabel("A past payroll email").fill(OCT_23);
+      await page.getByRole("button", { name: "Start from this email" }).click();
+      await expect(page.getByLabel("A past payroll email")).toHaveCount(0);
+      // Filiberto stays by hours, Omar Peña is Omar Pena, and Arnoldo the app won't guess.
+      await expect(page.getByLabel("Name").first()).toHaveValue("Filiberto Villegas");
+      await expect(page.getByLabel("Paid as").first()).toHaveValue("employee");
+      await expect(flagged).toContainText("Arnoldo Mujica");
+      await expect(flagged).not.toContainText("Omar Pena");
+      await expect(flagged).not.toContainText("Filiberto");
+      await page.getByLabel("Arnoldo Mujica is").selectOption({ label: "Arnold Mujica" });
+      await expect(flagged).toHaveCount(0);
+      await page.getByLabel("Paid as").nth(1).selectOption("rate");
+      await page.getByRole("button", { name: "Save the run" }).click();
+      await expect(page.getByLabel("Email to the accountant")).toHaveText(OCT_23);
+
+      // Next week: one line each. Omar's flat $3,390 stays with 2 hours on the clock; Arnold's by-rate line moves and says so.
+      await page.goto(`/app/accounting/payroll/run?date=${next}`, { waitUntil: "networkidle" });
+      await expect(page.getByRole("region", { name: "On the clock, not on this run" })).toHaveCount(0);
+      await expect(page.getByLabel("Name")).toHaveCount(6);
+      await expect(page.getByLabel("Amount").nth(1)).toHaveValue("3390.00");
+      await expect(page.getByLabel("Amount").first()).toHaveValue("960.00");
+      await expect(page.getByText("Was $1,489.25 last run")).toBeVisible();
+      await page.getByRole("button", { name: "Save the run" }).click();
+      const email = page.getByLabel("Email to the accountant");
+      await expect(email).toContainText("Filiberto Villegas: 40 hours");
+      await expect(email).toContainText("Arnold Mujica: $960");
+      await expect(email).toContainText("Omar Peña: $3,390");
+      await expect(email).not.toContainText("Pena");
+      await expect(email).not.toContainText("Arnoldo");
+    } finally {
+      sql(`delete from public.crew_shifts where job_name = 'E2E' and day in ('${firstWeek}', '${nextWeek}')`);
+      sql(`delete from public.payroll_runs where pay_date in ('${first}', '${next}')`);
+    }
+  });
 });

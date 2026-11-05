@@ -19,6 +19,8 @@ const lineSchema = z
     hours: z.number().min(0).max(400).nullable(),
     amountCents: z.number().int().min(0).max(100_000_000).nullable(),
     note: z.string().trim().max(200),
+    email: z.string().trim().max(200).optional(),
+    byRate: z.boolean().optional(),
   })
   .strict();
 const bodySchema = z.object({ payDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), lines: z.array(lineSchema).max(100) }).strict();

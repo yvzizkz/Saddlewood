@@ -8,22 +8,35 @@ import { useMemo, useState } from 'react'
 
 import { Button, Card, Field, INPUT } from '@/components/bot/ui'
 import { day } from '@/components/money/format'
-import { parseRunEmail, runEmail, runProblem, runSubject, type RunLine } from '@/lib/accounting/payrollRun'
+import { linkClocked, parseRunEmail, runEmail, runProblem, runSubject, type Clocked, type RunLine, type StartedLine } from '@/lib/accounting/payrollRun'
+import { usd } from '@/lib/money'
 import { parseMoney } from '@/lib/trackers/core'
 
-type Row = { name: string; kind: RunLine['kind']; hours: string; amount: string; note: string }
+type Row = { name: string; kind: RunLine['kind']; hours: string; amount: string; note: string; email: string; byRate: boolean; lastCents?: number | null }
 
-const toRow = (l: RunLine): Row => ({ name: l.name, kind: l.kind, hours: l.hours === null ? '' : String(l.hours), amount: l.amountCents === null ? '' : (l.amountCents / 100).toFixed(2), note: l.note })
+const toRow = (l: StartedLine): Row => ({ name: l.name, kind: l.kind, hours: l.hours === null ? '' : String(l.hours), amount: l.amountCents === null ? '' : (l.amountCents / 100).toFixed(2), note: l.note, email: l.email ?? '', byRate: !!l.byRate, lastCents: l.lastCents })
 const toLine = (r: Row): RunLine => {
   const cents = Math.round(parseMoney(r.amount) * 100)
   const hours = Number(r.hours)
-  return { name: r.name.trim(), kind: r.kind, hours: r.kind === 'employee' && r.hours.trim() && Number.isFinite(hours) ? hours : null, amountCents: r.kind === 'sub' && r.amount.trim() && Number.isFinite(cents) ? cents : null, note: r.note.trim() }
+  return {
+    name: r.name.trim(),
+    kind: r.kind,
+    hours: r.kind === 'employee' && r.hours.trim() && Number.isFinite(hours) ? hours : null,
+    amountCents: r.kind === 'sub' && r.amount.trim() && Number.isFinite(cents) ? cents : null,
+    note: r.note.trim(),
+    ...(r.email ? { email: r.email } : {}),
+    ...(r.byRate && r.kind === 'sub' ? { byRate: true } : {}),
+  }
 }
 
-export default function PayrollRunEditor({ payDate, initial, saved, startedFrom, signer }: { payDate: string; initial: RunLine[]; saved: boolean; startedFrom: string | null; signer: string }) {
+const paidAs = (r: Row) => (r.kind === 'employee' ? 'employee' : r.byRate ? 'rate' : 'sub')
+const hoursOf = (c: Clocked) => `${Math.round(c.hours * 100) / 100} hours`
+
+export default function PayrollRunEditor({ payDate, initial, clocked, saved, startedFrom, signer }: { payDate: string; initial: StartedLine[]; clocked: Clocked[]; saved: boolean; startedFrom: string | null; signer: string }) {
   const router = useRouter()
   const [rows, setRows] = useState(initial.map(toRow))
   const [paste, setPaste] = useState('')
+  const [pasted, setPasted] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(saved)
@@ -33,16 +46,29 @@ export default function PayrollRunEditor({ payDate, initial, saved, startedFrom,
   const problem = rows.length ? runProblem(lines) : null
   const subject = runSubject(payDate)
   const body = runEmail(lines, signer)
+  const { matched, unlinked } = useMemo(() => linkClocked(lines, clocked), [lines, clocked])
+  // A name match keeps its link when the run is saved.
+  const toSave = lines.map((l, i) => (matched[i] ? { ...l, email: matched[i].email } : l))
   const edit = (i: number, change: Partial<Row>) => (setRows(rows.map((r, n) => (n === i ? { ...r, ...change } : r))), setDone(false))
 
   const save = async () => {
     setBusy(true)
     setErr('')
-    const res = await fetch('/api/accounting/payroll-run', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payDate, lines }) })
+    const res = await fetch('/api/accounting/payroll-run', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payDate, lines: toSave }) })
     setBusy(false)
     if (!res.ok) return setErr((await res.json().catch(() => null))?.error ?? 'Could not save')
     setDone(true)
     router.refresh()
+  }
+
+  const startFromEmail = () => {
+    setRows(parseRunEmail(paste).map(toRow))
+    setPasted(true)
+    setDone(false)
+  }
+  const addClocked = (c: Clocked) => {
+    setRows([...rows, { name: c.name, kind: 'sub', hours: '', amount: c.costCents === null ? '' : (c.costCents / 100).toFixed(2), note: '', email: c.email, byRate: c.costCents !== null }])
+    setDone(false)
   }
 
   const copy = async () => {
@@ -57,13 +83,13 @@ export default function PayrollRunEditor({ payDate, initial, saved, startedFrom,
         <p className="text-sm text-[var(--color-charcoal-light)]">{saved ? 'Saved.' : startedFrom ? `Started from ${day(startedFrom)}. Check every line before you save.` : 'The first run. Paste a past payroll email to start, or add people.'}</p>
       </div>
 
-      {!rows.length ? (
+      {!startedFrom && !saved && !pasted ? (
         <Card className="p-4">
           <Field label="A past payroll email">
             <textarea className={`${INPUT} min-h-40 font-mono text-sm`} value={paste} onChange={(e) => setPaste(e.target.value)} />
           </Field>
           <div className="mt-2">
-            <Button disabled={!paste.trim()} onClick={() => setRows(parseRunEmail(paste).map(toRow))}>
+            <Button disabled={!paste.trim()} onClick={startFromEmail}>
               Start from this email
             </Button>
           </div>
@@ -76,8 +102,9 @@ export default function PayrollRunEditor({ payDate, initial, saved, startedFrom,
             <input className={INPUT} value={r.name} onChange={(e) => edit(i, { name: e.target.value })} maxLength={120} />
           </Field>
           <Field label="Paid as">
-            <select className={INPUT} value={r.kind} onChange={(e) => edit(i, { kind: e.target.value as Row['kind'] })}>
+            <select className={INPUT} value={paidAs(r)} onChange={(e) => edit(i, { kind: e.target.value === 'employee' ? 'employee' : 'sub', byRate: e.target.value === 'rate', lastCents: undefined })}>
               <option value="sub">Amount</option>
+              <option value="rate">Hours × rate</option>
               <option value="employee">Hours</option>
             </select>
           </Field>
@@ -88,6 +115,7 @@ export default function PayrollRunEditor({ payDate, initial, saved, startedFrom,
           ) : (
             <Field label="Amount">
               <input className={INPUT} inputMode="decimal" value={r.amount} onChange={(e) => edit(i, { amount: e.target.value })} />
+              {r.lastCents !== undefined ? <span className="mt-1 block text-xs font-medium text-[var(--color-charcoal)]">{r.lastCents === null ? 'Blank last run' : `Was ${usd(r.lastCents)} last run`}</span> : null}
             </Field>
           )}
           <Field label="Note">
@@ -99,8 +127,34 @@ export default function PayrollRunEditor({ payDate, initial, saved, startedFrom,
         </Card>
       ))}
 
+      {unlinked.length ? (
+        <Card className="p-4">
+          <section aria-label="On the clock, not on this run">
+            <p className="text-sm font-medium text-[var(--color-charcoal)]">On the clock, not on this run</p>
+            <p className="mb-2 text-xs text-[var(--color-charcoal-light)]">Say who each one is on the run, or add them. The app won&apos;t guess: a second line would pay them twice.</p>
+            <ul className="grid gap-2">
+              {unlinked.map((c) => (
+                <li key={c.email} className="flex flex-wrap items-center gap-2 text-sm text-[var(--color-charcoal)]">
+                  <span className="min-w-0 flex-1">
+                    {c.name}, {hoursOf(c)}
+                    {c.costCents === null ? '' : `, ${usd(c.costCents)} at their rate`}
+                  </span>
+                  <select aria-label={`${c.name} is`} className={`${INPUT} w-auto`} value="" onChange={(e) => edit(Number(e.target.value), { email: c.email })}>
+                    <option value="">Is on the run as…</option>
+                    {rows.map((r, i) => (!r.email && r.name.trim() ? <option key={i} value={i}>{r.name}</option> : null))}
+                  </select>
+                  <Button variant="quiet" aria-label={`Add ${c.name} to the run`} onClick={() => addClocked(c)}>
+                    Add
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </Card>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => setRows([...rows, { name: '', kind: 'sub', hours: '', amount: '', note: '' }])}>Add a person</Button>
+        <Button onClick={() => setRows([...rows, { name: '', kind: 'sub', hours: '', amount: '', note: '', email: '', byRate: false }])}>Add a person</Button>
         <Button variant="primary" busy={busy} disabled={!rows.length || !!problem} onClick={save}>
           Save the run
         </Button>

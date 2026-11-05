@@ -5,11 +5,33 @@ import { addDays } from "@/lib/crew/time";
 // #435038, #455577): a weekly figure, a company with a W-9, a piece of work. So a
 // line is whatever Finance says it is. The clock only fills in what it knows, and
 // the next run starts from the last one. Pure.
+//
+// A line and a person on the clock are the same person by the crew email saved
+// on the line. A line with no email links by name, ignoring accents and case
+// ("Omar Peña" is "Omar Pena"), and saving keeps the link. Anyone else on the
+// clock is flagged for Finance and never added on their own: "Arnoldo Mujica"
+// might be "Arnold Mujica", and a second line would pay him twice.
+//
+// An amount carries as it was. Only a line Finance marked by rate (`byRate`) is
+// recomputed from the clock, and it shows what it was last run.
 
-export type RunLine = { name: string; kind: "employee" | "sub"; hours: number | null; amountCents: number | null; note: string };
+export type RunLine = {
+  name: string;
+  kind: "employee" | "sub";
+  hours: number | null;
+  amountCents: number | null;
+  note: string;
+  /** The crew person this line is, once linked. */
+  email?: string;
+  /** Paid hours times rate: the amount comes from the clock each run. */
+  byRate?: boolean;
+};
+
+/** A line of a new run, and what a by-rate amount was last run when the clock changed it. */
+export type StartedLine = RunLine & { lastCents?: number | null };
 
 /** What the clock knows about a person for the pay week. */
-export type Clocked = { name: string; hours: number; costCents: number | null };
+export type Clocked = { email: string; name: string; hours: number; costCents: number | null };
 
 /** The Friday a run on this day pays: this one, or today if it's Friday. */
 export function payDateFor(today: string): string {
@@ -19,23 +41,35 @@ export function payDateFor(today: string): string {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** A name with its accents, case and extra spaces gone. */
+export function sameName(name: string): string {
+  return name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** Each line's person on the clock, by email and then by name, and the people no line claims. */
+export function linkClocked(lines: RunLine[], clocked: Clocked[]): { matched: (Clocked | null)[]; unlinked: Clocked[] } {
+  const left = new Map(clocked.map((c) => [c.email, c]));
+  const take = (c: Clocked | undefined) => (c && left.delete(c.email) ? c : null);
+  const byEmail = lines.map((l) => (l.email ? take(left.get(l.email)) : null));
+  const matched = lines.map((l, i) => byEmail[i] ?? (l.email ? null : take([...left.values()].find((c) => sameName(c.name) === sameName(l.name)))));
+  return { matched, unlinked: [...left.values()] };
+}
+
 /**
  * A new run: last run's people with the amounts they had, each employee's hours
- * from the clock when it has any, and a sub on an hourly rate at hours times rate.
- * Anyone the clock has who wasn't on the last run is added.
+ * from the clock when it has any, and a by-rate line at hours times rate, blank
+ * if the clock has nothing to go on.
  */
-export function startLines(previous: RunLine[], clocked: Clocked[]): RunLine[] {
-  const byName = new Map(clocked.map((c) => [c.name, c]));
-  const lines = previous.map((l): RunLine => {
-    const c = byName.get(l.name);
-    if (l.kind === "employee") return { ...l, hours: c ? round2(c.hours) : null, note: "" };
-    return { ...l, amountCents: c?.costCents ?? l.amountCents, note: "" };
+export function startLines(previous: RunLine[], clocked: Clocked[]): StartedLine[] {
+  const { matched } = linkClocked(previous, clocked);
+  return previous.map((l, i): StartedLine => {
+    const c = matched[i];
+    const line: RunLine = { ...l, ...(c ? { email: c.email } : {}), note: "" };
+    if (l.kind === "employee") return { ...line, hours: c ? round2(c.hours) : null };
+    if (!l.byRate) return line;
+    const amountCents = c?.costCents ?? null;
+    return { ...line, amountCents, ...(amountCents === l.amountCents ? {} : { lastCents: l.amountCents }) };
   });
-  const known = new Set(previous.map((l) => l.name));
-  for (const c of clocked) {
-    if (!known.has(c.name)) lines.push({ name: c.name, kind: "sub", hours: null, amountCents: c.costCents, note: "" });
-  }
-  return lines;
 }
 
 /** Why this run can't be saved, or null. */
@@ -45,8 +79,10 @@ export function runProblem(lines: RunLine[]): string | null {
   for (const l of lines) {
     const name = l.name.trim();
     if (!name) return "Every line needs a name.";
-    if (seen.has(name.toLowerCase())) return `${name} is on the run twice.`;
-    seen.add(name.toLowerCase());
+    for (const key of [sameName(name), ...(l.email ? [l.email] : [])]) {
+      if (seen.has(key)) return `${name} is on the run twice.`;
+      seen.add(key);
+    }
     if (l.kind === "employee" && !((l.hours ?? 0) > 0)) return `${name}: fill in the hours, or take them off this run.`;
     if (l.kind === "sub" && !((l.amountCents ?? 0) > 0)) return `${name}: fill in the amount, or take them off this run.`;
   }
