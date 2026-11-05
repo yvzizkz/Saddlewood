@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Gavel, Phone, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import { Gavel, Globe, Mail, Phone, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 
 import { botApi } from '@/components/bot/BotProvider'
 import { useSalesToast } from './useSalesToast'
@@ -18,8 +18,8 @@ import { QuickAddSheet } from './pipeline/QuickAddSheet'
 // The pipeline: every prospect from the first call to the signed job. Three
 // ways to look at the same list. "Today" is what to do now (the follow-ups the
 // bot used to text about), "Board" is where everything stands, "List" finds
-// anything, closed ones too. Callers and bid invites that are not tracked yet
-// wait on top, one tap from the pipeline.
+// anything, closed ones too. Website leads, callers and bid invites that are
+// not tracked yet wait on top, one tap from the pipeline.
 
 type Data = {
   today: string
@@ -27,6 +27,7 @@ type Data = {
   metrics: Metrics
   inbox: InboxItem[]
   inboxSyncedAt: string | null
+  applicationsWaiting: number
   me: string
   canSyncLeads: boolean
 }
@@ -221,12 +222,12 @@ function Inbox({ items, syncedAt, canSync, onChanged }: { items: InboxItem[]; sy
         method: 'POST',
         body: JSON.stringify({
           title: i.title,
-          kind: i.from === 'bid' ? 'framing_sub' : 'remodel',
-          source: i.from === 'bid' ? 'bid_invite' : 'call',
-          contact: i.from === 'bid' ? { name: '', company: i.who } : { name: i.who === i.phone ? '' : i.who, phone: i.phone ?? '', email: i.email ?? '' },
+          kind: i.from === 'bid' || i.company ? 'framing_sub' : 'remodel',
+          source: i.from === 'bid' ? 'bid_invite' : i.from === 'web' ? 'website' : 'call',
+          contact: i.from === 'bid' ? { name: '', company: i.who } : { name: i.who === i.phone ? '' : i.who, company: i.company ?? '', phone: i.phone ?? '', email: i.email ?? '' },
           externalRef: i.ref,
           firstNote: i.detail || undefined,
-          nextStep: i.from === 'bid' ? 'Decide: bid or pass' : 'Call back',
+          nextStep: i.from === 'bid' ? 'Decide: bid or pass' : i.phone ? 'Call back' : 'Reply',
         }),
       })
       router.push(`/app/sales/${r.opportunity.id}`)
@@ -239,10 +240,11 @@ function Inbox({ items, syncedAt, canSync, onChanged }: { items: InboxItem[]; sy
   }
 
   async function mark(i: InboxItem, status: CallStatus) {
-    if (!i.phone) return
+    if (!i.phone && !i.webId) return
     setBusy(i.ref)
     try {
-      await botApi('/api/sales/inbox', { method: 'PATCH', body: JSON.stringify({ phone: i.phone, status }) })
+      const body = i.webId ? { webId: i.webId, status: status === 'pending' ? 'new' : status } : { phone: i.phone, status }
+      await botApi('/api/sales/inbox', { method: 'PATCH', body: JSON.stringify(body) })
       toast(status === 'dismissed' ? `${i.who} dismissed` : status === 'pending' ? `${i.who} back to waiting` : `${i.who} marked ${status}`)
       setOpen(null)
       onChanged()
@@ -320,9 +322,9 @@ function Inbox({ items, syncedAt, canSync, onChanged }: { items: InboxItem[]; sy
             <div key={i.ref} className="px-3.5 py-3">
               <div className="flex items-center gap-3">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-cream)] text-[var(--color-gold-accessible)]" aria-hidden="true">
-                  {i.from === 'bid' ? <Gavel className="size-4" /> : <Phone className="size-4" />}
+                  {i.from === 'bid' ? <Gavel className="size-4" /> : i.from === 'web' ? <Globe className="size-4" /> : <Phone className="size-4" />}
                 </span>
-                {i.from === 'call' && i.phone ? (
+                {i.from !== 'bid' ? (
                   <button
                     type="button"
                     className="min-w-0 flex-1 text-left"
@@ -337,13 +339,21 @@ function Inbox({ items, syncedAt, canSync, onChanged }: { items: InboxItem[]; sy
                     <InboxText i={i} />
                   </div>
                 )}
-                {i.from === 'call' && i.phone ? (
+                {i.from !== 'bid' && i.phone ? (
                   <a
                     href={i.dialUrl || `tel:${dialable(i.phone)}`}
                     aria-label={`Call ${i.who}`}
                     className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--color-stone-mid)] bg-white text-[var(--color-teal)]"
                   >
                     <Phone className="size-4" aria-hidden="true" />
+                  </a>
+                ) : i.from === 'web' && i.email ? (
+                  <a
+                    href={`mailto:${i.email}`}
+                    aria-label={`Email ${i.who}`}
+                    className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--color-stone-mid)] bg-white text-[var(--color-teal)]"
+                  >
+                    <Mail className="size-4" aria-hidden="true" />
                   </a>
                 ) : null}
                 <Button className="shrink-0 !px-3" busy={busy === i.ref} disabled={!!busy} onClick={() => track(i)}>
@@ -469,6 +479,11 @@ export default function SalesScreen() {
         <>
           <MetricsStrip m={data.metrics} />
           <Inbox items={data.inbox} syncedAt={data.inboxSyncedAt} canSync={data.canSyncLeads} onChanged={load} />
+          {data.canSyncLeads ? (
+            <Link href="/app/sales/applications" className="mt-1 flex min-h-11 items-center text-[13px] font-medium text-[var(--color-teal)]">
+              Website applications{data.applicationsWaiting ? ` (${data.applicationsWaiting} waiting)` : ''}
+            </Link>
+          ) : null}
           <div className="mb-3 mt-6">
             <Segmented<View>
               label="View"
