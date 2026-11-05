@@ -6,6 +6,7 @@ import DataTable, { type Column, type TableRow } from "@/components/data/DataTab
 import KpiHeader from "@/components/data/KpiHeader";
 import ClientPortalCard, { type PortalState } from "@/components/jobs/ClientPortalCard";
 import JobClientCard from "@/components/jobs/JobClientCard";
+import JobOpeningCard from "@/components/jobs/JobOpeningCard";
 import JobFrame, { type JobTab, type Stage } from "@/components/jobs/JobFrame";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
@@ -95,8 +96,9 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   // What every tab needs to place the job on its lifecycle.
   const [money, crew, watches] = await Promise.all([jobMoney(ref, today), jobCrew(ref), jobWatches(ref)]);
   const issued = money.issued.filter((d) => d.status === "issued");
-  const billed = issued.reduce((a, d) => a + d.totalCents, 0);
-  const collected = money.collected.reduce((a, r) => a + r.amountCents, 0);
+  const settled = money.opening?.settledCents ?? 0;
+  const billed = settled + issued.reduce((a, d) => a + d.totalCents, 0);
+  const collected = settled + money.collected.reduce((a, r) => a + r.amountCents, 0);
   const open = money.open.reduce((a, r) => a + r.balanceCents, 0);
   const built = crew.phases.length > 0 && crew.phases.every((p) => p.verified_at);
   const closed = !ref.active;
@@ -333,6 +335,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             ))}
           </dl>
         ) : null}
+        {tab === "money" && ref.billingId ? <JobOpeningCard job={ref.key} opening={money.opening} contractCents={ref.contractCents} canEdit={owner && (!ref.awarded || !!money.opening)} /> : null}
         <DataTable rows={table} columns={columns} searchKeys={["number", "title", "kind", "status"]} name={`${ref.key}-${tab}`} rowHrefKey="href" initialSort={{ key: "day", dir: "desc" }} empty="Nothing billed on this job yet." />
         {tab === "money" ? (
           <>

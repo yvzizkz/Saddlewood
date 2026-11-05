@@ -7,6 +7,7 @@ import { loadLabor } from "@/lib/accounting/labor";
 import { loadPurchases } from "@/lib/accounting/purchases";
 import { loadPayables } from "@/lib/accounting/payables";
 import { loadCollected, loadIssued, loadOpenReceivables } from "@/lib/accounting/receivables";
+import { loadOpenings } from "@/lib/billing/jobOpeningStore";
 import { listWatches } from "@/lib/sales/awardStore";
 import { watchDue } from "@/lib/sales/award";
 import { listPackages } from "@/lib/subs/store";
@@ -15,9 +16,9 @@ import type { JobRef } from "./hub";
 const EPOCH = "2020-01-01";
 
 export async function jobMoney(ref: JobRef, today = localDay()) {
-  const [open, issued, collected] = await Promise.all([loadOpenReceivables(today), loadIssued(EPOCH, today), loadCollected(EPOCH, today)]);
+  const [open, issued, collected, openings] = await Promise.all([loadOpenReceivables(today), loadIssued(EPOCH, today), loadCollected(EPOCH, today), loadOpenings(ref.billingId ? [ref.billingId] : [])]);
   const mine = <T extends { jobId: string }>(rows: T[]) => (ref.billingId ? rows.filter((r) => r.jobId === ref.billingId) : []);
-  return { open: mine(open.rows), issued: mine(issued), collected: mine(collected) };
+  return { open: mine(open.rows), issued: mine(issued), collected: mine(collected), opening: (ref.billingId && openings.get(ref.billingId)) || null };
 }
 
 export async function jobLabor(ref: JobRef, from: string, to: string) {
