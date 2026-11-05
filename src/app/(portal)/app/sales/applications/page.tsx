@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import ApplicationsList from '@/components/sales/ApplicationsList'
 import { salesSeatForPage } from '@/lib/sales/seat'
 import { loadSettings } from '@/lib/sales/settingsStore'
-import { APPLICATIONS, listSubmissions } from '@/lib/webforms/store'
+import { listApplications } from '@/lib/webforms/store'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export default async function ApplicationsPage() {
   const seat = await salesSeatForPage(await loadSettings())
   if (seat?.role !== 'owner' && seat?.role !== 'staff') redirect('/app')
-  const rows = await listSubmissions(APPLICATIONS)
+  const rows = await listApplications()
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4">
       <p className="text-sm">

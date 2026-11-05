@@ -151,7 +151,7 @@ A PM or a field lead doesn't get the card. Turning a link off is for good: the o
 
 ## 13. What the website sends (`e2e/web-forms.spec.ts`)
 
-Every website form is kept in the app beside GoHighLevel and email (`web_submissions`, 0067). A contact-form lead shows in the Sales inbox with or without a phone: one tap tracks it as a website lead, or mark it called, texted or dismissed. Trade-partner and job applications show at `Sales › Website applications` for owners and staff, who close them with Done. A form fails only if every channel fails.
+Every website form is kept in the app beside GoHighLevel and email (`web_submissions`, 0067). A contact-form lead shows in the Sales inbox with or without a phone. Opening the row shows everything they sent; one tap tracks it as a website lead with that on the timeline, or mark it called, texted or dismissed. Trade-partner and job applications show at `Sales › Website applications` for owners and staff, who close them with Done. A form fails only if every channel fails.
 
 ## What an owner, a PM and finance can and can't do today
 

@@ -95,6 +95,35 @@ describe("loadInbox", () => {
     expect((await loadInbox(new Set())).items).toEqual([]);
   });
 
+  it("carries everything the lead sent", async () => {
+    web.list = [sub(1, { summary: "Project: Kitchen\nMessage: Wants an island" })];
+    expect((await loadInbox(new Set())).items[0].summary).toBe("Project: Kitchen\nMessage: Wants an island");
+  });
+
+  it("a phone match keeps the lead's summary and the call list's snippet, once", async () => {
+    web.list = [sub(1, { phone: "6025550001", summary: "Message: Wants an island" })];
+    leads.fresh = [{ ...lead("6025550001", 0), tags: ["ghl"], snippet: "Called about a kitchen" }];
+    leads.backlog = [{ ...lead("6025550001", 9), tags: ["ghl"], snippet: "An older call" }];
+    const { items } = await loadInbox(new Set());
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ webId: 1, summary: "Message: Wants an island\n\nCall list: ghl · Called about a kitchen" });
+  });
+
+  it("a phone match with no summary still shows the call list's snippet", async () => {
+    web.list = [sub(1, { phone: "6025550001" })];
+    leads.fresh = [{ ...lead("6025550001", 0), snippet: "Called about a kitchen" }];
+    expect((await loadInbox(new Set())).items[0].summary).toBe("Call list: Called about a kitchen");
+  });
+
+  it("the newest submission keeps what the older ones said, without repeating a double send", async () => {
+    web.list = [
+      sub(3, { phone: "6025550001", summary: "Message: Budget changed" }),
+      sub(2, { phone: "6025550001", summary: "Message: Budget changed" }),
+      sub(1, { phone: "6025550001", summary: "Message: Wants an island" }),
+    ];
+    expect((await loadInbox(new Set())).items[0]).toMatchObject({ webId: 3, summary: "Message: Budget changed\n\nMessage: Wants an island" });
+  });
+
   it("drops a tracked website lead", async () => {
     web.list = [sub(1, { phone: "6025550001" })];
     expect((await loadInbox(new Set([phoneRef("6025550001")]))).items).toEqual([]);

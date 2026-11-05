@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { insert, broken } = vi.hoisted(() => ({ insert: vi.fn(), broken: { on: false } }));
+const { insert, broken, read } = vi.hoisted(() => ({ insert: vi.fn(), broken: { on: false }, read: { rows: [] as { status: string; created_at: string }[], error: null as { message: string } | null } }));
 
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => {
     if (broken.on) throw new Error("no database");
-    return { from: () => ({ insert }) };
+    const chain = { select: () => chain, in: () => chain, gte: () => chain, order: () => chain, limit: async () => ({ data: read.rows, error: read.error }) };
+    return { from: () => ({ insert, ...chain }) };
   },
 }));
 
-import { keepSubmission } from "../store";
+import { applicationsWaiting, keepSubmission, listApplications } from "../store";
 
 beforeEach(() => {
   broken.on = false;
+  read.rows = [];
+  read.error = null;
   insert.mockReset().mockResolvedValue({ error: null });
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -30,5 +33,23 @@ describe("keepSubmission", () => {
     expect(await keepSubmission({ form: "careers", summary: "s" })).toBe(false);
     broken.on = true;
     expect(await keepSubmission({ form: "careers", summary: "s" })).toBe(false);
+  });
+});
+
+describe("listApplications", () => {
+  it("reads as none, not a crash, before 0067 is applied", async () => {
+    read.error = { message: 'relation "web_submissions" does not exist' };
+    expect(await listApplications()).toEqual([]);
+    expect(await applicationsWaiting()).toBe(0);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("counts the ones nobody has closed", async () => {
+    read.rows = [
+      { status: "new", created_at: "2026-11-01T00:00:00Z" },
+      { status: "dismissed", created_at: "2026-11-01T00:00:00Z" },
+    ];
+    expect(await listApplications()).toHaveLength(2);
+    expect(await applicationsWaiting()).toBe(1);
   });
 });

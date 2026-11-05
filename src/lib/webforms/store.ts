@@ -13,7 +13,7 @@ export type Submission = { id: number; form: WebForm; name: string; email: strin
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 const WINDOW_DAYS = 90;
-export const APPLICATIONS: WebForm[] = ["trade_partner", "careers"];
+const APPLICATIONS: WebForm[] = ["trade_partner", "careers"];
 
 export async function keepSubmission(s: NewSubmission): Promise<boolean> {
   try {
@@ -36,14 +36,19 @@ export async function listSubmissions(forms: WebForm[]): Promise<Submission[]> {
   return ((data ?? []) as (Omit<Submission, "createdAt"> & { created_at: string })[]).map(({ created_at, ...s }) => ({ ...s, createdAt: created_at }));
 }
 
-/** Trade-partner and job applications nobody has closed. Zero rather than failing Sales. */
-export async function applicationsWaiting(): Promise<number> {
+/** Trade-partner and job applications. None rather than failing, as before 0067 is applied. */
+export async function listApplications(): Promise<Submission[]> {
   try {
-    return (await listSubmissions(APPLICATIONS)).filter((s) => s.status !== "dismissed").length;
+    return await listSubmissions(APPLICATIONS);
   } catch (err) {
     console.error("[web_submissions] applications:", err);
-    return 0;
+    return [];
   }
+}
+
+/** Trade-partner and job applications nobody has closed. */
+export async function applicationsWaiting(): Promise<number> {
+  return (await listApplications()).filter((s) => s.status !== "dismissed").length;
 }
 
 /** False when no such submission, or it's on a form this seat can't mark. */

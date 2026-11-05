@@ -17,7 +17,9 @@ test.describe("What the website sends", () => {
     const email = (who: string) => `${who.toLowerCase().replaceAll(" ", ".")}@example.com`;
     try {
       for (const name of [track, skip]) {
-        const res = await page.request.post("/api/contact", { data: { name, email: email(name), projectType: "Kitchen", message: "Wants an island", company: "" } });
+        // Longer than a timeline note can hold, so Track has to cap it.
+        const message = `Wants an island. ${"And more. ".repeat(500)}`;
+        const res = await page.request.post("/api/contact", { data: { name, email: email(name), projectType: "Kitchen", budget: "$150k", message, company: "" } });
         expect(res.ok()).toBe(true);
         expect((await res.json()).delivered.app).toBe(true);
       }
@@ -32,14 +34,22 @@ test.describe("What the website sends", () => {
       await expect(inbox.getByText(track, { exact: true })).toBeVisible();
       await expect(inbox.getByRole("link", { name: `Email ${track}` })).toHaveAttribute("href", `mailto:${email(track)}`);
 
-      await inbox.getByRole("button", { name: `${skip}: mark called, texted or dismissed` }).click();
+      const opens = (who: string) => inbox.getByRole("button", { name: `${who}: read what they sent, or mark called, texted or dismissed` });
+      const row = inbox.locator("div.px-3\\.5").filter({ hasText: track });
+      await opens(track).click();
+      await expect(row).toContainText("Budget: $150k");
+      await expect(row).toContainText("Message: Wants an island.");
+
+      await opens(skip).click();
       await inbox.getByRole("button", { name: "Dismiss", exact: true }).click();
       await expect(inbox.getByText(skip, { exact: true })).toHaveCount(0);
       expect(sql(`select status from public.web_submissions where name = '${skip}'`)).toBe("dismissed");
 
-      const row = inbox.locator("div.px-3\\.5").filter({ hasText: track });
       await row.getByRole("button", { name: "Track", exact: true }).click();
       await expect(page).toHaveURL(/\/app\/sales\/[0-9a-f-]+$/);
+      const note = page.getByRole("listitem").filter({ hasText: "Message: Wants an island." });
+      await expect(note).toContainText("Budget: $150k");
+      expect(sql(`select length(e.text) from public.sales_events e join public.sales_opportunities o on o.id = e.opportunity_id where o.title = '${track}' and e.kind = 'note'`)).toBe("4000");
       expect(sql(`select source || '|' || external_ref from public.sales_opportunities where title = '${track}'`)).toBe(`website|email:${email(track)}`);
       await page.goto("/app/sales", { waitUntil: "networkidle" });
       await expect(page.getByRole("heading", { name: /Not tracked yet/ })).toBeVisible();

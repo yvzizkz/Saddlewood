@@ -11,7 +11,7 @@ import { Button, Card, Chip, Empty, INPUT, ScreenTitle, SectionTitle, Segmented,
 import type { InboxItem } from '@/lib/sales/inbox'
 import { agenda, valueOf, type Metrics, type OpportunityRow } from '@/lib/sales/pipeline'
 import { KINDS, OPEN_STAGES, STAGES, stageInfo, type Opportunity, type OpportunityKind, type Stage } from '@/lib/sales/types'
-import { usd } from './format'
+import { firstNote, usd } from './format'
 import { contactLine, dialable, proofChip, stageAge } from './pipeline/labels'
 import { QuickAddSheet } from './pipeline/QuickAddSheet'
 
@@ -226,7 +226,7 @@ function Inbox({ items, syncedAt, canSync, onChanged }: { items: InboxItem[]; sy
           source: i.from === 'bid' ? 'bid_invite' : i.from === 'web' ? 'website' : 'call',
           contact: i.from === 'bid' ? { name: '', company: i.who } : { name: i.who === i.phone ? '' : i.who, company: i.company ?? '', phone: i.phone ?? '', email: i.email ?? '' },
           externalRef: i.ref,
-          firstNote: i.detail || undefined,
+          firstNote: firstNote(i),
           nextStep: i.from === 'bid' ? 'Decide: bid or pass' : i.phone ? 'Call back' : 'Reply',
         }),
       })
@@ -329,7 +329,7 @@ function Inbox({ items, syncedAt, canSync, onChanged }: { items: InboxItem[]; sy
                     type="button"
                     className="min-w-0 flex-1 text-left"
                     aria-expanded={open === i.ref}
-                    aria-label={`${i.who}: mark called, texted or dismissed`}
+                    aria-label={`${i.who}: ${i.summary ? 'read what they sent, or ' : ''}mark called, texted or dismissed`}
                     onClick={() => setOpen((o) => (o === i.ref ? null : i.ref))}
                   >
                     <InboxText i={i} />
@@ -361,20 +361,23 @@ function Inbox({ items, syncedAt, canSync, onChanged }: { items: InboxItem[]; sy
                 </Button>
               </div>
               {open === i.ref ? (
-                <div className="mt-2 flex flex-wrap gap-2 pl-12">
-                  {(i.status ? (['pending', 'called', 'texted', 'dismissed'] as const) : (['called', 'texted', 'dismissed'] as const))
-                    .filter((st) => st !== i.status)
-                    .map((st) => (
-                      <button
-                        key={st}
-                        type="button"
-                        disabled={!!busy}
-                        onClick={() => mark(i, st)}
-                        className="min-h-11 rounded-xl border border-[var(--color-stone-mid)] bg-white px-3 text-[13px] font-medium text-[var(--color-charcoal)] disabled:opacity-50"
-                      >
-                        {st === 'pending' ? 'Not yet' : st === 'called' ? 'Called' : st === 'texted' ? 'Texted' : 'Dismiss'}
-                      </button>
-                    ))}
+                <div className="mt-2 space-y-2 pl-12">
+                  {i.summary ? <p className="whitespace-pre-line break-words text-[13px] text-[var(--color-charcoal)]">{i.summary}</p> : null}
+                  <div className="flex flex-wrap gap-2">
+                    {(i.status ? (['pending', 'called', 'texted', 'dismissed'] as const) : (['called', 'texted', 'dismissed'] as const))
+                      .filter((st) => st !== i.status)
+                      .map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          disabled={!!busy}
+                          onClick={() => mark(i, st)}
+                          className="min-h-11 rounded-xl border border-[var(--color-stone-mid)] bg-white px-3 text-[13px] font-medium text-[var(--color-charcoal)] disabled:opacity-50"
+                        >
+                          {st === 'pending' ? 'Not yet' : st === 'called' ? 'Called' : st === 'texted' ? 'Texted' : 'Dismiss'}
+                        </button>
+                      ))}
+                  </div>
                 </div>
               ) : null}
             </div>

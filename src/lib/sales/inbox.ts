@@ -14,7 +14,8 @@ import { listSubmissions, type Submission } from "@/lib/webforms/store";
 //
 // A website lead has the fuller story, so it wins over the same phone on the
 // call list, and its newest submission speaks for the person: dismissing it
-// hides their older ones and the call list's row too.
+// hides their older ones and the call list's row too. What the others said
+// stays readable in its summary.
 
 export type InboxItem = {
   ref: string;
@@ -31,9 +32,16 @@ export type InboxItem = {
   /** A website lead: its web_submissions row, and the company on a builder's bid request. */
   webId?: number;
   company?: string;
+  /** A website lead: everything they sent, shown when the row opens and noted on Track. */
+  summary?: string;
 };
 
 export const INBOX_MAX = 30;
+
+function addSummary(item: InboxItem, text: string): void {
+  if (!text || item.summary?.includes(text)) return;
+  item.summary = item.summary ? `${item.summary}\n\n${text}` : text;
+}
 
 export function phoneRef(phone: string): string {
   return `phone:${phone.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "")}`;
@@ -81,6 +89,7 @@ export function webToInbox(s: Submission, now = Date.now()): InboxItem {
     ageDays: Math.max(0, Math.floor((now - Date.parse(s.createdAt)) / 86_400_000)),
     webId: s.id,
     ...(s.company ? { company: s.company } : {}),
+    ...(s.summary ? { summary: s.summary } : {}),
     ...(s.status === "called" || s.status === "texted" ? { status: s.status } : {}),
   };
 }
@@ -89,12 +98,20 @@ export async function loadInbox(tracked: Set<string>): Promise<{ items: InboxIte
   const out: InboxItem[] = [];
   let syncedAt: string | null = null;
   const seen = new Set<string>();
+  const web = new Map<string, InboxItem>();
   try {
     for (const s of await listSubmissions(["contact"])) {
       const item = webToInbox(s);
-      if (seen.has(item.ref)) continue;
+      if (seen.has(item.ref)) {
+        const newest = web.get(item.ref);
+        if (newest) addSummary(newest, s.summary);
+        continue;
+      }
       seen.add(item.ref);
-      if (s.status !== "dismissed" && !tracked.has(item.ref)) out.push(item);
+      if (s.status !== "dismissed" && !tracked.has(item.ref)) {
+        out.push(item);
+        web.set(item.ref, item);
+      }
     }
   } catch (err) {
     console.error("sales inbox, website:", err);
@@ -105,7 +122,13 @@ export async function loadInbox(tracked: Set<string>): Promise<{ items: InboxIte
     for (const l of [...(leads.state.fresh_list ?? []), ...(leads.state.backlog_list ?? [])]) {
       if (l.callback_status === "dismissed" || !l.phone) continue;
       const item = leadToInbox(l);
-      if (tracked.has(item.ref) || seen.has(item.ref)) continue;
+      if (tracked.has(item.ref)) continue;
+      if (seen.has(item.ref)) {
+        const site = web.get(item.ref);
+        if (site && item.detail) addSummary(site, `Call list: ${item.detail}`);
+        web.delete(item.ref); // the fresh row only, as for any caller on both lists
+        continue;
+      }
       seen.add(item.ref);
       out.push(item);
     }
