@@ -200,3 +200,12 @@ Run on 2026-10-25 against the local stack: one grid of every seat against every 
 1. **An office Finance seat who is not an owner has no Accounting, Tasks or Schedule.** Accounting opens only for owners and crew with `money.view` (`src/lib/accounting/access.ts`), and Tasks/Schedule only for `workSeat()`. Today the Finance seat is Ilene, who is an owner, so nothing is blocked. But handing Finance to a bookkeeper who is not an owner would leave them only Subs, Sales, Policies and Duties, and their 7 AM push (`owner/morning.ts`, which links a seat off the crew to `/app/tasks`) would open a page that sends them home. The fix is a finance seat in `moneySeatForPage` (every job, Payables, no Policies writes) and a Finance cut of Tasks; it needs the owner's call on what a non-owner bookkeeper may change.
 2. **An office Sales admin who is not an owner has no Tasks.** Work handed to the Sales seat (`work_items` with role `sales`, and the bot's sales lane) lives on Tasks, which they cannot open; they see the pipeline on Sales only. Both gaps close with the same change: a Tasks cut for an office seat (its role's items, no job pages).
 3. **A field lead's Crew page shows receipt amounts.** The lead group's `crew.view` and `receipts` switches (from before the seat) list the job's receipts on `/app/crew` with their dollars, including one an owner paid out of pocket ("Home Depot · $64.25 · Paid out of pocket: owed to lando"). Every other page keeps a field lead off money. Open, waiting on the owner's call (T246): hide the amount for crew without `money.view`, or keep it because the lead approves the receipt. Not changed here.
+
+## The Wednesday payroll run (`e2e/payroll-run.spec.ts`)
+
+Finance runs payroll on Wednesday for that Friday, at `Accounting › Payroll › Wednesday run`. Owners only.
+1. **First run.** Paste a past payroll email (KB #435038). Saved, it gives the same email back to copy to the accountant.
+2. **Next week.** The run starts from the last one: amounts carry, hours come from the clock and are blank until filled in, and a line with no figure can't be saved.
+3. **A one-off.** Add a company with a note: `Belico’s Mora LLC: $1,600 (W9 attached)` (KB #455577).
+
+The app doesn't send it. Amounts aren't in Job Costing unless the person has an hourly rate and clocks in.

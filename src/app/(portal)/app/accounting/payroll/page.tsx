@@ -97,6 +97,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       sections={seat.sections}
       actions={
         !seat.laborCost ? undefined : (
+        <div className="flex flex-wrap items-center gap-2">
+        {seat.owner ? <Link href={`${PATH}/run`} className="text-sm font-medium underline underline-offset-2">Wednesday run</Link> : null}
         <div className="flex rounded-xl border border-[var(--color-stone)] bg-[var(--color-cream)] p-1 text-[13px] font-medium" role="group" aria-label="Measure">
           {(["hours", "cost"] as const).map((m) => (
             <Link
@@ -109,6 +111,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
               {m === "hours" ? "Hours" : "Cost"}
             </Link>
           ))}
+        </div>
         </div>
         )
       }
