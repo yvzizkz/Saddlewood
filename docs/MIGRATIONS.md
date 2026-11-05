@@ -43,6 +43,7 @@ site change that reads them with the server key must be live first.
 | 0060 | `joist_sync` (before the Mac syncs queued COs into Joist) | Joist sync PR |
 | 0061 | `complaints` (before the site change) | Complaints PR |
 | 0062 | `client_portals` (before the site change; the job page hides the card and `/c/<token>` reads as off without it, so the order is safe either way) | Client portal PR |
+| 0066 | `staff_seen` (before the site change; a missing table only blanks office people's last opened, but the rollout page fails loudly) | Who's on the app PR |
 
 ## Production state
 

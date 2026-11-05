@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import CrewAdminScreen, { LeadCrewScreen } from "@/components/crew/admin/CrewAdminScreen";
@@ -9,7 +10,18 @@ import { hasPerm } from "@/lib/crew/types";
 // Anyone else goes home.
 export default async function BotAppCrew() {
   const viewer = await getViewer();
-  if (viewer.kind === "staff" && (await viewerIsOwner(viewer))) return <CrewAdminScreen />;
+  if (viewer.kind === "staff" && (await viewerIsOwner(viewer))) {
+    return (
+      <>
+        <p className="px-4 pt-3 text-sm">
+          <Link className="underline underline-offset-2" href="/app/crew/on-the-app">
+            Who&apos;s on the app
+          </Link>
+        </p>
+        <CrewAdminScreen />
+      </>
+    );
+  }
   if (viewer.kind === "crew" && hasPerm(viewer.person, "crew.view")) return <LeadCrewScreen />;
   redirect("/app");
 }
