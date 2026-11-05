@@ -7,8 +7,9 @@
 // keyed by its billing id when it has one, else by its field id, so both
 // halves of the same job land on one row.
 
+import { localDay } from "@/lib/crew/time";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { contractOf } from "@/lib/billing/jobMoney";
+import { contractOf, jobOfBill } from "@/lib/billing/jobMoney";
 import { loadLabor } from "./labor";
 import { loadPayables } from "./payables";
 import { loadPurchases } from "./purchases";
@@ -53,15 +54,15 @@ export const CATEGORY_LABEL: Record<CostLine["category"], string> = { labor: "La
 export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lines: CostLine[]; jobs: JobTotals[]; laborWithoutRate: number; payablesMissing: boolean; capped: boolean }> {
   const db = getSupabaseAdmin();
   const [jobsRes, crewRes, labor, purchases, payables, docs] = await Promise.all([
-    db.from("jobs").select("id,name,crew_job_id,contract_cents"),
+    db.from("jobs").select("id,name,crew_job_id,number_prefix,contract_cents"),
     db.from("crew_jobs").select("id,name"),
     loadLabor(fromDay, toDay, { withPay: true }),
     loadPurchases(fromDay, toDay),
     loadPayables(),
-    db.from("documents").select("id,job_id,kind,status,total_cents,issued_at").eq("status", "issued").in("kind", ["invoice", "change_order"]),
+    db.from("documents").select("id,number,job_id,kind,status,total_cents,issued_at").eq("status", "issued").in("kind", ["invoice", "change_order"]),
   ]);
   if (jobsRes.error) throw new Error(`jobs: ${jobsRes.error.message}`);
-  type J = { id: string; name: string; crew_job_id: string | null; contract_cents: number | null };
+  type J = { id: string; name: string; crew_job_id: string | null; number_prefix: string | null; contract_cents: number | null };
   const billingJobs = (jobsRes.data ?? []) as J[];
   const byCrew = new Map(billingJobs.filter((j) => j.crew_job_id).map((j) => [j.crew_job_id as string, j]));
   const crewName = new Map(((crewRes.data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]));
@@ -99,9 +100,10 @@ export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lin
   }
 
   // Billed and collected in the range, per billing job.
-  const docRows = ((docs.data ?? []) as { id: string; job_id: string | null; total_cents: number; issued_at: string | null }[]).filter(
-    (d) => d.job_id && d.issued_at && d.issued_at.slice(0, 10) >= fromDay && d.issued_at.slice(0, 10) <= toDay,
-  );
+  const moneyJobs = billingJobs.map((j) => ({ id: j.id, prefix: j.number_prefix }));
+  const docRows = ((docs.data ?? []) as { id: string; number: string; kind: string; job_id: string | null; total_cents: number; issued_at: string | null }[])
+    .map((d) => ({ ...d, placedJob: jobOfBill({ jobId: d.job_id, number: d.number, kind: d.kind }, moneyJobs) }))
+    .filter((d) => d.placedJob && d.issued_at && localDay(d.issued_at) >= fromDay && localDay(d.issued_at) <= toDay);
   const docIds = docRows.map((d) => d.id);
   const alloc = docIds.length ? await db.from("payment_allocations").select("document_id,amount_cents,payments!inner(voided_at)").in("document_id", docIds) : { data: [] };
   const paid = new Map<string, number>();
@@ -128,7 +130,7 @@ export async function loadJobCost(fromDay: string, toDay: string): Promise<{ lin
     else t.subsCents += l.cents;
   }
   for (const d of docRows) {
-    const k = keyOf(d.job_id, null);
+    const k = keyOf(d.placedJob, null);
     const t = get(k.key, k.name);
     t.billedCents += Number(d.total_cents);
     t.collectedCents += paid.get(d.id) ?? 0;

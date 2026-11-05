@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contractOf, invoiceNamedIn, jobOfNumber, placeMoney, summarizeJobMoney, type MoneyInput, type MoneyJob } from "../jobMoney";
+import { contractOf, invoiceNamedIn, jobOfBill, jobOfNumber, placeMoney, summarizeJobMoney, type MoneyInput, type MoneyJob } from "../jobMoney";
 import type { BillingDocument } from "../types";
 
 const JURY = "11111111-1111-1111-1111-111111111111";
@@ -52,6 +52,10 @@ describe("which job a bill belongs to", () => {
     expect(jobOfNumber("CO-2", JOBS)).toBeNull();
     expect(jobOfNumber("8009-1", [...JOBS, { id: "x", prefix: "8009-1" }])).toBe(JURY);
     expect(jobOfNumber("8009-1-2", [...JOBS, { id: "x", prefix: "8009-1" }])).toBe("x");
+    // Every reader places a bill the same way: its own job first, then its number. A statement isn't placed by its number.
+    expect(jobOfBill({ jobId: "own", number: "8009-13", kind: "invoice" }, JOBS)).toBe("own");
+    expect(jobOfBill({ jobId: null, number: "8009-13", kind: "invoice" }, JOBS)).toBe(JURY);
+    expect(jobOfBill({ jobId: null, number: "8009-13", kind: "statement" }, JOBS)).toBeNull();
   });
 
   it("splits a statement across the jobs its lines name", () => {
