@@ -67,6 +67,11 @@ export function jobOfNumber(number: string, jobs: MoneyJob[]): string | null {
   return best?.id ?? null;
 }
 
+/** The job a bill belongs to, by the two rules above. A statement has no job by its number: its lines are placed one by one. */
+export function jobOfBill(d: { jobId: string | null; number: string; kind: string }, jobs: MoneyJob[]): string | null {
+  return d.jobId ?? (d.kind === "statement" ? null : jobOfNumber(d.number, jobs));
+}
+
 export function placeMoney(input: MoneyInput): Placed {
   const jobBilling = new Map(input.jobs.map((j) => [j.id, j.billing ?? null]));
   const byJob = new Map<string, MoneyItem[]>();
@@ -86,7 +91,7 @@ export function placeMoney(input: MoneyInput): Placed {
   for (const d of bills) {
     const paid = input.paid.get(d.id);
     if (d.kind !== "statement") {
-      put(d, d.jobId ?? jobOfNumber(d.number, input.jobs), {
+      put(d, jobOfBill(d, input.jobs), {
         number: normalizeNumber(d.number),
         title: d.title,
         documentId: d.id,

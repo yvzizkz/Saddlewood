@@ -9,6 +9,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { localDay } from "@/lib/crew/time";
 import { moneyOverview } from "@/lib/billing/overview";
+import { jobOfBill, type MoneyJob } from "@/lib/billing/jobMoney";
 import { daysBetween } from "@/lib/billing/ladder";
 import type { BillingProfile } from "@/lib/billing/types";
 
@@ -52,16 +53,26 @@ export type OpenRow = {
   payWhenPaid: boolean;
 };
 
-type JobName = { id: string; name: string; crew_job_id: string | null; billing: unknown };
+type JobName = { id: string; name: string; crew_job_id: string | null; number_prefix: string | null; billing: unknown };
 
 async function jobNames(): Promise<Map<string, JobName>> {
-  const { data, error } = await getSupabaseAdmin().from("jobs").select("id,name,crew_job_id,billing");
+  const { data, error } = await getSupabaseAdmin().from("jobs").select("id,name,crew_job_id,number_prefix,billing");
   if (error) throw new Error(`jobs: ${error.message}`);
   return new Map(((data ?? []) as JobName[]).map((j) => [j.id, j]));
 }
 
+/** Places a bill the way the money card does (jobMoney.ts): the bot's invoices carry no job, only a number. */
+function billPlacer(jobs: Map<string, JobName>) {
+  const list: MoneyJob[] = [...jobs.values()].map((j) => ({ id: j.id, prefix: j.number_prefix }));
+  return (d: { jobId: string | null; number: string; kind: string }) => {
+    const id = jobOfBill(d, list);
+    return { jobId: id ?? "", job: id ? jobs.get(id) : undefined };
+  };
+}
+
 export async function loadOpenReceivables(today = localDay()): Promise<{ rows: OpenRow[]; today: string }> {
   const [o, jobs] = await Promise.all([moneyOverview(today), jobNames()]);
+  const place = billPlacer(jobs);
   const rows: OpenRow[] = [];
   for (const c of o.clients) {
     for (const d of c.documents) {
@@ -71,7 +82,7 @@ export async function loadOpenReceivables(today = localDay()): Promise<{ rows: O
       const p = d.proof;
       const standing =
         p.bouncedAt ? "Bounced" : p.viewCount > 0 ? "Viewed" : d.unconfirmed ? "Not viewed" : p.deliveredAt ? "Delivered" : p.firstSentAt ? "Sent" : "Not sent";
-      const job = d.doc.jobId ? jobs.get(d.doc.jobId) : undefined;
+      const { jobId, job } = place(d.doc);
       rows.push({
         id: d.doc.id,
         number: d.doc.number,
@@ -79,7 +90,7 @@ export async function loadOpenReceivables(today = localDay()): Promise<{ rows: O
         kind: d.doc.kind,
         clientId: c.id ?? "",
         client: c.name,
-        jobId: d.doc.jobId ?? "",
+        jobId,
         job: job?.name ?? "No job",
         issuedOn: d.doc.issuedAt ? localDay(d.doc.issuedAt) : null,
         dueOn: due,
@@ -137,9 +148,10 @@ export async function loadCollected(fromDay: string, toDay: string): Promise<Col
   if (alloc.error) throw new Error(`payment_allocations: ${alloc.error.message}`);
   const allocs = (alloc.data ?? []) as { payment_id: string; document_id: string; amount_cents: number }[];
   const docIds = [...new Set(allocs.map((a) => a.document_id))];
-  const docs = docIds.length ? await db.from("documents").select("id,number,job_id").in("id", docIds) : { data: [], error: null };
+  const docs = docIds.length ? await db.from("documents").select("id,number,kind,job_id").in("id", docIds) : { data: [], error: null };
   if (docs.error) throw new Error(`documents: ${docs.error.message}`);
-  const docMap = new Map(((docs.data ?? []) as { id: string; number: string; job_id: string | null }[]).map((d) => [d.id, d]));
+  const docMap = new Map(((docs.data ?? []) as { id: string; number: string; kind: string; job_id: string | null }[]).map((d) => [d.id, d]));
+  const place = billPlacer(jobs);
   const clientName = new Map(((clients.data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]));
 
   const out: CollectedRow[] = [];
@@ -157,12 +169,12 @@ export async function loadCollected(fromDay: string, toDay: string): Promise<Col
     };
     mine.forEach((a, i) => {
       const d = docMap.get(a.document_id);
-      const j = d?.job_id ? jobs.get(d.job_id) : undefined;
+      const { jobId, job } = d ? place({ jobId: d.job_id, number: d.number, kind: d.kind }) : { jobId: "", job: undefined };
       out.push({
         ...base,
         id: `${p.id}:${i}`,
-        jobId: d?.job_id ?? "",
-        job: j?.name ?? "No job",
+        jobId,
+        job: job?.name ?? "No job",
         documentId: a.document_id,
         number: d?.number ?? "",
         amountCents: Number(a.amount_cents),
@@ -211,10 +223,11 @@ export async function loadIssued(fromDay: string, toDay: string): Promise<Issued
   if (docs.error) throw new Error(`documents: ${docs.error.message}`);
   const clientName = new Map(((clients.data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]));
   type D = { id: string; number: string; title: string; kind: string; status: string; client_id: string | null; job_id: string | null; issued_at: string | null; created_at: string; due_date: string | null; total_cents: number };
+  const place = billPlacer(jobs);
   return ((docs.data ?? []) as D[])
-    .map((d) => ({ d, day: localDay(d.issued_at ?? d.created_at) }))
+    .map((d) => ({ d, day: localDay(d.issued_at ?? d.created_at), at: place({ jobId: d.job_id, number: d.number ?? "", kind: d.kind }) }))
     .filter(({ day }) => day >= fromDay && day <= toDay)
-    .map(({ d, day }) => ({
+    .map(({ d, day, at }) => ({
       id: d.id,
       number: d.number || "(draft)",
       title: d.title || d.kind,
@@ -222,8 +235,8 @@ export async function loadIssued(fromDay: string, toDay: string): Promise<Issued
       status: d.status,
       clientId: d.client_id ?? "",
       client: (d.client_id && clientName.get(d.client_id)) || "No client",
-      jobId: d.job_id ?? "",
-      job: (d.job_id && jobs.get(d.job_id)?.name) || "No job",
+      jobId: at.jobId,
+      job: at.job?.name ?? "No job",
       day,
       dueOn: d.due_date,
       totalCents: Number(d.total_cents),
