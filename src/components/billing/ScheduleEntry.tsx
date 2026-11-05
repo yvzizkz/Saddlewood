@@ -41,7 +41,7 @@ export default function ScheduleEntry({ jobKey, tracker, changeOrders, onDone, o
           <Button onClick={() => setText(asText(tracker.lines))}>
             Fill from {tracker.name} tracker #{tracker.invoice}
           </Button>
-          {tracker.draft ? <p className="mt-1 text-xs text-[var(--color-charcoal-light)]">#{tracker.invoice} is still a draft, so what's on it isn't counted as billed. The next draw bills it.</p> : null}
+          {tracker.draft ? <p className="mt-1 text-xs text-[var(--color-charcoal-light)]">#{tracker.invoice} is still a draft, so what&apos;s on it isn&apos;t counted as billed. The next draw bills it.</p> : null}
         </div>
       ) : null}
       <Field label="Lines" hint="One line per row: description, amount, billed to date. Paste from a spreadsheet, or split with |.">
@@ -55,7 +55,7 @@ export default function ScheduleEntry({ jobKey, tracker, changeOrders, onDone, o
       {changeOrders.length ? (
         <div className="mt-3 grid gap-2">
           <p className="text-sm font-medium text-[var(--color-charcoal)]">Signed change orders</p>
-          <p className="text-xs text-[var(--color-charcoal-light)]">A tracker's lines include change orders. Say where each one is, so it isn't billed twice. Already in the lines moves it to billed, and that can't be undone here.</p>
+          <p className="text-xs text-[var(--color-charcoal-light)]">A tracker&apos;s lines include change orders. Say where each one is, so it isn&apos;t billed twice. Already in the lines moves it to billed, and that can&apos;t be undone here.</p>
           {changeOrders.map((c) => (
             <Field key={c.key} label={`${c.description}, ${formatValue('money', c.scheduledCents)}`}>
               <select className={INPUT} value={inLines[c.key] === undefined ? '' : String(inLines[c.key])} onChange={(e) => setInLines({ ...inLines, [c.key]: e.target.value === 'true' })}>
