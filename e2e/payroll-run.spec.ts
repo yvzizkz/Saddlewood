@@ -105,4 +105,49 @@ test.describe("The Wednesday payroll run", () => {
       sql(`delete from public.payroll_runs where pay_date in ('${first}', '${next}')`);
     }
   });
+
+  test("on a carried run, marking a line or linking it fills it from the clock", async ({ owner: page }) => {
+    const first = "2098-11-21";
+    const next = "2098-11-28";
+    const week = "2098-11-21";
+    const shift = (email: string, hours: number) =>
+      `insert into public.crew_shifts (email, job_id, job_name, day, started_at, ended_at, status) values ('${email}', '8009-n-ironwood-dr', 'E2E', '${week}', '${week}T15:00:00Z', timestamptz '${week}T15:00:00Z' + interval '${hours} hours', 'ok');`;
+    sql([shift("omar.runner@example.com", 2), shift("filiberto.framing@example.com", 40), shift("arnold.framing@example.com", 30), shift("cesar.finish@example.com", 10)].join(" "));
+    const line = (name: string, kind: string, hours: number | null, amountCents: number | null, byRate = false) => ({ name, kind, hours, amountCents, note: "", ...(byRate ? { byRate } : {}) });
+    try {
+      const saved = await page.request.put("/api/accounting/payroll-run", {
+        data: { payDate: first, lines: [line("Omar Peña", "sub", null, 339_000), line("Filiberto Villegas", "sub", null, 150_000), line("A. Hours", "employee", 10, null), line("R. Rate", "sub", null, 50_000, true)] },
+      });
+      expect(saved.ok(), await saved.text()).toBeTruthy();
+
+      await page.goto(`/app/accounting/payroll/run?date=${next}`, { waitUntil: "networkidle" });
+      await expect(page.getByText(/Started from/)).toBeVisible();
+
+      // A carried flat figure doesn't survive being marked by rate; the clock's does, and says what it replaced.
+      await expect(page.getByLabel(/^Amount/).first()).toHaveValue("3390.00");
+      await page.getByLabel("Paid as").first().selectOption("rate");
+      await expect(page.getByLabel(/^Amount/).first()).toHaveValue("50.00");
+      await expect(page.getByText("Was $3,390.00 last run")).toBeVisible();
+
+      await page.getByLabel("Paid as").nth(1).selectOption("employee");
+      await expect(page.getByLabel(/^Hours/).first()).toHaveValue("40");
+
+      // Linking fills a blank line, so it can be saved and nothing goes missing.
+      await page.getByLabel("Arnoldo Mujica is").selectOption({ label: "A. Hours" });
+      await expect(page.getByLabel(/^Hours/).nth(1)).toHaveValue("30");
+      await page.getByLabel("Cesar Olivares is").selectOption({ label: "R. Rate" });
+      await expect(page.getByLabel(/^Amount/).last()).toHaveValue("340.00");
+      await expect(page.getByRole("region", { name: "On the clock, not on this run" })).toHaveCount(0);
+
+      await page.getByRole("button", { name: "Save the run" }).click();
+      const email = page.getByLabel("Email to the accountant");
+      await expect(email).toContainText("Omar Peña: $50");
+      await expect(email).toContainText("Filiberto Villegas: 40 hours");
+      await expect(email).toContainText("A. Hours: 30 hours");
+      await expect(email).toContainText("R. Rate: $340");
+    } finally {
+      sql(`delete from public.crew_shifts where job_name = 'E2E' and day = '${week}'`);
+      sql(`delete from public.payroll_runs where pay_date in ('${first}', '${next}')`);
+    }
+  });
 });

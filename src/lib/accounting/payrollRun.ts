@@ -13,7 +13,8 @@ import { addDays } from "@/lib/crew/time";
 // might be "Arnold Mujica", and a second line would pay him twice.
 //
 // An amount carries as it was. Only a line Finance marked by rate (`byRate`) is
-// recomputed from the clock, and it shows what it was last run.
+// recomputed from the clock, and it shows what it was last run. Marking a line
+// or linking it fills it from the clock on the spot.
 
 export type RunLine = {
   name: string;
@@ -29,6 +30,8 @@ export type RunLine = {
 
 /** A line of a new run, and what a by-rate amount was last run when the clock changed it. */
 export type StartedLine = RunLine & { lastCents?: number | null };
+
+export type PaidAs = "sub" | "rate" | "employee";
 
 /** What the clock knows about a person for the pay week. */
 export type Clocked = { email: string; name: string; hours: number; costCents: number | null };
@@ -70,6 +73,31 @@ export function startLines(previous: RunLine[], clocked: Clocked[]): StartedLine
     const amountCents = c?.costCents ?? null;
     return { ...line, amountCents, ...(amountCents === l.amountCents ? {} : { lastCents: l.amountCents }) };
   });
+}
+
+/**
+ * The clock fills a line Finance just changed or linked: hours on an employee,
+ * the amount on a by-rate line, keeping what it replaces beside it. A figure
+ * pasted from a real email stays unless the field is blank.
+ */
+export function fromClock(line: StartedLine, c: Clocked | null, pasted: boolean): StartedLine {
+  const keep = (v: number | null) => pasted && v !== null;
+  if (line.kind === "employee") return c && !keep(line.hours) ? { ...line, hours: round2(c.hours) } : line;
+  if (!line.byRate || c?.costCents == null || c.costCents === line.amountCents || keep(line.amountCents)) return line;
+  return { ...line, amountCents: c.costCents, ...(line.amountCents === null ? {} : { lastCents: line.amountCents }) };
+}
+
+/**
+ * Finance changed how a line is paid. A carried flat figure never stays on a
+ * by-rate line: with no clock to go on it blanks, so Finance fills it in. Back
+ * to Amount, the figure it replaced returns.
+ */
+export function paidAs(line: StartedLine, to: PaidAs, c: Clocked | null, pasted: boolean): StartedLine {
+  const { lastCents, ...rest } = line;
+  const next: StartedLine = { ...rest, kind: to === "employee" ? "employee" : "sub", byRate: to === "rate" };
+  if (to === "sub") return line.byRate && lastCents != null ? { ...next, amountCents: lastCents } : next;
+  if (to === "rate" && !pasted && c?.costCents == null && line.amountCents !== null) return { ...next, amountCents: null, lastCents: line.amountCents };
+  return fromClock(next, c, pasted);
 }
 
 /** Why this run can't be saved, or null. */

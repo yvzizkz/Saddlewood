@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react'
 
 import { Button, Card, Field, INPUT } from '@/components/bot/ui'
 import { day } from '@/components/money/format'
-import { linkClocked, parseRunEmail, runEmail, runProblem, runSubject, type Clocked, type RunLine, type StartedLine } from '@/lib/accounting/payrollRun'
+import { fromClock, linkClocked, paidAs, parseRunEmail, runEmail, runProblem, runSubject, type Clocked, type PaidAs, type RunLine, type StartedLine } from '@/lib/accounting/payrollRun'
 import { usd } from '@/lib/money'
 import { parseMoney } from '@/lib/trackers/core'
 
@@ -29,7 +29,18 @@ const toLine = (r: Row): RunLine => {
   }
 }
 
-const paidAs = (r: Row) => (r.kind === 'employee' ? 'employee' : r.byRate ? 'rate' : 'sub')
+const paidAsOf = (r: Row): PaidAs => (r.kind === 'employee' ? 'employee' : r.byRate ? 'rate' : 'sub')
+/** A row's figures as a line, both of them whatever it's paid as, so switching back loses nothing. */
+const figures = (r: Row): StartedLine => {
+  const cents = Math.round(parseMoney(r.amount) * 100)
+  const hours = Number(r.hours)
+  return { ...toLine(r), hours: r.hours.trim() && Number.isFinite(hours) ? hours : null, amountCents: r.amount.trim() && Number.isFinite(cents) ? cents : null, byRate: r.byRate, ...(r.lastCents === undefined ? {} : { lastCents: r.lastCents }) }
+}
+/** The new figures, leaving what the person typed alone when they didn't change. */
+const refilled = (r: Row, l: StartedLine): Partial<Row> => {
+  const was = figures(r)
+  return { kind: l.kind, byRate: !!l.byRate, lastCents: l.lastCents, ...(l.hours === was.hours ? {} : { hours: toRow(l).hours }), ...(l.amountCents === was.amountCents ? {} : { amount: toRow(l).amount }) }
+}
 const hoursOf = (c: Clocked) => `${Math.round(c.hours * 100) / 100} hours`
 
 export default function PayrollRunEditor({ payDate, initial, clocked, saved, startedFrom, signer }: { payDate: string; initial: StartedLine[]; clocked: Clocked[]; saved: boolean; startedFrom: string | null; signer: string }) {
@@ -50,6 +61,8 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
   // A name match keeps its link when the run is saved.
   const toSave = lines.map((l, i) => (matched[i] ? { ...l, email: matched[i].email } : l))
   const edit = (i: number, change: Partial<Row>) => (setRows(rows.map((r, n) => (n === i ? { ...r, ...change } : r))), setDone(false))
+
+  const link = (i: number, c: Clocked) => edit(i, { email: c.email, ...refilled(rows[i], fromClock(figures(rows[i]), c, pasted)) })
 
   const save = async () => {
     setBusy(true)
@@ -102,7 +115,7 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
             <input className={INPUT} value={r.name} onChange={(e) => edit(i, { name: e.target.value })} maxLength={120} />
           </Field>
           <Field label="Paid as">
-            <select className={INPUT} value={paidAs(r)} onChange={(e) => edit(i, { kind: e.target.value === 'employee' ? 'employee' : 'sub', byRate: e.target.value === 'rate', lastCents: undefined })}>
+            <select className={INPUT} value={paidAsOf(r)} onChange={(e) => edit(i, refilled(r, paidAs(figures(r), e.target.value as PaidAs, matched[i], pasted)))}>
               <option value="sub">Amount</option>
               <option value="rate">Hours × rate</option>
               <option value="employee">Hours</option>
@@ -139,7 +152,7 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
                     {c.name}, {hoursOf(c)}
                     {c.costCents === null ? '' : `, ${usd(c.costCents)} at their rate`}
                   </span>
-                  <select aria-label={`${c.name} is`} className={`${INPUT} w-auto`} value="" onChange={(e) => edit(Number(e.target.value), { email: c.email })}>
+                  <select aria-label={`${c.name} is`} className={`${INPUT} w-auto`} value="" onChange={(e) => link(Number(e.target.value), c)}>
                     <option value="">Is on the run as…</option>
                     {rows.map((r, i) => (!r.email && !matched[i] && r.name.trim() ? <option key={i} value={i}>{r.name}</option> : null))}
                   </select>
