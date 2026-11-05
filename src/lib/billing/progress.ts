@@ -79,7 +79,8 @@ export function computeDraw(lines: ProgressLine[], asked: Record<string, number>
     const pct = raw === undefined || raw === null || Number.isNaN(Number(raw)) ? l.pctToDate : Math.round(Number(raw) * 100) / 100;
     if (pct < 0 || pct > 100) errors.push(`${l.description}: percent complete must be 0 to 100.`);
     if (pct < l.pctToDate) errors.push(`${l.description}: ${pct}% is below the ${l.pctToDate}% already billed. Issue a credit instead.`);
-    const toDate = shareOf(l.scheduledCents, Math.min(100, Math.max(0, pct)));
+    // A line that hasn't moved bills nothing, even when its billed to date isn't a round percent (an opening in cents).
+    const toDate = pct === l.pctToDate ? l.billedToDateCents : shareOf(l.scheduledCents, Math.min(100, Math.max(0, pct)));
     const thisPeriod = toDate - l.billedToDateCents;
     if (l.scheduledCents >= 0 && toDate > l.scheduledCents) errors.push(`${l.description}: would bill past the line.`);
     return { ...l, pct, thisPeriodCents: thisPeriod, toDateCents: toDate, balanceCents: l.scheduledCents - toDate };

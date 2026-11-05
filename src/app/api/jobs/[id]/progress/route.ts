@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { jobForWrite, workSeat } from "@/lib/jobs/access";
 import { loadPeople } from "@/lib/roles/store";
-import { clearReport, createDrawDraft, discardDraw, loadProgress, previewDraw, ProgressError, saveReport, setClientCutoff, setOpening } from "@/lib/billing/progressStore";
+import { clearReport, createDrawDraft, discardDraw, loadProgress, previewDraw, ProgressError, saveReport, setClientCutoff, setOpening, setSchedule, trackerDraft } from "@/lib/billing/progressStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,9 @@ export const dynamic = "force-dynamic";
 //   POST { action: "draw", pcts }           the draft invoice, and what it bills per line (owners)
 //   POST { action: "discard" }              throw away the draft draw (owners; issue it from the card instead)
 //   POST { action: "opening", pcts }        percents billed before the app, before the first draw (owners)
+//   POST { action: "schedule", lines }      a pre-app job's schedule with what's billed per line, before the first draw (owners)
+
+const scheduleLines = z.array(z.object({ description: z.string().trim().min(1).max(200), amountCents: z.number().int(), billedCents: z.number().int() }).strict()).max(200);
 
 async function billingJob(id: string): Promise<{ seat: NonNullable<Awaited<ReturnType<typeof workSeat>>>; job: string } | NextResponse> {
   const seat = await workSeat();
@@ -32,9 +36,11 @@ async function billingJob(id: string): Promise<{ seat: NonNullable<Awaited<Retur
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const found = await billingJob((await params).id);
   if (found instanceof NextResponse) return found;
-  const { job } = found;
+  const { seat, job } = found;
   try {
-    return NextResponse.json({ ok: true, ...(await loadProgress(job)) });
+    const state = await loadProgress(job);
+    const draft = seat.owner && !state.awarded && state.draws === 0 ? await trackerDraft(job) : null;
+    return NextResponse.json({ ok: true, ...state, trackerDraft: draft });
   } catch (e) {
     if (e instanceof ProgressError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
     throw e;
@@ -45,7 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const found = await billingJob((await params).id);
   if (found instanceof NextResponse) return found;
   const { seat, job } = found;
-  const body = (await request.json().catch(() => null)) as { action?: string; pcts?: Record<string, number>; note?: string; cutoffDay?: number | null } | null;
+  const body = (await request.json().catch(() => null)) as { action?: string; pcts?: Record<string, number>; note?: string; cutoffDay?: number | null; lines?: unknown } | null;
   const pcts = body?.pcts && typeof body.pcts === "object" ? body.pcts : {};
   try {
     if (body?.action === "preview") return NextResponse.json({ ok: true, draw: previewDraw(await loadProgress(job), pcts) });
@@ -66,6 +72,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     if (body?.action === "opening") {
       await setOpening(job, pcts, owner.email);
+      return NextResponse.json({ ok: true });
+    }
+    if (body?.action === "schedule") {
+      const lines = scheduleLines.safeParse(body.lines);
+      if (!lines.success) return NextResponse.json({ ok: false, error: "Check the lines." }, { status: 400 });
+      await setSchedule(job, lines.data, owner.email);
       return NextResponse.json({ ok: true });
     }
     if (body?.action === "clearReport") {
