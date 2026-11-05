@@ -141,7 +141,7 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
                   </span>
                   <select aria-label={`${c.name} is`} className={`${INPUT} w-auto`} value="" onChange={(e) => edit(Number(e.target.value), { email: c.email })}>
                     <option value="">Is on the run as…</option>
-                    {rows.map((r, i) => (!r.email && r.name.trim() ? <option key={i} value={i}>{r.name}</option> : null))}
+                    {rows.map((r, i) => (!r.email && !matched[i] && r.name.trim() ? <option key={i} value={i}>{r.name}</option> : null))}
                   </select>
                   <Button variant="quiet" aria-label={`Add ${c.name} to the run`} onClick={() => addClocked(c)}>
                     Add

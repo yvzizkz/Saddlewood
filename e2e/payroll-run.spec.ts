@@ -90,8 +90,8 @@ test.describe("The Wednesday payroll run", () => {
       await page.goto(`/app/accounting/payroll/run?date=${next}`, { waitUntil: "networkidle" });
       await expect(page.getByRole("region", { name: "On the clock, not on this run" })).toHaveCount(0);
       await expect(page.getByLabel("Name")).toHaveCount(6);
-      await expect(page.getByLabel("Amount").nth(1)).toHaveValue("3390.00");
-      await expect(page.getByLabel("Amount").first()).toHaveValue("960.00");
+      await expect(page.getByLabel(/^Amount/).nth(1)).toHaveValue("3390.00");
+      await expect(page.getByLabel(/^Amount/).first()).toHaveValue("960.00");
       await expect(page.getByText("Was $1,489.25 last run")).toBeVisible();
       await page.getByRole("button", { name: "Save the run" }).click();
       const email = page.getByLabel("Email to the accountant");
