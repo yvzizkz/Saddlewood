@@ -46,6 +46,35 @@ test.describe("Job money counts each dollar once", () => {
     }
   });
 
+  test("a change order stays billed while the draw that bills it all is a draft", async ({ owner: page, browser }) => {
+    const n = Date.now().toString().slice(-7);
+    const job = sql(`insert into public.jobs (name, address, number_prefix) values ('E2E draft draw ${n}', '${n} Draft Way', '${n}') returning id`).split("\n")[0];
+    const api = page.request;
+    const money = async () => (await (await api.get(`/api/crew/projects/money?job=${job}`)).json()).money as { billedCents: number; owedCents: number };
+    const clientCtx = await browser.newContext();
+    try {
+      const coId = (await (await api.post("/api/change-orders", { data: { job, title: `E2E porch ${n}` } })).json()).id;
+      const doc = await (await api.post("/api/billing/documents", { data: { kind: "change_order", number: `${n}-CO1`, title: `E2E porch ${n}`, jobId: job, snapshot: { lines: [{ description: "Porch", amountCents: 500_000 }] } } })).json();
+      expect((await api.post(`/api/billing/documents/${doc.document.id}/issue`, { data: {} })).ok()).toBeTruthy();
+      expect((await api.patch("/api/change-orders", { data: { id: coId, status: "priced", amountCents: 500_000, documentId: doc.document.id } })).ok()).toBeTruthy();
+      expect((await api.patch("/api/change-orders", { data: { id: coId, status: "signed" } })).ok()).toBeTruthy();
+
+      const draw = await (await api.post(`/api/jobs/${job}/progress`, { data: { action: "draw", pcts: { [`co:${coId}`]: 100 } } })).json();
+      expect(sql(`select status from public.change_orders where id = ${coId}`), "a full draw marks it billed at draft").toBe("billed");
+      expect(await money()).toMatchObject({ billedCents: 500_000, owedCents: 500_000 });
+
+      const link = await (await api.post(`/api/jobs/${job}/portal`)).json();
+      expect(link.preview.money).toMatchObject({ billedCents: 500_000, openCents: 500_000 });
+
+      expect((await api.post(`/api/billing/documents/${draw.documentId}/issue`, { data: {} })).ok()).toBeTruthy();
+      expect(await money()).toMatchObject({ billedCents: 500_000, owedCents: 500_000 });
+    } finally {
+      await clientCtx.close();
+      sql(`delete from public.client_portals where job_id = '${job}'`);
+      wipe(job);
+    }
+  });
+
   test("a rejected change order and a replaced invoice stay out of Billed, on the card and the client's link", async ({ owner: page, browser }) => {
     const n = Date.now().toString().slice(-7);
     const job = sql(`insert into public.jobs (name, address, number_prefix) values ('E2E rejected ${n}', '${n} Reject Way', '${n}') returning id`).split("\n")[0];
@@ -96,6 +125,8 @@ test.describe("Job money counts each dollar once", () => {
     const api = page.request;
     const clientCtx = await browser.newContext();
     let statement = "";
+    let statement2 = "";
+    let own = "";
     try {
       const { document } = await (
         await api.post("/api/billing/documents", {
@@ -130,11 +161,27 @@ test.describe("Job money counts each dollar once", () => {
       const payments = client.getByTestId("portal-payments");
       await expect(payments.locator("div").filter({ hasText: "Paid" })).toContainText("$3,000.00");
       await expect(payments.locator("div").filter({ hasText: "Open" })).toContainText("$0.00");
+
+      // A line that's its own document: money on it is that job's, on the card and the link alike.
+      const invoice = await (await api.post("/api/billing/documents", { data: { kind: "invoice", number: `${n}-2`, title: "Own invoice", clientId, jobId: jobA, snapshot: { lines: [{ description: "Own invoice", amountCents: 400_000 }] } } })).json();
+      own = invoice.document.id;
+      expect((await api.post(`/api/billing/documents/${own}/issue`, { data: {} })).ok()).toBeTruthy();
+      const second = await (await api.post("/api/billing/documents", { data: { kind: "statement", number: `ST2-${n}`, title: "Statement 2", clientId, snapshot: { lines: [{ description: `Invoice ${n}-2 · Job A`, amountCents: 400_000 }, { description: `Invoice ${m}-2 · Job B`, amountCents: 100_000 }] } } })).json();
+      statement2 = second.document.id;
+      expect((await api.post(`/api/billing/documents/${statement2}/issue`, { data: {} })).ok()).toBeTruthy();
+      const onLine = await api.post("/api/billing/payments", { data: { documentId: statement2, amountCents: 250_000, method: "check", receivedOn: "2026-11-05", lineIndex: 0, confirm: true } });
+      expect(onLine.ok(), await onLine.text()).toBeTruthy();
+      const card = (await (await api.get(`/api/crew/projects/money?job=${jobA}`)).json()).money;
+      expect(card).toMatchObject({ billedCents: 700_000, paidCents: 550_000, owedCents: 150_000 });
+      await client.reload();
+      await expect(payments.locator("div").filter({ hasText: "Paid" })).toContainText("$5,500.00");
+      await expect(payments.locator("div").filter({ hasText: "Open" })).toContainText("$1,500.00");
     } finally {
       await clientCtx.close();
       sql(`delete from public.client_portals where job_id in ('${jobA}', '${jobB}')`);
-      sql(`begin; set local session_replication_role = replica; delete from public.payment_allocations where document_id = ${statement ? `'${statement}'` : "null"}; delete from public.payments where client_id = '${clientId}'; commit;`);
-      wipe(jobA, statement ? [statement] : []);
+      const docs = [statement, statement2, own].filter(Boolean);
+      sql(`begin; set local session_replication_role = replica; delete from public.payment_allocations where document_id in (${docs.map((d) => `'${d}'`).join(",") || "null"}); delete from public.payments where client_id = '${clientId}'; commit;`);
+      wipe(jobA, docs);
       wipe(jobB);
       sql(`delete from public.clients where id = '${clientId}'`);
     }

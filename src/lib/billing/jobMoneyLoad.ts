@@ -13,9 +13,11 @@ import { paidByDocument } from "./payments";
 // has no job of its own, and a bill is placed by its number as well (jobMoney.ts).
 
 /**
- * The register, by document. An invoice has billed a change order when it's
- * named as the bill, or an issued draw carries its line: a draw short of 100%
- * leaves it signed with no billed document, so the status alone can't say.
+ * The register, by document. An invoice has billed a change order when an
+ * issued document is named as the bill, or an issued draw carries its line: a
+ * draw short of 100% leaves it signed with no billed document, and a draft at
+ * 100% already names it, so neither the status nor the name alone can say.
+ * Billed with no document named means it was billed some other way.
  */
 async function changeOrderStanding(issued: ReadonlySet<string>): Promise<Map<string, CoStanding>> {
   const db = getSupabaseAdmin();
@@ -27,7 +29,8 @@ async function changeOrderStanding(issued: ReadonlySet<string>): Promise<Map<str
   if (drawn.error) throw new Error(`job money failed: ${drawn.error.message}`);
   const onDraw = new Set(((drawn.data ?? []) as { line_key: string; document_id: string }[]).filter((r) => issued.has(r.document_id)).map((r) => r.line_key));
   type Co = { id: number; status: string; document_id: string; billed_document_id: string | null };
-  return new Map(((cos.data ?? []) as Co[]).map((c) => [c.document_id, { status: c.status, invoiced: !!c.billed_document_id || onDraw.has(`co:${c.id}`) }]));
+  const invoiced = (c: Co) => (c.billed_document_id ? issued.has(c.billed_document_id) : c.status === "billed") || onDraw.has(`co:${c.id}`);
+  return new Map(((cos.data ?? []) as Co[]).map((c) => [c.document_id, { status: c.status, invoiced: invoiced(c) }]));
 }
 
 export async function loadJobMoney(
