@@ -1,10 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import { summarizeJobMoney } from "../jobMoney";
-import { openingItem, openingProblem, type JobOpening } from "../jobOpening";
+import { jobMargin, openingItem, openingProblem, type JobOpening } from "../jobOpening";
 
 const POWELL: JobOpening = { settledCents: 61_317_283, asOf: "2026-10-30", source: "Powell tracker #3526-12", enteredBy: "o@x", enteredAt: "2026-11-05T00:00:00Z" };
 const OK = { settledCents: 100, asOf: "2026-10-30", source: "x", contractCents: 200 };
+
+describe("margin on a job with an opening", () => {
+  it("stays on what the app billed: Powell with $50,000 of cost is -$20,000, not $593,172.83", () => {
+    const m = jobMargin({ billedCents: 64_317_283, settledCents: 61_317_283, costCents: 5_000_000 });
+    expect(m).toEqual({ cents: -2_000_000, pct: -67, appOnly: true });
+  });
+
+  it("is the same with or without the opening", () => {
+    const without = jobMargin({ billedCents: 3_000_000, settledCents: 0, costCents: 5_000_000 });
+    expect(without).toEqual({ cents: -2_000_000, pct: -67, appOnly: false });
+  });
+
+  it("has no percent with nothing billed in the app, opening or not", () => {
+    expect(jobMargin({ billedCents: 61_317_283, settledCents: 61_317_283, costCents: 100 })).toEqual({ cents: -100, pct: null, appOnly: true });
+    expect(jobMargin({ billedCents: 0, settledCents: 0, costCents: 0 }).pct).toBeNull();
+  });
+});
 
 describe("a job's opening", () => {
   it("adds to Billed and Paid and never to what's owed", () => {

@@ -17,8 +17,15 @@ test.describe("A job's opening", () => {
     const client = sql("select id from public.clients order by id limit 1");
     const job = sql(`insert into public.jobs (name, number_prefix, client_id) values ('E2E opening ${n}', '${prefix}', '${client}') returning id`).split("\n")[0];
     sql(`insert into public.documents (kind, client_id, number, title, status, total_cents, token, issued_at, issued_by) values ('invoice', '${client}', '${prefix}-13', 'Draw 13', 'issued', 3000000, '${`${n}`.padEnd(32, "d")}', '2026-11-04T17:00:00Z', 'E2E')`);
+    sql(`insert into public.bills (bill_number, vendor_name, job_id, issued_on, amount_cents) values ('E2E-${n}', 'E2E framer', '${job}', '2026-10-30', 5000000)`);
     const pmCtx = await browser.newContext();
+    const marginTile = () => page.getByRole("link").filter({ has: page.getByText("Margin", { exact: true }) });
     try {
+      // $30,000 billed in the app against $50,000 of cost.
+      await page.goto(`/app/jobs/${job}`, { waitUntil: "networkidle" });
+      await expect(marginTile()).toContainText("-$20,000.00");
+      await expect(marginTile()).toContainText("-67% of billed");
+
       await page.goto(`/app/jobs/${job}?tab=money`, { waitUntil: "networkidle" });
       const card = page.getByRole("region", { name: "Before the app" });
       await card.getByRole("button", { name: "Enter it" }).click();
@@ -46,6 +53,12 @@ test.describe("A job's opening", () => {
       const api = await (await page.request.get(`/api/crew/projects/money?job=${job}`)).json();
       expect(api.money).toMatchObject({ contractCents: 81_798_097, billedCents: 64_317_283, paidCents: 61_317_283, owedCents: 3_000_000 });
 
+      // The opening has no cost behind it, so Margin stays on what the app billed.
+      await page.goto(`/app/jobs/${job}`, { waitUntil: "networkidle" });
+      await expect(marginTile()).toContainText("-$20,000.00");
+      await expect(marginTile()).toContainText("-67% of billed in the app");
+      await page.goto(`/app/jobs/${job}?tab=money`, { waitUntil: "networkidle" });
+
       // A change keeps the old row: the newest counts, the trail stays.
       await card.getByRole("button", { name: "Change" }).click();
       await card.getByLabel("Billed and paid in full before the app").fill("613,000");
@@ -60,7 +73,7 @@ test.describe("A job's opening", () => {
       expect(put.status()).toBe(403);
     } finally {
       await pmCtx.close();
-      sql(`begin; set local session_replication_role = replica; delete from public.documents where number like '${prefix}-%'; delete from public.jobs where id = '${job}'; commit;`);
+      sql(`begin; set local session_replication_role = replica; delete from public.bills where job_id = '${job}'; delete from public.documents where number like '${prefix}-%'; delete from public.jobs where id = '${job}'; commit;`);
     }
   });
 });

@@ -23,6 +23,17 @@ export function openingItem(o: JobOpening | null | undefined): MoneyItem | null 
   return { number: "Before the app", title: o.source, documentId: "", lineIndex: null, billedCents: o.settledCents, paidCents: o.settledCents, dueOn: null, payWhenPaid: false };
 }
 
+/**
+ * The job's margin, on what the app billed. An opening has no cost behind it,
+ * since the costs before the app aren't here either, so it stays out, as it does
+ * in Job Costing. `appOnly`: an opening was left out and the tile should say so.
+ */
+export function jobMargin(m: { billedCents: number; settledCents: number; costCents: number }): { cents: number; pct: number | null; appOnly: boolean } {
+  const inApp = m.billedCents - m.settledCents;
+  const cents = inApp - m.costCents;
+  return { cents, pct: inApp ? Math.round((cents / inApp) * 100) : null, appOnly: m.settledCents > 0 };
+}
+
 /** Why this opening can't be saved, or null. `overlapping` is the job's bills issued on or before the date. */
 export function openingProblem(input: OpeningInput, today: string, overlapping: string[]): string | null {
   if (input.asOf > today) return "The date can't be in the future.";

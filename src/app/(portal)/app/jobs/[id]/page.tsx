@@ -11,6 +11,7 @@ import JobFrame, { type JobTab, type Stage } from "@/components/jobs/JobFrame";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { siteUrl } from "@/lib/billing/http";
+import { jobMargin } from "@/lib/billing/jobOpening";
 import { livePortal } from "@/lib/portal/store";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import type { LaborRow } from "@/lib/accounting/labor";
@@ -786,6 +787,8 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   const materials = purchases.filter(isMaterialCost).reduce((a, r) => a + r.lineTotalCents, 0);
   const subs = bills.filter((b) => !b.purchaseTripKey).reduce((a, b) => a + b.amountCents, 0);
   const cost = laborCost + materials + subs;
+  const margin = jobMargin({ billedCents: billed, settledCents: settled, costCents: cost });
+  const marginHint = margin.pct === null ? (margin.appOnly ? "app only" : undefined) : `${margin.pct}% of ${margin.appOnly ? "billed in the app" : "billed"}`;
   const hoursWeek = labor.filter((r) => inRange(r.day, resolvePeriod({ p: "wtd" }, today).from, today)).reduce((a, r) => a + r.minutes, 0);
   const openWatches = watches.filter((w) => !w.doneAt);
   const tile = (label: string, value: number | null, kind: "money" | "hours" | "percent", href?: string, hint?: string) => (
@@ -826,7 +829,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
           </>
         ) : null}
         {seat.margin ? tile("Cost to date", cost, "money", hrefOf("/app/accounting/job-costing", { p: "custom", from: "2020-01-01", to: today, job: ref.billingId ?? `crew:${ref.crewId}`, by: "category" })) : null}
-        {seat.margin ? tile("Margin", billed - cost, "money", undefined, billed ? `${Math.round(((billed - cost) / billed) * 100)}% of billed` : undefined) : null}
+        {seat.margin ? tile("Margin", margin.cents, "money", undefined, marginHint) : null}
         {tile("Labor this week", hoursWeek, "hours", `${base}?tab=labor&p=wtd`)}
         {seat.money ? tile("Materials", materials, "money", `${base}?tab=purchases&p=ytd`) : null}
       </div>
