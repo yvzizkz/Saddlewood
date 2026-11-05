@@ -6,6 +6,8 @@ import { rolloutRows, type RolloutMark, type RolloutPerson, type RolloutRow } fr
 // What rollout.ts reads, with the service role. The page has checked the seat.
 
 const WINDOW_DAYS = 90;
+/** Shifts the person clocked themselves. 'office' is someone typing their hours in for them. */
+const OWN_CLOCK = ["app", "late"];
 const recently = new Map<string, number>();
 
 /** Stamp that a staff person opened the app, at most every five minutes per server. Never fails the page. */
@@ -26,7 +28,7 @@ export async function loadRollout(today = localDay()): Promise<RolloutRow[]> {
     db.from("crew_people").select("email,name,group_id,phone,last_seen_at").eq("active", true),
     db.from("crew_groups").select("id,name"),
     db.from("staff_seen").select("email,last_seen_at"),
-    db.from("crew_shifts").select("email,day").eq("status", "ok").gte("day", from),
+    db.from("crew_shifts").select("email,day").eq("status", "ok").in("source", OWN_CLOCK).gte("day", from),
     db.from("crew_entries").select("email,day").eq("kind", "eod").gte("day", from),
     readState(),
   ]);

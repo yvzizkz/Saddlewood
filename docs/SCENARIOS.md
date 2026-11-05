@@ -203,4 +203,4 @@ Run on 2026-10-25 against the local stack: one grid of every seat against every 
 
 ## Who's on the app (`e2e/on-the-app.spec.ts`)
 
-Owners track the January move at `Crew › Who's on the app`: each person's last opened, last clock-in, clock-ins in 7 days, last daily log and whether a phone is on file. Field people count as using it when they clock in or log the day; opening it isn't enough. Office people count by opening it (`staff_seen`, 0066). The window is 90 days.
+Owners track the January move at `Crew › Who's on the app`: each person's last opened, last clock-in, clock-ins in 7 days, last daily log and whether a phone is on file. Field people count as using it when they clock in or log the day; opening it isn't enough, and neither are hours the office typed in for them. Office people count by opening it (`staff_seen`, 0066). The window is 90 days.

@@ -39,4 +39,39 @@ test.describe("Who's on the app", () => {
       sql(`begin; set local session_replication_role = replica; delete from public.crew_shifts where email = '${clocking}'; delete from public.crew_people where email in ('${clocking}', '${idle}'); commit;`);
     }
   });
+
+  test("hours the office typed in aren't the person clocking in", async ({ owner: page }) => {
+    const n = Date.now().toString().slice(-8);
+    const email = `e2e-hands-${n}@example.com`;
+    const name = `E2E Hands ${n}`;
+    const group = sql("select id from public.crew_groups where id = 'crew'") || sql("select id from public.crew_groups limit 1");
+    const job = sql("select id from public.crew_jobs limit 1");
+    const row = page.getByRole("row", { name: new RegExp(name) }).first();
+    const figure = async (label: string) => parseInt((await page.locator("dt", { hasText: label }).locator("+ dd").innerText()).trim(), 10);
+    const figures = async () => {
+      await page.goto("/app/crew/on-the-app", { waitUntil: "networkidle" });
+      await expect(row).toBeVisible();
+      return { using: await figure("Using it this week"), never: await figure("Never opened it") };
+    };
+    try {
+      // The owner's own visit is stamped first, so it can't move the figures below.
+      await page.goto("/app/crew", { waitUntil: "networkidle" });
+      sql(`insert into public.crew_people (email, name, group_id) values ('${email}', '${name}', '${group}')`);
+      sql(`insert into public.crew_shifts (email, job_id, job_name, day, started_at, ended_at, source, end_source) values ('${email}', '${job}', 'E2E', (now() at time zone 'America/Phoenix')::date, now() - interval '2 hours', now(), 'office', 'office')`);
+
+      const typedIn = await figures();
+      await expect(row).toContainText("Not yet");
+      await expect(row).not.toContainText("Opened it");
+
+      // The same shift, clocked by the person, moves them into Using it and out of
+      // Never opened it, so they were in Never and out of Using while it was the office's.
+      for (const source of ["app", "late"]) {
+        sql(`update public.crew_shifts set source = '${source}' where email = '${email}'`);
+        expect(await figures()).toEqual({ using: typedIn.using + 1, never: typedIn.never - 1 });
+        await expect(row).toContainText("Using it");
+      }
+    } finally {
+      sql(`begin; set local session_replication_role = replica; delete from public.crew_shifts where email = '${email}'; delete from public.crew_people where email = '${email}'; commit;`);
+    }
+  });
 });
