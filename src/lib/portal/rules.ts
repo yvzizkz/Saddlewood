@@ -81,10 +81,12 @@ export type ClientMoney = { contractCents: number | null; billedCents: number; p
 /**
  * The job's totals, or null with nothing billed or paid here yet. Money still
  * in Joist isn't in the app, so a job with none here shows no section at all,
- * never "Paid $0" to a client who has paid.
+ * never "Paid $0" to a client who has paid. The same with money received that
+ * sits on no job yet and could be this one's (`unplacedCents`): Paid would be
+ * short and Open too high, so nothing shows until it's placed.
  */
-export function clientMoney(m: { contractCents: number | null; billedCents: number; paidCents: number; owedCents: number }): ClientMoney | null {
-  if (!m.billedCents && !m.paidCents) return null;
+export function clientMoney(m: { contractCents: number | null; billedCents: number; paidCents: number; owedCents: number }, unplacedCents = 0): ClientMoney | null {
+  if (unplacedCents > 0 || (!m.billedCents && !m.paidCents)) return null;
   return { contractCents: m.contractCents, billedCents: m.billedCents, paidCents: m.paidCents, openCents: m.owedCents };
 }
 

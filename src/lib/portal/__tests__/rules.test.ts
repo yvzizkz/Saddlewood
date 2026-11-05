@@ -84,6 +84,11 @@ describe("clientMoney", () => {
     expect(clientMoney({ ...m, billedCents: 40_000, paidCents: 10_000, owedCents: 30_000 })).toEqual({ contractCents: 100_000, billedCents: 40_000, paidCents: 10_000, openCents: 30_000 });
     expect(clientMoney({ ...m, contractCents: null, paidCents: 5 })?.contractCents).toBeNull();
   });
+
+  it("shows nothing while money received could be this job's: never Paid $0 to a client who paid", () => {
+    expect(clientMoney({ ...m, billedCents: 300_000, paidCents: 0, owedCents: 300_000 }, 500_000)).toBeNull();
+    expect(clientMoney({ ...m, billedCents: 300_000, paidCents: 0, owedCents: 300_000 }, 0)?.openCents).toBe(300_000);
+  });
 });
 
 describe("clientTimeline", () => {

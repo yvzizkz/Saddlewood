@@ -132,6 +132,7 @@ describe("pay-when-paid", () => {
       documents: [doc],
       paid: new Map(),
       firstSent: new Map([["sb", "2026-10-05T21:15:02Z"]]),
+      changeOrders: new Map(),
       jobs: [{ id: BELLEVUE_JOB, prefix: "9146", billing: {} }],
       clients: new Map([[SCHIFFERER, { payWhenPaidDays: 10 }]]),
     });

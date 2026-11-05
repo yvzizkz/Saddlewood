@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contractOf, invoiceNamedIn, jobOfNumber, placeMoney, summarizeJobMoney, type MoneyInput, type MoneyJob } from "../jobMoney";
+import { coIsBill, contractOf, invoiceNamedIn, jobOfNumber, placeMoney, summarizeJobMoney, unplacedPaidFor, type MoneyInput, type MoneyJob } from "../jobMoney";
 import type { BillingDocument } from "../types";
 
 const JURY = "11111111-1111-1111-1111-111111111111";
@@ -36,8 +36,128 @@ function doc(p: Partial<BillingDocument> & Pick<BillingDocument, "kind" | "numbe
 }
 
 function input(documents: BillingDocument[], extra: Partial<MoneyInput> = {}): MoneyInput {
-  return { documents, paid: new Map(), firstSent: new Map(), jobs: JOBS, ...extra };
+  return { documents, paid: new Map(), firstSent: new Map(), changeOrders: new Map(), jobs: JOBS, ...extra };
 }
+
+describe("what counts as billed", () => {
+  const billedOn = (i: MoneyInput, job = JURY) => (placeMoney(i).byJob.get(job) ?? []).reduce((s, x) => s + x.billedCents, 0);
+  const paidOn = (i: MoneyInput, job = JURY) => (placeMoney(i).byJob.get(job) ?? []).reduce((s, x) => s + x.paidCents, 0);
+  const inv = () => doc({ kind: "invoice", number: "8009-01", jobId: JURY, totalCents: 100_000 });
+  const co = () => doc({ kind: "change_order", number: "8009-CO1", jobId: JURY, totalCents: 500_000 });
+  const on = (d: { id: string }, status: string, invoiced = false) => ({ changeOrders: new Map([[d.id, { status, invoiced }]]) });
+
+  it("a change order is a bill once signed, until an invoice bills it", () => {
+    expect(coIsBill({ status: "signed", invoiced: false })).toBe(true);
+    expect(coIsBill({ status: "signed", invoiced: true })).toBe(false);
+    for (const status of ["requested", "priced", "sent", "billed", "rejected", "void"]) expect(coIsBill({ status, invoiced: false })).toBe(false);
+    expect(coIsBill(undefined)).toBe(false);
+  });
+
+  it("a rejected or voided change order's document stays issued and bills nothing", () => {
+    const c = co();
+    expect(billedOn(input([inv(), c], on(c, "rejected")))).toBe(100_000);
+    expect(billedOn(input([inv(), c], on(c, "void")))).toBe(100_000);
+  });
+
+  it("one awaiting approval, or not on the register, bills nothing yet", () => {
+    const c = co();
+    expect(billedOn(input([inv(), c], on(c, "sent")))).toBe(100_000);
+    expect(billedOn(input([inv(), c], on(c, "priced")))).toBe(100_000);
+    expect(billedOn(input([inv(), c]))).toBe(100_000);
+  });
+
+  it("a signed one counts once: as itself, then as the draw that bills it", () => {
+    const c = co();
+    const draw = doc({ kind: "invoice", number: "8009-02", jobId: JURY, totalCents: 250_000 });
+    expect(billedOn(input([c], on(c, "signed")))).toBe(500_000);
+    // A draw short of 100% leaves it signed: the draw's line is what says so.
+    expect(billedOn(input([c, draw], on(c, "signed", true)))).toBe(250_000);
+    expect(billedOn(input([c, draw], on(c, "billed", true)))).toBe(250_000);
+  });
+
+  it("money paid on a change order that bills nothing is still paid, and owes nothing", () => {
+    const c = co();
+    const i = input([c], { ...on(c, "rejected"), paid: new Map([[c.id, { total: 40_000, byLine: new Map() }]]) });
+    expect(paidOn(i)).toBe(40_000);
+    expect(billedOn(i)).toBe(0);
+    expect(summarizeJobMoney(JURY, placeMoney(i).byJob.get(JURY) ?? [], null, "2026-11-05").owedCents).toBe(0);
+  });
+
+  it("a revision replaces what it corrects, through every revision between", () => {
+    const first = inv();
+    const second = doc({ kind: "invoice", number: "8009-01", jobId: JURY, totalCents: 90_000, revision: 2, supersedes: first.id });
+    expect(billedOn(input([first, second]))).toBe(90_000);
+    const third = doc({ kind: "invoice", number: "8009-01", jobId: JURY, totalCents: 80_000, revision: 3, supersedes: second.id });
+    expect(billedOn(input([first, second, third]))).toBe(80_000);
+  });
+
+  it("a revision still in draft or voided replaces nothing", () => {
+    const first = inv();
+    const draft = doc({ kind: "invoice", number: "8009-01", jobId: JURY, totalCents: 90_000, status: "draft", supersedes: first.id });
+    const voided = doc({ kind: "invoice", number: "8009-01", jobId: JURY, totalCents: 90_000, status: "void", supersedes: first.id });
+    expect(billedOn(input([first, draft, voided]))).toBe(100_000);
+  });
+
+  it("money paid on a replaced document moves to the revision", () => {
+    const first = inv();
+    const second = doc({ kind: "invoice", number: "8009-01", jobId: JURY, totalCents: 90_000, revision: 2, supersedes: first.id });
+    const i = input([first, second], { paid: new Map([[first.id, { total: 60_000, byLine: new Map() }]]) });
+    const m = summarizeJobMoney(JURY, placeMoney(i).byJob.get(JURY) ?? [], null, "2026-11-05");
+    expect([m.billedCents, m.paidCents, m.owedCents]).toEqual([90_000, 60_000, 30_000]);
+  });
+
+  it("a replaced statement's lines aren't billed twice", () => {
+    const lines = [{ description: "Invoice 8009-08", amountCents: 100_000 }];
+    const first = doc({ kind: "statement", number: "AFT-1", snapshot: { lines } });
+    const second = doc({ kind: "statement", number: "AFT-1", revision: 2, supersedes: first.id, snapshot: { lines } });
+    expect(billedOn(input([first, second]))).toBe(100_000);
+  });
+});
+
+describe("money that could be another job's", () => {
+  const CLIENT = "client-1";
+  const jobs: MoneyJob[] = [
+    { id: JURY, prefix: "8009", clientId: CLIENT },
+    { id: RABBIT, prefix: "5203", clientId: CLIENT },
+    { id: CHURCH, prefix: null, clientId: CLIENT },
+  ];
+  const lump = (d: { id: string }, total: number) => ({ jobs, paid: new Map([[d.id, { total, byLine: new Map() }]]) });
+
+  it("a lump on a statement for two jobs could be either, and no one else's", () => {
+    const st = doc({ kind: "statement", number: "AFT-1", clientId: CLIENT, snapshot: { lines: [{ description: "Invoice 8009-08", amountCents: 300_000 }, { description: "Invoice 5203-12", amountCents: 200_000 }] } });
+    const { byJob, unplaced } = placeMoney(input([st], lump(st, 500_000)));
+    expect(byJob.get(JURY)?.[0].paidCents).toBe(0);
+    expect(unplacedPaidFor(JURY, unplaced)).toBe(500_000);
+    expect(unplacedPaidFor(RABBIT, unplaced)).toBe(500_000);
+    expect(unplacedPaidFor(CHURCH, unplaced)).toBe(0);
+  });
+
+  it("a line that's its own document still counts as a job the lump could pay", () => {
+    const inv = doc({ kind: "invoice", number: "5203-12", jobId: RABBIT, totalCents: 200_000 });
+    const st = doc({ kind: "statement", number: "AFT-1", clientId: CLIENT, snapshot: { lines: [{ description: "Invoice 8009-08", amountCents: 300_000 }, { description: "Invoice 5203-12", amountCents: 200_000 }] } });
+    const { byJob, unplaced } = placeMoney(input([inv, st], lump(st, 300_000)));
+    expect(byJob.get(JURY)?.[0].paidCents).toBe(0);
+    expect(unplacedPaidFor(RABBIT, unplaced)).toBe(300_000);
+  });
+
+  it("with a line no job claims, it could be any of the client's jobs", () => {
+    const st = doc({ kind: "statement", number: "AFT-1", clientId: CLIENT, snapshot: { lines: [{ description: "Invoice 8009-08", amountCents: 300_000 }, { description: "Overhead", amountCents: 200_000 }] } });
+    const { unplaced } = placeMoney(input([st], lump(st, 100_000)));
+    expect(unplacedPaidFor(CHURCH, unplaced)).toBe(100_000);
+  });
+
+  it("paid on a line, it's that line's job's and holds nothing back", () => {
+    const st = doc({ kind: "statement", number: "AFT-1", clientId: CLIENT, snapshot: { lines: [{ description: "Invoice 8009-08", amountCents: 300_000 }, { description: "Invoice 5203-12", amountCents: 200_000 }] } });
+    const { unplaced } = placeMoney(input([st], { jobs, paid: new Map([[st.id, { total: 300_000, byLine: new Map([[0, 300_000]]) }]]) }));
+    expect(unplacedPaidFor(JURY, unplaced)).toBe(0);
+  });
+
+  it("a bill with no job, paid, could be any of its client's jobs; unpaid, it holds nothing back", () => {
+    const paid = doc({ kind: "invoice", number: "7777-01", clientId: CLIENT, totalCents: 100_000 });
+    expect(unplacedPaidFor(CHURCH, placeMoney(input([paid], lump(paid, 100_000))).unplaced)).toBe(100_000);
+    expect(unplacedPaidFor(CHURCH, placeMoney(input([paid], { jobs })).unplaced)).toBe(0);
+  });
+});
 
 describe("which job a bill belongs to", () => {
   it("reads the invoice a statement line names", () => {
@@ -96,7 +216,7 @@ describe("which job a bill belongs to", () => {
       jobId: CHURCH,
       snapshot: { lines: [{ description: "Invoice 9146-90929 · First phase", amountCents: 1320000 }, { description: "Invoice 9146-90929 · Overhead", amountCents: 264000 }] },
     });
-    const items = placeMoney(input([co, st])).byJob.get(CHURCH) ?? [];
+    const items = placeMoney(input([co, st], { changeOrders: new Map([[co.id, { status: "signed", invoiced: false }]]) })).byJob.get(CHURCH) ?? [];
     expect(items.map((i) => i.billedCents)).toEqual([50000, 1320000, 264000]);
   });
 
@@ -160,7 +280,7 @@ describe("one job's money", () => {
     const st = doc({ kind: "statement", number: "S", jobId: JURY, snapshot: { lines: [{ description: "Draw 7", amountCents: 5000 }] } });
     const { byJob } = placeMoney(input([st], { firstSent: new Map([[st.id, "2026-10-05T16:20:00Z"]]) }));
     const m = summarizeJobMoney(JURY, byJob.get(JURY) ?? [], null, today);
-    expect(m.open).toEqual([{ documentId: "doc-15", number: "S", title: "Draw 7", owedCents: 5000, dueOn: "2026-10-05", daysLate: 8, payWhenPaid: false }]);
+    expect(m.open).toEqual([{ documentId: st.id, number: "S", title: "Draw 7", owedCents: 5000, dueOn: "2026-10-05", daysLate: 8, payWhenPaid: false }]);
     expect(m.pastDueCents).toBe(5000);
   });
 

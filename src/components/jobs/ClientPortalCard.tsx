@@ -9,13 +9,14 @@ import { Button, Card } from '@/components/bot/ui'
 import { usd } from '@/lib/money'
 import { PORTAL_SECTIONS, SECTION_INFO, type ClientMoney, type PortalSection } from '@/lib/portal/rules'
 
-type Preview = { money: ClientMoney | null; timeline: boolean }
+type Preview = { money: ClientMoney | null; unplacedCents: number; timeline: boolean }
 export type PortalState = { href: string; sections: PortalSection[]; preview: Preview } | null
 
 /** What turning a section on would show, for the two that can have nothing to show. */
 function willShow(s: PortalSection, p: Preview): string | null {
   if (s === 'timeline') return p.timeline ? null : "No dates on this job yet, so the client won't see this."
   if (s !== 'payments') return null
+  if (p.unplacedCents) return `${usd(p.unplacedCents)} received isn't on a job yet and could be this one's, so the client won't see this until it's applied to its bill or statement lines.`
   if (!p.money) return "Nothing billed or paid in this app yet, so the client won't see this."
   const { contractCents: c, billedCents, paidCents, openCents } = p.money
   return `The client will see: ${[c === null ? null : `Contract ${usd(c)}`, `Billed ${usd(billedCents)}`, `Paid ${usd(paidCents)}`, `Open ${usd(openCents)}`].filter(Boolean).join(' · ')}`
@@ -42,7 +43,7 @@ export default function ClientPortalCard({ job, origin, initial }: { job: string
 
   const make = async () => {
     const r = await call('POST')
-    if (r?.token) setPortal({ href: `${origin}/c/${r.token}`, sections: r.sections ?? [], preview: r.preview ?? { money: null, timeline: false } })
+    if (r?.token) setPortal({ href: `${origin}/c/${r.token}`, sections: r.sections ?? [], preview: r.preview ?? { money: null, unplacedCents: 0, timeline: false } })
   }
   const toggle = async (s: PortalSection, on: boolean) => {
     if (!portal) return

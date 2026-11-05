@@ -12,7 +12,7 @@ vi.mock("@/lib/jobs/access", () => ({
 vi.mock("@/lib/portal/store", () => ({
   createPortal: async (...a: unknown[]) => (state.calls.push(["create", ...a]), { token: "tok", sections: [] }),
   setPortalSections: async (...a: unknown[]) => (state.calls.push(["set", ...a]), state.live ? { sections: a[1] } : null),
-  portalPreview: async () => ({ money: null, timeline: false }),
+  portalPreview: async () => ({ money: null, unplacedCents: 0, timeline: false }),
   revokePortal: async (...a: unknown[]) => void state.calls.push(["revoke", ...a]),
 }));
 
@@ -41,7 +41,7 @@ describe("the client link route", () => {
 
   it("makes the link for the billing job, as the owner", async () => {
     const res = await POST(req("POST"), ctx("job"));
-    expect(await res.json()).toEqual({ ok: true, token: "tok", sections: [], preview: { money: null, timeline: false } });
+    expect(await res.json()).toEqual({ ok: true, token: "tok", sections: [], preview: { money: null, unplacedCents: 0, timeline: false } });
     expect(state.calls).toEqual([["create", "b1", "o@x"]]);
   });
 

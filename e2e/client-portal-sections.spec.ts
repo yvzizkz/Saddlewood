@@ -65,7 +65,7 @@ test.describe("The client's link: Timeline and Payments", () => {
 
       // A job with nothing on file: both on, neither appears, and the card says why.
       const bare = await (await page.request.post(`/api/jobs/${empty}/portal`)).json();
-      expect(bare.preview).toEqual({ money: null, timeline: false });
+      expect(bare.preview).toEqual({ money: null, unplacedCents: 0, timeline: false });
       expect((await show(empty, ["timeline", "payments"])).status()).toBe(200);
       await client.goto(`/c/${bare.token}`);
       await expect(client.getByRole("heading", { name: `E2E empty ${n}` })).toBeVisible();
