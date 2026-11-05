@@ -10,10 +10,15 @@ export type ScheduleEntryLine = { description: string; amountCents: number; bill
 
 const cents = (dollars: number) => Math.round(dollars * 100);
 
-/** The tracker's lines as of now: billed is everything invoiced so far, this invoice and any draw included. A line with no money yet is left out. */
-export function trackerSchedule(state: Pick<TrackerState, "lines">): ScheduleEntryLine[] {
+/**
+ * The tracker's lines as of now. Billed is everything invoiced so far, and this
+ * invoice and any draw only once it's issued: on a draft they haven't gone out,
+ * so they stay for the next draw to bill. A line with no money yet is left out.
+ */
+export function trackerSchedule(state: Pick<TrackerState, "lines" | "invoice">): ScheduleEntryLine[] {
+  const issued = state.invoice.status === "issued";
   return state.lines
-    .map((l) => ({ description: l.name, amountCents: cents(l.contract + l.changeOrder), billedCents: cents(l.completedPrior + l.thisInvoice + l.draw) }))
+    .map((l) => ({ description: l.name, amountCents: cents(l.contract + l.changeOrder), billedCents: cents(l.completedPrior + (issued ? l.thisInvoice + l.draw : 0)) }))
     .filter((l) => l.amountCents !== 0 || l.billedCents !== 0);
 }
 

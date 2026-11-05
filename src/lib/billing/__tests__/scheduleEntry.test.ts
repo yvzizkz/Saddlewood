@@ -5,9 +5,20 @@ import { parseSchedule, scheduleProblem, trackerSchedule } from "../scheduleEntr
 
 const line = (name: string, contract: number, changeOrder: number, completedPrior: number, thisInvoice = 0, draw = 0) => ({ id: name, name, contract, changeOrder, completedPrior, thisInvoice, draw, tbd: false, note: "" });
 
+const ISSUED = { number: "3526-13", date: "11/04/2026", status: "issued" as const };
+
 describe("a schedule brought in from before the app", () => {
+  it("doesn't call a draft tracker's amounts billed, so the next draw still bills them", () => {
+    const state = { invoice: { ...ISSUED, status: "draft" as const }, lines: [line("Baths", 62055, 0, 46000, 5000), line("Fireplaces", 28087, 0, 0, 0, 15000)] };
+    const lines = trackerSchedule(state);
+    expect(lines.map((l) => l.billedCents)).toEqual([4_600_000, 0]);
+    expect(trackerSchedule({ ...state, invoice: ISSUED }).map((l) => l.billedCents)).toEqual([5_100_000, 1_500_000]);
+    const baths = { key: "b", description: "Baths", scheduledCents: lines[0].amountCents, billedToDateCents: lines[0].billedCents, pctToDate: 0, kind: "sov" as const };
+    expect(computeDraw([baths], { b: 100 }, 0).grossCents).toBe(1_605_500);
+  });
+
   it("takes the tracker's lines, billed including this invoice and any draw, and leaves out lines with no money", () => {
-    const lines = trackerSchedule({ lines: [line("Kitchen", 89512, 0, 69000), line("Fireplaces", 28087, 0, 0, 0, 15000), line("Baths", 62055, 0, 46000, 5000), line("Rear deck", 0, 42448.14, 14000), line("Attic", 0, 0, 0)] });
+    const lines = trackerSchedule({ invoice: ISSUED, lines: [line("Kitchen", 89512, 0, 69000), line("Fireplaces", 28087, 0, 0, 0, 15000), line("Baths", 62055, 0, 46000, 5000), line("Rear deck", 0, 42448.14, 14000), line("Attic", 0, 0, 0)] });
     expect(lines).toEqual([
       { description: "Kitchen", amountCents: 8_951_200, billedCents: 6_900_000 },
       { description: "Fireplaces", amountCents: 2_808_700, billedCents: 1_500_000 },

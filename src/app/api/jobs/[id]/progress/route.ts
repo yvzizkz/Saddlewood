@@ -20,8 +20,9 @@ export const dynamic = "force-dynamic";
 //   POST { action: "draw", pcts }           the draft invoice, and what it bills per line (owners)
 //   POST { action: "discard" }              throw away the draft draw (owners; issue it from the card instead)
 //   POST { action: "opening", pcts }        percents billed before the app, before the first draw (owners)
-//   POST { action: "schedule", lines }      a pre-app job's schedule with what's billed per line, before the first draw (owners)
+//   POST { action: "schedule", lines, changeOrders }  a pre-app job's schedule with what's billed per line, and whether each signed change order is in it (owners)
 
+const scheduleCos = z.array(z.object({ id: z.number().int().positive(), inLines: z.boolean() }).strict()).max(200);
 const scheduleLines = z.array(z.object({ description: z.string().trim().min(1).max(200), amountCents: z.number().int(), billedCents: z.number().int() }).strict()).max(200);
 
 async function billingJob(id: string): Promise<{ seat: NonNullable<Awaited<ReturnType<typeof workSeat>>>; job: string } | NextResponse> {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const found = await billingJob((await params).id);
   if (found instanceof NextResponse) return found;
   const { seat, job } = found;
-  const body = (await request.json().catch(() => null)) as { action?: string; pcts?: Record<string, number>; note?: string; cutoffDay?: number | null; lines?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { action?: string; pcts?: Record<string, number>; note?: string; cutoffDay?: number | null; lines?: unknown; changeOrders?: unknown } | null;
   const pcts = body?.pcts && typeof body.pcts === "object" ? body.pcts : {};
   try {
     if (body?.action === "preview") return NextResponse.json({ ok: true, draw: previewDraw(await loadProgress(job), pcts) });
@@ -77,7 +78,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (body?.action === "schedule") {
       const lines = scheduleLines.safeParse(body.lines);
       if (!lines.success) return NextResponse.json({ ok: false, error: "Check the lines." }, { status: 400 });
-      await setSchedule(job, lines.data, owner.email);
+      const cos = scheduleCos.safeParse(body.changeOrders ?? []);
+      if (!cos.success) return NextResponse.json({ ok: false, error: "Check the change orders." }, { status: 400 });
+      await setSchedule(job, lines.data, owner.email, cos.data);
       return NextResponse.json({ ok: true });
     }
     if (body?.action === "clearReport") {

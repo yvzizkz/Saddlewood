@@ -61,7 +61,7 @@ vi.mock("../documents", () => ({
   },
 }));
 
-import { createDrawDraft, discardDraw, loadProgress, setOpening } from "../progressStore";
+import { createDrawDraft, discardDraw, loadProgress, setOpening, setSchedule } from "../progressStore";
 
 const JOB = "job-1";
 const job = (billing: Row) => ({ id: JOB, name: "Powell", address: "", client_id: "c1", number_prefix: "3526", billing });
@@ -175,6 +175,27 @@ describe("setOpening", () => {
 
   it("refuses an index key from before the move", async () => {
     await expect(setOpening(JOB, { "sov:0": 50 }, "lando")).rejects.toThrow(/No line sov:0/);
+  });
+
+  it("won't clear a schedule billed in cents: Kitchen stays at $69,000 and bills $20,512 to finish", async () => {
+    db.t.sov_lines = [{ id: 41, job_id: JOB, position: 0, description: "Kitchen", amount_cents: 8_951_200, kind: "section" }];
+    db.t.jobs = [job({ sovOpeningCents: { [FRAMING]: 6_900_000 } })];
+    const before = await loadProgress(JOB);
+    expect(before.billedInCents).toBe(true);
+    await expect(setOpening(JOB, { [FRAMING]: 10 }, "lando")).rejects.toMatchObject({ status: 409, message: expect.stringContaining("Change the schedule") });
+    const after = await loadProgress(JOB);
+    expect(after.openingCents).toBe(6_900_000);
+    expect(computeDraw(after.lines, { [FRAMING]: 100 }, 0).grossCents).toBe(2_051_200);
+  });
+});
+
+describe("setSchedule", () => {
+  it("won't take a schedule until each signed change order is called", async () => {
+    db.t.change_orders = [{ id: 7, job_id: JOB, number: "CO-7", title: "Deck", amount_cents: 4_000_000, status: "signed" }];
+    const lines = [{ description: "Rear deck", amountCents: 4_000_000, billedCents: 0 }];
+    await expect(setSchedule(JOB, lines, "lando")).rejects.toMatchObject({ status: 409, message: expect.stringContaining("CO-7 Deck") });
+    await expect(setSchedule(JOB, lines, "lando", [{ id: 8, inLines: true }])).rejects.toMatchObject({ status: 409 });
+    expect(db.t.change_orders[0].status).toBe("signed");
   });
 });
 

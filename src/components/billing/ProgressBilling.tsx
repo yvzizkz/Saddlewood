@@ -25,7 +25,8 @@ type State = {
   opening: Record<string, number>
   openingCents: number
   awarded: boolean
-  trackerDraft: { name: string; invoice: string; lines: ScheduleEntryLine[] } | null
+  trackerDraft: { name: string; invoice: string; draft: boolean; lines: ScheduleEntryLine[] } | null
+  billedInCents: boolean
   deposit: { cents: number; appliedCents: number; number: string } | null
   report: PmReport | null
 }
@@ -69,7 +70,7 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
   if (error) return <p className="rounded-2xl border border-dashed border-[var(--color-stone-mid)] p-4 text-sm text-[var(--color-charcoal-light)]">{error}</p>
   if (!state || !draw) return <p className="p-4 text-sm text-[var(--color-charcoal-light)]">Loading the schedule of values…</p>
   const canEnter = !reporting && !state.awarded && state.draws === 0
-  if (entering) return <ScheduleEntry jobKey={jobKey} tracker={state.trackerDraft} onDone={() => (setEntering(false), void load(), router.refresh())} onCancel={() => setEntering(false)} />
+  if (entering) return <ScheduleEntry jobKey={jobKey} tracker={state.trackerDraft} changeOrders={state.lines.filter((l) => l.kind === 'co')} onDone={() => (setEntering(false), void load(), router.refresh())} onCancel={() => setEntering(false)} />
   if (!state.lines.length)
     return (
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-[var(--color-stone-mid)] p-4 text-sm text-[var(--color-charcoal-light)]">
@@ -267,7 +268,7 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
             <Button variant="primary" busy={busy === 'draw'} disabled={!!state.openDraft || draw.errors.length > 0 || draw.grossCents <= 0} onClick={() => post('draw')}>
               Make the draft invoice
             </Button>
-            {state.draws === 0 ? (
+            {state.draws === 0 && !state.billedInCents ? (
               <Button variant="quiet" onClick={() => (setOpeningMode(true), setPcts(Object.fromEntries(Object.entries(state.opening).map(([k, v]) => [k, String(v)]))))}>
                 Billed before the app?
               </Button>

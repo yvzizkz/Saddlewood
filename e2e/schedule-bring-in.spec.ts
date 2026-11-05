@@ -54,6 +54,14 @@ test.describe("Bringing in a schedule", () => {
       expect(state2.openingCents).toBe(13_500_000);
       expect((await (await page.request.post(api, { data: { action: "preview", pcts: {} } })).json()).draw.grossCents).toBe(0);
 
+      // Percents can't stand in for it: the button's gone, and a direct call leaves the cents alone.
+      await expect(billing.getByRole("button", { name: "Change the schedule" })).toBeVisible();
+      await expect(billing.getByRole("button", { name: "Billed before the app?" })).toHaveCount(0);
+      const opening = await page.request.post(api, { data: { action: "opening", pcts: { [key("Kitchen")]: 10 } } });
+      expect(opening.status()).toBe(409);
+      expect((await opening.json()).error).toContain("Change the schedule");
+      expect((await (await page.request.get(api)).json()).openingCents).toBe(13_500_000);
+
       // Kitchen to 100%: the rest of the line, to the penny.
       const made = await (await page.request.post(api, { data: { action: "draw", pcts: { [key("Kitchen")]: 100 } } })).json();
       expect(made).toMatchObject({ ok: true, dueCents: 2_051_200 });
@@ -63,6 +71,69 @@ test.describe("Bringing in a schedule", () => {
       expect(again.status()).toBe(409);
     } finally {
       sql(`begin; set local session_replication_role = replica; delete from public.progress_trackers where id = 'e2e-${n}'; delete from public.sov_progress where job_id = '${job}'; delete from public.documents where job_id = '${job}'; delete from public.sov_lines where job_id = '${job}'; delete from public.jobs where id = '${job}'; commit;`);
+    }
+  });
+
+  test("a draft tracker's amounts stay to bill, and a signed change order is called before it can count twice", async ({ owner: page }) => {
+    const n = Date.now().toString().slice(-8);
+    const prefix = `56${n}`;
+    const client = sql("select id from public.clients order by id limit 1");
+    const job = sql(`insert into public.jobs (name, number_prefix, client_id) values ('E2E draft ${n}', '${prefix}', '${client}') returning id`).split("\n")[0];
+    const state = {
+      schemaVersion: 1,
+      project: { name: `E2E ${n}`, contractor: "Saddlewood", owners: "E2E", address: "" },
+      invoice: { number: `${prefix}-14`, date: "2026-11-04", status: "draft" },
+      payments: [],
+      lines: [{ id: "deck", name: "Rear deck", contract: 0, changeOrder: 40000, completedPrior: 10000, thisInvoice: 5000, draw: 0, tbd: false, note: "" }],
+      pendingChangeOrders: [],
+      notes: { mode: "auto", text: "" },
+      meta: { updatedAt: "2026-11-04T00:00:00Z", updatedBy: "E2E" },
+    };
+    sql(`insert into public.progress_trackers (id, project_name, invoice_number, state) values ('e2e-d${n}', 'E2E ${n}', '${prefix}-14', '${JSON.stringify(state)}'::jsonb)`);
+    const api = `/api/jobs/${job}/progress`;
+    const co = async (title: string) => {
+      const { id } = await (await page.request.post("/api/change-orders", { data: { job, title } })).json();
+      expect((await page.request.patch("/api/change-orders", { data: { id, status: "priced", amountCents: 4_000_000 } })).ok()).toBeTruthy();
+      expect((await page.request.patch("/api/change-orders", { data: { id, status: "signed" } })).ok()).toBeTruthy();
+      return id as number;
+    };
+    try {
+      const netted = await co(`E2E deck ${n}`);
+      const separate = await co(`E2E pergola ${n}`);
+
+      await page.goto(`/app/jobs/${job}?tab=money`, { waitUntil: "networkidle" });
+      await page.getByRole("button", { name: "Change the schedule" }).click();
+      const entry = page.getByRole("region", { name: "Bring in a schedule" });
+      await expect(entry).toContainText("is still a draft");
+      await entry.getByRole("button", { name: `Fill from E2E ${n} tracker #${prefix}-14` }).click();
+      await expect(entry).toContainText("1 lines: $40,000.00 scheduled, $10,000.00 billed");
+      await expect(entry.getByRole("button", { name: "Save the schedule" })).toBeDisabled();
+
+      // Not called, the server won't take it either.
+      const line = { description: "Rear deck", amountCents: 4_000_000, billedCents: 1_000_000 };
+      const refused = await page.request.post(api, { data: { action: "schedule", lines: [line] } });
+      expect(refused.status()).toBe(409);
+      expect((await refused.json()).error).toContain("already in these lines");
+
+      await entry.getByLabel(new RegExp(`E2E deck ${n}`)).selectOption("true");
+      await entry.getByLabel(new RegExp(`E2E pergola ${n}`)).selectOption("false");
+      await entry.getByRole("button", { name: "Save the schedule" }).click();
+      await expect(page.getByRole("region", { name: "Progress billing" })).toContainText("Rear deck");
+
+      // The deck is the line now, once. The pergola keeps its own line, and the contract is the two.
+      const after = await (await page.request.get(api)).json();
+      expect(after.lines.map((l: { description: string }) => l.description)).toEqual(["Rear deck", expect.stringContaining("E2E pergola")]);
+      expect(after.lines.reduce((a: number, l: { scheduledCents: number }) => a + l.scheduledCents, 0)).toBe(8_000_000);
+      expect(sql(`select status from public.change_orders where id = ${netted}`)).toBe("billed");
+      expect(sql(`select status from public.change_orders where id = ${separate}`)).toBe("signed");
+
+      // The draft's $5,000 wasn't billed, so the next draw bills it: to 37.5% of $40,000 is $15,000 to date.
+      const deck = after.lines[0];
+      expect(deck.billedToDateCents).toBe(1_000_000);
+      const made = await (await page.request.post(api, { data: { action: "draw", pcts: { [deck.key]: 37.5 } } })).json();
+      expect(made).toMatchObject({ ok: true, dueCents: 500_000 });
+    } finally {
+      sql(`begin; set local session_replication_role = replica; delete from public.progress_trackers where id = 'e2e-d${n}'; delete from public.change_order_events where change_order_id in (select id from public.change_orders where job_id = '${job}'); delete from public.joist_jobs where change_order_id in (select id from public.change_orders where job_id = '${job}'); delete from public.change_orders where job_id = '${job}'; delete from public.sov_progress where job_id = '${job}'; delete from public.documents where job_id = '${job}'; delete from public.sov_lines where job_id = '${job}'; delete from public.jobs where id = '${job}'; commit;`);
     }
   });
 });

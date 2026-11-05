@@ -37,6 +37,8 @@ export type ProgressState = {
   opening: Record<string, number>;
   /** All of what was billed before the app, by percent or in cents. */
   openingCents: number;
+  /** The schedule came in with billed in cents: percents can't stand in for it, only a new schedule can. */
+  billedInCents: boolean;
   /** Award wrote the schedule: it comes from the accepted proposal and isn't re-entered here. */
   awarded: boolean;
   /** The PM's percent complete sent since the last draw, if any: the next draw opens with it. */
@@ -140,6 +142,7 @@ export async function loadProgress(billingJobId: string): Promise<ProgressState>
     draws: drawDocs.size,
     opening,
     openingCents: lines.reduce((a, l) => a + openingCents(l.key, l.scheduledCents), 0),
+    billedInCents: Object.keys(inCents).length > 0,
     awarded: !!billing.award,
     // A report a draw has already used is spent.
     report: billing.pmReport?.at && Date.parse(billing.pmReport.at) > lastDrawAt ? billing.pmReport : null,
@@ -172,6 +175,7 @@ export async function saveReport(billingJobId: string, pcts: Record<string, numb
 export async function setOpening(billingJobId: string, pcts: Record<string, number>, by: string): Promise<void> {
   const state = await loadProgress(billingJobId);
   if (state.draws > 0) throw new ProgressError("Draws already exist in the app; the opening can't change now.", 409);
+  if (state.billedInCents) throw new ProgressError("This schedule came in with what's billed to the penny. Use Change the schedule.", 409);
   const keys = new Set(state.lines.map((l) => l.key));
   const clean: Record<string, number> = {};
   for (const [k, v] of Object.entries(pcts)) {
@@ -190,13 +194,22 @@ export async function setOpening(billingJobId: string, pcts: Record<string, numb
 /**
  * The schedule of a job that started before the app, with what's billed on each
  * line, before its first draw here. An awarded job's schedule stays Award's.
+ *
+ * A tracker's lines net change orders in, and a signed change order is its own
+ * line here, so each one has to be called: `inLines` says it's already in these
+ * lines, and it goes to billed so it isn't scheduled or billed a second time.
+ * Left out of `inLines`, it stays a line of its own.
  */
-export async function setSchedule(billingJobId: string, lines: ScheduleEntryLine[], by: string): Promise<void> {
+export async function setSchedule(billingJobId: string, lines: ScheduleEntryLine[], by: string, changeOrders: { id: number; inLines: boolean }[] = []): Promise<void> {
   const state = await loadProgress(billingJobId);
   if (state.draws > 0) throw new ProgressError("Draws already exist in the app; the schedule can't change now.", 409);
   if (state.awarded) throw new ProgressError("Award wrote this job's schedule from the accepted proposal.", 409);
   const problem = scheduleProblem(lines);
   if (problem) throw new ProgressError(problem, 400);
+  const open = state.lines.filter((l) => l.kind === "co");
+  const undecided = open.find((l) => !changeOrders.some((c) => `co:${c.id}` === l.key));
+  if (undecided) throw new ProgressError(`${undecided.description}: say if it's already in these lines, or it could be billed twice.`, 409);
+  const inLines = changeOrders.filter((c) => c.inLines && open.some((l) => l.key === `co:${c.id}`)).map((c) => c.id);
   const stored = await replaceSovLines(billingJobId, lines.map((l) => ({ description: l.description, amountCents: l.amountCents, kind: "section" as const })), by);
   const sovOpeningCents = Object.fromEntries(stored.flatMap((s, i) => (lines[i].billedCents > 0 ? [[lineKey(s.id), lines[i].billedCents]] : [])));
   const db = getSupabaseAdmin();
@@ -205,17 +218,22 @@ export async function setSchedule(billingJobId: string, lines: ScheduleEntryLine
   const billing = { ...(((data as { billing?: Record<string, unknown> } | null)?.billing) ?? {}), sovOpening: {}, sovOpeningCents, sovOpeningBy: by, sovOpeningAt: new Date().toISOString() };
   const { error } = await db.from("jobs").update({ billing }).eq("id", billingJobId);
   if (error) throw new Error(`jobs update: ${error.message}`);
+  if (inLines.length) {
+    const { data: moved, error: coError } = await db.from("change_orders").update({ status: "billed" }).in("id", inLines).eq("status", "signed").select("id");
+    if (coError) throw new Error(`change_orders update: ${coError.message}`);
+    await coEventsAfter(((moved ?? []) as { id: number }[]).map((r) => r.id), "billed", by, { why: "already in the schedule brought in" });
+  }
 }
 
 /** The lines of the progress tracker billing this job, found by its invoice number, for an owner to start from. Null when there's none. */
-export async function trackerDraft(billingJobId: string): Promise<{ name: string; invoice: string; lines: ScheduleEntryLine[] } | null> {
+export async function trackerDraft(billingJobId: string): Promise<{ name: string; invoice: string; draft: boolean; lines: ScheduleEntryLine[] } | null> {
   const { data, error } = await getSupabaseAdmin().from("jobs").select("number_prefix").eq("id", billingJobId).maybeSingle();
   if (error) throw new Error(`jobs: ${error.message}`);
   const prefix = (data as { number_prefix: string | null } | null)?.number_prefix;
   if (!prefix) return null;
   const row = (await listTrackers()).find((t) => t.invoiceNumber.startsWith(`${prefix}-`));
   const tracker = row ? await getTracker(row.id) : null;
-  return tracker ? { name: tracker.state.project.name, invoice: tracker.state.invoice.number, lines: trackerSchedule(tracker.state) } : null;
+  return tracker ? { name: tracker.state.project.name, invoice: tracker.state.invoice.number, draft: tracker.state.invoice.status === "draft", lines: trackerSchedule(tracker.state) } : null;
 }
 
 /** Clear the PM's percent-complete report on a job (owners only). */

@@ -122,6 +122,7 @@ Each scenario drives the screens a person in that seat would use, writes through
 
 6. **The January move: a job's schedule** (`e2e/schedule-bring-in.spec.ts`).
    - On a job that started before the app, an owner fills the schedule from its progress tracker, or pastes it from a spreadsheet, with what's billed on each line in cents. Billed past a line is stopped.
+   - A draft tracker's amounts aren't billed yet, so they aren't counted: the next draw bills them. Each signed change order has to be called first: already in the lines moves it to billed, otherwise it stays a line of its own, so it can't be scheduled twice. With billed in cents, `Billed before the app?` is gone and the server refuses it with a 409: only `Change the schedule` replaces it.
    - A line that hasn't moved bills nothing, even at $69,000 of $89,512. Kitchen to 100% bills the rest, `$20,512.00`. Once a draw exists, the schedule can't be replaced.
 
 ## 9. A change order's week (the Jury job, AFT)
