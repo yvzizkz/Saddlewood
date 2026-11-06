@@ -6,10 +6,12 @@ import DataTable, { type Column, type TableRow } from "@/components/data/DataTab
 import KpiHeader from "@/components/data/KpiHeader";
 import ClientPortalCard, { type PortalState } from "@/components/jobs/ClientPortalCard";
 import JobClientCard from "@/components/jobs/JobClientCard";
+import JobOpeningCard from "@/components/jobs/JobOpeningCard";
 import JobFrame, { type JobTab, type Stage } from "@/components/jobs/JobFrame";
 import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { siteUrl } from "@/lib/billing/http";
+import { jobMargin } from "@/lib/billing/jobOpening";
 import { livePortal } from "@/lib/portal/store";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import type { LaborRow } from "@/lib/accounting/labor";
@@ -95,8 +97,9 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   // What every tab needs to place the job on its lifecycle.
   const [money, crew, watches] = await Promise.all([jobMoney(ref, today), jobCrew(ref), jobWatches(ref)]);
   const issued = money.issued.filter((d) => d.status === "issued");
-  const billed = issued.reduce((a, d) => a + d.totalCents, 0);
-  const collected = money.collected.reduce((a, r) => a + r.amountCents, 0);
+  const settled = money.opening?.settledCents ?? 0;
+  const billed = settled + issued.reduce((a, d) => a + d.totalCents, 0);
+  const collected = settled + money.collected.reduce((a, r) => a + r.amountCents, 0);
   const open = money.open.reduce((a, r) => a + r.balanceCents, 0);
   const built = crew.phases.length > 0 && crew.phases.every((p) => p.verified_at);
   const closed = !ref.active;
@@ -333,6 +336,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             ))}
           </dl>
         ) : null}
+        {tab === "money" && ref.billingId ? <JobOpeningCard job={ref.key} opening={money.opening} contractCents={ref.contractCents} canEdit={owner && (!ref.awarded || !!money.opening)} /> : null}
         <DataTable rows={table} columns={columns} searchKeys={["number", "title", "kind", "status"]} name={`${ref.key}-${tab}`} rowHrefKey="href" initialSort={{ key: "day", dir: "desc" }} empty="Nothing billed on this job yet." />
         {tab === "money" ? (
           <>
@@ -783,6 +787,8 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   const materials = purchases.filter(isMaterialCost).reduce((a, r) => a + r.lineTotalCents, 0);
   const subs = bills.filter((b) => !b.purchaseTripKey).reduce((a, b) => a + b.amountCents, 0);
   const cost = laborCost + materials + subs;
+  const margin = jobMargin({ billedCents: billed, settledCents: settled, costCents: cost });
+  const marginHint = margin.pct === null ? (margin.appOnly ? "app only" : undefined) : `${margin.pct}% of ${margin.appOnly ? "billed in the app" : "billed"}`;
   const hoursWeek = labor.filter((r) => inRange(r.day, resolvePeriod({ p: "wtd" }, today).from, today)).reduce((a, r) => a + r.minutes, 0);
   const openWatches = watches.filter((w) => !w.doneAt);
   const tile = (label: string, value: number | null, kind: "money" | "hours" | "percent", href?: string, hint?: string) => (
@@ -823,7 +829,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
           </>
         ) : null}
         {seat.margin ? tile("Cost to date", cost, "money", hrefOf("/app/accounting/job-costing", { p: "custom", from: "2020-01-01", to: today, job: ref.billingId ?? `crew:${ref.crewId}`, by: "category" })) : null}
-        {seat.margin ? tile("Margin", billed - cost, "money", undefined, billed ? `${Math.round(((billed - cost) / billed) * 100)}% of billed` : undefined) : null}
+        {seat.margin ? tile("Margin", margin.cents, "money", undefined, marginHint) : null}
         {tile("Labor this week", hoursWeek, "hours", `${base}?tab=labor&p=wtd`)}
         {seat.money ? tile("Materials", materials, "money", `${base}?tab=purchases&p=ytd`) : null}
       </div>

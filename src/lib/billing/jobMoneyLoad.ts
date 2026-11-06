@@ -1,6 +1,8 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { localDay } from "@/lib/crew/time";
 import { contractOf, placeMoney, summarizeJobMoney, type JobMoney, type MoneyItem } from "./jobMoney";
+import { openingItem } from "./jobOpening";
+import { loadOpenings } from "./jobOpeningStore";
 import { toDocument, type DocumentRow } from "./documents";
 import type { BillingProfile } from "./types";
 import { paidByDocument } from "./payments";
@@ -12,11 +14,7 @@ import { paidByDocument } from "./payments";
 // Every issued bill is read, not just the job's: a statement for several jobs
 // has no job of its own, and a bill is placed by its number as well (jobMoney.ts).
 
-export async function loadJobMoney(
-  jobIds: string[],
-  today: string = localDay(),
-): Promise<{ jobs: JobMoney[]; unplaced: MoneyItem[] }> {
-  if (jobIds.length === 0) return { jobs: [], unplaced: [] };
+async function readPlaced() {
   const db = getSupabaseAdmin();
   const [docs, jobs, clients] = await Promise.all([
     db.from("documents").select("*").eq("status", "issued").in("kind", ["invoice", "change_order", "statement"]),
@@ -49,11 +47,33 @@ export async function loadJobMoney(
     jobs: jobRows.map((j) => ({ id: j.id, prefix: j.number_prefix, billing: j.billing })),
     clients: new Map(((clients.data ?? []) as { id: string; billing: BillingProfile | null }[]).map((c) => [c.id, c.billing ?? {}])),
   });
-  const contract = new Map(jobRows.map((j) => [j.id, contractOf(j)]));
+  return { placed, documents, contract: new Map(jobRows.map((j) => [j.id, contractOf(j)])) };
+}
+
+export async function loadJobMoney(
+  jobIds: string[],
+  today: string = localDay(),
+): Promise<{ jobs: JobMoney[]; unplaced: MoneyItem[] }> {
+  if (jobIds.length === 0) return { jobs: [], unplaced: [] };
+  const [{ placed, contract }, openings] = await Promise.all([readPlaced(), loadOpenings(jobIds)]);
   return {
     jobs: jobIds
       .filter((id) => contract.has(id))
-      .map((id) => summarizeJobMoney(id, placed.byJob.get(id) ?? [], contract.get(id) ?? null, today)),
+      .map((id) => {
+        const opening = openingItem(openings.get(id));
+        return summarizeJobMoney(id, [...(placed.byJob.get(id) ?? []), ...(opening ? [opening] : [])], contract.get(id) ?? null, today);
+      }),
     unplaced: placed.unplaced,
   };
+}
+
+/** The numbers of the job's bills issued on or before a day: the ones an opening through that day would count twice. */
+export async function billsThrough(jobId: string, day: string): Promise<string[]> {
+  const { placed, documents } = await readPlaced();
+  const issuedOn = new Map(documents.map((d) => [d.id, d.issuedAt ? localDay(d.issuedAt) : null]));
+  const numbers = (placed.byJob.get(jobId) ?? []).filter((it) => {
+    const on = issuedOn.get(it.documentId);
+    return on && on <= day;
+  });
+  return [...new Set(numbers.map((it) => it.number))].sort();
 }
