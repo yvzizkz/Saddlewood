@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { approvalBlock } from "@/lib/billing/coApprove";
 import { CO_STATUS } from "@/lib/billing/registers";
 
-import { cleanSections, clientDocuments, clientLogText, clientPeople, withApprovals, type PortalDoc, type PortalDocRow } from "../rules";
+import { cleanSections, clientDocuments, clientLogText, clientMoney, clientPeople, clientTimeline, withApprovals, type PortalDoc, type PortalDocRow } from "../rules";
 
 const row = (over: Partial<PortalDocRow>): PortalDocRow => ({
   id: "a",
@@ -69,6 +69,45 @@ describe("withApprovals", () => {
       const canApprove = approvalBlock({ status: "issued" }, { status }) === null;
       expect(one(status)[0]?.approval === "needed", status).toBe(canApprove);
     }
+  });
+});
+
+describe("clientMoney", () => {
+  const m = { contractCents: 100_000, billedCents: 0, paidCents: 0, owedCents: 0 };
+
+  it("shows nothing with nothing billed or paid here, contract or not: Joist's money isn't in the app", () => {
+    expect(clientMoney(m)).toBeNull();
+    expect(clientMoney({ ...m, contractCents: null })).toBeNull();
+  });
+
+  it("gives the totals once there's money here", () => {
+    expect(clientMoney({ ...m, billedCents: 40_000, paidCents: 10_000, owedCents: 30_000 })).toEqual({ contractCents: 100_000, billedCents: 40_000, paidCents: 10_000, openCents: 30_000 });
+    expect(clientMoney({ ...m, contractCents: null, paidCents: 5 })?.contractCents).toBeNull();
+  });
+
+  it("shows nothing while money received could be this job's: never Paid $0 to a client who paid", () => {
+    expect(clientMoney({ ...m, billedCents: 300_000, paidCents: 0, owedCents: 300_000 }, 500_000)).toBeNull();
+    expect(clientMoney({ ...m, billedCents: 300_000, paidCents: 0, owedCents: 300_000 }, 0)?.openCents).toBe(300_000);
+  });
+});
+
+describe("clientTimeline", () => {
+  const row = (over = {}) => ({ name: "Framing", planned_from: null, planned_to: null, verified_at: null, ...over });
+
+  it("is nothing without a date anywhere", () => {
+    expect(clientTimeline([], null)).toBeNull();
+    expect(clientTimeline([row()], null)).toBeNull();
+  });
+
+  it("takes a promised day, a planned date or a done phase as an answer", () => {
+    expect(clientTimeline([], "2026-12-01")).toEqual({ promised: "2026-12-01", phases: [] });
+    expect(clientTimeline([row({ planned_to: "2026-12-01" }), row({ name: "Paint" })], null)?.phases.map((p) => p.name)).toEqual(["Framing", "Paint"]);
+    expect(clientTimeline([row({ verified_at: "2026-11-01T15:00:00Z" })], null)?.phases[0].done).toBe(true);
+  });
+
+  it("carries only names and dates", () => {
+    const [p] = clientTimeline([row({ planned_from: "2026-11-01", note: "failed once", verified_by: "eli@x" })], null)!.phases;
+    expect(Object.keys(p).sort()).toEqual(["done", "from", "name", "to"]);
   });
 });
 

@@ -3,12 +3,13 @@
 // a table never reaches a client by accident. Server only.
 
 import { newToken } from "@/lib/billing/documents";
-import { jobOfNumber } from "@/lib/billing/jobMoney";
+import { jobOfNumber, unplacedPaidFor } from "@/lib/billing/jobMoney";
+import { loadJobMoney } from "@/lib/billing/jobMoneyLoad";
 import { logComplaint } from "@/lib/complaints/store";
 import { getJobRef, type JobRef } from "@/lib/jobs/hub";
 import { proposalNumber } from "@/lib/sales/store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { cleanSections, clientDocuments, clientLogText, COMPLAINTS_PER_DAY, LOG_DAYS, withApprovals, type ClientDoc, type PortalDocRow, type PortalSection } from "./rules";
+import { cleanSections, clientDocuments, clientLogText, clientMoney, clientTimeline, COMPLAINTS_PER_DAY, LOG_DAYS, withApprovals, type ClientDoc, type ClientMoney, type ClientTimeline, type PhaseRow, type PortalDocRow, type PortalSection } from "./rules";
 
 const UNIQUE_VIOLATION = "23505";
 /** How the app shows who logged a complaint that came in on a link. */
@@ -117,6 +118,40 @@ export async function portalDocuments(jobId: string): Promise<ClientDoc[]> {
   const { data: register, error: coError } = cos.length ? await db.from("change_orders").select("document_id,status").in("document_id", cos) : { data: [], error: null };
   if (coError) throw new Error(`portal change orders: ${coError.message}`);
   return withApprovals(docs, new Map(((register ?? []) as { document_id: string; status: string }[]).map((c) => [c.document_id, c.status])));
+}
+
+/** The figures a client may see, and what's holding them back. */
+async function moneyView(jobId: string): Promise<{ money: ClientMoney | null; unplacedCents: number }> {
+  const { jobs, unplaced } = await loadJobMoney([jobId]);
+  const unplacedCents = unplacedPaidFor(jobId, unplaced);
+  return { money: jobs[0] ? clientMoney(jobs[0], unplacedCents) : null, unplacedCents };
+}
+
+/** Only the totals: never the bills behind them, and never `unplaced`, which holds other jobs'. */
+export async function portalMoney(jobId: string): Promise<ClientMoney | null> {
+  return (await moneyView(jobId)).money;
+}
+
+/** Phase names and dates and the promised day. Not the phase's note or who verified it. */
+export async function portalTimeline(ref: Pick<JobRef, "crewId">): Promise<ClientTimeline | null> {
+  if (!ref.crewId) return null;
+  const db = getSupabaseAdmin();
+  const [phases, job] = await Promise.all([
+    db.from("crew_job_phases").select("name,planned_from,planned_to,verified_at").eq("job_id", ref.crewId).order("ord", { ascending: true }),
+    db.from("crew_jobs").select("promised").eq("id", ref.crewId).maybeSingle(),
+  ]);
+  if (phases.error) throw new Error(`portal phases: ${phases.error.message}`);
+  if (job.error) throw new Error(`portal job: ${job.error.message}`);
+  return clientTimeline((phases.data ?? []) as PhaseRow[], (job.data as { promised: string | null } | null)?.promised ?? null);
+}
+
+export type PortalPreview = { money: ClientMoney | null; unplacedCents: number; timeline: boolean };
+
+/** What the owner's card says a client would see. A failed read shows as nothing to show, the same as the page. */
+export async function portalPreview(ref: Pick<JobRef, "billingId" | "crewId">): Promise<PortalPreview> {
+  const nothing = { money: null, unplacedCents: 0 };
+  const [view, timeline] = await Promise.all([ref.billingId ? moneyView(ref.billingId).catch(() => nothing) : nothing, portalTimeline(ref).catch(() => null)]);
+  return { ...view, timeline: !!timeline };
 }
 
 export type ClientLog = { id: number; day: string; weather: string; text: string };

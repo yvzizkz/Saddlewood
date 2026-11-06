@@ -12,7 +12,7 @@ import { drill, hrefOf, type DrillSpec } from "@/lib/analytics/drill";
 import { formatValue } from "@/lib/analytics/format";
 import { siteUrl } from "@/lib/billing/http";
 import { jobMargin } from "@/lib/billing/jobOpening";
-import { livePortal } from "@/lib/portal/store";
+import { livePortal, portalPreview } from "@/lib/portal/store";
 import { inRange, resolvePeriod } from "@/lib/analytics/period";
 import type { LaborRow } from "@/lib/accounting/labor";
 import type { PurchaseItemRow } from "@/lib/accounting/purchases";
@@ -809,7 +809,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   const portal: PortalState | undefined =
     owner && ref.billingId
       ? await livePortal(ref.billingId).then(
-          (p) => (p ? { href: `${siteUrl()}/c/${p.token}`, sections: p.sections } : null),
+          async (p) => (p ? { href: `${siteUrl()}/c/${p.token}`, sections: p.sections, preview: await portalPreview(ref) } : null),
           (err) => {
             console.error("client portal:", err);
             return undefined;

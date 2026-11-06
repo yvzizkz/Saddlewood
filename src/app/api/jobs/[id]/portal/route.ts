@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { jobForWrite, workSeat } from "@/lib/jobs/access";
 import { PORTAL_SECTIONS } from "@/lib/portal/rules";
-import { createPortal, revokePortal, setPortalSections } from "@/lib/portal/store";
+import { createPortal, portalPreview, revokePortal, setPortalSections } from "@/lib/portal/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ async function ownersJob(id: string) {
   const ref = await jobForWrite(seat, id);
   if (!ref) return { fail: NextResponse.json({ ok: false, error: "No such job." }, { status: 404 }) };
   if (!ref.billingId) return { fail: NextResponse.json({ ok: false, error: "This job has no billing record yet." }, { status: 409 }) };
-  return { jobId: ref.billingId, email: seat.email };
+  return { jobId: ref.billingId, email: seat.email, ref };
 }
 
 const failed = (err: unknown) => {
@@ -36,7 +36,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   if (job.fail) return job.fail;
   try {
     const { token, sections } = await createPortal(job.jobId, job.email);
-    return NextResponse.json({ ok: true, token, sections });
+    return NextResponse.json({ ok: true, token, sections, preview: await portalPreview(job.ref) });
   } catch (err) {
     return failed(err);
   }
