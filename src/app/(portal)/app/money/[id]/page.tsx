@@ -8,6 +8,7 @@ import VoidButton from "@/components/money/VoidButton";
 import WaiverPanel from "@/components/billing/WaiverPanel";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getDocument, listEvents } from "@/lib/billing/documents";
+import { jobOfBill } from "@/lib/billing/jobMoney";
 import { listExhibits } from "@/lib/billing/exhibits";
 import { paidByDocument, paymentsForDocument } from "@/lib/billing/payments";
 import { describeDevice, summarizeProof } from "@/lib/billing/proof";
@@ -55,6 +56,14 @@ function eventLine(e: DocumentEvent): string {
   }
 }
 
+/** The bot's invoices carry no job, only a number, and are placed by it everywhere else too. */
+async function placedJob(doc: { jobId: string | null; number: string; kind: string }): Promise<string | null> {
+  if (doc.jobId) return doc.jobId;
+  const { data, error } = await getSupabaseAdmin().from("jobs").select("id,number_prefix");
+  if (error) throw new Error(`jobs: ${error.message}`);
+  return jobOfBill(doc, ((data ?? []) as { id: string; number_prefix: string | null }[]).map((j) => ({ id: j.id, prefix: j.number_prefix })));
+}
+
 export default async function MoneyDocument({ params }: { params: Promise<{ id: string }> }) {
   // Owners: everything. A PM with money.view: read only, on their own jobs.
   const seat = await moneySeatForPage("receivables");
@@ -62,7 +71,9 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const doc = await getDocument(id);
-  if (!doc || !seesBillingJob(seat, doc.jobId)) notFound();
+  if (!doc) notFound();
+  const jobId = await placedJob(doc);
+  if (!seesBillingJob(seat, jobId)) notFound();
 
   const [events, exhibits, payments, paid] = await Promise.all([listEvents(doc.id), listExhibits(doc.id), paymentsForDocument(doc.id), paidByDocument([doc.id])]);
   const p = paid.get(doc.id);
@@ -71,7 +82,7 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
   const proof = summarizeProof(events);
   const clientLink = doc.token ? `/d/${doc.token}?copy=1` : null;
   // Where it belongs: its job (and the sale that won it), so a document is never a dead end.
-  const job = doc.jobId ? await getJobRef(doc.jobId).catch(() => null) : null;
+  const job = jobId ? await getJobRef(jobId).catch(() => null) : null;
   // The waiver this invoice owes (the client's profile asks for one) and the register's row for it (0040).
   const db = getSupabaseAdmin();
   const [clientRow, waiverRow] = await Promise.all([
@@ -87,7 +98,7 @@ export default async function MoneyDocument({ params }: { params: Promise<{ id: 
         <Link href="/app/accounting/receivables" className="text-[var(--color-teal)]">
           ← Receivables
         </Link>
-        {job && seat.owner ? (
+        {job ? (
           <Link href={jobHref(job.key, "money")} className="text-[var(--color-teal)] underline-offset-2 hover:underline">
             Job: {job.name}
           </Link>

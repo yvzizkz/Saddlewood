@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeSales, salesError } from "@/lib/sales/access";
 import { loadInbox } from "@/lib/sales/inbox";
+import { applicationsWaiting } from "@/lib/webforms/store";
 import { metrics } from "@/lib/sales/pipeline";
 import { createOpportunity, listOpportunities, type NewOpportunity } from "@/lib/sales/store";
 import { newOpportunitySchema } from "@/lib/sales/validate";
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
     const today = localDay();
     const tracked = new Set(rows.map((r) => r.externalRef).filter((r): r is string => !!r));
     const inbox = await loadInbox(tracked);
+    const office = gate.seat.role === "owner" || gate.seat.role === "staff";
     return NextResponse.json({
       ok: true,
       today,
@@ -29,7 +31,8 @@ export async function GET(request: NextRequest) {
       inbox: inbox.items,
       inboxSyncedAt: inbox.syncedAt,
       me: gate.who.actor,
-      canSyncLeads: gate.seat.role === "owner" || gate.seat.role === "staff",
+      canSyncLeads: office,
+      applicationsWaiting: office ? await applicationsWaiting() : 0,
     });
   } catch (err) {
     return salesError(err, "load the pipeline");
