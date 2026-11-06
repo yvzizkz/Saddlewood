@@ -25,7 +25,7 @@ const LOOKS_LIKE: Record<BillingAttachment, RegExp> = {
 };
 
 const isWaiver = (a: BillingAttachment) => a === "conditional_waiver" || a === "final_waiver";
-const isBill = (kind: string) => kind === "invoice" || kind === "statement";
+export const isBill = (kind: string) => kind === "invoice" || kind === "statement";
 
 export type PackageDoc = { id: string; number: string; kind: string; exhibits: { label: string }[] };
 export type PackageItem = { attachment: BillingAttachment; label: string; missing: { id: string; number: string }[] };

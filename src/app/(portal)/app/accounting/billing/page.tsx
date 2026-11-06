@@ -173,9 +173,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                       </div>
                     </div>
                     {c.attachments.length ? <p className="mt-2 text-[11px] text-[var(--color-charcoal-light)]">With every invoice: {c.attachments.join(", ")}</p> : null}
-                    {c.packageSentOn ? (
-                      <p className="mt-2 text-xs font-medium text-[#2f6b4a]">Package sent {formatValue("date", c.packageSentOn)}</p>
-                    ) : c.packageGroupId && seat.owner ? (
+                    {c.packageSentOn ? <p className="mt-2 text-xs font-medium text-[#2f6b4a]">Package sent {formatValue("date", c.packageSentOn)}</p> : null}
+                    {c.packageGroupId && seat.owner ? (
                       <Link href={`/app/bill?group=${c.packageGroupId}`} className="mt-2 inline-block text-xs font-medium underline">
                         {c.packageLateFor ? `Late for ${formatValue("date", c.packageLateFor)}: open the package` : "Open the package"}
                       </Link>

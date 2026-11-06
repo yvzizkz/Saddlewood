@@ -21,7 +21,7 @@ import { loadWaiting } from "@/lib/owner/load";
 import type { Lane } from "@/lib/owner/lanes";
 import type { WaitingItem } from "@/lib/owner/waiting";
 import { loadPayables } from "@/lib/accounting/payables";
-import { loadBillingCalendar } from "@/lib/accounting/receivables";
+import { loadBillingCalendar, packageTaskDay } from "@/lib/accounting/receivables";
 import { loadChangeOrders, loadWaivers, type CoRow } from "@/lib/billing/registers";
 import { POLICY_DEFAULTS } from "@/lib/policies/rules";
 import { loadPolicies } from "@/lib/policies/store";
@@ -212,12 +212,12 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
   // the PM's percent complete 3 business days before, then finance builds it.
   for (const c of calendar) {
     const base = { source: "billing" as const, assignee: "", jobKey: null, job: "", since: null, href: "/app/accounting/billing", editable: false };
-    const pack = (day: string) => {
+    // Open until this cycle's package has gone and none is waiting; one that missed its cutoff stays, past due, until it goes.
+    const packDay = packageTaskDay(c, today);
+    if (packDay) {
       const href = c.packageGroupId ? `/app/bill?group=${c.packageGroupId}` : base.href;
-      out.push({ ...base, href, id: `pk${c.clientId}:${day}`, kind: "billing", title: `Invoice package for ${c.client}`, detail: [c.delivery, ...c.attachments].join(" · "), role: "finance", dueOn: day, ...placeItem("finance", day, 0, today) });
-    };
-    // One that missed its cutoff stays on the list, past due, until it goes.
-    if (c.packageLateFor) pack(c.packageLateFor);
+      out.push({ ...base, href, id: `pk${c.clientId}:${packDay}`, kind: "billing", title: `Invoice package for ${c.client}`, detail: [c.delivery, ...c.attachments].join(" · "), role: "finance", dueOn: packDay, ...placeItem("finance", packDay, 0, today) });
+    }
     if (c.prepOn > addDays(today, 7)) continue;
     // Done once every open job billed by percent complete has the PM's report for this cycle (sent from the job's Money tab).
     const allIn = c.sovJobs > 0 && c.reported >= c.sovJobs;
@@ -225,8 +225,6 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
       const progress = c.sovJobs ? `${c.reported} of ${c.sovJobs} reported` : `${c.openJobs} open job${c.openJobs === 1 ? "" : "s"}`;
       out.push({ ...base, id: `pc${c.clientId}:${c.day}`, kind: "billing", title: `% complete and photos for ${c.client}`, detail: `${progress} · bills ${c.day}`, role: "pm", dueOn: c.prepOn, ...placeItem("pm", c.prepOn, 0, today) });
     }
-    // Done once this cycle's package has gone out; until then it opens the one waiting.
-    if (!c.packageSentOn && !c.packageLateFor) pack(c.day);
   }
 
   // Waivers owed: ours with an invoice, a sub's before we pay (S9).
