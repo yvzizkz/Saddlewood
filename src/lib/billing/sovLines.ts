@@ -1,8 +1,9 @@
 // A job's schedule of values, one row per line in public.sov_lines (migration
-// 0055). Award writes it; progress billing reads it. A draw names a line by
+// 0055). Award writes it, or an owner brings it in on a job from before the app
+// (scheduleEntry.ts); progress billing reads it. A draw names a line by
 // its id ("line:<id>"), so the schedule's order never moves a draw onto the
-// wrong line. Lines are never edited; Award may replace a schedule nothing has
-// billed yet (the database refuses to delete a line a draw billed). Server only.
+// wrong line. Lines are never edited; a schedule nothing has billed yet may be
+// replaced (the database refuses to delete a line a draw billed). Server only.
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { SovLine } from "@/lib/sales/award";

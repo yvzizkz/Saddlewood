@@ -12,7 +12,9 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/bot/ui'
 import { formatValue } from '@/lib/analytics/format'
-import { computeDraw, shareOf, type PmReport, type ProgressLine } from '@/lib/billing/progress'
+import { computeDraw, type PmReport, type ProgressLine } from '@/lib/billing/progress'
+import type { ScheduleEntryLine } from '@/lib/billing/scheduleEntry'
+import ScheduleEntry from './ScheduleEntry'
 
 type State = {
   lines: ProgressLine[]
@@ -21,6 +23,10 @@ type State = {
   lastIssued: { id: string; number: string } | null
   draws: number
   opening: Record<string, number>
+  openingCents: number
+  awarded: boolean
+  trackerDraft: { name: string; invoice: string; draft: boolean; lines: ScheduleEntryLine[] } | null
+  billedInCents: boolean
   deposit: { cents: number; appliedCents: number; number: string } | null
   report: PmReport | null
 }
@@ -35,6 +41,7 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
   const [pcts, setPcts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [openingMode, setOpeningMode] = useState(false)
+  const [entering, setEntering] = useState(false)
 
   const load = async () => {
     const res = await fetch(`/api/jobs/${encodeURIComponent(jobKey)}/progress`, { cache: 'no-store' })
@@ -58,11 +65,19 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
   const draw = useMemo(() => (state ? computeDraw(state.lines, openingMode ? {} : asked, state.retainagePct, state.deposit) : null), [state, asked, openingMode])
 
   // What was billed before the app (Joist), so this total and the invoices below reconcile.
-  const before = state ? state.lines.reduce((a, l) => a + (state.opening[l.key] ? shareOf(l.scheduledCents, state.opening[l.key]) : 0), 0) : 0
+  const before = state?.openingCents ?? 0
 
   if (error) return <p className="rounded-2xl border border-dashed border-[var(--color-stone-mid)] p-4 text-sm text-[var(--color-charcoal-light)]">{error}</p>
   if (!state || !draw) return <p className="p-4 text-sm text-[var(--color-charcoal-light)]">Loading the schedule of values…</p>
-  if (!state.lines.length) return <p className="rounded-2xl border border-dashed border-[var(--color-stone-mid)] p-4 text-sm text-[var(--color-charcoal-light)]">No schedule of values on this job. Award writes one from the accepted proposal.</p>
+  const canEnter = !reporting && !state.awarded && state.draws === 0
+  if (entering) return <ScheduleEntry jobKey={jobKey} tracker={state.trackerDraft} changeOrders={state.lines.filter((l) => l.kind === 'co')} onDone={() => (setEntering(false), void load(), router.refresh())} onCancel={() => setEntering(false)} />
+  if (!state.lines.length)
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-[var(--color-stone-mid)] p-4 text-sm text-[var(--color-charcoal-light)]">
+        <p>No schedule of values on this job. Award writes one from the accepted proposal.</p>
+        {canEnter ? <Button onClick={() => setEntering(true)}>Bring in a schedule</Button> : null}
+      </div>
+    )
 
   const post = async (action: 'draw' | 'opening' | 'report') => {
     setBusy(action)
@@ -253,9 +268,14 @@ export default function ProgressBilling({ jobKey, mode = 'owner' }: { jobKey: st
             <Button variant="primary" busy={busy === 'draw'} disabled={!!state.openDraft || draw.errors.length > 0 || draw.grossCents <= 0} onClick={() => post('draw')}>
               Make the draft invoice
             </Button>
-            {state.draws === 0 ? (
+            {state.draws === 0 && !state.billedInCents ? (
               <Button variant="quiet" onClick={() => (setOpeningMode(true), setPcts(Object.fromEntries(Object.entries(state.opening).map(([k, v]) => [k, String(v)]))))}>
                 Billed before the app?
+              </Button>
+            ) : null}
+            {canEnter ? (
+              <Button variant="quiet" onClick={() => setEntering(true)}>
+                Change the schedule
               </Button>
             ) : null}
             {state.lastIssued && !state.openDraft ? (
