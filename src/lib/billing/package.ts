@@ -70,7 +70,7 @@ export async function apAddresses(docs: readonly BillingDocument[]): Promise<str
   return ((data ?? []) as { email: string }[]).map((r) => r.email.trim().toLowerCase()).filter(Boolean);
 }
 
-/** A bill that reaches the super but not AP gets turned back, so a client with AP on file has them on the email. */
+/** A bill that goes to anyone but AP waits to be entered, so a client with AP on file has them on the email. */
 export function apGap(ap: readonly string[], recipients: readonly string[]): string | null {
   if (!ap.length || recipients.some((r) => ap.includes(r.trim().toLowerCase()))) return null;
   return `Their accounts payable has to be on this: ${ap.join(", ")}`;
