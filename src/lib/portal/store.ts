@@ -3,6 +3,7 @@
 // a table never reaches a client by accident. Server only.
 
 import { newToken } from "@/lib/billing/documents";
+import { jobOfNumber } from "@/lib/billing/jobMoney";
 import { logComplaint } from "@/lib/complaints/store";
 import { getJobRef, type JobRef } from "@/lib/jobs/hub";
 import { proposalNumber } from "@/lib/sales/store";
@@ -88,12 +89,30 @@ async function saleProposals(jobId: string): Promise<PortalDocRow[]> {
   return (data ?? []) as PortalDocRow[];
 }
 
+/**
+ * The bot issues invoices with no job, and that job_id is frozen too. One comes
+ * in by the rule the money card uses, its number's prefix, and because this page
+ * is the client's: only if it's also this job's client.
+ */
+async function numberedBills(jobId: string): Promise<PortalDocRow[]> {
+  const db = getSupabaseAdmin();
+  const { data: jobs, error } = await db.from("jobs").select("id,number_prefix,client_id");
+  if (error) throw new Error(`portal jobs: ${error.message}`);
+  const rows = (jobs ?? []) as { id: string; number_prefix: string | null; client_id: string | null }[];
+  const job = rows.find((j) => j.id === jobId);
+  if (!job?.number_prefix || !job.client_id) return [];
+  const { data, error: docError } = await db.from("documents").select(DOC_COLS).in("kind", ["invoice", "change_order"]).eq("status", "issued").is("job_id", null).eq("client_id", job.client_id).like("number", `${job.number_prefix}-%`);
+  if (docError) throw new Error(`portal bills: ${docError.message}`);
+  const moneyJobs = rows.map((j) => ({ id: j.id, prefix: j.number_prefix }));
+  return ((data ?? []) as PortalDocRow[]).filter((d) => jobOfNumber(d.number, moneyJobs) === jobId);
+}
+
 /** What we issued on the job, with each change order's standing. */
 export async function portalDocuments(jobId: string): Promise<ClientDoc[]> {
   const db = getSupabaseAdmin();
-  const [{ data, error }, proposals] = await Promise.all([db.from("documents").select(DOC_COLS).eq("job_id", jobId).eq("status", "issued"), saleProposals(jobId)]);
+  const [{ data, error }, proposals, bills] = await Promise.all([db.from("documents").select(DOC_COLS).eq("job_id", jobId).eq("status", "issued"), saleProposals(jobId), numberedBills(jobId)]);
   if (error) throw new Error(`portal documents: ${error.message}`);
-  const docs = clientDocuments([...((data ?? []) as PortalDocRow[]), ...proposals]);
+  const docs = clientDocuments([...((data ?? []) as PortalDocRow[]), ...proposals, ...bills]);
   const cos = docs.filter((d) => d.kind === "change_order").map((d) => d.id);
   const { data: register, error: coError } = cos.length ? await db.from("change_orders").select("document_id,status").in("document_id", cos) : { data: [], error: null };
   if (coError) throw new Error(`portal change orders: ${coError.message}`);

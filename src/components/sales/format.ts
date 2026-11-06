@@ -1,5 +1,7 @@
 // Small formatters shared by the Sales screens.
 
+const NOTE_MAX = 4000;
+
 // The one money formatter (src/lib/money.ts), under the name these screens use.
 export { usd } from "@/lib/money";
 
@@ -34,4 +36,10 @@ export function personName(email: string): string {
   const local = (email.split("@")[0] ?? "").replace(/^crew:\s*/, "");
   if (!local || local === "agent") return "Bot";
   return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
+/** The first timeline note, kept under the 4,000 a note can hold. */
+export function firstNote(i: { summary?: string; detail: string }): string | undefined {
+  const text = i.summary || i.detail;
+  return (text.length > NOTE_MAX ? `${text.slice(0, NOTE_MAX - 1)}…` : text) || undefined;
 }

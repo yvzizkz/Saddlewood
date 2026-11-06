@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 // The Sales inbox's call-list actions (moved from the old /internal/leads):
 // mark a caller, and ask the office Mac to sync GoHighLevel.
 
-const { gate, updateLeadStatusMock, createActionMock, getActionMock } = vi.hoisted(() => ({
+const { gate, updateLeadStatusMock, createActionMock, getActionMock, markMock } = vi.hoisted(() => ({
+  markMock: vi.fn(),
   gate: { role: "owner" as "owner" | "staff" | "member" | "agent" | null },
   updateLeadStatusMock: vi.fn(),
   createActionMock: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@/lib/sales/access", () => ({
   salesError: (_err: unknown, what: string) => NextResponse.json({ ok: false, error: `could not ${what}` }, { status: 500 }),
 }));
 vi.mock("@/lib/leads/store", () => ({ updateLeadStatus: updateLeadStatusMock }));
+vi.mock("@/lib/webforms/store", () => ({ markSubmission: markMock }));
 vi.mock("@/lib/bot/queries", () => ({ createAction: createActionMock, getAction: getActionMock }));
 
 import { GET, PATCH, POST } from "../route";
@@ -34,8 +36,25 @@ const req = (method: string, body?: unknown, query = "") =>
 beforeEach(() => {
   gate.role = "owner";
   updateLeadStatusMock.mockReset().mockResolvedValue(undefined);
+  markMock.mockReset().mockResolvedValue(true);
   createActionMock.mockReset().mockResolvedValue({ id: 7, status: "queued" });
   getActionMock.mockReset();
+});
+
+describe("PATCH: mark a website submission", () => {
+  it("the office can mark any form; a crew seat only a contact lead", async () => {
+    await PATCH(req("PATCH", { webId: 5, status: "dismissed" }));
+    expect(markMock).toHaveBeenLastCalledWith(5, "dismissed", ["contact", "trade_partner", "careers"]);
+    gate.role = "member";
+    await PATCH(req("PATCH", { webId: 5, status: "called" }));
+    expect(markMock).toHaveBeenLastCalledWith(5, "called", ["contact"]);
+    expect(updateLeadStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("says so when there's no such submission for this seat", async () => {
+    markMock.mockResolvedValue(false);
+    expect((await PATCH(req("PATCH", { webId: 5, status: "called" }))).status).toBe(404);
+  });
 });
 
 describe("PATCH: mark a caller", () => {
