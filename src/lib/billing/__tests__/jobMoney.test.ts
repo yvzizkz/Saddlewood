@@ -190,11 +190,43 @@ describe("money on a statement", () => {
     expect(placeMoney(i).unplaced).toEqual([]);
   });
 
-  it("a line the revision dropped leaves its money on the whole document", () => {
+  it("a line the revision dropped keeps its money with that line's job", () => {
     const first = doc({ kind: "statement", number: "AFT-1", snapshot: { lines: [{ description: "Invoice 8009-08", amountCents: 300_000 }, { description: "Invoice 5203-12", amountCents: 700_000 }] } });
     const next = doc({ kind: "statement", number: "AFT-1", revision: 2, supersedes: first.id, snapshot: { lines: [{ description: "Invoice 8009-09", amountCents: 300_000 }, { description: "Invoice 5203-12", amountCents: 700_000 }] } });
-    const { unplaced } = placeMoney(input([first, next], { paid: paid(first, 300_000, [[0, 300_000]]) }));
-    expect(unplaced.map((u) => [u.paidCents, u.lineIndex])).toEqual([[300_000, null]]);
+    const i = input([first, next], { paid: paid(first, 300_000, [[0, 300_000]]) });
+    expect(placeMoney(i).unplaced).toEqual([]);
+    expect(money(i)).toEqual([300_000, 300_000, 0]);
+    expect(money(i, RABBIT)).toEqual([700_000, 0, 700_000]);
+  });
+
+  it("a revision left with one job never takes the dropped line's money", () => {
+    const own = doc({ kind: "invoice", number: "5203-1", jobId: RABBIT, totalCents: 2000 });
+    const lines = [{ description: "Invoice 8009-1", amountCents: 1000 }, { description: "Invoice 5203-1", amountCents: 2000 }];
+    const first = doc({ kind: "statement", number: "AFT-1", snapshot: { lines } });
+    const next = doc({ kind: "statement", number: "AFT-1", revision: 2, supersedes: first.id, snapshot: { lines: [lines[0]] } });
+    const i = input([own, first, next], { paid: paid(first, 2000, [[1, 2000]]) });
+    expect(money(i)).toEqual([1000, 0, 1000]);
+    expect(money(i, RABBIT)).toEqual([2000, 2000, 0]);
+    expect(placeMoney(i).unplaced).toEqual([]);
+  });
+
+  it("a dropped line nobody can place holds, and the revision's job holds with it", () => {
+    const CLIENT = "client-a";
+    const jobs: MoneyJob[] = [{ id: JURY, prefix: "8009", clientId: CLIENT }, { id: RABBIT, prefix: "5203", clientId: CLIENT }];
+    const first = doc({ kind: "statement", number: "AFT-1", clientId: CLIENT, snapshot: { lines: [{ description: "Invoice 8009-1", amountCents: 1000 }, { description: "Retainage", amountCents: 500 }] } });
+    const next = doc({ kind: "statement", number: "AFT-1", clientId: CLIENT, revision: 2, supersedes: first.id, snapshot: { lines: [{ description: "Invoice 8009-1", amountCents: 1000 }] } });
+    const { unplaced } = placeMoney(input([first, next], { jobs, paid: paid(first, 500, [[1, 500]]) }));
+    expect(unplaced.map((u) => [u.paidCents, u.title])).toEqual([[500, "Retainage"]]);
+    expect(unplacedPaidFor(JURY, unplaced)).toBe(500);
+    expect(unplacedPaidFor(RABBIT, unplaced)).toBe(500);
+  });
+
+  it("a later statement re-listing an open invoice bills it once, and money on either line counts", () => {
+    const relist = { description: "Invoice 8009-08", amountCents: 100_000 };
+    const first = doc({ kind: "statement", number: "AFT-1", snapshot: { lines: [relist] } });
+    const later = doc({ kind: "statement", number: "AFT-2", snapshot: { lines: [relist, { description: "Invoice 8009-09", amountCents: 50_000 }] } });
+    expect(money(input([first, later]))).toEqual([150_000, 0, 150_000]);
+    expect(money(input([first, later], { paid: paid(later, 40_000, [[0, 40_000]]) }))).toEqual([150_000, 40_000, 110_000]);
   });
 });
 
@@ -264,8 +296,23 @@ describe("money with no client on the document", () => {
   it("paid money nothing can place could be any job's, so every job holds", () => {
     const paidBill = doc({ kind: "invoice", number: "7777-01", totalCents: 1000 });
     const { unplaced } = placeMoney(input([paidBill], { jobs, paid: new Map([[paidBill.id, { total: 1000, byLine: new Map() }]]) }));
-    expect(unplaced[0].couldBe).toEqual([]);
+    expect(unplaced[0].couldBe).toBeNull();
     for (const j of jobs) expect(unplacedPaidFor(j.id, unplaced)).toBe(1000);
+  });
+
+  it("a known client with no jobs holds nobody else's", () => {
+    const paidBill = doc({ kind: "invoice", number: "7777-01", clientId: "client-c", totalCents: 1000 });
+    const { unplaced } = placeMoney(input([paidBill], { jobs, paid: new Map([[paidBill.id, { total: 1000, byLine: new Map() }]]) }));
+    expect(unplaced[0].couldBe).toEqual([]);
+    for (const j of jobs) expect(unplacedPaidFor(j.id, unplaced)).toBe(0);
+  });
+
+  it("no owner to be found and a line unclaimed, every job holds", () => {
+    const loose: MoneyJob[] = [{ id: JURY, prefix: "8009" }, { id: RABBIT, prefix: "5203" }];
+    const st = doc({ kind: "statement", number: "AFT-1", snapshot: { lines: [{ description: "Invoice 8009-08", amountCents: 1000 }, { description: "Retainage", amountCents: 1000 }] } });
+    const { unplaced } = placeMoney(input([st], { jobs: loose, paid: new Map([[st.id, { total: 500, byLine: new Map() }]]) }));
+    expect(unplaced[0].couldBe).toBeNull();
+    for (const j of loose) expect(unplacedPaidFor(j.id, unplaced)).toBe(500);
   });
 });
 

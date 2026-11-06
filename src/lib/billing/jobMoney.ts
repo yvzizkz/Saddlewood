@@ -45,7 +45,7 @@ export type MoneyItem = {
   /** The client (or the job) pays when their own client pays. */
   payWhenPaid: boolean;
   /** Unplaced money only: the jobs it might be. */
-  couldBe?: string[];
+  couldBe?: string[] | null;
 };
 
 /** Where a change order's document stands on the register. `invoiced`: an issued invoice billed it, whole or in part. */
@@ -102,10 +102,11 @@ export function placeMoney(input: MoneyInput): Placed {
   const unplaced: MoneyItem[] = [];
   type Draft = Omit<MoneyItem, "dueOn" | "payWhenPaid">;
   // The jobs a document's money might be: its client's, and any job with no client on file. With no
-  // client on the document, the jobs it's known to bill say whose it is.
-  const clientJobs = (d: BillingDocument, known: string[] = []) => {
+  // client on the document, the jobs it's known to bill say whose it is. Null when nothing says whose
+  // it is; an empty list is a known client with no job to hold.
+  const clientJobs = (d: BillingDocument, known: string[] = []): string[] | null => {
     const owners = new Set(d.clientId ? [d.clientId] : input.jobs.filter((j) => j.clientId && known.includes(j.id)).map((j) => j.clientId));
-    return owners.size ? input.jobs.filter((j) => !j.clientId || owners.has(j.clientId)).map((j) => j.id) : [];
+    return owners.size ? input.jobs.filter((j) => !j.clientId || owners.has(j.clientId)).map((j) => j.id) : null;
   };
   const put = (d: BillingDocument, jobId: string | null, draft: Draft, couldBe = clientJobs(d)) => {
     const placed = jobId && jobBilling.has(jobId) ? jobId : null;
@@ -124,7 +125,8 @@ export function placeMoney(input: MoneyInput): Placed {
     return next ? newest(next) : id;
   };
   // What's paid on a replaced document moves to its revision, a line's money to the
-  // same line there. A line the revision no longer has leaves its money on the whole document.
+  // same line there. A line the revision no longer has keeps its money with that line's
+  // job, or holds it with the owners: the revision's own lines never claim it.
   const docById = new Map(input.documents.map((d) => [d.id, d]));
   const movedPaid = new Map<string, number>();
   const movedLines = new Map<string, Map<number, number>>();
@@ -132,19 +134,33 @@ export function placeMoney(input: MoneyInput): Placed {
     const paid = input.paid.get(id);
     if (!paid?.total) continue;
     const to = newest(id);
-    movedPaid.set(to, (movedPaid.get(to) ?? 0) + paid.total);
-    const from = docById.get(id)?.snapshot.lines ?? [];
-    const lines = docById.get(to)?.snapshot.lines ?? [];
+    const old = docById.get(id);
+    const revision = docById.get(to);
+    const from = old?.snapshot.lines ?? [];
+    const lines = revision?.snapshot.lines ?? [];
     const onto = movedLines.get(to) ?? new Map<number, number>();
+    let dropped = 0;
     for (const [i, cents] of paid.byLine) {
       const same = lines.findIndex((l) => l.description === from[i]?.description);
-      if (same >= 0) onto.set(same, (onto.get(same) ?? 0) + cents);
+      if (same >= 0) {
+        onto.set(same, (onto.get(same) ?? 0) + cents);
+        continue;
+      }
+      dropped += cents;
+      if (!old || !revision) continue;
+      const named = invoiceNamedIn(from[i]?.description ?? "");
+      const jobId = (named && (ownDocs.get(named) ?? jobOfNumber(named, input.jobs))) || old.jobId;
+      put(revision, jobId, { number: named ?? normalizeNumber(old.number), title: from[i]?.description ?? "Paid on a line the revision dropped", documentId: to, lineIndex: null, billedCents: 0, paidCents: cents }, clientJobs(old));
     }
+    movedPaid.set(to, (movedPaid.get(to) ?? 0) + paid.total - dropped);
     movedLines.set(to, onto);
   }
   // The register names a change order's first document; a revision of it stands the same.
   const standing = new Map([...input.changeOrders].map(([id, co]) => [newest(id), co]));
 
+  // A later statement re-lists an invoice still open: billed once, on the first statement to
+  // name it, whichever line it's paid on. Two lines on one statement are two amounts.
+  const listed = new Set<string>();
   for (const d of bills) {
     if (replacedBy.has(d.id)) continue;
     const paid = input.paid.get(d.id);
@@ -180,7 +196,8 @@ export function placeMoney(input: MoneyInput): Placed {
       }
       const jobId = (named && jobOfNumber(named, input.jobs)) || d.jobId;
       lineJobs.add(jobId);
-      items.push({ jobId, item: { ...base, billedCents: l.amountCents } });
+      const again = !!named && listed.has(named);
+      if (!again || base.paidCents) items.push({ jobId, item: { ...base, billedCents: again ? 0 : l.amountCents } });
     });
     // Money applied to the statement as a whole (no line) belongs to a job only
     // when every line it could pay is that job's; otherwise it waits with the owners.
@@ -196,7 +213,8 @@ export function placeMoney(input: MoneyInput): Placed {
       }
       if (lineless > 0) {
         const known = [...lineJobs].filter((j): j is string => !!j);
-        const couldBe = known.length === lineJobs.size && known.length ? known : [...new Set([...known, ...clientJobs(d, known)])];
+        const others = clientJobs(d, known);
+        const couldBe = known.length === lineJobs.size && known.length ? known : others && [...new Set([...known, ...others])];
         put(
           d,
           only,
@@ -213,13 +231,17 @@ export function placeMoney(input: MoneyInput): Placed {
       }
     }
     for (const x of items) put(d, x.jobId, x.item);
+    for (const l of lines) {
+      const named = invoiceNamedIn(l.description);
+      if (named) listed.add(named);
+    }
   }
   return { byJob, unplaced };
 }
 
 /** Money received that sits on no job yet and could be this one's, so this job's Paid and Open can't be trusted. With nothing to say whose it is, it could be anyone's. */
 export function unplacedPaidFor(jobId: string, unplaced: readonly MoneyItem[]): number {
-  return unplaced.reduce((sum, u) => sum + (!u.couldBe?.length || u.couldBe.includes(jobId) ? u.paidCents : 0), 0);
+  return unplaced.reduce((sum, u) => sum + (u.couldBe == null || u.couldBe.includes(jobId) ? u.paidCents : 0), 0);
 }
 
 export type OpenBill = { number: string; title: string; owedCents: number; dueOn: string | null; daysLate: number | null; payWhenPaid: boolean; documentId?: string };
