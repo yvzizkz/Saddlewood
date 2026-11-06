@@ -116,6 +116,10 @@ Each scenario drives the screens a person in that seat would use, writes through
    - On `9146 W Hutton Dr` (Schifferer Built LLC, closes the 20th), the PM sends `% complete` + note (`Send my % complete`), which clears `"% complete and photos for Schifferer Built LLC (Synthetic)"` from `Tasks`; off-job reports (`404`) and PM draw attempts (`403`) are refused.
    - On `3526 Emerson Street (Powell)`, backward `%` is refused (`400` + UI guard); the PM reports Framing `90% → 95%` (`+$8,250.00`), the owner opens `Job › Money` to see `"Eli Ramirez's % complete"` prefilled at `95%` (`$8,250.00`), clicks `"Make the draft invoice"` to create the `$8,250.00` draft, and the report banner clears once spent by the draw.
 
+5. **The January move: a job's opening** (`e2e/job-opening.spec.ts`).
+   - An owner enters, on `Job › Money`, the contract and one figure for what was billed and paid in full before the app, through a date, with where it came from. On Powell's real numbers: contract `$817,980.97`, `$613,172.83` through #3526-12, plus #3526-13's `$30,000` in the app gives Billed `$643,172.83`, Collected `$613,172.83`, Open `$30,000`.
+   - A date that would hold a bill already in the app is refused (`would count twice`). Each save is a new row, and the newest counts. A PM can't write it.
+
 ## 9. A change order's week (the Jury job, AFT)
 
 One CO end to end, with each step handing to the next (every step also has its own spec: `co-intake`, `co-price`, `co-approve`, `joist-sync`, `powell-draw`).
@@ -154,6 +158,10 @@ A PM or a field lead doesn't get the card. Turning a link off is for good: the o
 ## 13. What the website sends (`e2e/web-forms.spec.ts`)
 
 Every website form is kept in the app beside GoHighLevel and email (`web_submissions`, 0067). A contact-form lead shows in the Sales inbox with or without a phone. Opening the row shows everything they sent; one tap tracks it as a website lead with that on the timeline, or mark it called, texted or dismissed. Trade-partner and job applications show at `Sales › Website applications` for owners and staff, who close them with Done. A form fails only if every channel fails.
+
+## Who's on the app (`e2e/on-the-app.spec.ts`)
+
+Owners track the January move at `Crew › Who's on the app`: each person's last opened, last clock-in, clock-ins in 7 days, last daily log and whether a phone is on file. Field people count as using it when they clock in or log the day; opening it isn't enough, and neither are hours the office typed in for them. Office people count by opening it (`staff_seen`, 0066). The window is 90 days.
 
 ## What an owner, a PM and finance can and can't do today
 
