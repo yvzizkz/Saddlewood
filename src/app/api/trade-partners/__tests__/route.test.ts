@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Capture the Resend send call. The route does `new Resend(key).emails.send(...)`.
-const sendMock = vi.fn();
+const { sendMock, keepMock } = vi.hoisted(() => ({ sendMock: vi.fn(), keepMock: vi.fn() }));
+vi.mock("@/lib/webforms/store", () => ({ keepSubmission: keepMock }));
 vi.mock("resend", () => ({
   // Must be a real constructor — the route calls `new Resend(key)`.
   Resend: class {
@@ -33,6 +34,7 @@ const VALID = {
 beforeEach(() => {
   sendMock.mockReset();
   sendMock.mockResolvedValue({ error: null });
+  keepMock.mockReset().mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -84,7 +86,20 @@ describe("POST /api/trade-partners", () => {
     expect(arg.subject).toContain("Acme Framing LLC");
   });
 
-  it("returns 500 when no channel is configured (no email, no CRM)", async () => {
+  it("keeps the application in the app, enough on its own", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    keepMock.mockResolvedValue(true);
+    const res = await POST(makeRequest(VALID));
+    expect(res.status).toBe(200);
+    expect(keepMock.mock.calls[0][0]).toMatchObject({ form: "trade_partner", company: "Acme Framing LLC", about: "Framing / Rough Carpentry" });
+  });
+
+  it("keeps nothing from a bot", async () => {
+    await POST(makeRequest({ ...VALID, company: "bot-filled" }));
+    expect(keepMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when no channel delivers (no email, no CRM, no app)", async () => {
     vi.stubEnv("RESEND_API_KEY", ""); // email no-ops; GHL creds unset at import
     const res = await POST(makeRequest(VALID));
     expect(res.status).toBe(500);

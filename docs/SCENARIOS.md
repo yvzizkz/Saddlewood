@@ -133,6 +133,10 @@ One CO end to end, with each step handing to the next (every step also has its o
 
 The office, a PM or a field lead logs what the client said on the job's Tasks tab. It goes to that job's PM, or to Owner decisions on a job with no PM, due on the `complaints` policy (1 business day by default), and it is one row in Tasks. A day past due it moves up to Owner decisions. A PM closes an open one of theirs, once, with what was done, which stays on the job; they can't move it, re-date it, drop it, rewrite it or close one with Owner decisions. Only an owner can, and a drop needs a note too. A complaint from the client's link (§12) writes the same record.
 
+## 11. Who the job is for (`e2e/job-contact.spec.ts`)
+
+On the job's Overview, an owner links a job that has only a typed name to a client on file, or makes the client record from that name. They pick the job's contact from that client, or add one, and the database copies the contact's email and phone onto the job. A first contact keeps any email or phone already on the job that the record lacks; moving to another contact replaces them. A job's client is set once: moving a job to another client moves its money, so the app doesn't offer it. A PM reads the card and can't change it; a field lead's seat doesn't get it. A contact's email is also an address the client's documents may be mailed to, so adding one is owners only, and tests add them through this form, never with SQL.
+
 ## 12. The client's link (client portal, first slice, `e2e/client-portal.spec.ts`)
 
 An owner makes a job's link on the job's Overview (**Client link**) and copies it to send: nothing here emails anyone. The client opens `/c/<token>` with no sign-in, as they do every document we send. A new link shows the job's name, address and PM (by name, never an email), and nothing else until an owner turns a section on:
@@ -146,6 +150,10 @@ An owner makes a job's link on the job's Overview (**Client link**) and copies i
 A PM or a field lead doesn't get the card. Turning a link off is for good: the old one reads "not active", the same as a made-up one, and a new link gets a new token.
 
 **Not in this slice:** invoice paid or open (a payment can sit on a statement rather than the invoice, and "open" on something a client paid is worse than nothing), money from Joist, photos, the client's own uploads, allowances, the timeline, and a password or passkey in place of the link.
+
+## 13. What the website sends (`e2e/web-forms.spec.ts`)
+
+Every website form is kept in the app beside GoHighLevel and email (`web_submissions`, 0067). A contact-form lead shows in the Sales inbox with or without a phone. Opening the row shows everything they sent; one tap tracks it as a website lead with that on the timeline, or mark it called, texted or dismissed. Trade-partner and job applications show at `Sales › Website applications` for owners and staff, who close them with Done. A form fails only if every channel fails.
 
 ## What an owner, a PM and finance can and can't do today
 

@@ -86,6 +86,11 @@ export function jobOfNumber(number: string, jobs: MoneyJob[]): string | null {
   return best?.id ?? null;
 }
 
+/** The job a bill belongs to, by the two rules above. A statement has no job by its number: its lines are placed one by one. */
+export function jobOfBill(d: { jobId: string | null; number: string; kind: string }, jobs: MoneyJob[]): string | null {
+  return d.jobId ?? (d.kind === "statement" ? null : jobOfNumber(d.number, jobs));
+}
+
 /** Whether a change order's document is itself a bill right now. */
 export function coIsBill(co: CoStanding | undefined): boolean {
   return (co?.status === "signed" || co?.status === "billed") && !co.invoiced;
@@ -111,7 +116,7 @@ export function placeMoney(input: MoneyInput): Placed {
   };
 
   const bills = input.documents.filter((d) => d.status === "issued" && BILLS.has(d.kind));
-  const ownDocs = new Map(bills.filter((d) => d.kind !== "statement").map((d) => [normalizeNumber(d.number), d.jobId ?? jobOfNumber(d.number, input.jobs)]));
+  const ownDocs = new Map(bills.filter((d) => d.kind !== "statement").map((d) => [normalizeNumber(d.number), jobOfBill(d, input.jobs)]));
 
   const replacedBy = new Map(bills.flatMap((d) => (d.supersedes ? [[d.supersedes, d.id] as const] : [])));
   const newest = (id: string): string => {
@@ -147,7 +152,7 @@ export function placeMoney(input: MoneyInput): Placed {
     if (d.kind !== "statement") {
       const isBill = d.kind !== "change_order" || coIsBill(standing.get(d.id));
       if (!isBill && !paidCents) continue;
-      put(d, d.jobId ?? jobOfNumber(d.number, input.jobs), {
+      put(d, jobOfBill(d, input.jobs), {
         number: normalizeNumber(d.number),
         title: d.title,
         documentId: d.id,
