@@ -40,9 +40,11 @@ function license(summary: string): string {
 
 const digits = (s: string) => s.replace(/\D/g, "");
 
-/** "Sunfire Construction, LLC." and "SUNFIRE CONSTRUCTION" are one company. */
+/** "Sunfire Construction, LLC." and "SUNFIRE CONSTRUCTION" are one company, and so are "Piñas" and "Pinas". */
 function sameCompany(name: string): string {
   return name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9]+/g, " ")

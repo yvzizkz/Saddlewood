@@ -58,6 +58,7 @@ describe("findSub", () => {
   it("knows a company however it's spelled", () => {
     expect(findSub(application(), [sub({ name: "WALLCOVERING SOLUTIONS, L.L.C." })])?.id).toBe("s1");
     expect(findSub(application({ company: "A & B Drywall Inc." }), [sub({ name: "A and B Drywall" })])?.id).toBe("s1");
+    expect(findSub(application({ company: "Pinas Brothers Stucco and Lath LLC" }), [sub({ name: "Piñas Brothers Stucco and Lath" })])?.id).toBe("s1");
   });
 
   it("knows it by license digits, or by the email on the sub or a contact", () => {
