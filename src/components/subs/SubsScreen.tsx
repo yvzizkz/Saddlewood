@@ -39,16 +39,16 @@ export const STATUS_CHIP: Record<PackageStatus, { label: string; tone: 'ok' | 'w
   cancelled: { label: 'Cancelled', tone: 'quiet' },
 }
 
-export default function SubsScreen() {
+export default function SubsScreen({ find = '' }: { find?: string }) {
   const { toast } = useSalesToast()
-  const [tab, setTab] = useState<'bids' | 'subs' | 'scorecard'>('bids')
+  const [tab, setTab] = useState<'bids' | 'subs' | 'scorecard'>(find ? 'subs' : 'bids')
   const [packages, setPackages] = useState<PackageRow[] | null>(null)
   const [subs, setSubs] = useState<Sub[] | null>(null)
   const [scorecards, setScorecards] = useState<SubScorecard[] | null>(null)
   const [complianceSummary, setComplianceSummary] = useState<ComplianceSummary | null>(null)
   const [can, setCan] = useState({ manage: false, award: false })
   const [isOwner, setIsOwner] = useState(false)
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(find)
   const [trade, setTrade] = useState('')
   const [editing, setEditing] = useState<Sub | 'new' | null>(null)
   const [newPkg, setNewPkg] = useState(false)

@@ -59,6 +59,52 @@ test.describe("What the website sends", () => {
     }
   });
 
+  test("a trade partner goes on Subs in one tap, once, and a PM can't do it", async ({ owner: page, browser }) => {
+    const n = Date.now().toString().slice(-8);
+    const firm = `E2E Stucco Co ${n}`;
+    const again = `E2E Stucco Company, LLC ${n}`;
+    const email = `stucco${n}@example.com`;
+    const apply = (businessName: string, license: string, classifications: string[]) => page.request.post("/api/trade-partners", { data: { businessName, name: "Jo Stucco", email, phone: "4805550199", classifications, license, serviceArea: "Valley-wide", company: "" } });
+    const pmCtx = await browser.newContext();
+    try {
+      expect((await apply(firm, `ROC ${n}`, ["Stucco / Exterior", "Drywall & Insulation", "Other"])).ok()).toBe(true);
+      const id = sql(`select id from public.web_submissions where company = '${firm}'`);
+
+      await signIn(pmCtx, PM, { crew: true });
+      const pm = await pmCtx.newPage();
+      const refused = await pm.request.post(`/api/sales/applications/${id}/sub`);
+      expect(refused.ok()).toBe(false);
+      expect(sql(`select count(*) from public.subs where name = '${firm}'`)).toBe("0");
+
+      await page.goto("/app/sales/applications", { waitUntil: "networkidle" });
+      const card = (text: string) => page.getByRole("listitem").filter({ hasText: text });
+      await card(firm).getByRole("button", { name: "Add to Subs" }).click();
+      await expect(card(firm).getByRole("link", { name: `On Subs as ${firm}` })).toBeVisible();
+      await expect(card(firm).getByRole("button", { name: "Reopen" })).toBeVisible();
+      expect(sql(`select status from public.web_submissions where id = ${id}`)).toBe("dismissed");
+      expect(sql(`select status || '|' || array_to_string(trades, ',') || '|' || roc_license || '|' || email from public.subs where name = '${firm}'`)).toBe(`prospect|stucco,drywall,insulation|ROC ${n}|${email}`);
+      expect(sql(`select c.name || '|' || c.phone from public.sub_contacts c join public.subs s on s.id = c.sub_id where s.name = '${firm}' and c.active`)).toBe("Jo Stucco|4805550199");
+      expect(sql(`select note like '%Service area: Valley-wide%' from public.subs where name = '${firm}'`)).toBe("t");
+
+      // The same company applying again, spelled differently, is the same sub.
+      expect((await apply(again, "", ["Stucco / Exterior"])).ok()).toBe(true);
+      await page.reload({ waitUntil: "networkidle" });
+      await expect(card(again).getByRole("link", { name: `On Subs as ${firm}` })).toBeVisible();
+      await expect(card(again).getByRole("button", { name: "Add to Subs" })).toHaveCount(0);
+      const twice = await page.request.post(`/api/sales/applications/${sql(`select id from public.web_submissions where company = '${again}'`)}/sub`);
+      expect((await twice.json()).created).toBe(false);
+      expect(sql(`select count(*) from public.subs where name like 'E2E Stucco%${n}'`)).toBe("1");
+
+      await card(again).getByRole("link", { name: `On Subs as ${firm}` }).click();
+      await expect(page).toHaveURL(/\/app\/subs\?find=/);
+      await expect(page.getByLabel("Search the directory")).toHaveValue(firm);
+      await expect(page.getByText(firm, { exact: true })).toBeVisible();
+    } finally {
+      await pmCtx.close();
+      sql(`delete from public.sub_contacts where sub_id in (select id from public.subs where name like 'E2E Stucco%${n}'); delete from public.subs where name like 'E2E Stucco%${n}'; delete from public.web_submissions where email = '${email}';`);
+    }
+  });
+
   test("trade-partner and job applications wait on their own page; a PM can't open it", async ({ owner: page, browser }) => {
     const n = Date.now().toString().slice(-8);
     const firm = `E2E Framing ${n}`;

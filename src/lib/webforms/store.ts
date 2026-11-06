@@ -51,6 +51,14 @@ export async function applicationsWaiting(): Promise<number> {
   return (await listApplications()).filter((s) => s.status !== "dismissed").length;
 }
 
+export async function getSubmission(id: number): Promise<Submission | null> {
+  const { data, error } = await getSupabaseAdmin().from("web_submissions").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`web_submissions: ${error.message}`);
+  if (!data) return null;
+  const { created_at, ...s } = data as Omit<Submission, "createdAt"> & { created_at: string };
+  return { ...s, createdAt: created_at };
+}
+
 /** False when no such submission, or it's on a form this seat can't mark. */
 export async function markSubmission(id: number, status: WebStatus, forms: WebForm[]): Promise<boolean> {
   const { data, error } = await getSupabaseAdmin().from("web_submissions").update({ status }).eq("id", id).in("form", forms).select("id");

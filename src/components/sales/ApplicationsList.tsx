@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { botApi } from '@/components/bot/BotProvider'
@@ -9,7 +10,7 @@ import type { Submission } from '@/lib/webforms/store'
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-US', { timeZone: 'America/Phoenix', month: 'short', day: 'numeric' })
 
-function Row({ s, busy, onMark }: { s: Submission; busy: boolean; onMark: (s: Submission) => void }) {
+function Row({ s, busy, sub, onMark, onAdd }: { s: Submission; busy: boolean; sub?: string; onMark: (s: Submission) => void; onAdd: (s: Submission) => void }) {
   const done = s.status === 'dismissed'
   return (
     <Card className="space-y-1 px-3.5 py-3">
@@ -29,7 +30,17 @@ function Row({ s, busy, onMark }: { s: Submission; busy: boolean; onMark: (s: Su
         </Button>
       </div>
       <p className="whitespace-pre-line text-[13px] text-[var(--color-charcoal)]">{s.summary}</p>
-      <p className="flex gap-4 text-[13px]">
+      <p className="flex flex-wrap items-center gap-4 text-[13px]">
+        {s.form === 'trade_partner' && sub ? (
+          <Link className="underline" href={`/app/subs?find=${encodeURIComponent(sub)}`}>
+            On Subs as {sub}
+          </Link>
+        ) : null}
+        {s.form === 'trade_partner' && !sub ? (
+          <Button className="!px-3" busy={busy} disabled={busy} onClick={() => onAdd(s)}>
+            Add to Subs
+          </Button>
+        ) : null}
         {s.phone ? (
           <a className="underline" href={`tel:${s.phone.replace(/[^0-9+]/g, '')}`}>
             Call
@@ -45,7 +56,7 @@ function Row({ s, busy, onMark }: { s: Submission; busy: boolean; onMark: (s: Su
   )
 }
 
-export default function ApplicationsList({ rows }: { rows: Submission[] }) {
+export default function ApplicationsList({ rows, onSubs }: { rows: Submission[]; onSubs: Record<number, string> }) {
   const router = useRouter()
   const [busy, setBusy] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -65,6 +76,19 @@ export default function ApplicationsList({ rows }: { rows: Submission[] }) {
     }
   }
 
+  async function add(s: Submission) {
+    setBusy(s.id)
+    setError('')
+    try {
+      await botApi(`/api/sales/applications/${s.id}/sub`, { method: 'POST' })
+      router.refresh()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     <div className="space-y-3">
       {error ? <p className="text-[13px] text-[var(--color-charcoal)]">{error}</p> : null}
@@ -72,7 +96,7 @@ export default function ApplicationsList({ rows }: { rows: Submission[] }) {
       <ul className="space-y-3">
         {waiting.map((s) => (
           <li key={s.id}>
-            <Row s={s} busy={busy === s.id} onMark={mark} />
+            <Row s={s} busy={busy === s.id} sub={onSubs[s.id]} onMark={mark} onAdd={add} />
           </li>
         ))}
       </ul>
@@ -80,7 +104,7 @@ export default function ApplicationsList({ rows }: { rows: Submission[] }) {
       <ul className="space-y-3">
         {closed.map((s) => (
           <li key={s.id}>
-            <Row s={s} busy={busy === s.id} onMark={mark} />
+            <Row s={s} busy={busy === s.id} sub={onSubs[s.id]} onMark={mark} onAdd={add} />
           </li>
         ))}
       </ul>
