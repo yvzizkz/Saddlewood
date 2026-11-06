@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import AppShell from "@/components/bot/AppShell";
 import CrewShell from "@/components/crew/CrewShell";
 import { getViewer } from "@/lib/crew/auth";
+import { noteStaffSeen } from "@/lib/crew/rolloutStore";
 import { createClient } from "@/lib/supabase/server";
 
 // The Saddlewood app. One link for everyone, two different apps behind it:
@@ -26,6 +27,7 @@ export default async function BotAppLayout({ children }: Readonly<{ children: Re
   const viewer = await getViewer();
 
   if (viewer.kind === "anonymous") redirect("/login?next=/app");
+  if (viewer.kind === "staff") void noteStaffSeen(viewer.email);
   if (viewer.kind === "stranger") {
     const supabase = await createClient();
     await supabase.auth.signOut();
