@@ -32,7 +32,7 @@ function Row({ s, busy, sub, onMark, onAdd }: { s: Submission; busy: boolean; su
       <p className="whitespace-pre-line text-[13px] text-[var(--color-charcoal)]">{s.summary}</p>
       <p className="flex flex-wrap items-center gap-4 text-[13px]">
         {s.form === 'trade_partner' && sub ? (
-          <Link className="underline" href="/app/subs">
+          <Link className="underline" href={`/app/subs?find=${encodeURIComponent(sub)}`}>
             On Subs as {sub}
           </Link>
         ) : null}

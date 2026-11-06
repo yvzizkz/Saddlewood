@@ -73,7 +73,8 @@ test.describe("What the website sends", () => {
       await signIn(pmCtx, PM, { crew: true });
       const pm = await pmCtx.newPage();
       const refused = await pm.request.post(`/api/sales/applications/${id}/sub`);
-      expect(refused.status()).toBe(403);
+      expect(refused.ok()).toBe(false);
+      expect(sql(`select count(*) from public.subs where name = '${firm}'`)).toBe("0");
 
       await page.goto("/app/sales/applications", { waitUntil: "networkidle" });
       const card = (text: string) => page.getByRole("listitem").filter({ hasText: text });
@@ -94,8 +95,10 @@ test.describe("What the website sends", () => {
       expect((await twice.json()).created).toBe(false);
       expect(sql(`select count(*) from public.subs where name like 'E2E Stucco%${n}'`)).toBe("1");
 
-      await page.goto("/app/subs", { waitUntil: "networkidle" });
-      await expect(page.getByText(firm).first()).toBeVisible();
+      await card(again).getByRole("link", { name: `On Subs as ${firm}` }).click();
+      await expect(page).toHaveURL(/\/app\/subs\?find=/);
+      await expect(page.getByLabel("Search the directory")).toHaveValue(firm);
+      await expect(page.getByText(firm, { exact: true })).toBeVisible();
     } finally {
       await pmCtx.close();
       sql(`delete from public.sub_contacts where sub_id in (select id from public.subs where name like 'E2E Stucco%${n}'); delete from public.subs where name like 'E2E Stucco%${n}'; delete from public.web_submissions where email = '${email}';`);
