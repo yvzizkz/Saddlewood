@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { renderNotificationEmail } from "@/lib/emailTemplate";
+import { keepSubmission } from "@/lib/webforms/store";
 
 /**
  * Careers application API route — sister to /api/trade-partners and /api/contact,
  * same never-lose-a-submission contract: GHL upsert (tagged `applicant` + the role)
- * plus a Resend notification; success only if at least one channel delivers.
+ * plus a Resend notification plus the app (web_submissions, shown at
+ * /app/sales/applications); success only if at least one channel delivers.
  *
  * Deliberately captures basics only — role, contact, salary expectation, start
  * date, experience, languages — no work-history essay. Resumes arrive by reply.
@@ -158,9 +160,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const [ghlOk, emailOk] = await Promise.all([upsertToGhl(body), sendEmail(body)]);
+  const [ghlOk, emailOk, appOk] = await Promise.all([
+    upsertToGhl(body),
+    sendEmail(body),
+    keepSubmission({ form: "careers", name: body.name, email: body.email, phone: body.phone, about: body.role, summary: buildSummary(body) }),
+  ]);
 
-  if (!ghlOk && !emailOk) {
+  if (!ghlOk && !emailOk && !appOk) {
     console.error("[careers] ALL delivery channels failed. Payload:", buildSummary(body));
     return NextResponse.json(
       { success: false, error: "We couldn't submit your application — please email info@saddlewoodcontracting.com." },

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { renderNotificationEmail } from "@/lib/emailTemplate";
+import { keepSubmission } from "@/lib/webforms/store";
 
 /**
  * Contact Form API Route — lead fail-safe
  *
  * A submitted lead must NEVER be silently lost. This route delivers each lead
- * through up to two independent channels and only reports success if at least
+ * through up to three independent channels and only reports success if at least
  * one of them actually succeeds:
  *
  *   1. GoHighLevel  — primary CRM delivery via the Contacts upsert API, which is
@@ -15,8 +16,9 @@ import { renderNotificationEmail } from "@/lib/emailTemplate";
  *      if the API isn't configured or fails.
  *   2. Resend email — defense-in-depth notification to the team inbox, sent
  *      whenever RESEND_API_KEY is configured, even if GHL also succeeds.
+ *   3. The app      — kept in web_submissions, where it shows in the Sales inbox.
  *
- * If NEITHER channel delivers, the route returns HTTP 500 with
+ * If NO channel delivers, the route returns HTTP 500 with
  * { success: false } so the client surfaces an error (and the visitor is told
  * to call instead) rather than seeing a false "sent" confirmation.
  *
@@ -71,6 +73,27 @@ interface ContactBody {
   tags?: string[];
   /** Honeypot — must be empty. A non-empty value means a bot. */
   company?: string;
+}
+
+/** The whole lead as text, for the app. Scopes come from a public form: don't trust the shape. */
+function buildSummary(b: ContactBody): string {
+  return [
+    b.role === "builder" ? "Builder bid request" : "",
+    b.businessName ? `Company: ${b.businessName}` : "",
+    b.neighborhood ? `Neighborhood: ${b.neighborhood}` : "",
+    b.projectType ? `Project: ${b.projectType}` : "",
+    b.budget ? `Budget: ${b.budget}` : "",
+    b.timeline ? `Target start: ${b.timeline}` : "",
+    Array.isArray(b.scopes) && b.scopes.length ? `Scopes: ${b.scopes.join(", ")}` : "",
+    b.plansStatus ? `Plans: ${b.plansStatus}` : "",
+    b.plansLink ? `Plan set: ${b.plansLink}` : "",
+    b.bidDue ? `Bid due: ${b.bidDue}` : "",
+    b.projectLocation ? `Location: ${b.projectLocation}` : "",
+    b.message ? `Message: ${b.message}` : "",
+    b.source ? `Came from: ${b.source}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function buildHtml(b: ContactBody) {
@@ -251,17 +274,18 @@ export async function POST(request: Request) {
   }
 
   // Deliver to GHL (direct upsert preferred — it maps the full lead — with the
-  // inbound webhook as fallback) AND always email the team via Resend when
-  // configured. Upsert + email run in parallel; each fails soft.
-  const [ghlApiOk, resendOk] = await Promise.all([
+  // inbound webhook as fallback), email the team via Resend when configured,
+  // and keep it in the app. All in parallel; each fails soft.
+  const [ghlApiOk, resendOk, appOk] = await Promise.all([
     upsertToGhl(body),
     sendEmail(body),
+    keepSubmission({ form: "contact", name: body.name, email: body.email, phone: body.phone, company: body.businessName, about: body.projectType, summary: buildSummary(body) }),
   ]);
 
   // Only forward to the webhook if the direct upsert wasn't configured/didn't fire.
   const ghlWebhookOk = ghlApiOk ? false : await forwardToGhlWebhook(body);
 
-  const delivered = ghlApiOk || ghlWebhookOk || resendOk;
+  const delivered = ghlApiOk || ghlWebhookOk || resendOk || appOk;
 
   if (!delivered) {
     // Nothing accepted the lead — never report success. Log the full payload
@@ -278,6 +302,7 @@ export async function POST(request: Request) {
     delivered: {
       ghl: ghlWebhookOk || ghlApiOk,
       email: resendOk,
+      app: appOk,
     },
   });
 }
