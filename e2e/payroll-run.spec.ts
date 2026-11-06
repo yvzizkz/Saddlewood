@@ -92,7 +92,7 @@ test.describe("The Wednesday payroll run", () => {
       await expect(page.getByLabel("Name")).toHaveCount(6);
       await expect(page.getByLabel(/^Amount/).nth(1)).toHaveValue("3390.00");
       await expect(page.getByLabel(/^Amount/).first()).toHaveValue("960.00");
-      await expect(page.getByText("Was $1,489.25 last run")).toBeVisible();
+      await expect(page.getByText("Was $1,489.25")).toBeVisible();
       await page.getByRole("button", { name: "Save the run" }).click();
       const email = page.getByLabel("Email to the accountant");
       await expect(email).toContainText("Filiberto Villegas: 40 hours");
@@ -100,6 +100,11 @@ test.describe("The Wednesday payroll run", () => {
       await expect(email).toContainText("Omar Peña: $3,390");
       await expect(email).not.toContainText("Pena");
       await expect(email).not.toContainText("Arnoldo");
+
+      // Reopened, a saved figure is real: marking it by rate doesn't replace it with the clock's.
+      await page.reload({ waitUntil: "networkidle" });
+      await page.getByLabel("Paid as").nth(2).selectOption("rate");
+      await expect(page.getByLabel(/^Amount/).nth(1)).toHaveValue("3390.00");
     } finally {
       sql(`delete from public.crew_shifts where job_name = 'E2E' and day in ('${firstWeek}', '${nextWeek}')`);
       sql(`delete from public.payroll_runs where pay_date in ('${first}', '${next}')`);
@@ -127,7 +132,7 @@ test.describe("The Wednesday payroll run", () => {
       await expect(page.getByLabel(/^Amount/).first()).toHaveValue("3390.00");
       await page.getByLabel("Paid as").first().selectOption("rate");
       await expect(page.getByLabel(/^Amount/).first()).toHaveValue("50.00");
-      await expect(page.getByText("Was $3,390.00 last run")).toBeVisible();
+      await expect(page.getByText("Was $3,390.00")).toBeVisible();
 
       await page.getByLabel("Paid as").nth(1).selectOption("employee");
       await expect(page.getByLabel(/^Hours/).first()).toHaveValue("40");
@@ -145,6 +150,13 @@ test.describe("The Wednesday payroll run", () => {
       await expect(email).toContainText("Filiberto Villegas: 40 hours");
       await expect(email).toContainText("A. Hours: 30 hours");
       await expect(email).toContainText("R. Rate: $340");
+
+      // A new line isn't saved yet, so the email for the accountant goes until it is.
+      await page.getByRole("button", { name: "Add a person" }).click();
+      await expect(email).toHaveCount(0);
+
+      const badDate = await page.request.put("/api/accounting/payroll-run", { data: { payDate: "2098-13-45", lines: [line("Omar Peña", "sub", null, 339_000)] } });
+      expect(badDate.status()).toBe(400);
     } finally {
       sql(`delete from public.crew_shifts where job_name = 'E2E' and day = '${week}'`);
       sql(`delete from public.payroll_runs where pay_date in ('${first}', '${next}')`);

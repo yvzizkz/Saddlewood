@@ -53,6 +53,8 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
   const [done, setDone] = useState(saved)
   const [copied, setCopied] = useState(false)
 
+  // A pasted or saved figure is real, not carried, so the clock doesn't replace it.
+  const kept = pasted || saved
   const lines = useMemo(() => rows.map(toLine), [rows])
   const problem = rows.length ? runProblem(lines) : null
   const subject = runSubject(payDate)
@@ -62,7 +64,7 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
   const toSave = lines.map((l, i) => (matched[i] ? { ...l, email: matched[i].email } : l))
   const edit = (i: number, change: Partial<Row>) => (setRows(rows.map((r, n) => (n === i ? { ...r, ...change } : r))), setDone(false))
 
-  const link = (i: number, c: Clocked) => edit(i, { email: c.email, ...refilled(rows[i], fromClock(figures(rows[i]), c, pasted)) })
+  const link = (i: number, c: Clocked) => edit(i, { email: c.email, ...refilled(rows[i], fromClock(figures(rows[i]), c, kept)) })
 
   const save = async () => {
     setBusy(true)
@@ -115,7 +117,7 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
             <input className={INPUT} value={r.name} onChange={(e) => edit(i, { name: e.target.value })} maxLength={120} />
           </Field>
           <Field label="Paid as">
-            <select className={INPUT} value={paidAsOf(r)} onChange={(e) => edit(i, refilled(r, paidAs(figures(r), e.target.value as PaidAs, matched[i], pasted)))}>
+            <select className={INPUT} value={paidAsOf(r)} onChange={(e) => edit(i, refilled(r, paidAs(figures(r), e.target.value as PaidAs, matched[i], kept)))}>
               <option value="sub">Amount</option>
               <option value="rate">Hours × rate</option>
               <option value="employee">Hours</option>
@@ -128,7 +130,7 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
           ) : (
             <Field label="Amount">
               <input className={INPUT} inputMode="decimal" value={r.amount} onChange={(e) => edit(i, { amount: e.target.value })} />
-              {r.lastCents !== undefined ? <span className="mt-1 block text-xs font-medium text-[var(--color-charcoal)]">{r.lastCents === null ? 'Blank last run' : `Was ${usd(r.lastCents)} last run`}</span> : null}
+              {r.lastCents !== undefined ? <span className="mt-1 block text-xs font-medium text-[var(--color-charcoal)]">{r.lastCents === null ? 'Was blank' : `Was ${usd(r.lastCents)}`}</span> : null}
             </Field>
           )}
           <Field label="Note">
@@ -167,7 +169,7 @@ export default function PayrollRunEditor({ payDate, initial, clocked, saved, sta
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => setRows([...rows, { name: '', kind: 'sub', hours: '', amount: '', note: '', email: '', byRate: false }])}>Add a person</Button>
+        <Button onClick={() => (setRows([...rows, { name: '', kind: 'sub', hours: '', amount: '', note: '', email: '', byRate: false }]), setDone(false))}>Add a person</Button>
         <Button variant="primary" busy={busy} disabled={!rows.length || !!problem} onClick={save}>
           Save the run
         </Button>

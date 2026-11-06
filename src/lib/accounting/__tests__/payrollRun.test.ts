@@ -109,6 +109,36 @@ describe("Finance changes a line", () => {
     expect(line.lastCents).toBeUndefined();
   });
 
+  it("through Hours and back to Amount, the flat figure still returns and the clock's isn't kept as flat", () => {
+    const rate = paidAs(sub("Omar Peña", 339_000), "rate", omar, false);
+    const line = paidAs(paidAs(rate, "employee", omar, false), "sub", omar, false);
+    expect(line).toMatchObject({ amountCents: 339_000, byRate: false, kind: "sub" });
+    expect(line.lastCents).toBeUndefined();
+  });
+
+  it("through Hours and back to Hours × rate, it still says what it replaced", () => {
+    const rate = paidAs(sub("Omar Peña", 339_000), "rate", omar, false);
+    expect(paidAs(paidAs(rate, "employee", omar, false), "rate", omar, false)).toMatchObject({ amountCents: 100_000, lastCents: 339_000, byRate: true });
+    expect(paidAs(paidAs(rate, "employee", omar, false), "rate", null, false)).toMatchObject({ amountCents: null, lastCents: 339_000 });
+  });
+
+  it("a line blank last run comes back blank from Hours × rate, not at the clock's figure", () => {
+    const [started] = startLines([{ ...sub("O. Pena", 0), amountCents: null, byRate: true }], []);
+    const line = paidAs({ ...started, amountCents: 100_000, lastCents: null }, "sub", omar, false);
+    expect(line.amountCents).toBeNull();
+    expect(runProblem([line])).toMatch(/fill in the amount/);
+  });
+
+  it("linked again, it keeps the first figure it replaced", () => {
+    const rate = paidAs(sub("Omar Peña", 339_000), "rate", omar, false);
+    expect(fromClock(rate, { ...omar, costCents: 120_000 }, false)).toMatchObject({ amountCents: 120_000, lastCents: 339_000 });
+  });
+
+  it("hours someone entered stay when the line is linked or marked", () => {
+    expect(fromClock(emp("Filiberto", 70.33), omar, false).hours).toBe(70.33);
+    expect(paidAs({ ...sub("Filiberto", 339_000), hours: 70.33 }, "employee", omar, false).hours).toBe(70.33);
+  });
+
   it("to Hours: the clock's hours, rounded", () => {
     expect(paidAs(sub("Omar Peña", 339_000), "employee", omar, false)).toMatchObject({ kind: "employee", hours: 40.13, byRate: false });
   });

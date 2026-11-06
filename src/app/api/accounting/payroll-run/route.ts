@@ -4,6 +4,7 @@ import { z } from "zod";
 import { runProblem } from "@/lib/accounting/payrollRun";
 import { saveRun } from "@/lib/accounting/payrollRunStore";
 import { getViewer, viewerIsOwner } from "@/lib/crew/auth";
+import { isDay } from "@/lib/crew/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ const lineSchema = z
     byRate: z.boolean().optional(),
   })
   .strict();
-const bodySchema = z.object({ payDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), lines: z.array(lineSchema).max(100) }).strict();
+const bodySchema = z.object({ payDate: z.string().refine(isDay), lines: z.array(lineSchema).max(100) }).strict();
 
 export async function PUT(request: NextRequest) {
   const viewer = await getViewer();
