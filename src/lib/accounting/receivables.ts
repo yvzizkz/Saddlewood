@@ -7,10 +7,12 @@
 // paid. Billing is every document issued (or drafted) in a range.
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { localDay } from "@/lib/crew/time";
+import { addDays, localDay } from "@/lib/crew/time";
 import { moneyOverview } from "@/lib/billing/overview";
 import { jobOfBill, type MoneyJob } from "@/lib/billing/jobMoney";
 import { daysBetween } from "@/lib/billing/ladder";
+import { ATTACHMENT_LABEL, isBill } from "@/lib/billing/package";
+import { readMessage } from "@/lib/billing/sendGroups";
 import type { BillingProfile } from "@/lib/billing/types";
 
 export const AGE_BUCKETS = [
@@ -255,18 +257,82 @@ export type CutoffRow = {
   /** Open jobs billed by percent complete (a schedule of values), and how many have the PM's report for this cycle. */
   sovJobs: number;
   reported: number;
+} & PackageState;
+
+/** A send group as the package task reads it: when it was started and went, and what's in it. */
+export type PackageGroup = { id: string; createdOn: string; sentOn: string | null; documents: { kind: string; status: string; sent: boolean }[] };
+
+export type PackageState = {
+  /** The day this cycle's package went out, if it did. */
+  packageSentOn: string | null;
+  /** The oldest package still waiting to go; another that went doesn't hide it. */
+  packageGroupId: string | null;
+  /** The cutoff that waiting package was started for, once it has passed. */
+  packageLateFor: string | null;
 };
+
+/**
+ * Where a client's packages (oldest first) stand. A group counts only for its
+ * bills: it went if it was sent holding one, and it waits while one is unsent
+ * and not void, so an empty group, a change order on its own, and bills all
+ * voided or sent one at a time are neither.
+ */
+export function packageState(groups: readonly PackageGroup[], day: string, today: string, cutoffDay?: number): PackageState {
+  const bills = (g: PackageGroup) => g.documents.filter((d) => isBill(d.kind) && d.status !== "void");
+  const started = (g: PackageGroup) => packageCutoff(g.createdOn, cutoffDay);
+  const waiting = groups.find((g) => !g.sentOn && bills(g).some((d) => !d.sent));
+  const late = waiting && started(waiting) < today ? started(waiting) : null;
+  return {
+    packageSentOn: groups.find((g) => g.sentOn && bills(g).length && started(g) === day)?.sentOn ?? null,
+    packageGroupId: waiting?.id ?? null,
+    packageLateFor: late,
+  };
+}
+
+/** The cutoff Finance's package task sits on, if it's on the list today: a waiting package always is, and no package only near the cutoff. */
+export function packageTaskDay(c: Pick<CutoffRow, "day" | "prepOn" | keyof PackageState>, today: string): string | null {
+  if (c.packageGroupId) return c.packageLateFor ?? c.day;
+  return c.packageSentOn || c.prepOn > addDays(today, 7) ? null : c.day;
+}
 
 /**
  * The next billing date per client: their cutoff day (AFT the 23rd, Schifferer
  * the 20th), or the 1st and 15th by default, with the day the PM's percent
  * complete is due (3 business days before, SOP-006 Gate 3).
  */
+type GroupRow = { id: string; client_id: string; message: unknown; created_at: string };
+
+/** Each client's send groups, oldest first, with their documents and which of those have gone out. */
+async function packagesByClient(groups: readonly GroupRow[]): Promise<Map<string, PackageGroup[]>> {
+  const db = getSupabaseAdmin();
+  const docs = await db.from("documents").select("id,send_group_id,kind,status").not("send_group_id", "is", null);
+  if (docs.error) throw new Error(`documents: ${docs.error.message}`);
+  type D = { id: string; send_group_id: string; kind: string; status: string };
+  const rows = (docs.data ?? []) as D[];
+  const events = rows.length ? await db.from("document_events").select("document_id").eq("kind", "sent").in("document_id", rows.map((d) => d.id)) : { data: [], error: null };
+  if (events.error) throw new Error(`document_events: ${events.error.message}`);
+  const sent = new Set(((events.data ?? []) as { document_id: string }[]).map((e) => e.document_id));
+  const out = new Map<string, PackageGroup[]>();
+  for (const g of groups) {
+    const sentAt = readMessage(g.message).sentAt;
+    const documents = rows.filter((d) => d.send_group_id === g.id).map((d) => ({ kind: d.kind, status: d.status, sent: sent.has(d.id) }));
+    out.set(g.client_id, [...(out.get(g.client_id) ?? []), { id: g.id, createdOn: localDay(g.created_at), sentOn: sentAt ? localDay(sentAt) : null, documents }]);
+  }
+  return out;
+}
+
 export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow[]> {
   const db = getSupabaseAdmin();
-  const [clients, jobs, sovJobs] = await Promise.all([db.from("clients").select("id,name,billing"), db.from("jobs").select("id,client_id,status,billing"), db.from("sov_lines").select("job_id")]);
+  const [clients, jobs, sovJobs, groups] = await Promise.all([
+    db.from("clients").select("id,name,billing"),
+    db.from("jobs").select("id,client_id,status,billing"),
+    db.from("sov_lines").select("job_id"),
+    db.from("send_groups").select("id,client_id,message,created_at").not("client_id", "is", null).order("created_at", { ascending: true }),
+  ]);
   if (clients.error) throw new Error(`clients: ${clients.error.message}`);
   if (sovJobs.error) throw new Error(`sov_lines: ${sovJobs.error.message}`);
+  if (groups.error) throw new Error(`send_groups: ${groups.error.message}`);
+  const packages = await packagesByClient((groups.data ?? []) as GroupRow[]);
   const hasSov = new Set(((sovJobs.data ?? []) as { job_id: string }[]).map((r) => r.job_id));
   const open = new Map<string, number>();
   type J = { id: string; client_id: string | null; status: string | null; billing: { pmReport?: { day?: string } } | null };
@@ -289,19 +355,11 @@ export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow
       openJobs: open.get(c.id) ?? 0,
       sovJobs: sov.length,
       reported: sov.filter((j) => reportedThisCycle(j.billing?.pmReport?.day, day, b.cutoffDay)).length,
+      ...packageState(packages.get(c.id) ?? [], day, today, b.cutoffDay),
     });
   }
   return out.sort((a, b) => a.day.localeCompare(b.day));
 }
-
-const ATTACHMENT_LABEL: Record<string, string> = {
-  conditional_waiver: "Conditional waiver",
-  final_waiver: "Final waiver",
-  tracker_workbook: "Tracker workbook",
-  schedule_of_values: "Schedule of values",
-  insurance_certificate: "COI",
-  w9: "W-9",
-};
 
 function ordinal(n: number): string {
   const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th";
@@ -346,6 +404,17 @@ export function previousCutoff(day: string, cutoffDay?: number): string {
 /** Whether a report sent on `reportDay` is the one for the cycle that bills on `day`. */
 export function reportedThisCycle(reportDay: string | null | undefined, day: string, cutoffDay?: number): boolean {
   return !!reportDay && reportDay > previousCutoff(day, cutoffDay) && reportDay <= day;
+}
+
+/**
+ * The cutoff a package started on `startedOn` is for: the nearer one, since most
+ * are put together in the days around it, often after. Fixed the day it's
+ * started, so however long it waits, its send closes that cycle.
+ */
+export function packageCutoff(startedOn: string, cutoffDay?: number): string {
+  const next = nextCutoff(startedOn, cutoffDay);
+  const previous = previousCutoff(next, cutoffDay);
+  return daysBetween(previous, startedOn) <= daysBetween(startedOn, next) ? previous : next;
 }
 
 export function businessDaysBefore(day: string, n: number): string {

@@ -20,6 +20,14 @@ const OWNERS = {
   "bot@saddlewoodcontracting.com": { name: "Bot", role: "requester" },
 };
 
+// What must go with a bill has its own tests (package.test.ts); nothing is owed here.
+vi.mock("@/lib/billing/package", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/billing/package")>()),
+  loadPackage: async () => [],
+  apAddresses: async () => [],
+  noteWaiversSent: async () => undefined,
+}));
+
 const getDocument = vi.fn();
 const clientContactEmails = vi.fn();
 const recordEvent = vi.fn();

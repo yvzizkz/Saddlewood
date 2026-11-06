@@ -29,11 +29,14 @@ type Message = { subject?: string; body?: string; to?: string[]; cc?: string[]; 
 type Group = {
   group: { id: string; name: string; clientId: string | null; createdAt: string; message: Message }
   documents: Doc[]
+  package: PackageItem[]
+  ap: string[]
   recipients: { to: Marked[]; cc: Marked[] }
   contacts: string[]
   allow: { fresh: boolean; updatedAt: string | null }
 }
 type PrepareNote = { number: string; flags: string[] }
+type PackageItem = { attachment: string; label: string; missing: { id: string; number: string }[] }
 
 const NUMBER = /^[#A-Za-z0-9 ._-]+$/
 const PREPARE_WAIT_MS = 150_000
@@ -349,7 +352,9 @@ function Review({ data, notes, reload, back }: { data: Group; notes: PrepareNote
   }, [to, cc, data.recipients, data.allow.fresh])
   const blockers = [...marked.to, ...marked.cc].filter((r) => r.status !== 'ok' && r.status !== 'company')
   const files = data.documents.flatMap((d) => d.exhibits.filter((x) => x.kind === 'file'))
-  const canSend = !sentAt && to.length > 0 && blockers.length === 0 && subject.trim().length > 0 && body.trim().length > 0
+  const gaps = data.package.flatMap((i) => i.missing.map((d) => ({ ...d, label: i.label })))
+  const needsAp = data.ap.length > 0 && ![...to, ...cc].some((a) => data.ap.includes(a.trim().toLowerCase()))
+  const canSend = !sentAt && gaps.length === 0 && !needsAp && to.length > 0 && blockers.length === 0 && subject.trim().length > 0 && body.trim().length > 0
 
   async function save(): Promise<boolean> {
     if (!dirty) return true
@@ -362,6 +367,23 @@ function Review({ data, notes, reload, back }: { data: Group; notes: PrepareNote
     } catch (e) {
       setNote({ tone: 'bad', text: (e as Error).message })
       return false
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** Onto the document's page, under the name the package looks for, so it rides with the email. */
+  async function attach(file: File, gap: { id: string; number: string; label: string }) {
+    setBusy('save')
+    setNote(null)
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      let raw = ''
+      for (let i = 0; i < bytes.length; i += 0x8000) raw += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+      await call(`/api/billing/documents/${gap.id}/exhibits`, { method: 'POST', body: JSON.stringify({ label: `${gap.label} ${gap.number}`.slice(0, 60), file: { filename: file.name, content: btoa(raw) } }) })
+      await reload()
+    } catch (e) {
+      setNote({ tone: 'bad', text: (e as Error).message })
     } finally {
       setBusy(null)
     }
@@ -486,6 +508,42 @@ function Review({ data, notes, reload, back }: { data: Group; notes: PrepareNote
         })}
       </div>
 
+      {data.package.length ? (
+        <>
+          <SectionTitle>What has to go with it</SectionTitle>
+          <Card className="p-4 space-y-2">
+            {data.package.map((i) =>
+              i.missing.length === 0 ? (
+                <p key={i.attachment} className="text-sm"><Chip tone="ok">Ready</Chip> {i.label}</p>
+              ) : (
+                i.missing.map((d) => (
+                  <div key={`${i.attachment}-${d.id}`} className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm"><Chip tone="bad">Missing</Chip> {i.label} for {d.number}</p>
+                    {!sentAt ? (
+                      <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-[var(--color-stone-mid)] bg-white px-3 text-xs">
+                        Add the file
+                        <input
+                          type="file"
+                          aria-label={`Add the ${i.label} for ${d.number}`}
+                          accept=".pdf,.png,.jpg,.jpeg,.xlsx"
+                          className="sr-only"
+                          disabled={!!busy}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            if (file) void attach(file, { ...d, label: i.label })
+                          }}
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                ))
+              ),
+            )}
+          </Card>
+        </>
+      ) : null}
+
       <SectionTitle>The email</SectionTitle>
       <Card className="p-4 space-y-3">
         <Field label="Subject">
@@ -526,6 +584,8 @@ function Review({ data, notes, reload, back }: { data: Group; notes: PrepareNote
           </div>
         ) : null}
         {!sentAt && blockers.length ? <p className="text-[11px] text-[var(--color-charcoal-light)]">Send opens once every address is ready.</p> : null}
+        {!sentAt && gaps.length ? <p className="text-[11px] text-[var(--color-charcoal-light)]">Send opens once everything that has to go with it is here.</p> : null}
+        {!sentAt && needsAp ? <p className="text-[11px] text-[var(--color-charcoal-light)]">Send opens once their accounts payable is on it: {data.ap.join(', ')}.</p> : null}
       </Card>
 
       {!sentAt ? (
