@@ -43,7 +43,11 @@ site change that reads them with the server key must be live first.
 | 0060 | `joist_sync` (before the Mac syncs queued COs into Joist) | Joist sync PR |
 | 0061 | `complaints` (before the site change) | Complaints PR |
 | 0062 | `client_portals` (before the site change; the job page hides the card and `/c/<token>` reads as off without it, so the order is safe either way) | Client portal PR |
+| 0063 | `client_portal_sections` (before the site change: without it, turning Timeline or Payments on can't save) | Client link slice 2 PR |
+| 0064 | `job_openings` (before the site change: the job page and money card read it) | Job opening PR |
 | 0065 | `payroll_runs` (before the site change; only the Wednesday run page reads it) | Payroll run PR |
+| 0066 | `staff_seen` (before the site change; a missing table only blanks office people's last opened, but the rollout page fails loudly) | Who's on the app PR |
+| 0067 | `web_submissions` (any time; 0063–0066 are in open PRs. Without it the forms answer from GHL and email, and the inbox and applications page read as empty) | Website forms PR |
 
 ## Production state
 

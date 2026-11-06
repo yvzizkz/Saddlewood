@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { renderNotificationEmail } from "@/lib/emailTemplate";
+import { keepSubmission } from "@/lib/webforms/store";
 
 /**
  * Trade Partner / Subcontractor Bid-List API Route.
  *
  * Sister route to /api/contact. A subcontractor application must NEVER be
- * silently lost, so it is delivered through up to two independent channels and
+ * silently lost, so it is delivered through up to three independent channels and
  * only reports success if at least one actually succeeds:
  *
  *   1. GoHighLevel — files the applicant into the CRM as a contact tagged
@@ -16,8 +17,9 @@ import { renderNotificationEmail } from "@/lib/emailTemplate";
  *      to the inbound webhook if the API isn't configured or fails.
  *   2. Resend email — notifies the team inbox (info@ + marco@) on every
  *      submission whenever RESEND_API_KEY is configured, even if GHL succeeds.
+ *   3. The app — kept in web_submissions, shown at /app/sales/applications.
  *
- * If NEITHER channel delivers, the route returns HTTP 500 { success: false } so
+ * If NO channel delivers, the route returns HTTP 500 { success: false } so
  * the client shows an error instead of a false confirmation.
  *
  * Reuses the same Vercel env vars as /api/contact: GHL_API_KEY, GHL_LOCATION_ID,
@@ -71,7 +73,7 @@ function buildSummary(b: TradePartnerBody): string {
     b.phone ? `Phone: ${b.phone}` : "",
     b.website ? `Website: ${b.website}` : "",
     b.license ? `License / ROC #: ${b.license}` : "",
-    b.classifications?.length ? `Trades: ${b.classifications.join(", ")}` : "",
+    Array.isArray(b.classifications) && b.classifications.length ? `Trades: ${b.classifications.join(", ")}` : "",
     b.serviceArea ? `Service area: ${b.serviceArea}` : "",
     b.yearsInBusiness ? `Years in business: ${b.yearsInBusiness}` : "",
     b.bondedInsured ? `Bonded/Insured: ${b.bondedInsured}` : "",
@@ -256,16 +258,25 @@ export async function POST(request: Request) {
     );
   }
 
-  // File into GHL (direct upsert preferred, webhook fallback) AND email the team
-  // via Resend when configured. Upsert + email run in parallel; each fails soft.
-  const [ghlApiOk, resendOk] = await Promise.all([
+  // File into GHL (direct upsert preferred, webhook fallback), email the team
+  // via Resend when configured, and keep it in the app. Each fails soft.
+  const [ghlApiOk, resendOk, appOk] = await Promise.all([
     upsertToGhl(body),
     sendEmail(body),
+    keepSubmission({
+      form: "trade_partner",
+      name: body.name,
+      email: body.email,
+      phone: body.phone,
+      company: body.businessName,
+      about: Array.isArray(body.classifications) ? body.classifications.join(", ") : "",
+      summary: buildSummary(body),
+    }),
   ]);
 
   const ghlWebhookOk = ghlApiOk ? false : await forwardToGhlWebhook(body);
 
-  const delivered = ghlApiOk || ghlWebhookOk || resendOk;
+  const delivered = ghlApiOk || ghlWebhookOk || resendOk || appOk;
 
   if (!delivered) {
     console.error(
@@ -280,6 +291,7 @@ export async function POST(request: Request) {
     delivered: {
       ghl: ghlWebhookOk || ghlApiOk,
       email: resendOk,
+      app: appOk,
     },
   });
 }
