@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { businessDaysBefore, nextCutoff, previousCutoff, reportedThisCycle } from "@/lib/accounting/receivables";
+import { businessDaysBefore, nextCutoff, packageCutoff, previousCutoff, reportedThisCycle } from "@/lib/accounting/receivables";
 import { addDays } from "@/lib/crew/time";
 import { checkReport, type ProgressLine } from "../progress";
 
@@ -42,6 +42,16 @@ describe("billing cycles", () => {
     expect(reportedThisCycle("2026-09-24", day, 23)).toBe(true);
     expect(reportedThisCycle("2026-09-23", day, 23)).toBe(false);
     expect(reportedThisCycle(null, day, 23)).toBe(false);
+  });
+
+  it("gives a package to the nearer cutoff, as the real AFT and homeowner sends went", () => {
+    expect(packageCutoff("2026-10-23", 23)).toBe("2026-10-23");
+    expect(packageCutoff("2026-10-27", 23)).toBe("2026-10-23");
+    expect(packageCutoff("2026-10-30", 23)).toBe("2026-10-23");
+    expect(packageCutoff("2026-11-20", 23)).toBe("2026-11-23");
+    expect(packageCutoff("2026-10-20")).toBe("2026-10-15");
+    expect(packageCutoff("2026-10-27")).toBe("2026-11-01");
+    expect(packageCutoff("2026-11-05")).toBe("2026-11-01");
   });
 
   it("keeps a cutoff 3 days ahead of today inside the 7-day prep window and current cycle on every day of the year", () => {

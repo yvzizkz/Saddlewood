@@ -5,7 +5,7 @@ import { allowMirror } from "@/lib/billing/deliver";
 import { clientContactEmails, documentsInGroup } from "@/lib/billing/documents";
 import { listExhibits } from "@/lib/billing/exhibits";
 import { answerError, bad, notFound, present, readBody } from "@/lib/billing/http";
-import { loadPackage } from "@/lib/billing/package";
+import { apAddresses, loadPackage } from "@/lib/billing/package";
 import { mirrorIsFresh, recipientStatus } from "@/lib/billing/send";
 import { getSendGroup, readMessageInput, updateSendGroupMessage } from "@/lib/billing/sendGroups";
 import { authorizeOps } from "@/lib/ops/auth";
@@ -27,11 +27,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const group = await getSendGroup(id);
     if (!group) return notFound();
     const docs = await documentsInGroup(group.id);
-    const [contacts, allow, exhibits, items] = await Promise.all([
+    const [contacts, allow, exhibits, items, ap] = await Promise.all([
       group.clientId ? clientContactEmails(group.clientId) : Promise.resolve([] as string[]),
       allowMirror(),
       Promise.all(docs.map((d) => listExhibits(d.id))),
       loadPackage(docs),
+      apAddresses(docs),
     ]);
     const where = (address: string) => ({ address, ...recipientStatus(address, contacts, allow) });
     return NextResponse.json({
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         exhibits: exhibits[i].map((x) => ({ id: x.id, label: x.label, kind: x.kind, url: x.url, bytes: x.bytes, contentType: x.contentType })),
       })),
       package: items,
+      ap,
       recipients: { to: (group.message.to ?? []).map(where), cc: (group.message.cc ?? []).map(where) },
       contacts,
       allow: { fresh: mirrorIsFresh(allow), updatedAt: allow?.updatedAt ?? null },

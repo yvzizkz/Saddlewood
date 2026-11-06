@@ -28,7 +28,7 @@ Each scenario drives the screens a person in that seat would use, writes through
 
 **Monday to Friday, around AFT's 23rd cutoff:**
 1. **Billing › Next to bill.** AFT shows "Closes the 23rd · Email" and needs a conditional waiver. The PM's % complete is due 3 business days before. The same dates appear in Tasks (the PM's % complete; Finance's invoice package).
-   - The package (`e2e/invoice-package.spec.ts`): `Open the package` goes to the Bill screen, which lists what must go with the bills. A waiver goes on each invoice, anything else once per email. Send stays shut, and the server refuses it, until each is on the page. Once it's out, the waiver is on the register as sent, the task closes and the card reads `Package sent`.
+   - The package (`e2e/invoice-package.spec.ts`): `Open the package` goes to the Bill screen, which lists what must go with the bills. A waiver goes on each invoice, anything else once per email. Send stays shut, and the server refuses it, until each is on the page and, for a client with AP on file, AP is on the email. A package that misses its cutoff stays on Finance's list, marked late, and sending it closes that cycle, not the next: a send belongs to the nearer cutoff. Once it's out, the waiver is on the register as sent, the task closes and the card reads `Package sent`.
 2. **A change in the field becomes a CO.**
    - Recorded on the job's Changes tab, then priced: it gets its CO number.
    - Marked signed: Tasks shows "Bill CO-n" for Finance.

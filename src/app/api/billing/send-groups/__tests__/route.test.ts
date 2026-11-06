@@ -64,10 +64,12 @@ vi.mock("@/lib/billing/sendGroups", async () => {
   };
 });
 const loadPackage = vi.fn();
+const apAddresses = vi.fn();
 const noteWaiversSent = vi.fn();
 vi.mock("@/lib/billing/package", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/billing/package")>()),
   loadPackage: (...a: unknown[]) => loadPackage(...a),
+  apAddresses: (...a: unknown[]) => apAddresses(...a),
   noteWaiversSent: (...a: unknown[]) => noteWaiversSent(...a),
 }));
 const listExhibits = vi.fn();
@@ -105,6 +107,7 @@ const send = (body: unknown) => sendGroup(req("POST", `/api/billing/send-groups/
 beforeEach(() => {
   sendMock.mockReset().mockResolvedValue({ data: { id: "em_g" }, error: null });
   loadPackage.mockReset().mockResolvedValue([]);
+  apAddresses.mockReset().mockResolvedValue([]);
   noteWaiversSent.mockReset().mockResolvedValue(undefined);
   authorizeOps.mockReset().mockResolvedValue({ actor: "lando@saddlewoodcontracting.com", via: "session" });
   readState.mockReset().mockResolvedValue({ sections: { people: OWNERS, outboundAllow: ALLOW }, bridge: {} });
@@ -352,11 +355,22 @@ describe("the group's working message (billing step 3)", () => {
     expect(noteWaiversSent).toHaveBeenCalledWith([DOC_A, DOC_B], "lando@saddlewoodcontracting.com");
   });
 
+  it("refuses a bill that leaves out the client's AP, and sends once they're on it", async () => {
+    apAddresses.mockResolvedValue(["ap@aft.test"]);
+    const refused = await send({ ...MSG, confirm: true });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error).toBe("Their accounts payable has to be on this: ap@aft.test");
+    expect(sendMock).not.toHaveBeenCalled();
+    apAddresses.mockResolvedValue([...MSG.to]);
+    expect((await send({ ...MSG, confirm: true })).status).toBe(200);
+  });
+
   it("GET says what the bills still need", async () => {
     const item = { attachment: "tracker_workbook", label: "Tracker workbook", missing: [] };
     loadPackage.mockResolvedValue([item]);
     const body = await (await lookGroup(req("GET", `/api/billing/send-groups/${GID}`), { params: Promise.resolve({ id: GID }) })).json();
     expect(body.package).toEqual([item]);
+    expect(body.ap).toEqual([]);
   });
 
   it("will not send a group twice", async () => {

@@ -177,7 +177,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                       <p className="mt-2 text-xs font-medium text-[#2f6b4a]">Package sent {formatValue("date", c.packageSentOn)}</p>
                     ) : c.packageGroupId && seat.owner ? (
                       <Link href={`/app/bill?group=${c.packageGroupId}`} className="mt-2 inline-block text-xs font-medium underline">
-                        Open the package
+                        {c.packageLateFor ? `Late for ${formatValue("date", c.packageLateFor)}: open the package` : "Open the package"}
                       </Link>
                     ) : null}
                   </Card>

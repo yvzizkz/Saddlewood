@@ -61,6 +61,20 @@ test.describe("Finance: the invoice package", () => {
       await expect(tasks.getByRole("row").filter({ hasText: `Invoice package for ${name}` })).toHaveCount(0);
       await page.goto("/app/accounting/billing?p=ytd");
       await expect(page.getByRole("region", { name: "Billing calendar" }).getByRole("listitem").filter({ hasText: name })).toContainText("Package sent");
+
+      // Back unsent with the cutoff 3 days gone: it stays on the list, late, and sending it closes that cycle.
+      const pastDue = JSON.stringify({ delivery: "email", cutoffDay: cutoffInDays(-3), attachments: ["conditional_waiver"] });
+      sql(`update public.clients set billing = '${pastDue}'::jsonb where id = '${client}'`);
+      sql(`update public.send_groups set message = message - 'sentAt' where id = '${group}'`);
+      await page.goto("/app/tasks?view=all");
+      await tasks.getByRole("searchbox").fill(name);
+      await expect(tasks.getByRole("row").filter({ hasText: `Invoice package for ${name}` })).toHaveCount(1);
+      await page.goto("/app/accounting/billing?p=ytd");
+      await expect(page.getByRole("region", { name: "Billing calendar" }).getByRole("listitem").filter({ hasText: name })).toContainText("Late for");
+      sql(`update public.send_groups set message = message || jsonb_build_object('sentAt', now()::text) where id = '${group}'`);
+      await page.goto("/app/tasks?view=all");
+      await tasks.getByRole("searchbox").fill(name);
+      await expect(tasks.getByRole("row").filter({ hasText: `Invoice package for ${name}` })).toHaveCount(0);
     } finally {
       sql(`begin; set local session_replication_role = replica;
            delete from public.document_exhibits where document_id = '${doc}';

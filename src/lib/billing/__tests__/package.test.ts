@@ -22,7 +22,7 @@ function table() {
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({ from: table }) }));
 
 import type { BillingDocument } from "../types";
-import { loadPackage, noteWaiversSent, packageGap, packageItems, type PackageDoc } from "../package";
+import { apGap, loadPackage, noteWaiversSent, packageGap, packageItems, type PackageDoc } from "../package";
 
 const doc = (number: string, labels: string[] = [], kind = "invoice"): PackageDoc => ({ id: `id-${number}`, number, kind, exhibits: labels.map((label) => ({ label })) });
 const missing = (items: ReturnType<typeof packageItems>) => items.flatMap((i) => i.missing.map((d) => `${i.label}: ${d.number}`));
@@ -59,6 +59,14 @@ describe("packageGap", () => {
   });
 });
 
+describe("apGap", () => {
+  it("wants their AP on the email, To or Cc, and asks nothing of a client with none on file", () => {
+    expect(apGap(["ap@aft.test"], ["super@aft.test"])).toBe("Their accounts payable has to be on this: ap@aft.test");
+    expect(apGap(["ap@aft.test", "ap2@aft.test"], ["super@aft.test", " AP2@aft.test "])).toBeNull();
+    expect(apGap([], ["owner@home.test"])).toBeNull();
+  });
+});
+
 const bill = (over: Partial<BillingDocument> = {}) => ({ id: "d1", number: "8009-13", kind: "invoice", clientId: "c1", totalCents: 120000, ...over }) as BillingDocument;
 
 describe("what's read and written", () => {
@@ -82,6 +90,12 @@ describe("what's read and written", () => {
   it("noteWaiversSent adds the waiver that went, as sent", async () => {
     await noteWaiversSent([bill()], "lando@x.com");
     expect(writes).toEqual([{ op: "insert", row: { direction: "out", kind: "conditional_progress", document_id: "d1", party: "AFT", amount_cents: 120000, status: "sent", created_by: "lando@x.com" } }]);
+  });
+
+  it("registers a final waiver as final, even for a client who wants conditionals", async () => {
+    listExhibits.mockResolvedValue([{ label: "Final waiver 8009-20" }]);
+    await noteWaiversSent([bill()], "x");
+    expect(writes[0].row).toMatchObject({ kind: "conditional_final" });
   });
 
   it("moves one that was prepared, and leaves one that already went", async () => {

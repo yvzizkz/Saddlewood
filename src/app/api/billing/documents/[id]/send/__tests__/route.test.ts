@@ -24,6 +24,7 @@ const OWNERS = {
 vi.mock("@/lib/billing/package", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/billing/package")>()),
   loadPackage: async () => [],
+  apAddresses: async () => [],
   noteWaiversSent: async () => undefined,
 }));
 

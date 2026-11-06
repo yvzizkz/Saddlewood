@@ -61,6 +61,21 @@ async function clientProfile(clientId: string | null | undefined): Promise<{ nam
   return { name: row?.name ?? "", billing: row?.billing ?? {} };
 }
 
+/** The client's accounts payable addresses, when the message's documents hold a bill. */
+export async function apAddresses(docs: readonly BillingDocument[]): Promise<string[]> {
+  const clientId = docs.find((d) => isBill(d.kind))?.clientId;
+  if (!clientId) return [];
+  const { data, error } = await getSupabaseAdmin().from("client_contacts").select("email").eq("client_id", clientId).eq("role", "ap").eq("active", true);
+  if (error) throw new Error(`client_contacts: ${error.message}`);
+  return ((data ?? []) as { email: string }[]).map((r) => r.email.trim().toLowerCase()).filter(Boolean);
+}
+
+/** A bill that reaches the super but not AP gets turned back, so a client with AP on file has them on the email. */
+export function apGap(ap: readonly string[], recipients: readonly string[]): string | null {
+  if (!ap.length || recipients.some((r) => ap.includes(r.trim().toLowerCase()))) return null;
+  return `Their accounts payable has to be on this: ${ap.join(", ")}`;
+}
+
 /** A message's documents, as the client's list and their pages have them. */
 export async function loadPackage(docs: readonly BillingDocument[]): Promise<PackageItem[]> {
   const bills = docs.filter((d) => isBill(d.kind));
@@ -80,7 +95,8 @@ export async function noteWaiversSent(docs: readonly BillingDocument[], actor: s
   if (!wants.length) return;
   const db = getSupabaseAdmin();
   for (const d of bills) {
-    if (!(await listExhibits(d.id)).some((x) => LOOKS_LIKE.conditional_waiver.test(x.label))) continue;
+    const waiver = (await listExhibits(d.id)).find((x) => LOOKS_LIKE.conditional_waiver.test(x.label));
+    if (!waiver) continue;
     const { data, error } = await db.from("lien_waivers").select("id, status").eq("direction", "out").eq("document_id", d.id).neq("status", "void");
     if (error) throw new Error(`lien_waivers: ${error.message}`);
     const held = (data ?? []) as { id: number; status: string }[];
@@ -89,7 +105,7 @@ export async function noteWaiversSent(docs: readonly BillingDocument[], actor: s
       ? db.from("lien_waivers").update({ status: "sent" }).eq("id", held[0].id)
       : db.from("lien_waivers").insert({
           direction: "out",
-          kind: wants.includes("conditional_waiver") ? "conditional_progress" : "conditional_final",
+          kind: wants.includes("conditional_waiver") && !/final/i.test(waiver.label) ? "conditional_progress" : "conditional_final",
           document_id: d.id,
           party: name.slice(0, 200),
           amount_cents: d.totalCents,

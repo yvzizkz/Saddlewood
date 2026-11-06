@@ -30,6 +30,7 @@ type Group = {
   group: { id: string; name: string; clientId: string | null; createdAt: string; message: Message }
   documents: Doc[]
   package: PackageItem[]
+  ap: string[]
   recipients: { to: Marked[]; cc: Marked[] }
   contacts: string[]
   allow: { fresh: boolean; updatedAt: string | null }
@@ -352,7 +353,8 @@ function Review({ data, notes, reload, back }: { data: Group; notes: PrepareNote
   const blockers = [...marked.to, ...marked.cc].filter((r) => r.status !== 'ok' && r.status !== 'company')
   const files = data.documents.flatMap((d) => d.exhibits.filter((x) => x.kind === 'file'))
   const gaps = data.package.flatMap((i) => i.missing.map((d) => ({ ...d, label: i.label })))
-  const canSend = !sentAt && gaps.length === 0 && to.length > 0 && blockers.length === 0 && subject.trim().length > 0 && body.trim().length > 0
+  const needsAp = data.ap.length > 0 && ![...to, ...cc].some((a) => data.ap.includes(a.trim().toLowerCase()))
+  const canSend = !sentAt && gaps.length === 0 && !needsAp && to.length > 0 && blockers.length === 0 && subject.trim().length > 0 && body.trim().length > 0
 
   async function save(): Promise<boolean> {
     if (!dirty) return true
@@ -583,6 +585,7 @@ function Review({ data, notes, reload, back }: { data: Group; notes: PrepareNote
         ) : null}
         {!sentAt && blockers.length ? <p className="text-[11px] text-[var(--color-charcoal-light)]">Send opens once every address is ready.</p> : null}
         {!sentAt && gaps.length ? <p className="text-[11px] text-[var(--color-charcoal-light)]">Send opens once everything that has to go with it is here.</p> : null}
+        {!sentAt && needsAp ? <p className="text-[11px] text-[var(--color-charcoal-light)]">Send opens once their accounts payable is on it: {data.ap.join(', ')}.</p> : null}
       </Card>
 
       {!sentAt ? (

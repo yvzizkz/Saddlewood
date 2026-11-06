@@ -260,6 +260,8 @@ export type CutoffRow = {
   /** The day this cycle's package went out, and the unsent one waiting, if any. */
   packageSentOn: string | null;
   packageGroupId: string | null;
+  /** The cutoff that passed with that waiting package still unsent. */
+  packageLateFor: string | null;
 };
 
 /**
@@ -292,6 +294,9 @@ export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow
     const sov = openJobs.filter((j) => j.client_id === c.id && hasSov.has(j.id));
     const theirs = sends.filter((g) => g.clientId === c.id);
     const sentDays = theirs.flatMap((g) => (g.sentAt ? [localDay(g.sentAt)] : []));
+    const waiting = theirs.find((g) => !g.sentAt)?.id ?? null;
+    const answers = packageCutoff(today, b.cutoffDay);
+    const late = waiting && answers < today && !sentDays.some((d) => packageCutoff(d, b.cutoffDay) === answers);
     out.push({
       client: c.name,
       clientId: c.id,
@@ -303,8 +308,9 @@ export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow
       openJobs: open.get(c.id) ?? 0,
       sovJobs: sov.length,
       reported: sov.filter((j) => reportedThisCycle(j.billing?.pmReport?.day, day, b.cutoffDay)).length,
-      packageSentOn: sentDays.find((d) => reportedThisCycle(d, day, b.cutoffDay)) ?? null,
-      packageGroupId: theirs.find((g) => !g.sentAt)?.id ?? null,
+      packageSentOn: sentDays.find((d) => packageCutoff(d, b.cutoffDay) === day) ?? null,
+      packageGroupId: waiting,
+      packageLateFor: late ? answers : null,
     });
   }
   return out.sort((a, b) => a.day.localeCompare(b.day));
@@ -353,6 +359,16 @@ export function previousCutoff(day: string, cutoffDay?: number): string {
 /** Whether a report sent on `reportDay` is the one for the cycle that bills on `day`. */
 export function reportedThisCycle(reportDay: string | null | undefined, day: string, cutoffDay?: number): boolean {
   return !!reportDay && reportDay > previousCutoff(day, cutoffDay) && reportDay <= day;
+}
+
+/**
+ * The cutoff a package sent on `sentDay` answers: the nearer one. Most go out
+ * days after the cutoff, and that one closes the cycle it's late for, not the next.
+ */
+export function packageCutoff(sentDay: string, cutoffDay?: number): string {
+  const next = nextCutoff(sentDay, cutoffDay);
+  const previous = previousCutoff(next, cutoffDay);
+  return daysBetween(previous, sentDay) <= daysBetween(sentDay, next) ? previous : next;
 }
 
 export function businessDaysBefore(day: string, n: number): string {
