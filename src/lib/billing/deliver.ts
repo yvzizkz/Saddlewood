@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { readState } from "@/lib/bot/queries";
 import { claimForSend, clientContactEmails, DocumentError, getDocument, issueDocument, recordEvent, releaseClaim } from "./documents";
 import { listExhibits, readExhibitFile } from "./exhibits";
+import { loadPackage, noteWaiversSent, packageGap } from "./package";
 import {
   BILLING_FROM,
   BILLING_REPLY_TO,
@@ -277,6 +278,9 @@ async function deliverDocuments(
   if ("error" in dry) return refuse(400, dry.error);
   if (input.confirm !== true) return { status: 200, body: { ok: true, sent: false, preview: dry.preview } };
 
+  const gap = packageGap(await loadPackage(docs));
+  if (gap) return refuse(409, gap);
+
   const key = process.env.RESEND_API_KEY;
   if (!key) return refuse(503, "mail service is not set up");
 
@@ -413,6 +417,8 @@ async function deliverDocuments(
     }
   }
   const recorded = docs.length ? recordedEach.every(Boolean) : null;
+  // The mail is gone; a register that fails must not read as a failed send.
+  await noteWaiversSent(docs, actor).catch((err) => console.error("billing send: sent, but the waiver register was not updated:", err));
 
   return {
     status: 200,

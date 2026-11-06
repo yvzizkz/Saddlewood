@@ -63,6 +63,13 @@ vi.mock("@/lib/billing/sendGroups", async () => {
     markSendGroupSent: (...a: unknown[]) => markSendGroupSent(...a),
   };
 });
+const loadPackage = vi.fn();
+const noteWaiversSent = vi.fn();
+vi.mock("@/lib/billing/package", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/billing/package")>()),
+  loadPackage: (...a: unknown[]) => loadPackage(...a),
+  noteWaiversSent: (...a: unknown[]) => noteWaiversSent(...a),
+}));
 const listExhibits = vi.fn();
 const readExhibitFile = vi.fn();
 vi.mock("@/lib/billing/exhibits", () => ({
@@ -97,6 +104,8 @@ const send = (body: unknown) => sendGroup(req("POST", `/api/billing/send-groups/
 
 beforeEach(() => {
   sendMock.mockReset().mockResolvedValue({ data: { id: "em_g" }, error: null });
+  loadPackage.mockReset().mockResolvedValue([]);
+  noteWaiversSent.mockReset().mockResolvedValue(undefined);
   authorizeOps.mockReset().mockResolvedValue({ actor: "lando@saddlewoodcontracting.com", via: "session" });
   readState.mockReset().mockResolvedValue({ sections: { people: OWNERS, outboundAllow: ALLOW }, bridge: {} });
   getDocument.mockReset().mockImplementation(async (id: string) => ({ [A]: DOC_A, [B]: DOC_B })[id] ?? null);
@@ -322,6 +331,32 @@ describe("the group's working message (billing step 3)", () => {
     expect(json.error).toMatch(/3 MB/);
     expect(sendMock).not.toHaveBeenCalled();
     expect(claimForSend).not.toHaveBeenCalled();
+  });
+
+  it("won't send a bill without what must go with it: nothing leaves, nothing is held, and a preview still works", async () => {
+    loadPackage.mockResolvedValue([{ attachment: "conditional_waiver", label: "Conditional waiver", missing: [{ id: A, number: "8009-13" }] }]);
+    const refused = await send({ ...MSG, confirm: true });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error).toBe("Still needed before this goes: Conditional waiver for 8009-13");
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(claimForSend).not.toHaveBeenCalled();
+    expect(markSendGroupSent).not.toHaveBeenCalled();
+    expect((await send(MSG)).status).toBe(200);
+  });
+
+  it("puts the waivers on the register once the mail is gone, and a register that fails isn't a failed send", async () => {
+    noteWaiversSent.mockRejectedValue(new Error("lien_waivers: down"));
+    const res = await send({ ...MSG, confirm: true });
+    expect(res.status).toBe(200);
+    expect((await res.json()).sent).toBe(true);
+    expect(noteWaiversSent).toHaveBeenCalledWith([DOC_A, DOC_B], "lando@saddlewoodcontracting.com");
+  });
+
+  it("GET says what the bills still need", async () => {
+    const item = { attachment: "tracker_workbook", label: "Tracker workbook", missing: [] };
+    loadPackage.mockResolvedValue([item]);
+    const body = await (await lookGroup(req("GET", `/api/billing/send-groups/${GID}`), { params: Promise.resolve({ id: GID }) })).json();
+    expect(body.package).toEqual([item]);
   });
 
   it("will not send a group twice", async () => {

@@ -219,7 +219,11 @@ export async function loadFeed(refs: JobRef[], seats: Seat[], today = localDay()
       const progress = c.sovJobs ? `${c.reported} of ${c.sovJobs} reported` : `${c.openJobs} open job${c.openJobs === 1 ? "" : "s"}`;
       out.push({ ...base, id: `pc${c.clientId}:${c.day}`, kind: "billing", title: `% complete and photos for ${c.client}`, detail: `${progress} · bills ${c.day}`, role: "pm", dueOn: c.prepOn, ...placeItem("pm", c.prepOn, 0, today) });
     }
-    out.push({ ...base, id: `pk${c.clientId}:${c.day}`, kind: "billing", title: `Invoice package for ${c.client}`, detail: [c.delivery, ...c.attachments].join(" · "), role: "finance", dueOn: c.day, ...placeItem("finance", c.day, 0, today) });
+    // Done once this cycle's package has gone out; until then it opens the one waiting.
+    if (!c.packageSentOn) {
+      const href = c.packageGroupId ? `/app/bill?group=${c.packageGroupId}` : base.href;
+      out.push({ ...base, href, id: `pk${c.clientId}:${c.day}`, kind: "billing", title: `Invoice package for ${c.client}`, detail: [c.delivery, ...c.attachments].join(" · "), role: "finance", dueOn: c.day, ...placeItem("finance", c.day, 0, today) });
+    }
   }
 
   // Waivers owed: ours with an invoice, a sub's before we pay (S9).

@@ -11,6 +11,8 @@ import { localDay } from "@/lib/crew/time";
 import { moneyOverview } from "@/lib/billing/overview";
 import { jobOfBill, type MoneyJob } from "@/lib/billing/jobMoney";
 import { daysBetween } from "@/lib/billing/ladder";
+import { ATTACHMENT_LABEL } from "@/lib/billing/package";
+import { readMessage } from "@/lib/billing/sendGroups";
 import type { BillingProfile } from "@/lib/billing/types";
 
 export const AGE_BUCKETS = [
@@ -255,6 +257,9 @@ export type CutoffRow = {
   /** Open jobs billed by percent complete (a schedule of values), and how many have the PM's report for this cycle. */
   sovJobs: number;
   reported: number;
+  /** The day this cycle's package went out, and the unsent one waiting, if any. */
+  packageSentOn: string | null;
+  packageGroupId: string | null;
 };
 
 /**
@@ -264,9 +269,16 @@ export type CutoffRow = {
  */
 export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow[]> {
   const db = getSupabaseAdmin();
-  const [clients, jobs, sovJobs] = await Promise.all([db.from("clients").select("id,name,billing"), db.from("jobs").select("id,client_id,status,billing"), db.from("sov_lines").select("job_id")]);
+  const [clients, jobs, sovJobs, groups] = await Promise.all([
+    db.from("clients").select("id,name,billing"),
+    db.from("jobs").select("id,client_id,status,billing"),
+    db.from("sov_lines").select("job_id"),
+    db.from("send_groups").select("id,client_id,message,created_at").not("client_id", "is", null).order("created_at", { ascending: false }),
+  ]);
   if (clients.error) throw new Error(`clients: ${clients.error.message}`);
   if (sovJobs.error) throw new Error(`sov_lines: ${sovJobs.error.message}`);
+  if (groups.error) throw new Error(`send_groups: ${groups.error.message}`);
+  const sends = ((groups.data ?? []) as { id: string; client_id: string; message: unknown }[]).map((g) => ({ id: g.id, clientId: g.client_id, sentAt: readMessage(g.message).sentAt ?? null }));
   const hasSov = new Set(((sovJobs.data ?? []) as { job_id: string }[]).map((r) => r.job_id));
   const open = new Map<string, number>();
   type J = { id: string; client_id: string | null; status: string | null; billing: { pmReport?: { day?: string } } | null };
@@ -278,6 +290,8 @@ export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow
     const b = c.billing ?? {};
     const day = nextCutoff(today, b.cutoffDay);
     const sov = openJobs.filter((j) => j.client_id === c.id && hasSov.has(j.id));
+    const theirs = sends.filter((g) => g.clientId === c.id);
+    const sentDays = theirs.flatMap((g) => (g.sentAt ? [localDay(g.sentAt)] : []));
     out.push({
       client: c.name,
       clientId: c.id,
@@ -289,19 +303,12 @@ export async function loadBillingCalendar(today = localDay()): Promise<CutoffRow
       openJobs: open.get(c.id) ?? 0,
       sovJobs: sov.length,
       reported: sov.filter((j) => reportedThisCycle(j.billing?.pmReport?.day, day, b.cutoffDay)).length,
+      packageSentOn: sentDays.find((d) => reportedThisCycle(d, day, b.cutoffDay)) ?? null,
+      packageGroupId: theirs.find((g) => !g.sentAt)?.id ?? null,
     });
   }
   return out.sort((a, b) => a.day.localeCompare(b.day));
 }
-
-const ATTACHMENT_LABEL: Record<string, string> = {
-  conditional_waiver: "Conditional waiver",
-  final_waiver: "Final waiver",
-  tracker_workbook: "Tracker workbook",
-  schedule_of_values: "Schedule of values",
-  insurance_certificate: "COI",
-  w9: "W-9",
-};
 
 function ordinal(n: number): string {
   const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th";
