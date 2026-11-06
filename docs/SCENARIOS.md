@@ -157,6 +157,10 @@ A PM or a field lead doesn't get the card. Turning a link off is for good: the o
 
 Every website form is kept in the app beside GoHighLevel and email (`web_submissions`, 0067). A contact-form lead shows in the Sales inbox with or without a phone. Opening the row shows everything they sent; one tap tracks it as a website lead with that on the timeline, or mark it called, texted or dismissed. Trade-partner and job applications show at `Sales › Website applications` for owners and staff, who close them with Done. A form fails only if every channel fails.
 
+## Who's on the app (`e2e/on-the-app.spec.ts`)
+
+Owners track the January move at `Crew › Who's on the app`: each person's last opened, last clock-in, clock-ins in 7 days, last daily log and whether a phone is on file. Field people count as using it when they clock in or log the day; opening it isn't enough, and neither are hours the office typed in for them. Office people count by opening it (`staff_seen`, 0066). The window is 90 days.
+
 ## What an owner, a PM and finance can and can't do today
 
 From the runs on 2026-10-20: `npx playwright test` passes **39/39**, twice in a row (Finance 6, Owner 5, PM access & week 8, Field 5, Purchasing 4, Subs 4, Sales 2, Powell SOV draws & PM report 5).
